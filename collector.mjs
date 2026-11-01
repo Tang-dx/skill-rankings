@@ -157,7 +157,7 @@ export async function collect({ output, repos = [], discover = false, token = pr
         known.set(name.toLowerCase(), repo);
       }
       Object.assign(repo, { description: item.description ?? '', created_at: item.created_at, archived: item.archived });
-      if (releaseDates && releaseChecks < 50 && Date.now()-started < 200000 &&
+      if (releaseDates && repo.launch_evidence?.kind !== 'official_launch' && releaseChecks < 50 && Date.now()-started < 200000 &&
           (!repo.launch_evidence?.checked_at || Date.parse(now)-Date.parse(repo.launch_evidence.checked_at) > 30*24*HOUR)) {
         releaseChecks++;
         try { repo.launch_evidence = await releaseEvidence(repo.name,request,token,now); }
