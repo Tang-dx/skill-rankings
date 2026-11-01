@@ -174,7 +174,7 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
   }
  }
  await Promise.all(Array.from({length:3},()=>worker()));
- if(!rows.length)throw new Error('No comparable star observations; previous feed preserved');
+ if(!rows.length)throw new Error('No comparable star observations; previous feed preserved: '+JSON.stringify(failures));
  const ranked=rankRows(rows,now);
  const displayed=new Map([...ranked.daily,...ranked.rising].map(row=>[row.name,row]));
  // Enrich only displayed results, reusing cached translations on an exact description match.
