@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTrending, interleave, dailyHistory, rankRows, collectDynamic } from './dynamic.mjs';
+import { parseTrending, interleave, dailyHistory, rankRows, collectDynamic, normalizeChineseTerms } from './dynamic.mjs';
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -8,6 +8,11 @@ import {verifyFeed} from './verify-feed.mjs';
 
 const end='2026-11-01T12:00:00Z';
 const start='2026-10-31T12:00:00Z';
+test('technical summary terms follow the actual source and do not turn LLM into a law degree',()=>{
+ assert.equal(normalizeChineseTerms('法学硕士教程','Tutorials on LLMs'),'大语言模型教程');
+ assert.equal(normalizeChineseTerms('法学硕士课程','Master of Laws course'),'法学硕士课程');
+ assert.equal(normalizeChineseTerms('代理线束控制界面','An agent harness control surface'),'AI 编程代理管理界面');
+});
 test('official history uses the current source day, including non-UTC boundaries, without inventing a 24h delta',()=>{
  const week=Date.parse('2026-11-01T03:00:00Z')/1000;
  const data=[{week,total:1323,days:[1323,0,0,0,0,0,0]}];

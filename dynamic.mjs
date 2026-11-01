@@ -6,6 +6,13 @@ import { archiveFeed, releaseEvidence } from './collector.mjs';
 const DAY=86400000;
 const validName=name=>typeof name==='string' && /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9_.-]+$/.test(name) && !name.endsWith('/..');
 export const metric='github_reported_daily_new_stars';
+export function normalizeChineseTerms(summary,description) {
+ // Disambiguate only when the corresponding technical term exists in the source.
+ if(/\bLLMs?\b/i.test(description))summary=summary.replace(/法学硕士/g,'大语言模型');
+ if(/agent harness control surface/i.test(description))summary=summary.replace(/代理线束控制界面/g,'AI 编程代理管理界面');
+ if(/\bagents?\b/i.test(description))summary=summary.replace(/座席/g,'智能体');
+ return summary;
+}
 // Official aggregate endpoint; stargazer identities are restricted since July 2026.
 // Bucket boundaries belong to GitHub and are not promised to be Beijing/UTC days.
 export function dailyHistory(data,now) {
@@ -159,6 +166,7 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
      if(!/[\u4e00-\u9fff]/.test(chinese))throw new Error('No Chinese translation returned');
      entry.description=row.description;entry.summary_zh=[...chinese].slice(0,220).join('');
     }
+    entry.summary_zh=normalizeChineseTerms(entry.summary_zh,row.description);
     row.summary_zh=entry.summary_zh;row.summary_source=row.description_source?.kind==='readme'?'machine_translation_of_readme_excerpt':'machine_translation_of_repository_description';
    }catch(e){failures.push({name:row.name,stage:'chinese_summary',error:e.message});}
   }
