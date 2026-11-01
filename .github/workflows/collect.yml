@@ -1,5 +1,5 @@
 # Inactive template: copy to .github/workflows/collect.yml in a dedicated DATA repository.
-# Copy collector.mjs and collector.test.mjs to that repository's root first.
+# Copy collector.mjs, collector.test.mjs, dynamic.mjs and dynamic.test.mjs to its root.
 name: Collect Skill rankings
 on:
   schedule:
@@ -19,8 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test collector.test.mjs
-      - run: node collector.mjs --discover --release-dates --output data
+      - run: node --test collector.test.mjs dynamic.test.mjs
+      - run: node dynamic.mjs --output data
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Save public repository metadata snapshots
@@ -28,7 +28,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/state.json data/rankings.json data/daily
+          git add data/discovery-cache.json data/rankings.json data/daily
           if ! git diff --cached --quiet; then
             git commit -m 'Update observed Skill star snapshots'
             git push
