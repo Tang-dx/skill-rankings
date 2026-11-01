@@ -21,6 +21,7 @@ export function buildFeed(state, now) {
     const row = {
       name: repo.name, url: `https://github.com/${repo.name}`, description: repo.description,
       created_at: repo.created_at, skill_paths: repo.skill_paths,
+      launch_evidence: repo.launch_evidence ?? null,
       skill_verified_at: repo.verified_at, stars: current?.stars ?? null,
       sampled_at: current?.at ?? null, net_stars: null,
       source_url: `https://api.github.com/repos/${repo.name}`,
@@ -83,7 +84,23 @@ export async function archiveFeed(output, feed) {
   await atomicJson(file, feed);
 }
 
-export async function collect({ output, repos = [], discover = false, token = process.env.GITHUB_TOKEN, request = github, observedAt }) {
+// Release dates are evidence of a version publication, not proof of project launch.
+export async function releaseEvidence(name, request, token, checkedAt) {
+  const releases = [];
+  for (let page = 1; page <= 3; page++) {
+    const batch = await request(`/repos/${name}/releases?per_page=100&page=${page}`, token);
+    if (!Array.isArray(batch)) throw new Error('Invalid release response');
+    releases.push(...batch.filter(r => !r.draft && Number.isFinite(Date.parse(r.published_at)) && Date.parse(r.published_at) <= Date.parse(checkedAt) && typeof r.html_url === 'string' && r.html_url.startsWith(`https://github.com/${name}/releases/tag/`)));
+    if (batch.length < 100) {
+      releases.sort((a,b) => Date.parse(a.published_at)-Date.parse(b.published_at));
+      const first=releases[0];
+      return { kind: 'release_record', checked_at: checkedAt, published_at: first?.published_at ?? null, url: first?.html_url ?? null, complete: true };
+    }
+  }
+  return { kind: 'release_record', checked_at: checkedAt, published_at: null, url: null, complete: false };
+}
+
+export async function collect({ output, repos = [], discover = false, token = process.env.GITHUB_TOKEN, request = github, observedAt, releaseDates = false }) {
   await mkdir(output, { recursive: true });
   const statePath = join(output, 'state.json');
   let state;
@@ -93,6 +110,7 @@ export async function collect({ output, repos = [], discover = false, token = pr
   const now = observedAt ?? new Date().toISOString();
   const started = Date.now();
   const failures = [];
+  let releaseChecks = 0;
   const known = new Map(state.repositories.map(repo => [repo.name.toLowerCase(), repo]));
   const candidates = new Set(repos);
   state.checked_candidates ??= {};
@@ -139,6 +157,12 @@ export async function collect({ output, repos = [], discover = false, token = pr
         known.set(name.toLowerCase(), repo);
       }
       Object.assign(repo, { description: item.description ?? '', created_at: item.created_at, archived: item.archived });
+      if (releaseDates && releaseChecks < 50 && Date.now()-started < 200000 &&
+          (!repo.launch_evidence?.checked_at || Date.parse(now)-Date.parse(repo.launch_evidence.checked_at) > 30*24*HOUR)) {
+        releaseChecks++;
+        try { repo.launch_evidence = await releaseEvidence(repo.name,request,token,now); }
+        catch(error) { failures.push({name,stage:'release_date',error:error.message}); }
+      }
       // Hourly buckets limit retry noise; <=1h movement stays inside the 20–28h window.
       const bucket = Math.floor(Date.parse(now) / HOUR);
       repo.samples = repo.samples.filter(s => Math.floor(Date.parse(s.at) / HOUR) !== bucket && Date.parse(s.at) >= Date.parse(now) - 35 * 24 * HOUR);
@@ -166,7 +190,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const output = resolve(outputIndex >= 0 ? args[outputIndex + 1] : 'data');
   const repos = reposIndex >= 0 ? args[reposIndex + 1].split(',') : [];
   if (!repos.length && !args.includes('--discover')) throw new Error('Specify --repos owner/name or --discover');
-  const result = await collect({ output, repos, discover: args.includes('--discover') });
+  const result = await collect({ output, repos, discover: args.includes('--discover'), releaseDates: args.includes('--release-dates') });
   console.log(JSON.stringify({ generated_at: result.generated_at, monitored: result.monitored_repositories,
     daily: result.daily.length, rising: result.rising.length, unranked: result.unranked.length,
     failures: result.failures, elapsed_ms: result.elapsed_ms }));

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFeed, collect, archiveFeed } from './collector.mjs';
+import { buildFeed, collect, archiveFeed, releaseEvidence } from './collector.mjs';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,6 +16,18 @@ const repo = (name, stars, previous, options = {}) => ({
   ], ...options,
 });
 const feed = (repos) => buildFeed({ schema: 1, repositories: repos }, now);
+
+test('release evidence follows pagination, excludes drafts and never equates releases to launch', async () => {
+  const release = (published_at) => ({published_at,html_url:'https://github.com/a/b/releases/tag/v1'});
+  const evidence = await releaseEvidence('a/b', async path => path.endsWith('page=1')
+    ? Array.from({length:100},()=>release('2026-10-01T00:00:00Z'))
+    : [release('2026-05-01T00:00:00Z'), {...release('2026-01-01T00:00:00Z'),draft:true}], null, now);
+  assert.equal(evidence.kind,'release_record');
+  assert.equal(evidence.published_at,'2026-05-01T00:00:00Z');
+  const incomplete=await releaseEvidence('a/b',async()=>Array.from({length:100},()=>release(now)),null,now);
+  assert.equal(incomplete.complete,false);assert.equal(incomplete.published_at,null);
+  const empty=await releaseEvidence('a/b',async()=>[],null,now);assert.equal(empty.published_at,null);
+});
 
 test('daily archives use Beijing dates, preserve other days and reject older same-day batches', async () => {
   const output = await mkdtemp(join(tmpdir(), 'skill-daily-'));
