@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFeed, collect } from './collector.mjs';
+import { buildFeed, collect, archiveFeed } from './collector.mjs';
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,6 +16,22 @@ const repo = (name, stars, previous, options = {}) => ({
   ], ...options,
 });
 const feed = (repos) => buildFeed({ schema: 1, repositories: repos }, now);
+
+test('daily archives use Beijing dates, preserve other days and reject older same-day batches', async () => {
+  const output = await mkdtemp(join(tmpdir(), 'skill-daily-'));
+  try {
+    const first = feed([]);
+    await archiveFeed(output, first);
+    const file = join(output, 'daily', '2026-11-02.json');
+    assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), first);
+    const later = { ...first, generated_at: '2026-11-01T17:00:00Z' };
+    await archiveFeed(output, later);
+    await archiveFeed(output, first);
+    assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), later);
+    await archiveFeed(output, { ...first, generated_at: '2026-11-02T16:00:00Z' });
+    assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), later);
+  } finally { await rm(output, { recursive: true, force: true }); }
+});
 
 test('daily sorts actual net growth; rising distinguishes small rapid growth', () => {
   const result = feed([

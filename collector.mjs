@@ -68,6 +68,21 @@ async function atomicJson(file, data) {
   await rename(temporary, file);
 }
 
+export async function archiveFeed(output, feed) {
+  const timestamp = Date.parse(feed.generated_at);
+  if (!Number.isFinite(timestamp)) throw new Error('Invalid archive time');
+  const day = new Date(timestamp + 8 * HOUR).toISOString().slice(0, 10);
+  const directory = join(output, 'daily');
+  await mkdir(directory, { recursive: true });
+  const file = join(directory, `${day}.json`);
+  try {
+    const previous = JSON.parse(await readFile(file, 'utf8'));
+    if (!Number.isFinite(Date.parse(previous.generated_at))) throw new Error('Damaged daily archive');
+    if (Date.parse(previous.generated_at) >= timestamp) return;
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  await atomicJson(file, feed);
+}
+
 export async function collect({ output, repos = [], discover = false, token = process.env.GITHUB_TOKEN, request = github, observedAt }) {
   await mkdir(output, { recursive: true });
   const statePath = join(output, 'state.json');
@@ -139,6 +154,7 @@ export async function collect({ output, repos = [], discover = false, token = pr
   if (state.repositories.length && !state.repositories.some(r => r.samples.at(-1)?.at === now)) throw new Error('No current samples; previous state/feed preserved');
   if (!state.repositories.length) throw new Error('No verified Skill repository sampled; no feed published');
   await atomicJson(statePath, state);
+  await archiveFeed(output, result);
   await atomicJson(join(output, 'rankings.json'), result);
   return result;
 }
