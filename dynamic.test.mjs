@@ -29,6 +29,8 @@ test('both lists are capped at ten and rising uses share of current stars, not a
  assert.equal(result.daily.length,10);assert.equal(result.rising.length,10);
  assert.equal(result.daily[0].new_stars_day,114);
  assert.equal(result.rising[0].recent_share_percent,11.4);
+ const zero=rankRows([{name:'a/zero',stars:0,new_stars_day:40,created_at:'2026-10-01T00:00:00Z'}],end);
+ assert.equal(zero.daily[0].recent_share_percent,null);assert.equal(zero.rising[0].rising_score,0.4);
 });
 
 test('full collection discovers beyond a full legacy pool, archives Chinese results and preserves feed on total failure',async()=>{
