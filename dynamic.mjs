@@ -5,7 +5,23 @@ import { archiveFeed, releaseEvidence } from './collector.mjs';
 
 const DAY=86400000;
 const validName=name=>typeof name==='string' && /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9_.-]+$/.test(name) && !name.endsWith('/..');
-export const metric='observed_retained_stars_in_24h_window';
+export const metric='github_reported_daily_new_stars';
+// Official aggregate endpoint; stargazer identities are restricted since July 2026.
+// Bucket boundaries belong to GitHub and are not promised to be Beijing/UTC days.
+export function dailyHistory(data,now) {
+ if(!Array.isArray(data)||!data.length)throw new Error('Missing GitHub daily star history');
+ const weeks=new Set();
+ for(const row of data) {
+  if(!Number.isSafeInteger(row.week)||row.week<0||weeks.has(row.week)||!Array.isArray(row.days)||row.days.length!==7||row.days.some(n=>!Number.isSafeInteger(n)||n<0)||!Number.isSafeInteger(row.total)||row.total!==row.days.reduce((a,b)=>a+b,0))throw new Error('Invalid GitHub daily star history');
+  weeks.add(row.week);
+ }
+ const at=Date.parse(now);
+ const matches=data.filter(row=>row.week*1000<=at&&at<row.week*1000+7*DAY);
+ if(matches.length!==1)throw new Error('Current GitHub statistics week unavailable');
+ const week=matches[0],index=Math.floor((at-week.week*1000)/DAY);
+ const start=week.week*1000+index*DAY;
+ return {count:week.days[index],window_start:new Date(start).toISOString(),window_end:new Date(start+DAY).toISOString(),consistency:'github_daily_history',source_week:week.week,source_day_index:index};
+}
 export function parseTrending(html) {
  return [...html.matchAll(/<article\b[^>]*>[\s\S]*?<\/article>/g)].flatMap(match=>{
   const heading=match[0].match(/<h2\b[^>]*>[\s\S]*?<\/h2>/)?.[0];
@@ -22,77 +38,13 @@ export function interleave(groups,limit=24) {
  return result;
 }
 
-// GitHub offers no snapshot isolation. Checks detect common movement, not all races.
-// Count is a bounded observation of currently retained stars, never historical net growth.
-export async function recentStars(name,request,start,end) {
- const pages=new Map();let calls=0;
- const path=p=>`/repos/${name}/stargazers?per_page=100&page=${p}`;
- function validate(data) {
-  if(!Array.isArray(data)||data.length>100)throw new Error('Invalid star page');
-  let previous=-Infinity;const ids=new Set();
-  for(const row of data) {
-   const at=Date.parse(row.starred_at);
-   if(!Number.isFinite(at)||at<previous||!Number.isSafeInteger(row.user?.id)||ids.has(row.user.id))throw new Error('Invalid or unordered star timestamps');
-   ids.add(row.user.id);previous=at;
-  }
- }
- async function fetchPage(p,fresh=false) {
-  if(!fresh&&pages.has(p))return pages.get(p);
-  if(++calls>30)throw new Error('Per-repository star request budget reached');
-  const response=await request(path(p),{star:true});validate(response.data);
-  if(!fresh) pages.set(p,response);
-  return response;
- }
- const first=await fetchPage(1);
- const lastLink=first.link?.match(/<([^>]+)>;\s*rel="last"/)?.[1];
- let last=1;
- if(lastLink) {
-  const url=new URL(lastLink);
-  if(url.origin!=='https://api.github.com'||url.pathname!==`/repos/${name}/stargazers`)throw new Error('Invalid pagination link');
-  last=Number(url.searchParams.get('page'));
- }
- if(!Number.isSafeInteger(last)||last<1||last>1000000)throw new Error('Invalid star page count');
- const tail=await fetchPage(last);
- if(last>1 && (!tail.data.length || first.data.length!==100))throw new Error('Star pagination changed');
- const total=(last-1)*100+tail.data.length;
- async function boundary(target,strict) {
-  const qualifies=at=>strict?at>target:at>=target;
-  if(!total)return 0;
-  if(qualifies(Date.parse(first.data[0].starred_at)))return 0;
-  if(!qualifies(Date.parse(tail.data.at(-1).starred_at)))return total;
-  // Most upper boundaries are in the last page; avoid a second binary search.
-  if(qualifies(Date.parse(tail.data[0].starred_at))) {
-   let lo=1,hi=last;
-   while(lo<hi) {
-    const mid=Math.floor((lo+hi)/2);const page=await fetchPage(mid);
-    if(page.data.length!==100&&mid!==last)throw new Error('Star pagination changed');
-    if(qualifies(Date.parse(page.data.at(-1).starred_at)))hi=mid;else lo=mid+1;
-   }
-   const page=await fetchPage(lo);
-   return (lo-1)*100+page.data.findIndex(r=>qualifies(Date.parse(r.starred_at)));
-  }
-  return (last-1)*100+tail.data.findIndex(r=>qualifies(Date.parse(r.starred_at)));
- }
- const lower=await boundary(Date.parse(start),false),upper=await boundary(Date.parse(end),true);
- const ordered=[...pages].sort((a,b)=>a[0]-b[0]);
- for(let i=1;i<ordered.length;i++) if(ordered[i-1][1].data.length&&ordered[i][1].data.length&&Date.parse(ordered[i-1][1].data.at(-1).starred_at)>Date.parse(ordered[i][1].data[0].starred_at))throw new Error('Star ordering drift');
- // Re-read all pages used by the calculation, not just the first and last.
- for(const [p,saved] of ordered) {
-  const fresh=await fetchPage(p,true);
-  const signature=data=>data.map(r=>`${r.user.id}:${r.starred_at}`).join('|');
-  if(signature(fresh.data)!==signature(saved.data)||(p===1&&fresh.link!==saved.link))throw new Error('Star pagination changed during observation');
- }
- if(lower<0||upper<lower||upper>total)throw new Error('Invalid star window boundaries');
- return {count:upper-lower,total,calls,consistency:'sampled_pages_rechecked'};
-}
-
 export function rankRows(rows,now) {
- const stable=(a,b)=>b.new_stars_24h-a.new_stars_24h||a.name.localeCompare(b.name);
- const positive=rows.filter(r=>r.new_stars_24h>0).map(row=>({...row,
-  recent_share_percent:row.stars>0?row.new_stars_24h/row.stars*100:null,
-  rising_score:row.new_stars_24h/Math.max(row.stars,100)}));
+ const stable=(a,b)=>b.new_stars_day-a.new_stars_day||a.name.localeCompare(b.name);
+ const positive=rows.filter(r=>r.new_stars_day>0).map(row=>({...row,
+  recent_share_percent:row.stars>0?row.new_stars_day/row.stars*100:null,
+  rising_score:row.new_stars_day/Math.max(row.stars,100)}));
  const daily=[...positive].sort(stable).slice(0,10);
- const rising=positive.filter(r=>{const age=(Date.parse(now)-Date.parse(r.created_at))/DAY;return age>=0&&age<=183&&r.stars<10000&&r.new_stars_24h>=30;})
+ const rising=positive.filter(r=>{const age=(Date.parse(now)-Date.parse(r.created_at))/DAY;return age>=0&&age<=183&&r.stars<10000&&r.new_stars_day>=30;})
   .sort((a,b)=>b.rising_score-a.rising_score||stable(a,b)).slice(0,10);
  return {daily,rising};
 }
@@ -111,9 +63,9 @@ function client(token) {
   text+=decoder.decode();
   return {text,link:response.headers.get('link')??''};
  }
- const request=async(path,{star=false}={})=>{
+ const request=async(path)=>{
   if(!path.startsWith('/')||path.startsWith('//'))throw new Error('Invalid API path');
-  const result=await fetchLimited('https://api.github.com'+path,{Accept:star?'application/vnd.github.star+json':'application/vnd.github+json',...(token?{Authorization:`Bearer ${token}`}:{})});
+  const result=await fetchLimited('https://api.github.com'+path,{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10',...(token?{Authorization:`Bearer ${token}`}:{})});
   return {...result,data:JSON.parse(result.text)};
  };
  return {request,fetchLimited,stats:()=>({requests,elapsed_ms:Date.now()-began})};
@@ -159,7 +111,7 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
     if(item.private!==false||item.archived||item.full_name?.toLowerCase()!==name.toLowerCase()||!Number.isSafeInteger(item.stargazers_count)||item.stargazers_count<0)throw new Error('Repository not eligible or identity invalid');
     const canonical=item.full_name,entry=state.entries[canonical.toLowerCase()]??{};entry.used_at=now;state.entries[canonical.toLowerCase()]=entry;
     row={name:canonical,url:`https://github.com/${canonical}`,description:item.description??'',created_at:item.created_at,
-     stars:item.stargazers_count,net_stars:null,new_stars_24h:null,sampled_at:now,window_start:windowStart,window_end:now,
+     stars:item.stargazers_count,net_stars:null,new_stars_day:null,sampled_at:now,window_start:windowStart,window_end:now,
      skill_paths:[],repository_type:'project',launch_evidence:entry.launch_evidence??null,
      candidate_sources:groups.flatMap((g,i)=>g.some(n=>n.toLowerCase()===name.toLowerCase())?[sources[i].source]:[])};
     try {
@@ -167,10 +119,10 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
      row.skill_paths=(tree.tree??[]).filter(r=>r.type==='blob'&&/(^|\/)SKILL\.md$/.test(r.path)).map(r=>r.path);
      if(row.skill_paths.length){row.repository_type='skill';row.skill_verified_at=now;}
     }catch(e){failures.push({name:canonical,stage:'skill_presence',error:e.message});}
-    const observation=await recentStars(canonical,api.request,windowStart,now);
-    Object.assign(row,{stars:observation.total,new_stars_24h:observation.count,consistency:observation.consistency,collection_finished_at:new Date().toISOString()});
+    const observation=dailyHistory((await api.request(`/repos/${canonical}/stargazers/history?per_page=2`)).data,now);
+    Object.assign(row,{new_stars_day:observation.count,window_start:observation.window_start,window_end:observation.window_end,source_week:observation.source_week,source_day_index:observation.source_day_index,consistency:observation.consistency,collection_finished_at:new Date().toISOString()});
     rows.push(row);
-   }catch(e){failures.push({name,stage:'count',error:e.message});if(row)unranked.push({...row,new_stars_24h:null,reason:'observation_incomplete'});}
+   }catch(e){failures.push({name,stage:'count',error:e.message});if(row)unranked.push({...row,new_stars_day:null,reason:'observation_incomplete'});}
   }
  }
  await Promise.all(Array.from({length:3},()=>worker()));
@@ -200,7 +152,7 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
  }
  // daily/rising contain separate row copies; copy display metadata back to both.
  for(const row of [...ranked.daily,...ranked.rising])Object.assign(row,displayed.get(row.name));
- const feed={schema:1,metric,generated_at:now,window_start:windowStart,window_end:now,
+ const feed={schema:1,metric,generated_at:now,window_start:rows[0].window_start,window_end:rows[0].window_end,
   collection_finished_at:new Date().toISOString(),scope:'dynamic Trending and GitHub search candidates; not all GitHub',
   monitored_repositories:evaluated,coverage:{discovered:candidateCount,evaluated,counted:rows.length,selected:candidates.length,sources,...api.stats()},
   policy:{top:10,rising_maximum_age_days:183,rising_maximum_current_stars:10000,rising_minimum_new_stars:30,denominator_floor:100},
@@ -213,5 +165,5 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
  const i=process.argv.indexOf('--output');
  const feed=await collectDynamic({output:resolve(i<0?'data':process.argv[i+1])});
- console.log(JSON.stringify({generated_at:feed.generated_at,coverage:feed.coverage,daily:feed.daily.map(r=>({name:r.name,new:r.new_stars_24h})),rising:feed.rising.map(r=>({name:r.name,new:r.new_stars_24h})),failures:feed.failures}));
+ console.log(JSON.stringify({generated_at:feed.generated_at,coverage:feed.coverage,daily:feed.daily.map(r=>({name:r.name,new:r.new_stars_day})),rising:feed.rising.map(r=>({name:r.name,new:r.new_stars_day})),failures:feed.failures}));
 }
