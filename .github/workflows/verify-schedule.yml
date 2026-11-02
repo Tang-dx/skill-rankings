@@ -1,0 +1,18 @@
+name: Verify automatic scheduling
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+permissions: {}
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Record automatic event
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          test "$EVENT_NAME" = "schedule"
+          echo "Automatic schedule event received; run=$RUN_ID"
+          date -u
