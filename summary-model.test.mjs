@@ -18,6 +18,7 @@ test('Responses summary uses bounded public evidence and refuses HTTP failures',
  assert.equal((await generate([{name:'a/tool',description:'public source',readme:'public README'}]))[0].name,'a/tool');
  assert.equal(body.store,false);assert.equal(body.max_output_tokens,5000);
  await assert.rejects(responsesSummaryGenerator({baseUrl:'https://example.test',token:'test',model:'test',request:async()=>({ok:false,status:429})})([]),/429/);
+ await assert.rejects(responsesSummaryGenerator({baseUrl:'https://example.test',token:'test',model:'test',request:async()=>({ok:true,json:async()=>({status:'incomplete',output_text:'{"summaries":[]}'})})})([]),/incomplete/);
 });
 
 test('ranked duplicates share one summary; cache invalidates when README changes', async () => {
