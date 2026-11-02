@@ -1,7 +1,7 @@
 import {readFile,writeFile,rename,readdir} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {summarizeRanked,githubSummaryGenerator} from './summary-model.mjs';
+import {summarizeRanked,configuredSummaryGenerator} from './summary-model.mjs';
 
 export async function enrichRecentReport(output,token=process.env.GITHUB_TOKEN) {
  const latest=JSON.parse(await readFile(join(output,'rankings.json'),'utf8'));
@@ -18,13 +18,14 @@ export async function enrichRecentReport(output,token=process.env.GITHUB_TOKEN) 
  const cache=JSON.parse(await readFile(join(output,'summary-cache.json'),'utf8'));
  const names=new Set([...feed.daily,...feed.rising].map(r=>r.name));
  feed.failures=feed.failures.filter(f=>!(names.has(f.name)&&f.stage==='chinese_summary'));
- await summarizeRanked({feed,cache,generate:githubSummaryGenerator({token}),readme:async name=>{
+ await summarizeRanked({feed,cache,model:process.env.SUMMARY_MODEL??'openai/gpt-4.1-mini',generate:configuredSummaryGenerator(token),readme:async name=>{
   const response=await fetch(`https://api.github.com/repos/${name}/readme`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.github+json'},redirect:'error',signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw new Error(`README HTTP ${response.status}`);
   const doc=await response.json();
   if(doc.encoding!=='base64'||typeof doc.content!=='string'||typeof doc.sha!=='string')throw new Error('Invalid README');
   return {text:Buffer.from(doc.content,'base64').toString('utf8'),sha:doc.sha,url:doc.html_url};
  }});
+ if(feed.failures.some(f=>f.stage==='chinese_summary'))throw new Error('Archived summaries incomplete; preserve prior archive');
  for(const [target,data] of [[file,feed],[join(output,'summary-cache.json'),cache]]) {
   await writeFile(target+'.tmp',JSON.stringify(data,null,2)+'\n');await rename(target+'.tmp',target);
  }

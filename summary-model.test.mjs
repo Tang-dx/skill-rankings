@@ -1,12 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summarizeRanked, sourceText } from './summary-model.mjs';
+import { summarizeRanked, sourceText, responsesSummaryGenerator } from './summary-model.mjs';
 
 test('does not present an old machine translation as a grounded summary', async () => {
  const feed={daily:[{name:'a/tool',description:'Something',summary_zh:'旧机译'}],rising:[],failures:[]};
  await summarizeRanked({feed,cache:{entries:{}},readme:async()=>{throw new Error('HTTP 503');},generate:async()=>[]});
  assert.equal(feed.daily[0].summary_zh,undefined);
  assert(feed.failures.some(f=>f.stage==='chinese_summary'));
+});
+
+test('Responses summary uses bounded public evidence and refuses HTTP failures',async()=>{
+ let body;
+ const generate=responsesSummaryGenerator({baseUrl:'https://example.test/v1',token:'test-only',model:'test',request:async(url,init)=>{
+  body=JSON.parse(init.body);assert.equal(init.redirect,'error');assert.equal(String(url),'https://example.test/v1/responses');
+  return {ok:true,json:async()=>({output:[{content:[{type:'output_text',text:JSON.stringify({summaries:[{name:'a/tool',purpose:'整理已有代码。',use_case:'适合开发时查看。'}]})}]}]})};
+ }});
+ assert.equal((await generate([{name:'a/tool',description:'public source',readme:'public README'}]))[0].name,'a/tool');
+ assert.equal(body.store,false);assert.equal(body.max_output_tokens,5000);
+ await assert.rejects(responsesSummaryGenerator({baseUrl:'https://example.test',token:'test',model:'test',request:async()=>({ok:false,status:429})})([]),/429/);
 });
 
 test('ranked duplicates share one summary; cache invalidates when README changes', async () => {

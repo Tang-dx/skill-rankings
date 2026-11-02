@@ -2,7 +2,7 @@ import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { archiveFeed, releaseEvidence } from './collector.mjs';
-import { summarizeRanked, githubSummaryGenerator } from './summary-model.mjs';
+import { summarizeRanked, configuredSummaryGenerator } from './summary-model.mjs';
 
 const DAY=86400000;
 const validName=name=>typeof name==='string' && /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9_.-]+$/.test(name) && !name.endsWith('/..');
@@ -174,7 +174,7 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
  if(summaries.schema!==1||!summaries.entries||typeof summaries.entries!=='object'||Array.isArray(summaries.entries))throw new Error('Damaged summary cache');
  await summarizeRanked({feed:{...ranked,failures},cache:summaries,now,
   readme:async name=>{const doc=readmes.get(name);if(!doc)throw new Error('README unavailable');return doc;},
-  generate:summaryGenerator??githubSummaryGenerator({token})});
+  model:process.env.SUMMARY_MODEL??'openai/gpt-4.1-mini',generate:summaryGenerator??configuredSummaryGenerator(token)});
  summaries.entries=Object.fromEntries(Object.entries(summaries.entries).sort((a,b)=>Date.parse(b[1].used_at??b[1].evidence.generated_at)-Date.parse(a[1].used_at??a[1].evidence.generated_at)).slice(0,500));
  if(rows.some(r=>r.window_start!==rows[0].window_start||r.window_end!==rows[0].window_end))throw new Error('Inconsistent source day windows; previous feed preserved');
  const feed={schema:1,collector_revision:2,metric,generated_at:now,window_start:rows[0].window_start,window_end:rows[0].window_end,
