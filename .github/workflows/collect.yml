@@ -4,9 +4,11 @@ name: Collect Skill rankings
 on:
   schedule:
     - cron: '0 12 * * *' # About 20:00 Asia/Shanghai; GitHub scheduling may be delayed.
+    - cron: '17 13 * * *' # Retry at 21:17 only if no successful evening report exists.
   workflow_dispatch:
 permissions:
   contents: write
+  models: read
 concurrency:
   group: skill-rankings-collector
   cancel-in-progress: false
@@ -16,24 +18,48 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+      - name: Skip scheduled retry when evening report already exists
+        id: freshness
+        env:
+          RUN_EVENT: ${{ github.event_name }}
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync,appendFileSync} from 'node:fs';
+          let fresh=false;
+          try {
+            const feed=JSON.parse(readFileSync('data/rankings.json','utf8'));
+            const now=new Date(),generated=new Date(feed.generated_at);
+            const parts=date=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).format(date);
+            fresh=Number.isFinite(+generated)&&generated<=now&&parts(generated).slice(0,10)===parts(now).slice(0,10)&&Number(parts(generated).slice(-2))>=20;
+          } catch {}
+          const collect=process.env.RUN_EVENT!=='schedule'||!fresh;
+          appendFileSync(process.env.GITHUB_OUTPUT,`collect=${collect}\n`);
+          console.log(collect?'Collect a new report':'Evening report already saved; skip duplicate scheduled collection');
+          NODE
       - uses: actions/setup-node@v4
+        if: steps.freshness.outputs.collect == 'true'
         with:
           node-version: '22'
       - run: node --test collector.test.mjs dynamic.test.mjs summary-model.test.mjs
+        if: steps.freshness.outputs.collect == 'true'
       - run: node dynamic.mjs --output data
+        if: steps.freshness.outputs.collect == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUMMARY_API_KEY: ${{ secrets.SUMMARY_API_KEY }}
           SUMMARY_BASE_URL: ${{ vars.SUMMARY_BASE_URL }}
           SUMMARY_MODEL: ${{ vars.SUMMARY_MODEL }}
       - run: node summary-backfill.mjs data
+        if: steps.freshness.outputs.collect == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUMMARY_API_KEY: ${{ secrets.SUMMARY_API_KEY }}
           SUMMARY_BASE_URL: ${{ vars.SUMMARY_BASE_URL }}
           SUMMARY_MODEL: ${{ vars.SUMMARY_MODEL }}
       - run: node verify-feed.mjs data/rankings.json
+        if: steps.freshness.outputs.collect == 'true'
       - name: Save public repository metadata snapshots
+        if: steps.freshness.outputs.collect == 'true'
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
