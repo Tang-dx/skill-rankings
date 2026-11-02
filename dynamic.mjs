@@ -2,6 +2,7 @@ import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { archiveFeed, releaseEvidence } from './collector.mjs';
+import { summarizeRanked, githubSummaryGenerator } from './summary-model.mjs';
 
 const DAY=86400000;
 const validName=name=>typeof name==='string' && /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9_.-]+$/.test(name) && !name.endsWith('/..');
@@ -78,7 +79,7 @@ function client(token) {
  return {request,fetchLimited,stats:()=>({requests,elapsed_ms:Date.now()-began})};
 }
 
-export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,transport,observedAt}={}) {
+export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,transport,observedAt,summaryGenerator}={}) {
  await mkdir(output,{recursive:true});
  const now=observedAt??new Date().toISOString(),windowStart=new Date(Date.parse(now)-DAY).toISOString();
  const api=transport??client(token),failures=[],groups=[],sources=[];
@@ -137,7 +138,8 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
  if(!rows.length)throw new Error('No comparable star observations; previous feed preserved: '+JSON.stringify(failures));
  const ranked=rankRows(rows,now);
  const displayed=new Map([...ranked.daily,...ranked.rising].map(row=>[row.name,row]));
- // Enrich only displayed results, reusing cached translations on an exact description match.
+ const readmes=new Map();
+ // Read public project evidence only for the ranked union.
  for(const row of displayed.values()) {
   const entry=state.entries[row.name.toLowerCase()];
   try {
@@ -145,31 +147,21 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
    row.skill_paths=(tree.tree??[]).filter(r=>r.type==='blob'&&/(^|\/)SKILL\.md$/.test(r.path)).map(r=>r.path);
    if(row.skill_paths.length){row.repository_type='skill';row.skill_verified_at=now;}
   }catch(e){failures.push({name:row.name,stage:'skill_presence',error:e.message});}
-  if(!row.description.trim()) {
-   try {
+  try {
     const doc=(await api.request(`/repos/${row.name}/readme`)).data;
     if(doc.encoding!=='base64'||typeof doc.content!=='string'||typeof doc.sha!=='string')throw new Error('Invalid README response');
     const markdown=Buffer.from(doc.content,'base64').toString('utf8');
+    const url=typeof doc.html_url==='string'&&doc.html_url.startsWith(`https://github.com/${row.name}/blob/`)?doc.html_url:`https://github.com/${row.name}/blob/${row.default_branch}/README.md`;
+    readmes.set(row.name,{text:markdown,sha:doc.sha,url});
+    if(!row.description.trim()) {
     const prose=markdown.replace(/```[\s\S]*?```/g,'').replace(/<!--[\s\S]*?-->/g,'').replace(/!\[[^\]]*\]\([^)]*\)/g,'').replace(/<[^>]+>/g,'').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1')
      .split(/\r?\n\s*\r?\n/).map(s=>s.trim()).filter(s=>s.length>35&&!/^(#|\||>|\[|[-*]\s)/.test(s));
     if(!prose.length)throw new Error('README has no usable introductory paragraph');
     row.description=prose.slice(0,2).join(' ').replace(/\s+/g,' ').slice(0,800);
     row.description_source={kind:'readme',sha:doc.sha,url:typeof doc.html_url==='string'&&doc.html_url.startsWith(`https://github.com/${row.name}/blob/`)?doc.html_url:`https://github.com/${row.name}/blob/${row.default_branch}/README.md`};
-   }catch(e){failures.push({name:row.name,stage:'readme_summary',error:e.message});}
-  }else row.description_source={kind:'repository_description',url:row.url};
-  if(row.description) {
-   try {
-    if(entry.description!==row.description||!entry.summary_zh) {
-     const source=row.description.replace(/https?:\/\/\S+/g,'').slice(0,500);
-     const translated=JSON.parse((await api.fetchLimited('https://translate.googleapis.com/translate_a/single?'+new URLSearchParams({client:'gtx',sl:'auto',tl:'zh-CN',dt:'t',q:source}))).text);
-     const chinese=translated[0].map(part=>part[0]).join('').replace(/\s+/g,' ').trim();
-     if(!/[\u4e00-\u9fff]/.test(chinese))throw new Error('No Chinese translation returned');
-     entry.description=row.description;entry.summary_zh=[...chinese].slice(0,220).join('');
     }
-    entry.summary_zh=normalizeChineseTerms(entry.summary_zh,row.description);
-    row.summary_zh=entry.summary_zh;row.summary_source=row.description_source?.kind==='readme'?'machine_translation_of_readme_excerpt':'machine_translation_of_repository_description';
-   }catch(e){failures.push({name:row.name,stage:'chinese_summary',error:e.message});}
-  }
+   }catch(e){failures.push({name:row.name,stage:'readme_summary',error:e.message});}
+  if(!row.description_source)row.description_source={kind:'repository_description',url:row.url};
   if(!entry.launch_evidence?.checked_at || Date.parse(now)-Date.parse(entry.launch_evidence.checked_at)>30*DAY) {
    try{entry.launch_evidence=await releaseEvidence(row.name,async path=>(await api.request(path)).data,token,now);}
    catch(e){failures.push({name:row.name,stage:'release_date',error:e.message});}
@@ -178,6 +170,12 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
  }
  // daily/rising contain separate row copies; copy display metadata back to both.
  for(const row of [...ranked.daily,...ranked.rising])Object.assign(row,displayed.get(row.name));
+ const summaries=await readJson(join(output,'summary-cache.json'),{schema:1,entries:{}});
+ if(summaries.schema!==1||!summaries.entries||typeof summaries.entries!=='object'||Array.isArray(summaries.entries))throw new Error('Damaged summary cache');
+ await summarizeRanked({feed:{...ranked,failures},cache:summaries,now,
+  readme:async name=>{const doc=readmes.get(name);if(!doc)throw new Error('README unavailable');return doc;},
+  generate:summaryGenerator??githubSummaryGenerator({token})});
+ summaries.entries=Object.fromEntries(Object.entries(summaries.entries).sort((a,b)=>Date.parse(b[1].used_at??b[1].evidence.generated_at)-Date.parse(a[1].used_at??a[1].evidence.generated_at)).slice(0,500));
  if(rows.some(r=>r.window_start!==rows[0].window_start||r.window_end!==rows[0].window_end))throw new Error('Inconsistent source day windows; previous feed preserved');
  const feed={schema:1,collector_revision:2,metric,generated_at:now,window_start:rows[0].window_start,window_end:rows[0].window_end,
   collection_finished_at:new Date().toISOString(),scope:'dynamic Trending and GitHub search candidates; not all GitHub',
@@ -187,6 +185,7 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
   ...ranked,unranked,failures};
  state.entries=Object.fromEntries(Object.entries(state.entries).filter(([,v])=>Date.parse(now)-Date.parse(v.used_at)<35*DAY).sort((a,b)=>Date.parse(b[1].used_at)-Date.parse(a[1].used_at)).slice(0,200));
  await atomic(join(output,'discovery-cache.json'),state);
+ await atomic(join(output,'summary-cache.json'),summaries);
  await archiveFeed(output,feed);await atomic(join(output,'rankings.json'),feed);
  return feed;
 }

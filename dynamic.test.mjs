@@ -8,6 +8,7 @@ import {verifyFeed} from './verify-feed.mjs';
 
 const end='2026-11-01T12:00:00Z';
 const start='2026-10-31T12:00:00Z';
+const summaryGenerator=async items=>items.map(i=>({name:i.name,purpose:'帮助制作中文数据报告。',use_case:'适合整理和展示已有数据。'}));
 test('technical summary terms follow the actual source and do not turn LLM into a law degree',()=>{
  assert.equal(normalizeChineseTerms('法学硕士教程','Tutorials on LLMs'),'大语言模型教程');
  assert.equal(normalizeChineseTerms('法学硕士课程','Master of Laws course'),'法学硕士课程');
@@ -56,7 +57,7 @@ test('counts all discovered candidates before ranking, finds late winner, reads 
    return {data:{full_name:name,private:false,stargazers_count:2000,created_at:'2026-10-01T00:00:00Z',description:name==='fresh/r44'?null:'Coding helper',default_branch:'main'}};
   }};
  try {
-  const result=await collectDynamic({output,observedAt:end,transport});
+  const result=await collectDynamic({output,observedAt:end,transport,summaryGenerator});
   assert.equal(result.coverage.counted,45);assert.equal(result.coverage.selected,45);
   assert.equal(result.daily.length,15);assert.equal(result.rising.length,15);
   const winner=result.daily[0];assert.equal(winner.name,'fresh/r44');assert.equal(winner.new_stars_day,900);
@@ -96,9 +97,9 @@ test('full collection discovers beyond a full legacy pool, archives Chinese resu
     return {data:{full_name:'fresh/new',private:false,stargazers_count:50,created_at:'2026-10-01T00:00:00Z',description:'Make data reports',default_branch:'main'}};
    }
   };
-  const result=await collectDynamic({output,observedAt:end,transport});
+  const result=await collectDynamic({output,observedAt:end,transport,summaryGenerator});
   assert.equal(result.daily[0].name,'fresh/new');assert.equal(result.daily[0].new_stars_day,40);
-  assert.equal(result.daily[0].summary_zh,'帮助制作中文数据报告。');assert.equal(result.rising.length,1);
+  assert.equal(result.daily[0].summary_zh,'帮助制作中文数据报告。 适合整理和展示已有数据。');assert.equal(result.rising.length,1);
   assert(!requested.some(path=>path.includes('/old/')));
   assert.equal(JSON.parse(await readFile(join(output,'daily','2026-11-01.json'),'utf8')).metric,result.metric);
   const saved=await readFile(join(output,'rankings.json'),'utf8');
