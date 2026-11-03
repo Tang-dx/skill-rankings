@@ -40,6 +40,8 @@ test('daily archives use Beijing dates, preserve other days and reject older sam
     await archiveFeed(output, later);
     await archiveFeed(output, first);
     assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), later);
+    assert.deepEqual(JSON.parse(await readFile(join(output,'batches','2026-11-02','2026-11-01T16-00-00-000Z.json'),'utf8')),first);
+    assert.deepEqual(JSON.parse(await readFile(join(output,'batches','2026-11-02','2026-11-01T17-00-00-000Z.json'),'utf8')),later);
     await archiveFeed(output, { ...first, generated_at: '2026-11-02T16:00:00Z' });
     assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), later);
   } finally { await rm(output, { recursive: true, force: true }); }

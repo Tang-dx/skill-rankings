@@ -7,6 +7,10 @@ import {join} from 'node:path';
 import {verifyFeed} from './verify-feed.mjs';
 
 const end='2026-11-01T12:00:00Z';
+test('completed day rejects a missing adjacent week', () => {
+ const week=1793491200,days=[1,0,0,0,0,0,0];
+ assert.throws(()=>dailyHistory([{week,total:1,days},{week:week-14*86400,total:1,days}],end),/Previous source week/);
+});
 const start='2026-10-31T12:00:00Z';
 const summaryGenerator=async items=>items.map(i=>({name:i.name,purpose:'帮助制作中文数据报告。',use_case:'适合整理和展示已有数据。'}));
 test('technical summary terms follow the actual source and do not turn LLM into a law degree',()=>{
@@ -14,16 +18,26 @@ test('technical summary terms follow the actual source and do not turn LLM into 
  assert.equal(normalizeChineseTerms('法学硕士课程','Master of Laws course'),'法学硕士课程');
  assert.equal(normalizeChineseTerms('代理线束控制界面','An agent harness control surface'),'AI 编程代理管理界面');
 });
-test('official history uses the current source day, including non-UTC boundaries, without inventing a 24h delta',()=>{
+test('official history uses the most recent completed source day, not the current accumulating day',()=>{
  const week=Date.parse('2026-11-01T03:00:00Z')/1000;
- const data=[{week,total:1323,days:[1323,0,0,0,0,0,0]}];
+ const prevWeek=week-7*86400;
+ // Today is the first day of current source week (index=0); use previous week's last completed day
+ const data=[
+  {week:prevWeek,total:500,days:[0,0,0,0,0,0,500]},
+  {week,total:1323,days:[1323,0,0,0,0,0,0]}
+ ];
  const row=dailyHistory(data,end);
- assert.equal(row.count,1323);assert.equal(row.window_start,'2026-11-01T03:00:00.000Z');
- assert.equal(row.window_end,'2026-11-02T03:00:00.000Z');
- assert.equal(dailyHistory(data,'2026-11-02T03:00:00Z').count,0);
- assert.throws(()=>dailyHistory(data,'2026-10-31T23:00:00Z'),/unavailable/);
+ assert.equal(row.count,500);
+ assert.equal(row.consistency,'github_daily_history_previous_completed_day');
+ assert.equal(row.source_week,prevWeek);assert.equal(row.source_day_index,6);
+ // When today is NOT the first day of source week, use same week's previous day
+ const row2=dailyHistory(data,'2026-11-02T03:00:00Z');
+ assert.equal(row2.count,1323);assert.equal(row2.source_week,week);assert.equal(row2.source_day_index,0);
+ // Previous week missing when needed → fail
+ assert.throws(()=>dailyHistory([{week,total:1323,days:[1323,0,0,0,0,0,0]}],end),/Previous source week unavailable/);
+ // Validation still works
  assert.throws(()=>dailyHistory([{...data[0],total:999}],end),/Invalid/);
- assert.throws(()=>dailyHistory([...data,...data],end),/Invalid/);
+ assert.throws(()=>dailyHistory([{week:prevWeek,total:500,days:[0,0,0,0,0,0,500]},{week:prevWeek,total:500,days:[0,0,0,0,0,0,500]}],end),/Invalid/);
  assert.throws(()=>dailyHistory([],end),/Missing/);
 });
 test('discovery interleaves sources without a historical pool; trending links are scoped to headings',()=>{
@@ -51,7 +65,7 @@ test('counts all discovered candidates before ranking, finds late winner, reads 
    if(path.startsWith('/search/'))return {data:{items:[]}};
    const name=path.match(/^\/repos\/([^/]+\/[^/?]+)/)?.[1];
    if(path.endsWith('/readme'))return {data:{encoding:'base64',content:Buffer.from('# App\n\n![badge](https://example.com/badge)\n\nControl coding agents from mobile and desktop.\n\n## Install\nDo not run this command.').toString('base64'),sha:'abc123',html_url:`https://github.com/${name}/blob/main/README.md`}};
-   if(path.includes('/stargazers/history')) {const count=name==='fresh/r44'?900:100+Number(name.split('/r')[1]);return {data:[{week:1793491200,total:count,days:[count,0,0,0,0,0,0]}]};}
+   if(path.includes('/stargazers/history')) {const count=name==='fresh/r44'?900:100+Number(name.split('/r')[1]);return {data:[{week:1792886400,total:count,days:[0,0,0,0,0,0,count]},{week:1793491200,total:0,days:[0,0,0,0,0,0,0]}]};}
    if(path.includes('/git/trees/'))return {data:{tree:[]}};
    if(path.includes('/releases?'))return {data:[]};
    return {data:{full_name:name,private:false,stargazers_count:2000,created_at:'2026-10-01T00:00:00Z',description:name==='fresh/r44'?null:'Coding helper',default_branch:'main'}};
@@ -63,7 +77,7 @@ test('counts all discovered candidates before ranking, finds late winner, reads 
   const winner=result.daily[0];assert.equal(winner.name,'fresh/r44');assert.equal(winner.new_stars_day,900);
   assert.equal(winner.description,'Control coding agents from mobile and desktop.');
   assert.equal(winner.description_source.kind,'readme');assert.equal(winner.description_source.sha,'abc123');
-  assert.equal(winner.star_evidence.history[0].days[0],900);
+  assert.equal(winner.star_evidence.history[0].days[6],900); // count now lives in prev-week days[6]
   assert.equal(result.observations.length,45);
   assert.equal(reads.filter(p=>p.includes('/git/trees/')).length,15);
   assert(!winner.description.includes('Install'));
@@ -92,7 +106,7 @@ test('full collection discovers beyond a full legacy pool, archives Chinese resu
     requested.push(path);
     if(path.startsWith('/search/'))return {data:{items:[{full_name:'fresh/new'}]}};
     if(path.includes('/git/trees/'))return {data:{tree:[]}};
-    if(path.includes('/stargazers/history'))return {data:[{week:Date.parse('2026-11-01T00:00:00Z')/1000,total:40,days:[40,0,0,0,0,0,0]}]};
+    if(path.includes('/stargazers/history'))return {data:[{week:Date.parse('2026-10-25T00:00:00Z')/1000,total:40,days:[0,0,0,0,0,0,40]},{week:Date.parse('2026-11-01T00:00:00Z')/1000,total:0,days:[0,0,0,0,0,0,0]}]};
     if(path.includes('/releases?'))return {data:[]};
     return {data:{full_name:'fresh/new',private:false,stargazers_count:50,created_at:'2026-10-01T00:00:00Z',description:'Make data reports',default_branch:'main'}};
    }

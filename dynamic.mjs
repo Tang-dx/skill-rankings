@@ -15,7 +15,8 @@ export function normalizeChineseTerms(summary,description) {
  return summary;
 }
 // Official aggregate endpoint; stargazer identities are restricted since July 2026.
-// Bucket boundaries belong to GitHub and are not promised to be Beijing/UTC days.
+// Bucket boundaries belong to GitHub and are not promised to be UTC or Beijing days.
+// Values reflect stars created on that date and still present; unstars may retroactively reduce counts.
 export function dailyHistory(data,now) {
  if(!Array.isArray(data)||!data.length||data.length>2)throw new Error('Missing or oversized GitHub daily star history');
  const weeks=new Set();
@@ -27,8 +28,16 @@ export function dailyHistory(data,now) {
  const matches=data.filter(row=>row.week*1000<=at&&at<row.week*1000+7*DAY);
  if(matches.length!==1)throw new Error('Current GitHub statistics week unavailable');
  const week=matches[0],index=Math.floor((at-week.week*1000)/DAY);
- const start=week.week*1000+index*DAY;
- return {count:week.days[index],window_start:new Date(start).toISOString(),window_end:new Date(start+DAY).toISOString(),consistency:'github_daily_history',source_week:week.week,source_day_index:index};
+ // Use the most recent completed source day, not the current accumulating day.
+ let prevWeek,prevIndex,start;
+ if(index>0) {prevWeek=week;prevIndex=index-1;start=week.week*1000+prevIndex*DAY;}
+ else {
+  // Today is the first day of the source week; find the previous week by timestamp, not array position.
+  const prevWeeks=data.filter(row=>row.week===week.week-7*DAY/1000);
+  if(!prevWeeks.length)throw new Error('Previous source week unavailable for completed day');
+  prevWeek=prevWeeks.reduce((a,b)=>a.week>b.week?a:b);prevIndex=6;start=prevWeek.week*1000+prevIndex*DAY;
+ }
+ return {count:prevWeek.days[prevIndex],window_start:new Date(start).toISOString(),window_end:new Date(start+DAY).toISOString(),consistency:'github_daily_history_previous_completed_day',source_week:prevWeek.week,source_day_index:prevIndex};
 }
 export function parseTrending(html) {
  return [...html.matchAll(/<article\b[^>]*>[\s\S]*?<\/article>/g)].flatMap(match=>{
@@ -177,7 +186,7 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
   model:process.env.SUMMARY_MODEL??'gpt-6.1-sol',generate:summaryGenerator??configuredSummaryGenerator(token)});
  summaries.entries=Object.fromEntries(Object.entries(summaries.entries).sort((a,b)=>Date.parse(b[1].used_at??b[1].evidence.generated_at)-Date.parse(a[1].used_at??a[1].evidence.generated_at)).slice(0,500));
  if(rows.some(r=>r.window_start!==rows[0].window_start||r.window_end!==rows[0].window_end))throw new Error('Inconsistent source day windows; previous feed preserved');
- const feed={schema:1,collector_revision:2,metric,generated_at:now,window_start:rows[0].window_start,window_end:rows[0].window_end,
+ const feed={schema:1,collector_revision:3,metric,generated_at:now,window_start:rows[0].window_start,window_end:rows[0].window_end,
   collection_finished_at:new Date().toISOString(),scope:'dynamic Trending and GitHub search candidates; not all GitHub',
   monitored_repositories:evaluated,coverage:{discovered:candidateCount,evaluated,counted:rows.length,excluded:excluded.length,selected:candidates.length,sources,...api.stats()},excluded,
   policy:{top:15,rising_maximum_age_days:183,rising_maximum_current_stars:10000,rising_minimum_new_stars:30,denominator_floor:100},

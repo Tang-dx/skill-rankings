@@ -76,11 +76,20 @@ export async function archiveFeed(output, feed) {
   const directory = join(output, 'daily');
   await mkdir(directory, { recursive: true });
   const file = join(directory, `${day}.json`);
+  const batches = join(output, 'batches', day);
+  await mkdir(batches, { recursive: true });
+  const preserve = async value => {
+    const batch = join(batches, `${new Date(value.generated_at).toISOString().replace(/[:.]/g, '-')}.json`);
+    try { await writeFile(batch, JSON.stringify(value, null, 2) + '\n', { flag: 'wx' }); }
+    catch (error) { if (error.code !== 'EEXIST') throw error; }
+  };
   try {
     const previous = JSON.parse(await readFile(file, 'utf8'));
     if (!Number.isFinite(Date.parse(previous.generated_at))) throw new Error('Damaged daily archive');
+    await preserve(previous);
     if (Date.parse(previous.generated_at) >= timestamp) return;
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  await preserve(feed);
   await atomicJson(file, feed);
 }
 

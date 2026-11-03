@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 // Independently recompute the published rankings from archived source arrays.
 // No calls to collector ranking/counting functions, no network or AI calls.
 export function verifyFeed(feed) {
- assert.equal(feed.collector_revision,2);
+ assert([2,3].includes(feed.collector_revision));
  const names=new Set(feed.coverage.sources.flatMap(s=>s.names).map(n=>n.toLowerCase()));
  assert.equal(names.size,feed.coverage.discovered);
  assert.equal(feed.coverage.selected,names.size);
@@ -15,18 +15,27 @@ export function verifyFeed(feed) {
   assert.equal(evidence.url,`https://api.github.com/repos/${row.name}/stargazers/history?per_page=2`);
   assert(Date.parse(evidence.requested_at)>=Date.parse(feed.generated_at));
   assert(Date.parse(evidence.requested_at)<=Date.parse(feed.collection_finished_at));
-  let matched=0,added;
+  // Verify window matches the most recent completed source day (index-1, or prev-week day 6).
   for(const week of evidence.history) {
    assert.equal(week.days.length,7);assert(week.days.every(n=>Number.isSafeInteger(n)&&n>=0));
    assert.equal(week.total,week.days.reduce((a,b)=>a+b,0));
-   const index=Math.floor((Date.parse(feed.generated_at)/1000-week.week)/86400);
-   if(index>=0&&index<7) {
-    matched++;added=week.days[index];
-    assert.equal(Date.parse(feed.window_start),1000*(week.week+index*86400));
-    assert.equal(Date.parse(feed.window_end),1000*(week.week+(index+1)*86400));
-   }
   }
-  assert.equal(matched,1);assert.equal(row.new_stars_day,added);
+  const genAt=Date.parse(feed.generated_at)/1000;
+  const currentWeek=evidence.history.filter(w=>w.week<=genAt&&genAt<w.week+7*86400);
+  assert.equal(currentWeek.length,1,'Current source week must be present');
+  const cw=currentWeek[0],todayIdx=Math.floor((genAt-cw.week)/86400);
+  let prevWeek,prevIdx;
+  if(feed.collector_revision===2){prevWeek=cw;prevIdx=todayIdx;}
+  else if(todayIdx>0){prevWeek=cw;prevIdx=todayIdx-1;}
+  else {
+   const pw=evidence.history.filter(w=>w.week===cw.week-7*86400);
+   assert(pw.length>0,'Previous source week must be present when today is first day of week');
+   prevWeek=pw.reduce((a,b)=>a.week>b.week?a:b);prevIdx=6;
+  }
+  const added=prevWeek.days[prevIdx];
+  assert.equal(Date.parse(feed.window_start),1000*(prevWeek.week+prevIdx*86400));
+  assert.equal(Date.parse(feed.window_end),1000*(prevWeek.week+(prevIdx+1)*86400));
+  assert.equal(row.new_stars_day,added);
   observed.set(key,{...row,added,score:added/Math.max(row.stars,100)});
  }
  for(const row of feed.excluded) {const key=row.name.toLowerCase();assert(names.has(key));assert(!observed.has(key));assert(['private','archived'].includes(row.reason));names.delete(key);}
