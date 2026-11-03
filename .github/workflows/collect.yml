@@ -6,6 +6,11 @@ on:
     - cron: '7 12 * * *' # About 20:07 Asia/Shanghai; avoid the top-of-hour load peak.
     - cron: '17 13 * * *' # Retry at 21:17 only if no successful evening report exists.
   workflow_dispatch:
+    inputs:
+      scheduled_check:
+        description: 'External scheduled check: skip if an evening report already exists'
+        type: boolean
+        default: false
 permissions:
   contents: write
   models: read
@@ -22,6 +27,7 @@ jobs:
         id: freshness
         env:
           RUN_EVENT: ${{ github.event_name }}
+          SCHEDULED_CHECK: ${{ inputs.scheduled_check }}
         run: |
           node --input-type=module <<'NODE'
           import {readFileSync,appendFileSync} from 'node:fs';
@@ -32,7 +38,8 @@ jobs:
             const parts=date=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).format(date);
             fresh=Number.isFinite(+generated)&&generated<=now&&parts(generated).slice(0,10)===parts(now).slice(0,10)&&Number(parts(generated).slice(-2))>=20;
           } catch {}
-          const collect=process.env.RUN_EVENT!=='schedule'||!fresh;
+          const scheduled=process.env.RUN_EVENT==='schedule'||process.env.SCHEDULED_CHECK==='true';
+          const collect=!scheduled||!fresh;
           appendFileSync(process.env.GITHUB_OUTPUT,`collect=${collect}\n`);
           console.log(collect?'Collect a new report':'Evening report already saved; skip duplicate scheduled collection');
           NODE
