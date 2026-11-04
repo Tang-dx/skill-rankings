@@ -33,7 +33,12 @@ export async function enrichRecentReport(output,token=process.env.GITHUB_TOKEN,{
  }
  if(file===join(output,'rankings.json')) {
   const date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(feed.generated_at));
-  await writeFile(join(output,'daily',date+'.json'),JSON.stringify(feed,null,2)+'\n');
+  const daily=join(output,'daily',date+'.json');
+  let existing=null;
+  try {existing=JSON.parse(await readFile(daily,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
+  if(!existing||existing.generated_at===feed.generated_at) {
+   await writeFile(daily+'.tmp',JSON.stringify(feed,null,2)+'\n');await rename(daily+'.tmp',daily);
+  }
  }
  console.log(JSON.stringify({summary_report:feed.generated_at,projects:names.size,failures:feed.failures.filter(f=>f.stage==='chinese_summary')}));
 }
