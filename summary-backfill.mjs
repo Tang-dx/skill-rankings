@@ -27,7 +27,8 @@ export async function enrichRecentReport(output,token=process.env.GITHUB_TOKEN,{
   if(doc.encoding!=='base64'||typeof doc.content!=='string'||typeof doc.sha!=='string')throw new Error('Invalid README');
   return {text:Buffer.from(doc.content,'base64').toString('utf8'),sha:doc.sha,url:doc.html_url};
  })});
- if(feed.failures.some(f=>f.stage==='chinese_summary'))throw new Error('Archived summaries incomplete; preserve prior archive');
+ const summaryFailures=feed.failures.filter(f=>f.stage==='chinese_summary');
+ if(summaryFailures.length)throw new Error(`Archived summaries incomplete; preserve prior archive: ${[...new Set(summaryFailures.map(f=>f.error))].join('; ').slice(0,600)}`);
  for(const [target,data] of [[file,feed],[join(output,'summary-cache.json'),cache]]) {
   await writeFile(target+'.tmp',JSON.stringify(data,null,2)+'\n');await rename(target+'.tmp',target);
  }
