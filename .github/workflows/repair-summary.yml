@@ -1,0 +1,32 @@
+name: Repair Chinese summaries
+on: workflow_dispatch
+permissions:
+  contents: write
+concurrency:
+  group: skill-rankings-collector
+  cancel-in-progress: false
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node summary-backfill.mjs data --repair-latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUMMARY_API_KEY: ${{ secrets.SUMMARY_API_KEY }}
+          SUMMARY_BASE_URL: ${{ vars.SUMMARY_BASE_URL }}
+          SUMMARY_MODEL: ${{ vars.SUMMARY_MODEL }}
+      - run: node verify-feed.mjs data/rankings.json
+      - name: Save repaired descriptions
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/summary-cache.json data/rankings.json data/daily
+          if ! git diff --cached --quiet; then
+            git commit -m 'Repair Chinese descriptions without changing star observations'
+            git push
+          fi
