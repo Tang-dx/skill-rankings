@@ -97,7 +97,7 @@ export function responsesSummaryGenerator({baseUrl,token,model,request=fetch}={}
   const blocks=Array.isArray(data.output)?data.output.flatMap(item=>Array.isArray(item.content)?item.content:[]):[];
   const nested=blocks.filter(content=>content.type==='output_text'&&typeof content.text==='string').map(content=>content.text).join('').trim();
   const text=nested||(typeof data.output_text==='string'?data.output_text.trim():'');
-  if(!text)throw new Error('Summary model returned no text; check response format or output budget');
+  if(!text)throw new Error(`Summary model returned no text; status=${String(data.status??'missing').slice(0,40)}; output_types=${(Array.isArray(data.output)?data.output.map(item=>String(item.type).slice(0,30)):[]).join(',')}; content_types=${blocks.map(item=>String(item.type).slice(0,30)).join(',')}; output_tokens=${Number(data.usage?.output_tokens)||0}; reasoning_tokens=${Number(data.usage?.output_tokens_details?.reasoning_tokens)||0}`);
   if(text.length>20000)throw new Error('Model returned no bounded summary');
   try {return JSON.parse(text.replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'')).summaries;}
   catch {throw new Error('Summary model returned invalid JSON; summaries were not saved');}
