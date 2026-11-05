@@ -77,3 +77,19 @@ test('empty and malformed model text give specific diagnostics, never an opaque 
   await assert.rejects(generate([]),/Summary model (returned no text|returned invalid JSON)/);
  }
 });
+
+
+test('Responses stream accepts split UTF-8 deltas only after terminal completion',async()=>{
+ const summaries=[{name:'a/tool',purpose:'帮助理解项目用途。',use_case:'适合开发时查看。'}];
+ const text=JSON.stringify({summaries});
+ const delta=`data: ${JSON.stringify({type:'response.output_text.delta',delta:text})}\r\n\r\n`;
+ const completed=`data: ${JSON.stringify({type:'response.completed',response:{status:'completed',output:[]}})}\r\n\r\n`;
+ const make=(body)=>responsesSummaryGenerator({baseUrl:'https://example.test',token:'test',model:'test',request:async(_url,init)=>{
+  assert.equal(JSON.parse(init.body).stream,true);
+  const bytes=new TextEncoder().encode(body);
+  return new Response(new ReadableStream({start(c){for(let i=0;i<bytes.length;i+=7)c.enqueue(bytes.slice(i,i+7));c.close();}}),{headers:{'content-type':'text/event-stream'}});
+ }});
+ assert.deepEqual(await make(delta+completed)([]),summaries);
+ await assert.rejects(make(delta)([]),/before completion/);
+ await assert.rejects(make(delta+'data: {"type":"response.incomplete"}\n\n')([]),/did not complete/);
+});
