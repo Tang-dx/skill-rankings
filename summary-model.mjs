@@ -93,7 +93,7 @@ async function readSummaryResponse(response) {
    const chunk=await reader.read();
    if(chunk.done)break;
    bytes+=chunk.value.byteLength;
-   if(bytes>256000)throw new Error('Summary response exceeds size budget');
+   if(bytes>2*1024*1024)throw new Error('Summary response exceeds size budget');
    buffer+=decoder.decode(chunk.value,{stream:true}).replace(/\r/g,'');
    let end;
    while((end=buffer.indexOf('\n\n'))>=0) {

@@ -93,3 +93,13 @@ test('Responses stream accepts split UTF-8 deltas only after terminal completion
  await assert.rejects(make(delta)([]),/before completion/);
  await assert.rejects(make(delta+'data: {"type":"response.incomplete"}\n\n')([]),/did not complete/);
 });
+
+
+test('Responses stream allows protocol overhead but bounds the wire size',async()=>{
+ const summaries=[{name:'a/tool',purpose:'帮助理解项目。',use_case:'适合接手代码。'}];
+ const event={type:'response.completed',response:{status:'completed',output_text:JSON.stringify({summaries})}};
+ const generate=body=>responsesSummaryGenerator({baseUrl:'https://example.test',token:'test',model:'test',request:async()=>new Response(body,{headers:{'content-type':'text/event-stream'}})});
+ const overhead=`data: ${JSON.stringify({type:'response.created',padding:'x'.repeat(300000)})}\n\n`;
+ assert.deepEqual(await generate(overhead+`data: ${JSON.stringify(event)}\n\n`)([]),summaries);
+ await assert.rejects(generate('x'.repeat(2*1024*1024+1))([]),/size budget/);
+});
