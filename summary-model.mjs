@@ -163,8 +163,8 @@ export function chatSummaryGenerator({baseUrl,token,model,request=fetch}={}) {
   }
   const data=await response.json();
   const choice=data.choices?.[0];
-  if(choice?.finish_reason&&choice.finish_reason!=='stop') {
-   const reason=['length','content_filter','tool_calls','function_call'].includes(choice.finish_reason)?choice.finish_reason:'unknown';
+  if(choice?.finish_reason!=='stop') {
+   const reason=['length','content_filter','tool_calls','function_call'].includes(choice?.finish_reason)?choice.finish_reason:'unknown';
    throw new Error(`Summary model did not complete; finish_reason=${reason}; completion_tokens=${Number(data.usage?.completion_tokens)||0}; reasoning_tokens=${Number(data.usage?.completion_tokens_details?.reasoning_tokens)||0}`);
   }
   const content=choice?.message?.content;

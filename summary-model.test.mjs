@@ -64,7 +64,7 @@ test('Chat Completions accepts the GitHub Models response shape',async()=>{
  const summary={summaries:[{name:'a/tool',purpose:'整理已有代码并提供清晰说明。',use_case:'适合开发时快速了解项目用途。'}]};
  const generate=chatSummaryGenerator({baseUrl:'https://example.test/v1',token:'test',model:'openai/gpt-4.1-mini',request:async(url,init)=>{
   requested={url:String(url),body:JSON.parse(init.body)};
-  return {ok:true,json:async()=>({choices:[{message:{content:JSON.stringify(summary)}}]})};
+  return {ok:true,json:async()=>({choices:[{finish_reason:'stop',message:{content:JSON.stringify(summary)}}]})};
  }});
  assert.deepEqual(await generate([{name:'a/tool',description:'工具',readme:'说明'}]),summary.summaries);
  assert.equal(requested.url,'https://example.test/v1/chat/completions');
@@ -124,7 +124,7 @@ test('DeepSeek summaries disable default thinking without changing other Chat pr
 });
 
 test('Chat rejects truncated or filtered output even when JSON parses, without exposing model text',async()=>{
- for(const reason of ['length','content_filter','tool_calls','test-only-secret']) {
+ for(const reason of ['length','content_filter','tool_calls','test-only-secret',null,undefined,'']) {
   const generate=chatSummaryGenerator({baseUrl:'https://example.test',token:'test-only-secret',model:'test',request:async()=>({ok:true,json:async()=>({choices:[{finish_reason:reason,message:{content:'{"summaries":[]}',reasoning_content:'private reasoning'}}],usage:{completion_tokens:5000,completion_tokens_details:{reasoning_tokens:5000}}})})});
   await assert.rejects(generate([]),error=>{assert.match(error.message,/did not complete/);assert.match(error.message,/completion_tokens=5000; reasoning_tokens=5000/);assert(!error.message.includes('private reasoning'));assert(!error.message.includes('test-only-secret'));return true;});
  }
