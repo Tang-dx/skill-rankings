@@ -83,7 +83,7 @@ export function client(token) {
  }
  const request=async(path,{maxBytes=4*1024*1024}={})=>{
   if(!path.startsWith('/')||path.startsWith('//'))throw new Error('Invalid API path');
-  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>8*1024*1024)throw new Error('Invalid response size budget');
+  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>32*1024*1024||(maxBytes>4*1024*1024&&!/^\/repos\/[^/]+\/[^/]+\/git\/trees\//.test(path)))throw new Error('Invalid response size budget');
   const result=await fetchLimited('https://api.github.com'+path,{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10',...(token?{Authorization:`Bearer ${token}`}:{})},maxBytes);
   try {
    return {...result,data:JSON.parse(result.text)};
