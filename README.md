@@ -2,7 +2,7 @@
 
 榜单按Trending与搜索发现的候选增长排序，每榜最多15条；不是全GitHub排名。不扩大本轮发现来源，不新增周榜；先完成独立云端自动触发验收。外部定时使用workflow_dispatch的scheduled_check=true输入，已有当日中午成功文件时跳过；账户接入状态以实际执行证据为准。
 
-中文用途总结：仅对两榜去重后的最多30个项目读取仓库简介与README，生成“能做什么、适合什么场景”两句中文；不再调用Google逐句翻译。每次工作流最多一个有界模型请求（60秒、最多5000输出token），不配置隐式模型降级或自动重试。使用明确配置的OpenAI兼容端点（自定义端点默认Responses流式；GitHub Models默认Chat，可用SUMMARY_API_STYLE明确选responses/chat）（加密Secret `SUMMARY_API_KEY`，变量 `SUMMARY_BASE_URL`/`SUMMARY_MODEL`）；只有管理员明确授权才配置密钥，不写入公开代码/元数据。未配置时仅复用有效缓存，缺失说明记录失败并显示待补。GitHub Models实测未返回推理结果，当前不作为自动回退。模型不可用时不把旧机译冒充新总结。
+中文用途总结：仅对两榜去重后的最多30个项目读取仓库简介与README，用直白、准确的中文讲清项目是什么、主要能做什么；根据内容复杂程度使用合理篇幅，不限定句数，不强加适用场景。少用抽象术语，必要的专业词简短解释；保留关键区别，删掉重复和空话，不编造资料没有支持的能力。完整介绍写在purpose，可含多句；use_case作为兼容字段保留为空，避免硬凑第二句场景。提示版本`plain_project_description_v2`独立于兼容桌面的来源标识`ai_grounded_summary_v1`，进入输入哈希、缓存与证据；下次常规生成遇到旧提示缓存时重新生成，不主动改写已发布日报。不再调用Google逐句翻译。每次工作流最多一个有界模型请求（60秒、最多5000输出token），不配置隐式模型降级或自动重试。使用明确配置的OpenAI兼容端点（自定义端点默认Responses流式；GitHub Models默认Chat，可用SUMMARY_API_STYLE明确选responses/chat）（加密Secret `SUMMARY_API_KEY`，变量 `SUMMARY_BASE_URL`/`SUMMARY_MODEL`）；只有管理员明确授权才配置密钥，不写入公开代码/元数据。未配置时仅复用有效缓存，缺失说明记录失败并显示待补。GitHub Models实测未返回推理结果，当前不作为自动回退。模型不可用时不把旧机译冒充新总结。
 
 `summary-cache.json`按仓库、提示版本、模型、实际发送的简介/README摘录及README SHA/URL固定缓存；相同资料复用，不同资料重新生成。仅传公开仓库文字，不传软件项目内容或个人资料。模型输出仍须核查，来源和生成时间随日报保存，不等于功能试用。桌面获取日报不调用模型。
 

@@ -1,6 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summarizeRanked, sourceText, responsesSummaryGenerator, chatSummaryGenerator } from './summary-model.mjs';
+import { summarizeRanked, sourceText, responsesSummaryGenerator, chatSummaryGenerator, summaryPromptVersion } from './summary-model.mjs';
+
+test('natural multi-sentence descriptions need no forced use case; legacy prompt caches regenerate',async()=>{
+ const feed={daily:[{name:'a/tool',description:'Inspect code and export a report.'}],rising:[],failures:[]};
+ const cache={entries:{}};let calls=0;
+ const purpose='分析已有代码，找出需要检查的位置。可以把检查结果导出为报告，方便后续修改。';
+ const options={feed,cache,model:'test',readme:async()=>null,generate:async()=>{calls++;return [{name:'a/tool',purpose,use_case:''}];}};
+ await summarizeRanked(options);
+ assert.equal(feed.daily[0].summary_zh,purpose);
+ assert.equal(feed.daily[0].summary_evidence.prompt_version,summaryPromptVersion);
+ assert.equal(feed.daily[0].summary_source,'ai_grounded_summary_v1');
+ await summarizeRanked(options);assert.equal(calls,1);
+ delete cache.entries['a/tool'].prompt_version;
+ await summarizeRanked(options);assert.equal(calls,2);
+ cache.entries['a/tool'].prompt_version='previous-prompt';
+ await summarizeRanked(options);assert.equal(calls,3);
+});
+
+test('optional use case does not weaken Chinese content or project identity validation',async()=>{
+ for(const item of [
+  {name:'a/tool',purpose:'',use_case:''},
+  {name:'a/tool',purpose:'分析代码。',use_case:'For developers.'},
+  {name:'another/tool',purpose:'分析代码。',use_case:''},
+ ]) {
+  const feed={daily:[{name:'a/tool',description:'Inspect code.'}],rising:[],failures:[]};
+  await summarizeRanked({feed,cache:{},readme:async()=>null,generate:async()=>[item]});
+  assert.equal(feed.daily[0].summary_zh,undefined);
+  assert.equal(feed.failures[0].stage,'chinese_summary');
+ }
+});
 
 test('does not present an old machine translation as a grounded summary', async () => {
  const feed={daily:[{name:'a/tool',description:'Something',summary_zh:'旧机译'}],rising:[],failures:[]};
