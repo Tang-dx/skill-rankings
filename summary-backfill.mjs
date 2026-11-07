@@ -1,12 +1,12 @@
 import {readFile,writeFile,rename,readdir} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {summarizeRanked,configuredSummaryGenerator} from './summary-model.mjs';
+import {summarizeRanked,configuredSummaryGenerator,summaryPromptVersion} from './summary-model.mjs';
 
 export async function enrichRecentReport(output,token=process.env.GITHUB_TOKEN,{generate,readme,repairLatest=false}={}) {
  const latest=JSON.parse(await readFile(join(output,'rankings.json'),'utf8'));
  if(latest.daily.length||latest.rising.length) {
-  if(!repairLatest||![...latest.daily,...latest.rising].some(row=>!row.summary_zh))return;
+  if(!repairLatest||![...latest.daily,...latest.rising].some(row=>!row.summary_zh||row.summary_evidence?.prompt_version!==summaryPromptVersion))return;
  }
  let file=join(output,'rankings.json'),feed=latest;
  if(!feed.daily.length&&!feed.rising.length) {
