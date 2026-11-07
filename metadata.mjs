@@ -5,7 +5,7 @@ export async function skillEvidence(name,branch,request,checkedAt) {
  const paths=[];
  const get=async(ref,recursive)=>{
   if(++requests>96)throw new Error('Skill tree traversal request budget reached');
-  const result=await request(`/repos/${name}/git/trees/${encodeURIComponent(ref)}${recursive?'?recursive=1':''}`,{maxBytes:8*1024*1024});
+  const result=await request(`/repos/${name}/git/trees/${encodeURIComponent(ref)}${recursive?'?recursive=1':''}`,{maxBytes:32*1024*1024});
   if(!result||!Array.isArray(result.tree)||typeof result.truncated!=='boolean'||typeof result.sha!=='string')throw new Error('Invalid Git tree response');
   for(const node of result.tree)if(typeof node.path!=='string'||!node.path||node.path.startsWith('/')||node.path.split('/').some(p=>p==='..'||p==='.'||!p)||typeof node.type!=='string')throw new Error('Invalid Git tree entry');
   entries+=result.tree.length;
