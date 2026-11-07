@@ -67,13 +67,15 @@ jobs:
           SUMMARY_API_STYLE: ${{ vars.SUMMARY_API_STYLE }}
       - run: node verify-feed.mjs data/rankings.json
         if: steps.freshness.outputs.collect == 'true'
+      - run: node --test history-bundles.test.mjs && node history-bundles.mjs data
+        if: steps.freshness.outputs.collect == 'true'
       - name: Save public repository metadata snapshots
         if: steps.freshness.outputs.collect == 'true'
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/discovery-cache.json data/summary-cache.json data/rankings.json data/daily data/batches
+          git add data/discovery-cache.json data/summary-cache.json data/rankings.json data/daily data/batches data/history
           if ! git diff --cached --quiet; then
             git commit -m 'Update observed Skill star snapshots'
             git push
