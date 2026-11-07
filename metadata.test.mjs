@@ -6,7 +6,7 @@ const tree=(entries,truncated=false,id=sha)=>({sha:id,tree:entries,truncated});
 test('complete recursive tree proves exact SKILL.md presence; truncated partial matches are discarded',async()=>{
  const reads=[];
  const result=await skillEvidence('a/b','main',async(path,options)=>{
-  reads.push(path);assert.equal(options.maxBytes,8*1024*1024);
+  reads.push(path);assert.equal(options.maxBytes,32*1024*1024);
   if(path.endsWith('/main?recursive=1'))return tree([{type:'blob',path:'false/SKILL.md'}],true);
   if(path.endsWith('/'+sha))return tree([{type:'tree',path:'skills',sha:child}]);
   if(path.endsWith('/'+child+'?recursive=1'))return tree([{type:'blob',path:'one/SKILL.md'},{type:'blob',path:'two/skill.md'}],false,child);
