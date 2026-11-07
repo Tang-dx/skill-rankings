@@ -103,3 +103,29 @@ test('Responses stream allows protocol overhead but bounds the wire size',async(
  assert.deepEqual(await generate(overhead+`data: ${JSON.stringify(event)}\n\n`)([]),summaries);
  await assert.rejects(generate('x'.repeat(2*1024*1024+1))([]),/size budget/);
 });
+
+
+test('Chat diagnostics redact echoed token rather than losing the HTTP failure cause',async()=>{
+ const generate=chatSummaryGenerator({baseUrl:'https://example.test',token:'chat-secret',model:'test',request:async()=>({ok:false,status:400,text:async()=>`protocol_not_supported chat-secret Bearer another-secret ${'x'.repeat(900)}`})});
+ await assert.rejects(generate([]),error=>{assert.match(error.message,/HTTP 400.*protocol_not_supported/);assert(!error.message.includes('chat-secret'));assert(!error.message.includes('another-secret'));assert(error.message.length<550);return true;});
+});
+
+test('DeepSeek summaries disable default thinking without changing other Chat providers',async()=>{
+ for(const baseUrl of ['https://api.deepseek.com','https://api.deepseek.com/v1','https://example.test/v1','https://api.deepseek.com.example.test']) {
+  let body;
+  const generate=chatSummaryGenerator({baseUrl,token:'test-only',model:'deepseek-flash',request:async(_url,init)=>{
+   body=JSON.parse(init.body);assert.equal(init.redirect,'error');
+   return {ok:true,json:async()=>({choices:[{finish_reason:'stop',message:{content:'{"summaries":[]}'}}]})};
+  }});
+  await generate([]);
+  assert.deepEqual(body.thinking,new URL(baseUrl).hostname==='api.deepseek.com'?{type:'disabled'}:undefined);
+  assert.equal(body.max_tokens,5000);
+ }
+});
+
+test('Chat rejects truncated or filtered output even when JSON parses, without exposing model text',async()=>{
+ for(const reason of ['length','content_filter','tool_calls','test-only-secret']) {
+  const generate=chatSummaryGenerator({baseUrl:'https://example.test',token:'test-only-secret',model:'test',request:async()=>({ok:true,json:async()=>({choices:[{finish_reason:reason,message:{content:'{"summaries":[]}',reasoning_content:'private reasoning'}}],usage:{completion_tokens:5000,completion_tokens_details:{reasoning_tokens:5000}}})})});
+  await assert.rejects(generate([]),error=>{assert.match(error.message,/did not complete/);assert.match(error.message,/completion_tokens=5000; reasoning_tokens=5000/);assert(!error.message.includes('private reasoning'));assert(!error.message.includes('test-only-secret'));return true;});
+ }
+});
