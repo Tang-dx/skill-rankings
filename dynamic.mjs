@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { archiveFeed, releaseEvidence } from './collector.mjs';
 import { summarizeRanked, configuredSummaryGenerator } from './summary-model.mjs';
+import { skillEvidence } from './metadata.mjs';
 
 const DAY=86400000;
 const validName=name=>typeof name==='string' && /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9_.-]+$/.test(name) && !name.endsWith('/..');
@@ -68,22 +69,27 @@ export function rankRows(rows,now) {
 
 async function atomic(file,value) {const temp=file+'.tmp';await writeFile(temp,JSON.stringify(value,null,2)+'\n','utf8');await rename(temp,file);}
 async function readJson(file,fallback) {try{return JSON.parse(await readFile(file,'utf8'));}catch(e){if(e.code==='ENOENT')return fallback;throw e;}}
-function client(token) {
+export function client(token) {
  const began=Date.now();let requests=0;
- async function fetchLimited(url,headers={}) {
+ async function fetchLimited(url,headers={},maxBytes=4*1024*1024) {
   if(Date.now()-began>235000||requests>=600)throw new Error('Collection request/time budget reached');
   requests++;
   const response=await fetch(url,{headers:{'User-Agent':'DevCockpit-Skill-Rankings',...headers},redirect:'error',signal:AbortSignal.timeout(Math.min(10000,240000-(Date.now()-began)))});
   if(!response.ok)throw new Error(`HTTP ${response.status}`);
   let bytes=0,text='';const decoder=new TextDecoder();
-  for await(const chunk of response.body) {bytes+=chunk.length;if(bytes>4*1024*1024)throw new Error('Response exceeds size budget');text+=decoder.decode(chunk,{stream:true});}
+  for await(const chunk of response.body) {bytes+=chunk.length;if(bytes>maxBytes)throw new Error('Response exceeds size budget');text+=decoder.decode(chunk,{stream:true});}
   text+=decoder.decode();
   return {text,link:response.headers.get('link')??''};
  }
- const request=async(path)=>{
+ const request=async(path,{maxBytes=4*1024*1024}={})=>{
   if(!path.startsWith('/')||path.startsWith('//'))throw new Error('Invalid API path');
-  const result=await fetchLimited('https://api.github.com'+path,{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10',...(token?{Authorization:`Bearer ${token}`}:{})});
-  return {...result,data:JSON.parse(result.text)};
+  if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>8*1024*1024)throw new Error('Invalid response size budget');
+  const result=await fetchLimited('https://api.github.com'+path,{Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10',...(token?{Authorization:`Bearer ${token}`}:{})},maxBytes);
+  try {
+   return {...result,data:JSON.parse(result.text)};
+  } catch (error) {
+   throw new Error(`Invalid JSON from GitHub ${path}: ${error.message}`);
+  }
  };
  return {request,fetchLimited,stats:()=>({requests,elapsed_ms:Date.now()-began})};
 }
@@ -152,8 +158,8 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
  for(const row of displayed.values()) {
   const entry=state.entries[row.name.toLowerCase()];
   try {
-   const tree=(await api.request(`/repos/${row.name}/git/trees/${encodeURIComponent(row.default_branch)}?recursive=1`)).data;
-   row.skill_paths=(tree.tree??[]).filter(r=>r.type==='blob'&&/(^|\/)SKILL\.md$/.test(r.path)).map(r=>r.path);
+   const result=await skillEvidence(row.name,row.default_branch,async(path,options)=>(await api.request(path,options)).data,now);
+   row.skill_paths=result.paths;row.skill_evidence=result.evidence;
    if(row.skill_paths.length){row.repository_type='skill';row.skill_verified_at=now;}
   }catch(e){failures.push({name:row.name,stage:'skill_presence',error:e.message});}
   try {

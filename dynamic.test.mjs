@@ -66,7 +66,7 @@ test('counts all discovered candidates before ranking, finds late winner, reads 
    const name=path.match(/^\/repos\/([^/]+\/[^/?]+)/)?.[1];
    if(path.endsWith('/readme'))return {data:{encoding:'base64',content:Buffer.from('# App\n\n![badge](https://example.com/badge)\n\nControl coding agents from mobile and desktop.\n\n## Install\nDo not run this command.').toString('base64'),sha:'abc123',html_url:`https://github.com/${name}/blob/main/README.md`}};
    if(path.includes('/stargazers/history')) {const count=name==='fresh/r44'?900:100+Number(name.split('/r')[1]);return {data:[{week:1792886400,total:count,days:[0,0,0,0,0,0,count]},{week:1793491200,total:0,days:[0,0,0,0,0,0,0]}]};}
-   if(path.includes('/git/trees/'))return {data:{tree:[]}};
+   if(path.includes('/git/trees/'))return {data:{tree:[],truncated:false,sha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'}};
    if(path.includes('/releases?'))return {data:[]};
    return {data:{full_name:name,private:false,stargazers_count:2000,created_at:'2026-10-01T00:00:00Z',description:name==='fresh/r44'?null:'Coding helper',default_branch:'main'}};
   }};
@@ -105,7 +105,7 @@ test('full collection discovers beyond a full legacy pool, archives Chinese resu
    request:async path=>{
     requested.push(path);
     if(path.startsWith('/search/'))return {data:{items:[{full_name:'fresh/new'}]}};
-    if(path.includes('/git/trees/'))return {data:{tree:[]}};
+    if(path.includes('/git/trees/'))return {data:{tree:[],truncated:false,sha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'}};
     if(path.includes('/stargazers/history'))return {data:[{week:Date.parse('2026-10-25T00:00:00Z')/1000,total:40,days:[0,0,0,0,0,0,40]},{week:Date.parse('2026-11-01T00:00:00Z')/1000,total:0,days:[0,0,0,0,0,0,0]}]};
     if(path.includes('/releases?'))return {data:[]};
     return {data:{full_name:'fresh/new',private:false,stargazers_count:50,created_at:'2026-10-01T00:00:00Z',description:'Make data reports',default_branch:'main'}};

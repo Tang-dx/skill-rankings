@@ -20,11 +20,11 @@ const feed = (repos) => buildFeed({ schema: 1, repositories: repos }, now);
 test('release evidence follows pagination, excludes drafts and never equates releases to launch', async () => {
   const release = (published_at) => ({published_at,html_url:'https://github.com/a/b/releases/tag/v1'});
   const evidence = await releaseEvidence('a/b', async path => path.endsWith('page=1')
-    ? Array.from({length:100},()=>release('2026-10-01T00:00:00Z'))
+    ? Array.from({length:10},()=>release('2026-10-01T00:00:00Z'))
     : [release('2026-05-01T00:00:00Z'), {...release('2026-01-01T00:00:00Z'),draft:true}], null, now);
   assert.equal(evidence.kind,'release_record');
   assert.equal(evidence.published_at,'2026-05-01T00:00:00Z');
-  const incomplete=await releaseEvidence('a/b',async()=>Array.from({length:100},()=>release(now)),null,now);
+  const incomplete=await releaseEvidence('a/b',async()=>Array.from({length:10},()=>release(now)),null,now);
   assert.equal(incomplete.complete,false);assert.equal(incomplete.published_at,null);
   const empty=await releaseEvidence('a/b',async()=>[],null,now);assert.equal(empty.published_at,null);
 });

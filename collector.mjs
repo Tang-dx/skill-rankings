@@ -96,11 +96,13 @@ export async function archiveFeed(output, feed) {
 // Release dates are evidence of a version publication, not proof of project launch.
 export async function releaseEvidence(name, request, token, checkedAt) {
   const releases = [];
-  for (let page = 1; page <= 3; page++) {
-    const batch = await request(`/repos/${name}/releases?per_page=100&page=${page}`, token);
-    if (!Array.isArray(batch)) throw new Error('Invalid release response');
+  // Smaller pages bound large release bodies/assets. Keep the 300-record cap.
+  const perPage=10;
+  for (let page = 1; page <= 30; page++) {
+    const batch = await request(`/repos/${name}/releases?per_page=${perPage}&page=${page}`, token);
+    if (!Array.isArray(batch)||batch.length>perPage) throw new Error('Invalid release response');
     releases.push(...batch.filter(r => !r.draft && Number.isFinite(Date.parse(r.published_at)) && Date.parse(r.published_at) <= Date.parse(checkedAt) && typeof r.html_url === 'string' && r.html_url.startsWith(`https://github.com/${name}/releases/tag/`)));
-    if (batch.length < 100) {
+    if (batch.length < perPage) {
       releases.sort((a,b) => Date.parse(a.published_at)-Date.parse(b.published_at));
       const first=releases[0];
       return { kind: 'release_record', checked_at: checkedAt, published_at: first?.published_at ?? null, url: first?.html_url ?? null, complete: true };
