@@ -1,0 +1,27 @@
+name: Publish history sync packages
+on: workflow_dispatch
+permissions:
+  contents: write
+concurrency:
+  group: skill-rankings-collector
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test history-bundles.test.mjs
+      - run: node history-bundles.mjs data
+      - name: Save immutable history packages and index
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/history
+          if ! git diff --cached --quiet; then
+            git commit -m 'Publish incremental history sync packages'
+            git push
+          fi
