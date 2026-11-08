@@ -26,18 +26,14 @@ export function dailyHistory(data,now) {
   weeks.add(row.week);
  }
  const at=Date.parse(now);
- const matches=data.filter(row=>row.week*1000<=at&&at<row.week*1000+7*DAY);
- if(matches.length!==1)throw new Error('Current GitHub statistics week unavailable');
- const week=matches[0],index=Math.floor((at-week.week*1000)/DAY);
- // Use the most recent completed source day, not the current accumulating day.
- let prevWeek,prevIndex,start;
- if(index>0) {prevWeek=week;prevIndex=index-1;start=week.week*1000+prevIndex*DAY;}
- else {
-  // Today is the first day of the source week; find the previous week by timestamp, not array position.
-  const prevWeeks=data.filter(row=>row.week===week.week-7*DAY/1000);
-  if(!prevWeeks.length)throw new Error('Previous source week unavailable for completed day');
-  prevWeek=prevWeeks.reduce((a,b)=>a.week>b.week?a:b);prevIndex=6;start=prevWeek.week*1000+prevIndex*DAY;
- }
+ if(!Number.isFinite(at)||data.some(row=>(row.week-data[0].week)%(7*DAY/1000)!==0))throw new Error('Invalid GitHub statistics week alignment or observation time');
+ // Yesterday relative to the source buckets is sufficient. GitHub may not
+ // publish a new (still accumulating) week immediately after the rollover.
+ const target=at-DAY;
+ const matches=data.filter(row=>row.week*1000<=target&&target<row.week*1000+7*DAY);
+ if(matches.length!==1)throw new Error('Previous source week unavailable for completed day');
+ const prevWeek=matches[0],prevIndex=Math.floor((target-prevWeek.week*1000)/DAY);
+ const start=prevWeek.week*1000+prevIndex*DAY;
  return {count:prevWeek.days[prevIndex],window_start:new Date(start).toISOString(),window_end:new Date(start+DAY).toISOString(),consistency:'github_daily_history_previous_completed_day',source_week:prevWeek.week,source_day_index:prevIndex};
 }
 export function parseTrending(html) {
