@@ -3,12 +3,13 @@
 name: Collect Skill rankings
 on:
   schedule:
-    - cron: '7 4 * * *' # 12:07 Asia/Shanghai; allow source refresh after the observed 08:00 day boundary.
-    - cron: '17 6 * * *' # Retry at 14:17 only if no successful midday report exists.
+    - cron: '0 22 * * *' # 06:00 Asia/Shanghai: latest completed source day available at that time.
+    - cron: '17 0 * * *' # 08:17: refresh after the observed 08:00 source-day boundary.
+    - cron: '17 2 * * *' # 10:17: retry only if no post-08:00 report exists.
   workflow_dispatch:
     inputs:
       scheduled_check:
-        description: 'External scheduled check: skip if a midday report already exists'
+        description: 'External scheduled check: skip if the current morning phase already succeeded'
         type: boolean
         default: false
 permissions:
@@ -25,7 +26,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Skip scheduled retry when midday report already exists
+      - name: Skip duplicate collection within the current morning phase
         id: freshness
         env:
           RUN_EVENT: ${{ github.event_name }}
@@ -38,12 +39,13 @@ jobs:
             const feed=JSON.parse(readFileSync('data/rankings.json','utf8'));
             const now=new Date(),generated=new Date(feed.generated_at);
             const parts=date=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).format(date);
-            fresh=Number.isFinite(+generated)&&generated<=now&&parts(generated).slice(0,10)===parts(now).slice(0,10)&&Number(parts(generated).slice(-2))>=12;
+            const threshold=Number(parts(now).slice(-2))>=8?8:6;
+            fresh=Number.isFinite(+generated)&&generated<=now&&parts(generated).slice(0,10)===parts(now).slice(0,10)&&Number(parts(generated).slice(-2))>=threshold;
           } catch {}
           const scheduled=process.env.RUN_EVENT==='schedule'||process.env.SCHEDULED_CHECK==='true';
           const collect=!scheduled||!fresh;
           appendFileSync(process.env.GITHUB_OUTPUT,`collect=${collect}\n`);
-          console.log(collect?'Collect a new report':'Midday report already saved; skip duplicate scheduled collection');
+          console.log(collect?'Collect a new report':'This morning phase already saved; skip duplicate scheduled collection');
           NODE
       - uses: actions/setup-node@v4
         if: steps.freshness.outputs.collect == 'true'
