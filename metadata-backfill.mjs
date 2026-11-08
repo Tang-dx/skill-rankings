@@ -10,7 +10,10 @@ export async function repairMetadata(output,{api=client(process.env.GITHUB_TOKEN
  const file=join(output,'rankings.json'),feed=JSON.parse(await readFile(file,'utf8'));
  verifyFeed(feed);
  const rows=new Map([...feed.daily,...feed.rising].map(row=>[row.name,row]));
- const targets=new Map(feed.failures.filter(f=>rows.has(f.name)&&['skill_presence','release_date'].includes(f.stage)).map(f=>[`${f.name}:${f.stage}`,f]));
+ const targets=new Map(feed.failures.filter(f=>rows.has(f.name)&&(
+  ['skill_presence','release_date'].includes(f.stage)||
+  (f.stage==='readme_summary'&&/^HTTP 404$/.test(f.error))
+ )).map(f=>[`${f.name}:${f.stage}`,f]));
  const repaired=[],failed=[],unknown=[];
  const cacheFile=join(output,'discovery-cache.json');
  const cache=JSON.parse(await readFile(cacheFile,'utf8'));
@@ -22,6 +25,20 @@ export async function repairMetadata(output,{api=client(process.env.GITHUB_TOKEN
     const result=await skillEvidence(row.name,row.default_branch,async(path,options)=>(await api.request(path,options)).data,now);
     Object.assign(row,{skill_paths:result.paths,skill_evidence:result.evidence,repository_type:result.paths.length?'skill':'project'});
     if(result.paths.length)row.skill_verified_at=now;else delete row.skill_verified_at;
+   } else if(target.stage==='readme_summary') {
+    // Clear only after the repository still exists, is confirmed still without a README,
+    // and the description-based summary basis is present; a repository that gained a README
+    // keeps its failure for the next full collection to read normally.
+    let repoItem;
+    try{repoItem=(await api.request(`/repos/${row.name}`)).data;}
+    catch(error){
+     if(/^HTTP 404$/.test(error.message))throw new Error('Repository missing, renamed or private; keep failure for the next collection');
+     throw new Error('Repository check failed: '+error.message);
+    }
+    if(repoItem.full_name?.toLowerCase()!==row.name.toLowerCase()||repoItem.private===true)throw new Error('Repository missing, renamed or private; keep failure for the next collection');
+    try{await api.request(`/repos/${row.name}/readme`);throw new Error('README is now readable; next collection will read it');}
+    catch(error){if(!/^HTTP 404$/.test(error.message))throw error;}
+    if(!String(row.description??'').trim())throw new Error('Repository description empty; summary basis unconfirmed');
    } else {
     const evidence=await releaseEvidence(row.name,async path=>(await api.request(path)).data,undefined,now);
     if(!evidence.complete)unknown.push({name:row.name,stage:target.stage,reason:'Release history exceeds the 300-record verification budget; earliest release remains unknown'});
