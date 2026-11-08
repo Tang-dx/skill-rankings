@@ -171,7 +171,8 @@ export async function collectDynamic({output,token=process.env.GITHUB_TOKEN,tran
     row.description=prose.slice(0,2).join(' ').replace(/\s+/g,' ').slice(0,800);
     row.description_source={kind:'readme',sha:doc.sha,url:typeof doc.html_url==='string'&&doc.html_url.startsWith(`https://github.com/${row.name}/blob/`)?doc.html_url:`https://github.com/${row.name}/blob/${row.default_branch}/README.md`};
     }
-   }catch(e){failures.push({name:row.name,stage:'readme_summary',error:e.message});}
+   }catch(e){if(!/^HTTP 404$/.test(e.message))failures.push({name:row.name,stage:'readme_summary',error:e.message});}
+   // HTTP 404 means the repository has no README file; the description-only summary is a complete observation, not a failure.
   if(!row.description_source)row.description_source={kind:'repository_description',url:row.url};
   if(!entry.launch_evidence?.checked_at || Date.parse(now)-Date.parse(entry.launch_evidence.checked_at)>30*DAY) {
    try{entry.launch_evidence=await releaseEvidence(row.name,async path=>(await api.request(path)).data,token,now);}
