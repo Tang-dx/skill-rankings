@@ -15,23 +15,21 @@ export function verifyFeed(feed) {
   assert.equal(evidence.url,`https://api.github.com/repos/${row.name}/stargazers/history?per_page=2`);
   assert(Date.parse(evidence.requested_at)>=Date.parse(feed.generated_at));
   assert(Date.parse(evidence.requested_at)<=Date.parse(feed.collection_finished_at));
-  // Verify window matches the most recent completed source day (index-1, or prev-week day 6).
+  // Independently locate the target bucket; a new accumulating week is optional.
+  assert(Array.isArray(evidence.history)&&evidence.history.length>0&&evidence.history.length<=2);
+  const weeks=new Set();
   for(const week of evidence.history) {
+   assert(Number.isSafeInteger(week.week)&&week.week>=0&&!weeks.has(week.week));weeks.add(week.week);
+   assert((week.week-evidence.history[0].week)%(7*86400)===0);
    assert.equal(week.days.length,7);assert(week.days.every(n=>Number.isSafeInteger(n)&&n>=0));
    assert.equal(week.total,week.days.reduce((a,b)=>a+b,0));
   }
   const genAt=Date.parse(feed.generated_at)/1000;
-  const currentWeek=evidence.history.filter(w=>w.week<=genAt&&genAt<w.week+7*86400);
-  assert.equal(currentWeek.length,1,'Current source week must be present');
-  const cw=currentWeek[0],todayIdx=Math.floor((genAt-cw.week)/86400);
-  let prevWeek,prevIdx;
-  if(feed.collector_revision===2){prevWeek=cw;prevIdx=todayIdx;}
-  else if(todayIdx>0){prevWeek=cw;prevIdx=todayIdx-1;}
-  else {
-   const pw=evidence.history.filter(w=>w.week===cw.week-7*86400);
-   assert(pw.length>0,'Previous source week must be present when today is first day of week');
-   prevWeek=pw.reduce((a,b)=>a.week>b.week?a:b);prevIdx=6;
-  }
+  assert(Number.isFinite(genAt));
+  const target=genAt-(feed.collector_revision===3?86400:0);
+  const matching=evidence.history.filter(w=>w.week<=target&&target<w.week+7*86400);
+  assert.equal(matching.length,1,'Target source day must be present exactly once');
+  const prevWeek=matching[0],prevIdx=Math.floor((target-prevWeek.week)/86400);
   const added=prevWeek.days[prevIdx];
   assert.equal(Date.parse(feed.window_start),1000*(prevWeek.week+prevIdx*86400));
   assert.equal(Date.parse(feed.window_end),1000*(prevWeek.week+(prevIdx+1)*86400));
