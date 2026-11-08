@@ -108,6 +108,36 @@ test('counts all discovered candidates before ranking, finds late winner, reads 
  }finally{await rm(output,{recursive:true,force:true});}
 });
 
+test('a repository without README is a complete observation, not a failure; transient outages still record honestly',async()=>{
+ const output=await mkdtemp(join(tmpdir(),'rankings-noreadme-'));
+ try {
+  const transport={
+   stats:()=>({requests:20,elapsed_ms:100}),
+   fetchLimited:async url=>({text:url.includes('translate.googleapis.com')?JSON.stringify([[['帮助制作中文数据报告。']]]):'<article><h2><a href="/fresh/noreadme">n</a></h2></article>'}),
+   request:async path=>{
+    if(path.startsWith('/search/'))return {data:{items:[{full_name:'fresh/noreadme'}]}};
+    if(path.endsWith('/readme'))throw new Error(readmeStatus);
+    if(path.includes('/git/trees/'))return {data:{tree:[],truncated:false,sha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'}};
+    if(path.includes('/stargazers/history'))return {data:[{week:Date.parse('2026-10-25T00:00:00Z')/1000,total:40,days:[0,0,0,0,0,0,40]},{week:Date.parse('2026-11-01T00:00:00Z')/1000,total:0,days:[0,0,0,0,0,0,0]}]};
+    if(path.includes('/releases?'))return {data:[]};
+    return {data:{full_name:'fresh/noreadme',private:false,stargazers_count:50,created_at:'2026-10-01T00:00:00Z',description:'Make data reports',default_branch:'main'}};
+   }
+  };
+  let readmeStatus='HTTP 404';
+  const result=await collectDynamic({output,observedAt:end,transport,summaryGenerator});
+  assert.equal(result.failures.length,0);
+  assert.equal(result.daily[0].description_source.kind,'repository_description');
+  assert.equal(result.daily[0].summary_zh,'帮助制作中文数据报告。 适合整理和展示已有数据。');
+  assert.equal(verifyFeed(result).rankingRecomputed,true);
+  const other=await mkdtemp(join(tmpdir(),'rankings-readme-403-'));
+  try {
+   readmeStatus='HTTP 403';
+   const outage=await collectDynamic({output:other,observedAt:end,transport,summaryGenerator});
+   assert.deepEqual(outage.failures,[{name:'fresh/noreadme',stage:'readme_summary',error:'HTTP 403'}]);
+  }finally{await rm(other,{recursive:true,force:true});}
+ }finally{await rm(output,{recursive:true,force:true});}
+});
+
 test('full collection discovers beyond a full legacy pool, archives Chinese results and preserves feed on total failure',async()=>{
  const output=await mkdtemp(join(tmpdir(),'dynamic-skills-'));
  try {
