@@ -181,7 +181,10 @@ export async function collect({ output, repos = [], discover = false, token = pr
     } catch (error) { if (!known.has(name.toLowerCase())) state.checked_candidates[name.toLowerCase()] = now; failures.push({ name, error: error.message }); }
   }
   state.repositories = [...known.values()];
-  state.checked_candidates = Object.fromEntries(Object.entries(state.checked_candidates).filter(([,at]) => Date.now() - Date.parse(at) < 7 * 24 * HOUR));
+  // Expire with the collection's logical clock (observedAt), not the wall clock: records are
+  // stamped with `now`, and mixing clocks made rotation depend on the real date (2026-11-09
+  // silently wiped test-timeline entries older than 7 real days and broke the schedule gate).
+  state.checked_candidates = Object.fromEntries(Object.entries(state.checked_candidates).filter(([,at]) => Date.parse(now) - Date.parse(at) < 7 * 24 * HOUR));
   const result = buildFeed(state, now);
   result.failures = failures;
   result.elapsed_ms = Date.now() - started;
