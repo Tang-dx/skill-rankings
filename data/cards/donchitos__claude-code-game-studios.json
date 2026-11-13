@@ -1,0 +1,1278 @@
+{
+  "schema": 1,
+  "repo": "Donchitos/Claude-Code-Game-Studios",
+  "tree_sha": "b1c28ef603cba044c55852f1a32738137ee9fcee",
+  "truncated_paths": 66,
+  "skills": [
+    {
+      "skill_path": ".claude/skills/adopt/SKILL.md",
+      "blob_sha": "718436bcff3cd10d9057470f75e25d9875c87c7c",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/adopt/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "adopt",
+        "description": "Brownfield audit — do existing artifacts actually work? Numbered migration plan. Unlike /project-stage-detect, checks compliance not existence."
+      },
+      "excerpt": "---\nname: adopt\ndescription: \"Brownfield audit — do existing artifacts actually work? Numbered migration plan. Unlike /project-stage-detect, checks compliance not existence.\"\nargument-hint: \"[focus: full | gdds | adrs | stories | infra]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, AskUserQuestion, Bash(bash \"*/.claude/skills/adopt/../../hooks/yaml-helper.sh\" resolve_config *), Bash(bash .claude/scripts/gdd-structure-check.sh *), Bash(bash .claude/scripts/migrate-v1-config.sh --dry-run*)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys review_mode,automation,automation_always_ask,workflow`\n\nResolved above — use as-is. `/adopt` also inspects `project.yaml` and the legacy\nconfig files directly when reporting and writing migration state; that raw\ninspection is deliberate and separate from the resolved values above.\n\n# Adopt — Brownfield Template Adoption\n\nThis skill audits an existing project's artifacts for **format compliance** with\nthe template's skill pipeline, then produces a prioritised migration plan.\n\n**This is not `/project-stage-detect`.**\n`/project-stage-detect` answers: *what exists?*\n`/adopt` answers: *will what exists actually work with the template's skills?*\n\nA project can have GDDs, ADRs, and stories — and every format-sensitive skill\nwill still fail silently or produce wrong results if those artifacts are in the\nwrong internal format.\n\n**Output:** `docs/adoption-plan-[date].md` — a persistent, checkable migration plan.\n\n**Argument modes:**\n\n**Audit mode:** `$ARGUMENTS` (blank = `full`)\n\n- **No argument / `full`**: Complete audit — all artifact types\n- **`gdds`**: GDD format compliance only\n- **`adrs`**: ADR format compliance only\n- **`stories`**: Story format compliance only\n- **`infra`**: Infrastructure artifact gaps only (registry, manifest, sprint-status, stage.txt)\n\n---\n\n**Automation mode**: Resolve `modes.automation` (`project.local.yaml` →\n`project.yaml` → default `collaborative`). Every `AskUserQuestion` call follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n**`workflow`** (per `.claude/docs/workflow-modes.md`). It scopes the Phase 2 audit and\nPhase 3 severity: `full` audits all doc types at full structure; `standard` audits\nonly the required docs/sections (optional sections are informational, not gaps);\n`minimal` is a `design/game-brief.md` format check — GDDs/ADRs/UX are not expected. See Phase 2.\n\n## Phase 1: Detect Project State\n\n**Read `references/1-detect.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 2: Format Audit\n\n**Read `references/2-format-audit.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 3: Classify and Prioritise Gaps\n\n**Read `references/3-classify.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 4: Build the Migration Plan\n\n**Read `references/4-migration-plan.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 5: Present Summary and Ask to Write\n\n**Read `references/5-summary.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 6: Write the Adoption Plan\n\n**Read `references/6-write.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 7: Offer First Action\n\n**Read `references/7-first-action.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Collaborative Protocol\n\n**Applies in `collaborative` mode (the default).** For `guided` and\n`autonomous` modes, see `.claude/docs/automation-modes.md` — the rules below\ndescribe what collaborative mode requires, not universal behavior.\n\n1. **Read silently** — complete the full audit before presenting anything\n2. **Show the summary first** — let the user see scope before asking to write\n3. **Ask before writing** — always confirm before creating the adoption plan file\n4. **Offer, don't force** — the plan is advisory; the user decides what to fix and when\n5. **One action at a time** — after handing off the plan, offer one specific next step,\n   not a list of six things to do simultaneously\n6. **Never regenerate existing artifacts** — only fill gaps in what exists;\n   do not rewrite GDDs, ADRs, or stories that already have content\n",
+      "card": {
+        "title_zh": "棕地模板采纳审计",
+        "purpose_zh": "审计既有项目产物是否符合模板技能管线的格式规范，并生成按优先级排序的迁移计划，判断现有产物能否真正被模板技能使用。",
+        "does": [
+          "检测项目当前状态",
+          "按 GDD、ADR、故事、基础设施等类型做格式合规审计",
+          "对差距分类并排定优先级",
+          "生成 docs/adoption-plan-[date].md 迁移计划",
+          "按协作、引导、自主三种自动化模式与用户交互",
+          "在写入前展示摘要并征求确认"
+        ],
+        "inputs": [
+          "可选参数：full、gdds、adrs、stories、infra",
+          "项目现有产物（GDD、ADR、故事、基础设施文件）",
+          "project.yaml 及旧版配置文件",
+          "workflow 与 automation 配置项"
+        ],
+        "outputs": [
+          "docs/adoption-plan-[date].md 迁移计划文件",
+          "审计摘要与差距分类结果",
+          "首个后续行动建议"
+        ],
+        "scenarios": [
+          "将既有项目接入模板技能管线前评估格式兼容性",
+          "排查格式敏感的模板技能为何静默失败或结果错误",
+          "为存量 GDD、ADR、故事制定分阶段迁移计划"
+        ],
+        "prerequisites": [
+          "项目内存在 .claude/skills/adopt 及相关 hooks、scripts 目录",
+          "存在 project.yaml 或旧版配置文件",
+          "项目已有 GDD、ADR、故事等产物可供审计"
+        ],
+        "limits": [
+          "只检查格式合规性，不判断产物是否存在（该职责属于 /project-stage-detect）",
+          "不重新生成已有产物，只填补缺口",
+          "迁移计划为建议性质，由用户决定修复内容与时机",
+          "各阶段具体步骤在 references 文件中，原文未展开"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "调研",
+          "产品规划",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill audits an existing project's artifacts for **format compliance** with\nthe template's skill pipeline, then produces a prioritised migration plan."
+          },
+          {
+            "field": "does",
+            "quote": "**Output:** `docs/adoption-plan-[date].md` — a persistent, checkable migration plan."
+          },
+          {
+            "field": "does",
+            "quote": "**No argument / `full`**: Complete audit — all artifact types"
+          },
+          {
+            "field": "does",
+            "quote": "**`infra`**: Infrastructure artifact gaps only (registry, manifest, sprint-status, stage.txt)"
+          },
+          {
+            "field": "does",
+            "quote": "**Ask before writing** — always confirm before creating the adoption plan file"
+          },
+          {
+            "field": "does",
+            "quote": "**Never regenerate existing artifacts** — only fill gaps in what exists;"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`/adopt` also inspects `project.yaml` and the legacy\nconfig files directly when reporting and writing migration state"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Bash(bash \"*/.claude/skills/adopt/../../hooks/yaml-helper.sh\" resolve_config *)"
+          },
+          {
+            "field": "limits",
+            "quote": "**This is not `/project-stage-detect`.**\n`/project-stage-detect` answers: *what exists?*\n`/adopt` answers: *will what exists actually work with the template's skills?*"
+          },
+          {
+            "field": "limits",
+            "quote": "**Offer, don't force** — the plan is advisory; the user decides what to fix and when"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Read, Glob, Grep, Write, AskUserQuestion, Bash(bash \"*/.claude/skills/adopt/../../hooks/yaml-helper.sh\" resolve_config *)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Bash(bash .claude/scripts/gdd-structure-check.sh *)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Bash(bash .claude/scripts/migrate-v1-config.sh --dry-run*)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/architecture-decision/SKILL.md",
+      "blob_sha": "a368961c10eadf55e2d1fe85cd455e5584e49c2c",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/architecture-decision/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "architecture-decision",
+        "description": "Create an ADR documenting a technical decision: context, alternatives considered, consequences."
+      },
+      "excerpt": "---\nname: architecture-decision\ndescription: \"Create an ADR documenting a technical decision: context, alternatives considered, consequences.\"\nargument-hint: \"[title | retrofit <path> | accept <ADR-id>] [--review full|lean|solo]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion, Bash(wc -c *), Bash(bash \"*/.claude/skills/architecture-decision/../../hooks/yaml-helper.sh\" resolve_config *), Bash(bash .claude/scripts/registry.sh *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys review_mode,automation,workflow,docs.density,team.size`\n\nResolved above — use as-is; `--review` overrides `review_mode`. No block →\ndefaults in `.claude/docs/config-resolution.md`.\n\n# Architecture Decision\n\nWhen this skill is invoked:\n\n## 0. Parse Arguments — Detect Retrofit / Acceptance Mode\n\nSee `.claude/docs/director-gates.md` for the full check pattern. Individual gate definitions live in `.claude/docs/director-gates/[gate-id].md` — the spawned agent reads its own gate file; do not read it in the parent session.\n\nEvery `AskUserQuestion` call follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n**`team.size`**: which agents validate this ADR (orthogonal to review_mode/workflow).\n- **`individual`** (default): `technical-director` (TD-ADR) + the engine-specialist.\n- **`small`** and **`studio`**: the same two. This skill spawns no engine\n  sub-specialist and no adversarial reviewer at any size.\n\n**`docs.density`** — it controls the *depth* of the ADR's prose sections, not\nwhich sections the skeleton emits (that is fixed). `modes.rigor` sets it\nalongside `workflow`; set `docs.density` explicitly to vary ADR verbosity alone:\n`terse` (the default, via `rigor: minimal`) = decision + alternatives as bullets, one line of rationale each;\n`balanced` = paragraph per section with light rationale (`rigor: standard`); `thorough` =\nfull prose with trade-offs and worked rationale in Decision, Alternatives, and\nConsequences. Apply it to the prose sections; the Engine Compatibility, ADR\nDependencies, and GDD Requirements tables are structural and stay whole at every\ndensity.\n\n**`workflow`** (see `.claude/docs/workflow-modes.md`):\n- `full` — all ADRs on the required ADR list must be completed.\n- `standard` — critical ADRs only (Foundation-layer systems).\n- `minimal` — not required. Can still be run voluntarily.\n\n**If the argument starts with `retrofit` followed by a file path**\n\n**Read `references/0-retrofit.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n**If the argument starts with `accept` followed by an ADR id**\n\n**Read `references/0-accept.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\nIf NOT in retrofit or acceptance mode, proceed to Step 1 below (normal ADR authoring).\n\n**No-argument guard**: If no argument was provided (title is empty), ask before\nrunning Phase 0:\n\n> \"What technical decision are you documenting? Please provide a short title\n> (e.g., `event-system-architecture`, `physics-engine-choice`).\"\n\nUse the user's response as the title, then proceed to Step 1.\n\n---\n\n## 1. Load Engine Context (ALWAYS FIRST)\n\n**Read `references/1-engine-context.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## 2. Determine the next ADR number\n\nScan `docs/architecture/` for existing ADRs to find the next number.\n\n---\n\n## 3. Gather context\n\n**Read `references/3-gather-context.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## 4. Guide the decision collaboratively\n\n**Read `references/4-decide.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## 5. Generate the ADR\n\n**Read `references/5-generate.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## 6. Closing Next Steps\n\nAfter the ADR is written (and registry optionally updated), close with `AskUserQuestion`.\n\nBefore generating the widget:\n1. Read the `## Required ADRs` section of `docs/architecture/architecture.md` (by section) and list `docs/architecture/adr-*.md`: a required ADR with no file is still unwritten. Without `architecture.md`, look for ADRs flagged in technical-preferences.md or systems-index.md as prerequisites\n2. Check if all prerequisite ADRs are now written. If yes, include a \"Start writing GDDs\" option.\n3. List ALL remaining priority ADRs as individual options — not just the next one or two.\n\nWidget format:\n```\nADR-[NNNN] written and registry updated. What would you like to do next?\n[1] Write [next-priority-adr-name] — [brief description from prerequisites list]\n[2] Write [another-priority-adr] — [brief description]  (include ALL remaining ones)\n[N] Start writing GDDs — run `/design-system [first-undesigned-system]` (only show if all prerequisite ADRs are written)\n[N+1] Stop here for this session\n```\n\nIf there are no remaining priority ADRs and no undesigned GDD systems, offer only \"Stop here\" and suggest running `/architecture-review` in a fresh session.\n\n**Always include this fixed notice in the closing output (do NOT omit it):**\n\n> To validate ADR coverage against your GDDs, open a **fresh Claude Code session**\n> and run `/architecture-review`.\n>\n> **Never run `/architecture-review` in the same session as `/architecture-decision`.**\n> The reviewing agent must be independent of the authoring context to give an unbiased\n> assessment. Running it here would invalidate the review.\n\n**Do NOT unblock stories here.** This ADR is `Proposed` — Step 5 guarantees it,\nand a story blocked *pending this decision* is still pending it. Unblocking on\nauthoring defeats the guard at the moment it becomes relevant: the pipeline\nappears to flow while running on decisions nobody has accepted.\n\nInstead, tell the user what is now waiting on acceptance:\n\n> \"ADR-NNNN is written and `Proposed`. [N] stories remain `Blocked` pending it.\n> Run `/architecture-decision accept ADR-NNNN` when the decision is settled —\n> that is what moves them to `Ready`.\"\n\nList the blocked stories by path so the cost of leaving it Proposed is visible.\n(Acceptance has consequences enforced across many skills and an authority\nrecorded in only a few, so the route between them must stay explicit.)\n",
+      "card": {
+        "title_zh": "架构决策记录",
+        "purpose_zh": "创建 ADR 文档记录技术决策，包含背景、备选方案与后果，并支持改造已有文档与接受决策两种模式。",
+        "does": [
+          "解析参数，识别 retrofit 改造模式与 accept 接受模式",
+          "加载引擎上下文并扫描 docs/architecture/ 确定下一个 ADR 编号",
+          "协作式引导用户梳理决策背景与备选方案",
+          "生成 ADR 文档并可选更新注册表",
+          "结尾列出剩余优先 ADR 与阻塞故事，提示用独立会话运行架构评审"
+        ],
+        "inputs": [
+          "ADR 标题参数",
+          "retrofit 加文件路径",
+          "accept 加 ADR 编号",
+          "--review full|lean|solo 覆盖评审模式"
+        ],
+        "outputs": [
+          "docs/architecture/ 下的 ADR 文档",
+          "可选的注册表更新",
+          "结尾的后续步骤选项与阻塞故事清单"
+        ],
+        "scenarios": [
+          "记录游戏引擎或系统架构的技术选型决策",
+          "为已有实现补写架构决策记录",
+          "正式接受某条 ADR 以解除阻塞的故事"
+        ],
+        "prerequisites": [
+          "存在 .claude/docs 下的配置与门禁文档",
+          "存在 references/ 下各阶段说明文件",
+          "存在 docs/architecture/ 目录用于存放 ADR"
+        ],
+        "limits": [
+          "本技能不解除故事阻塞，需另行运行 accept 模式",
+          "禁止在同一会话中运行架构评审，须开新会话",
+          "不生成引擎子专家或对抗性评审者"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "产品规划",
+          "后端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Create an ADR documenting a technical decision: context, alternatives considered, consequences."
+          },
+          {
+            "field": "does",
+            "quote": "Scan `docs/architecture/` for existing ADRs to find the next number."
+          },
+          {
+            "field": "does",
+            "quote": "**If the argument starts with `retrofit` followed by a file path**"
+          },
+          {
+            "field": "does",
+            "quote": "**If the argument starts with `accept` followed by an ADR id**"
+          },
+          {
+            "field": "does",
+            "quote": "After the ADR is written (and registry optionally updated), close with `AskUserQuestion`."
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"[title | retrofit <path> | accept <ADR-id>] [--review full|lean|solo]\""
+          },
+          {
+            "field": "outputs",
+            "quote": "List the blocked stories by path so the cost of leaving it Proposed is visible."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "See `.claude/docs/director-gates.md` for the full check pattern."
+          },
+          {
+            "field": "limits",
+            "quote": "**Never run `/architecture-review` in the same session as `/architecture-decision`.**"
+          },
+          {
+            "field": "limits",
+            "quote": "**Do NOT unblock stories here.** This ADR is `Proposed`"
+          },
+          {
+            "field": "hosts",
+            "quote": "open a **fresh Claude Code session**"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion, Bash(wc -c *)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/architecture-review/SKILL.md",
+      "blob_sha": "8c1dd9d6f27f396e3b769b939de27d780d7c486a",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/architecture-review/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "architecture-review",
+        "description": "Traceability matrix mapping GDD requirements to ADRs. Finds gaps, cross-ADR conflicts, engine compatibility. PASS/CONCERNS/NOT ASSESSED/FAIL."
+      },
+      "excerpt": "---\nname: architecture-review\ndescription: \"Traceability matrix mapping GDD requirements to ADRs. Finds gaps, cross-ADR conflicts, engine compatibility. PASS/CONCERNS/NOT ASSESSED/FAIL.\"\nargument-hint: \"[focus: full | coverage | consistency | engine | rtm | single-gdd path/to/gdd.md]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash(bash \"*/.claude/skills/architecture-review/../../hooks/yaml-helper.sh\" resolve_config *), Bash(bash .claude/scripts/review-receipts.sh check *), Bash(bash .claude/scripts/review-receipts.sh hash *), Bash(bash .claude/scripts/adr-dep-graph.sh*), Bash(bash .claude/scripts/registry.sh validate*)\nmodel: opus\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys automation,workflow`\n\n# Architecture Review\n\nThe architecture review validates that the complete body of architectural decisions\ncovers all game design requirements, is internally consistent, and correctly targets\nthe project's pinned engine version. It is the quality gate between Technical Setup\nand Pre-Production.\n\n**This skill spawns no agents.** Phase 5's engine specialist look runs here,\nfrom `references/lens-engine.md`.\n\n**Argument modes:**\n- **No argument / `full`**: Full review — all phases\n- **`coverage`**: Traceability only — which GDD requirements have no ADR\n- **`consistency`**: Cross-ADR conflict detection only\n- **`engine`**: Engine compatibility audit only\n- **`single-gdd [path]`**: Review architecture coverage for one specific GDD\n- **`rtm`**: Requirements Traceability Matrix — extends the standard matrix\n  to include story file paths and test file paths; outputs\n  `docs/architecture/requirements-traceability.md` with the full\n  GDD requirement → ADR → Story → Test chain. Use in Production phase when\n  stories and tests exist.\n\n---\n\nEvery `AskUserQuestion` call follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n**`workflow`** (see `.claude/docs/workflow-modes.md`):\n- `full` — full traceability matrix across all GDDs and all ADRs.\n- `standard` — reduced scope: architecture doc + critical ADRs only.\n- `minimal` — not applicable (no architecture doc required).\n\n## Phase 1: Load Everything\n\n**Read `references/1-load.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 2: Extract Technical Requirements from Every GDD\n\n**Read `references/2-extract-requirements.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 3: Build the Traceability Matrix\n\n**Read `references/3-traceability.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 4: Cross-ADR Conflict Detection\n\n**Read `references/4-conflicts.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 5: Engine Compatibility Cross-Check\n\n**Read `references/5-engine.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 6: Architecture Document Coverage\n\n**Read `references/6-document-coverage.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 7: Output the Review Report\n\n**Read `references/7-report.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 8: Write and Update Traceability Index\n\n**Read `references/8-write.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Phase 9: Handoff\n\n**Read `references/9-handoff.md` now and follow it** — this phase's steps are in that file, not here. Read it again if the conversation was compacted or resumed during this phase.\n\n## Error Recovery Protocol\n\n**First, verify the artifact.** When a phase names a file it writes, check the\npath exists before treating the phase as done — **a named artifact that is not\non disk is a failed phase, however fluent the response reads.**\n\nIf a phase is blocked or cannot finish: **surface it immediately, don't proceed\npast a dependency it blocks, and always produce a partial report** (retry scope\nhere = fewer GDDs / single-system). Full procedure:\n`.claude/docs/error-recovery-protocol.md`.\n\n---\n\n## Collaborative Protocol\n\n**Applies in `collaborative` mode (the default).** For `guided` and\n`autonomous` modes, see `.claude/docs/automation-modes.md` — the rules below\ndescribe what collaborative mode requires, not universal behavior.\n\n1. **Read silently** — do not narrate every file read\n2. **Show the matrix** — present the full traceability matrix before any write\n   approval; let the user see the state\n3. **Don't guess** — if a requirement is ambiguous, ask: \"Is [X] a technical\n   requirement or a design preference?\"\n4. **Draft before approval** — always show the content that will be written (the\n   report, the updated ADR section, the systems-index row) inline in the conversation\n   before requesting approval. Never ask to write something the user has not yet seen.\n5. **Use `AskUserQuestion` for write approvals** — plain text \"May I?\" is not\n   sufficient. Use the structured tool with labeled options [A]/[B]/[C] so the\n   user can choose between \"write now\", \"show full draft first\", and \"not yet\".\n   Multi-file changesets must list every file and what changes, then ask once\n   with grouped options — not a separate plain-text question per file.\n6. **Non-blocking** — the verdict is advisory; the user decides whether to continue\n   despite CONCERNS or even FAIL findings\n",
+      "card": null
+    },
+    {
+      "skill_path": ".claude/skills/art-bible/SKILL.md",
+      "blob_sha": "527aede9767be28eb2d35e8b670c5b09ddf5151f",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/art-bible/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "art-bible",
+        "description": "Author the Art Bible — visual identity gating asset production. Run before /map-systems."
+      },
+      "excerpt": "---\nname: art-bible\ndescription: \"Author the Art Bible — visual identity gating asset production. Run before /map-systems.\"\nargument-hint: \"[--review full|lean|solo]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion, Bash(bash \"*/.claude/skills/art-bible/../../hooks/yaml-helper.sh\" resolve_config *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys review_mode,automation,workflow,docs.density`\n\nResolved above — use as-is; `--review` overrides `review_mode`. No block →\ndefaults in `.claude/docs/config-resolution.md`.\n\n# Art Bible\n\n\n## Phase 0: Parse Arguments and Context Check\n\n\nSee `.claude/docs/director-gates.md` for the standard rules. This skill runs its one gate, AD-ART-BIBLE, itself (Phase 5) and reads `.claude/docs/director-gates/ad-art-bible.md` as its checklist.\n\n**Who drafts what.** `art-director` is spawned for Sections 1–4 and Section 9\nonly: those drafts scored better from the agent than from this conversation.\nNothing else spawns — not Sections 5–8 and not the AD-ART-BIBLE sign-off, even\nwhen the person asks for \"the art director's\" review: those checks are in the\nlens and the gate file, and you apply them here.\n\n**You draft Sections 5–8 yourself, through their lenses.** What the art-director,\nUX and technical-art specialists brought is in `references/`: read\n`references/lens-art-director.md` before the first of those sections, and\n`lens-ux-designer.md` at Section 7 and `lens-technical-artist.md` at Section 8\nonly. Read each once; it stays in context for the rest of the run. Outside\nSections 7 and 8, do not load `references/lens-ux-designer.md` or\n`references/lens-technical-artist.md`.\n\n\nEvery `AskUserQuestion` call follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n**`docs.density`** — it controls per-section *depth*, where `workflow`\ncontrols which sections exist. `modes.rigor` sets both together; set\n`docs.density` explicitly to vary depth alone: `terse` (the default, via `rigor: minimal`) = each section a bulleted list of\nconstraints + references; `balanced` = paragraphs explaining each visual choice\n(`rigor: standard`); `thorough` = full prose including style explorations, references, and\nrationale per choice. Apply it to every section you author.\n\n**`workflow`** (see `.claude/docs/workflow-modes.md`):\n- `full` — all 9 art bible sections required.\n- `standard` — required only if visual asset stories exist in the project;\n  sections 1–4 are the minimum when required. `workflow_overrides.art_bible_strict:\n  true` forces all 9 sections regardless of tier.\n- `minimal` — not required. Can still be run voluntarily.\n\nRead `design/gdd/game-concept.md` — or `design/game-brief.md`, the one-page brief\nthat replaces it at `rigor: minimal`. Read it by section: find the headings you need\nwith the Grep tool (pattern `^#`, content mode) and Read those ranges with offset\nand limit. If neither exists, fail with:\n> \"No game concept found. Run `/brainstorm` first — the art bible is authored after the game concept is approved.\"\n\nExtract from game-concept.md (from the brief: working title, pitch, \"Who it's for /\nwhat they feel\" line and Label line, \"Art & audio direction\" in older briefs — it has no pillars, Visual\nIdentity Anchor or platform):\n- Game title (working title)\n- Core fantasy and elevator pitch\n- Game pillars (all of them)\n- **Visual Identity Anchor** section if present (from brainstorm Phase 4 art-director output)\n- Target platform (if noted)\n\n**Retrofit mode detection**: Glob `design/art/art-bible.md`. If the file exists,\nbuild the status table **without reading the document** — you are about to author\nonly the *incomplete* sections, so loading the complete ones is loading exactly\nwhat you will not touch:\n\n```\nGrep pattern=\"^## \" path=\"design/art/art-bible.md\" output_mode=\"content\" -n\nGrep pattern=\"\\[To be designed\\]|\\[TBD\\]|\\[To be written\\]|^_?TODO\" path=\"design/art/art-bible.md\" output_mode=\"content\" -n\n```\n\n- The first grep gives the section headings and their line numbers — the gap\n  between consecutive headings is that section's size.\n- The second gives placeholder markers and where they fall.\n- A section is **Complete** if it has substantive distance to the next heading and\n  no placeholder marker inside it; **Placeholder** if a marker falls in its range;\n  **Empty** if consecutive headings sit adjacent.\n- Where the two greps leave a section genuinely ambiguous, read *that section's*\n  line range with `Read(offset, limit)` — never the whole file.\n- Build a section status table:\n\n```\nSection | Status\n--------|--------\n1. Visual Identity Statement | [Complete / Empty / Placeholder]\n2. Mood & Atmosphere | ...\n3. Shape Language | ...\n4. Color System | ...\n5. Character Design Direction | ...\n6. Environment Design Language | ...\n7. UI/HUD Visual Direction | ...\n8. Asset Standards | ...\n9. Reference Direction | ...\n```\n\n- Present this table to the user:\n  > \"Found existing art bible at `design/art/art-bible.md`. [N] sections are complete, [M] need content. I'll work on the incomplete sections only — existing content will not be touched.\"\n- Only work on sections with Status: Empty or Placeholder. Do not re-author sections that are already complete.\n\nIf the file does not exist, this is a fresh authoring session. The first\napproved section creates the file from `.claude/docs/templates/art-bible.md`,\nwhose nine `## N. Name` headings are the ones retrofit mode reads — ask first:\n\"May I create `design/art/art-bible.md` from the art bible template?\" Each\napproved section then replaces its own `[To be designed]` line with `Edit`;\nkeep the headings as the template has them.\n\n**A section's approval names its write.** Every section is approved through an\n`AskUserQuestion` whose approving option is `[A] Lock this in and write it to\ndesign/art/art-bible.md` (Section 1's full option list is below). Choosing it is\nthe approval to write that section; no section is written without it, fresh or\nretrofit.\n\nExtract performance budgets and the engine for asset standard constraints: read `performance.*` and `engine.name` from `project.yaml`; for any key absent or empty (including when `project.yaml` has no `performance` or `engine` block), fall back to `.claude/docs/technical-preferences.md`.\n\n---\n\n## Phase 1: Framing\n\nPresent the session context and ask two questions before authoring anything:\n\nUse `AskUserQuestion` with two tabs:\n- Tab **\"Scope\"** — \"Which sections need to be authored today?\"\n  Options: `Full bible — all 9 sections` / `Visual identity core (sections 1–4 only)` / `Asset standards only (section 8)` / `Resume — fill in missing sections`\n\n  **Mark the option the resolved `workflow` tier actually requires as\n  (Recommended), and say why** — the tier already decides this and the user\n  should not have to know the tier table to answer:\n  - `full` → **Full bible** — all 9 sections are required at this tier.\n  - `standard` → **Visual identity core (sections 1–4 only)** — that is the\n    documented minimum when an art bible is required at all. Say: \"Sections 1–4\n    are what `standard` requires; 5–9 are available if you want them.\"\n  - `minimal` → no art bible is required. Say so before asking, and offer\n    sections 1–4 as the useful-if-you-want-it option rather than defaulting to 9.\n  - `workflow_overrides.art_bible_strict: true` → **Full bible** regardless of tier.\n\n  This is the single biggest cost lever in this skill: authoring 9 sections\n  where the tier requires 4 more than doubles the run for artifacts nothing\n  downstream will check.\n- Tab **\"References\"** — \"Do you have reference games, films, or art that define the visual direction?\"\n  (Free text — let the user type specific titles. Do not preset options here.)\n\nIf the game-concept.md has a Visual Identity Anchor section, note it:\n> \"Found a visual identity anchor from brainstorm: '[",
+      "card": {
+        "title_zh": "美术圣经编写",
+        "purpose_zh": "为游戏项目编写美术圣经（Art Bible），定义视觉识别与美术资产标准，在资产生产前完成视觉方向把关。",
+        "does": [
+          "读取游戏概念文档，提取标题、核心幻想、支柱与视觉锚点",
+          "检测已有美术圣经并生成章节完成状态表，仅补写空缺章节",
+          "通过 art-director 代理起草视觉识别声明、情绪氛围、形状语言、色彩系统等章节",
+          "按用户确认逐节写入 design/art/art-bible.md",
+          "按 workflow 层级与 docs.density 控制章节范围与深度",
+          "执行 AD-ART-BIBLE 评审关卡"
+        ],
+        "inputs": [
+          "design/gdd/game-concept.md 或 design/game-brief.md",
+          "已有 design/art/art-bible.md（可选，用于续写）",
+          "project.yaml 中的 performance 与 engine.name",
+          "用户提供的参考游戏、电影或美术资料",
+          "用户对章节范围与内容的选择"
+        ],
+        "outputs": [
+          "design/art/art-bible.md 美术圣经文档",
+          "章节完成状态表",
+          "各章节草稿与用户确认记录"
+        ],
+        "scenarios": [
+          "新游戏概念确定后编写完整美术圣经",
+          "为已有美术圣经补齐空缺或占位章节",
+          "仅编写视觉识别核心章节（1–4）",
+          "仅编写资产标准章节（第8节）"
+        ],
+        "prerequisites": [
+          "已存在游戏概念文档，否则提示先运行 /brainstorm",
+          "用户确认可创建 design/art/art-bible.md",
+          "存在 .claude/docs 下的配置、模板与评审规则文件"
+        ],
+        "limits": [
+          "未找到游戏概念文档时直接失败",
+          "续写模式不重写已完成章节",
+          "第5–8节由本会话按视角文件自行起草，不派生代理",
+          "章节写入需用户通过 AskUserQuestion 批准"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "游戏",
+          "写作",
+          "产品规划",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Author the Art Bible — visual identity gating asset production. Run before /map-systems."
+          },
+          {
+            "field": "does",
+            "quote": "Read `design/gdd/game-concept.md` — or `design/game-brief.md`, the one-page brief that replaces it at `rigor: minimal`."
+          },
+          {
+            "field": "does",
+            "quote": "Only work on sections with Status: Empty or Placeholder. Do not re-author sections that are already complete."
+          },
+          {
+            "field": "does",
+            "quote": "This skill runs its one gate, AD-ART-BIBLE, itself (Phase 5)"
+          },
+          {
+            "field": "inputs",
+            "quote": "Extract performance budgets and the engine for asset standard constraints: read `performance.*` and `engine.name` from `project.yaml`"
+          },
+          {
+            "field": "outputs",
+            "quote": "The first approved section creates the file from `.claude/docs/templates/art-bible.md`"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Options: `Full bible — all 9 sections` / `Visual identity core (sections 1–4 only)` / `Asset standards only (section 8)` / `Resume — fill in missing sections`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "No game concept found. Run `/brainstorm` first — the art bible is authored after the game concept is approved."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "May I create `design/art/art-bible.md` from the art bible template?"
+          },
+          {
+            "field": "limits",
+            "quote": "If neither exists, fail with:"
+          },
+          {
+            "field": "limits",
+            "quote": "You draft Sections 5–8 yourself, through their lenses."
+          },
+          {
+            "field": "limits",
+            "quote": "no section is written without it, fresh or retrofit."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion, Bash(bash \"*/.claude/skills/art-bible/../../hooks/yaml-helper.sh\" resolve_config *)"
+          },
+          {
+            "field": "hosts",
+            "quote": "model: sonnet"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/asset-audit/SKILL.md",
+      "blob_sha": "94494e0e2c96cf6aa0b40fd809155151fdae56a0",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/asset-audit/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "asset-audit",
+        "description": "Audit assets against naming conventions, file size budgets, format standards. Finds orphaned assets, missing references."
+      },
+      "excerpt": "---\nname: asset-audit\ndescription: \"Audit assets against naming conventions, file size budgets, format standards. Finds orphaned assets, missing references.\"\nargument-hint: \"[category|all]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Bash(stat *), Bash(file *), Bash(od *), Bash(wc *), Bash(du *)\nmodel: sonnet\n# Read-only diagnostic skill — no specialist agent delegation needed\n---\n\n# Asset Audit\n\n## Measuring file sizes and formats requires Bash\n\nThis skill's report asks for **file sizes against budgets**, **texture dimensions**\n(power-of-two), **audio sample rates**, and **last-modified times** for orphan\ndetection. None of those are obtainable from `Read`/`Glob`/`Grep` — they need\n`stat` or a binary header read, so the read-only measuring commands (`stat`,\n`file`, `od`, `wc`, `du`) are pre-approved above; list files with Glob. Anything\nelse asks first.\n\n**If you cannot take a measurement, the cell is `NOT ASSESSED`, never an\nestimate.** A size budget table filled from guesses is worse than an empty one:\nit looks like evidence. This is a live fabrication vector even on a project full\nof real assets: if the template demands tables of numbers the tool allowlist\ncannot produce, the only way to complete it is to invent them.\n\n---\n\n## Insufficient input — check this before producing any report\n\n**If the inputs this skill needs do not exist, the answer is \"could not run\" —\nnot a filled-in report.** Check first, and stop if the check fails.\n\n1. List the inputs this skill reads (data files, prior reports, profiler output,\n   test results, registries, source code).\n2. For each, record `FOUND` or `ABSENT` — not \"assumed present\".\n3. If any input required for a section is ABSENT, that section is\n   **`NOT ASSESSED — NO DATA`**. Do not estimate it, do not infer it from an\n   adjacent artifact, and do not leave a mandated cell to be filled by whoever\n   reads the template next.\n4. If **every** required input is ABSENT, stop and report\n   **`NOT ASSESSED — NO DATA`** as the whole verdict, naming what was missing and\n   which skill produces it.\n\n**A verdict of `NOT ASSESSED` is a success.** It is the correct, useful answer to\n\"what does the data say?\" when there is no data. The failure mode this prevents is\nspecific: a report whose verdict enum has no \"could not run\" state produces\n**false clean passes** — an asset audit returning COMPLIANT on a project with no\nassets and no standards, or a performance profile reporting \">99% headroom against\na 16.67ms budget\" with zero profiler data and no budget ever set.\n\n**Absence of evidence is never evidence of absence.** A scan that finds no\nmatches because there are no files to scan has not verified anything. Say which of\nthe two happened — a reader cannot tell from a green result.\n\n---\n\n## Phase 1: Read Standards\n\nRead the art bible's Asset Standards section (`design/art/art-bible.md`) and any\nasset standards in the relevant design docs — size budgets and format rules come\nfrom there. The naming patterns are the ones in Phase 3 below, unless the art\nbible states its own. Read the art bible by section: find the heading with\nthe Grep tool (pattern `^#`, content mode) and Read that range with offset\nand limit.\n\nIf neither states a size budget — or there is no art bible — the Size section is\n`NOT ASSESSED — no size budget set`, and the report names `/art-bible`, whose\nAsset Standards section sets budgets, formats and the naming convention.\n\n---\n\n## Phase 2: Scan Asset Directories\n\nAssets live under the engine's asset root: `assets/` on Godot, `Assets/` on\nUnity, `Content/` on Unreal. Resolve the engine and its code root per\n`.claude/docs/code-root-resolution.md`; that code root is the one Phase 3's\norphan and missing-asset searches read. If it is unresolved, stop:\n`NOT ASSESSED — engine unresolved`, naming `/setup-engine`.\n\nScan the asset root using Glob:\n\n- **Godot** — `assets/art/**/*`, `assets/audio/**/*`, `assets/vfx/**/*`,\n  `assets/shaders/**/*`, `assets/data/**/*`\n- **Unity** — `Assets/**/*`, leaving out scripts (`*.cs`, `*.asmdef`) and `*.meta` files\n- **Unreal** — `Content/**/*.uasset` and `Content/**/*.umap`\n\nThe files matched are `Total assets scanned`. If there are none, the checks on\nscanned files — Naming, Size, Format, Orphaned — are\n`NOT ASSESSED — no assets under <asset root>`; the missing-asset search still runs.\n\n---\n\n## Phase 3: Run Compliance Checks\n\n**Naming conventions:**\n- Art: `[category]_[name]_[variant]_[size].[ext]`\n- Audio: `[category]_[context]_[name]_[variant].[ext]`\n- All files must be lowercase with underscores\n\nThese are Godot's conventions. Unity and Unreal name assets in PascalCase, so on\nthose engines check names only against a naming rule the art bible states; with\nnone, Naming is `NOT ASSESSED — no naming rule for <engine>` (name `/art-bible`).\n\n**File standards:**\n- Textures: Power-of-two dimensions, correct format (PNG for UI, compressed for 3D), within size budget\n- Audio: Correct sample rate, format (OGG for SFX, OGG/MP3 for music), within duration limits.\n  `file` reports an audio file's format and sample rate but not its length, and no\n  pre-approved tool here does; a duration budget is therefore\n  `NOT ASSESSED — duration not measurable here`, naming the files it covers.\n- Data: Valid JSON/YAML, schema-compliant\n\nOn Unreal an asset file (`.uasset`, `.umap`) does not keep its source file's\nformat or dimensions, so Format is `NOT ASSESSED` there; its size is still measured.\n\n**Orphaned assets:** Search the code root for references to each asset file. Flag any with no references.\n\n**Missing assets:** Search the code root for asset references and verify the files exist.\n\nBoth searches need code: if the code root holds no source files, Orphaned and\nMissing are `NOT ASSESSED — no code to search`. On Unity and Unreal most asset\nreferences live in scenes, prefabs and other assets rather than code, so an\nasset no code names may still be in use: Orphaned is `NOT ASSESSED` there.\n\n---\n\n## Phase 4: Output Audit Report\n\n```markdown\n# Asset Audit Report -- [Category] -- [Date]\n\n## Summary\n- **Total assets scanned**: [N]\n- **Naming violations**: [N]\n- **Size violations**: [N]\n- **Format violations**: [N]\n- **Orphaned assets**: [N]\n- **Missing assets**: [N]\n- **Sections not assessed**: [none | each section and why]\n\n## Naming Violations\n| File | Expected Pattern | Issue |\n|------|-----------------|-------|\n\n## Size Violations\n| File | Budget | Actual | Overage |\n|------|--------|--------|---------|\n\n## Format Violations\n| File | Expected Format | Actual Format |\n|------|----------------|---------------|\n\n## Orphaned Assets (no code references found)\n| File | Last Modified | Size | Recommendation |\n|------|-------------|------|---------------|\n\n## Missing Assets (referenced but not found)\n| Reference Location | Expected Path |\n|-------------------|---------------|\n\n## Recommendations\n[Prioritized list of fixes, one per violation, each naming the change — the\ntarget resolution or compression for a size violation, the corrected name for a\nnaming violation, the target format for a format violation]\n\n## Verdict: [NOT ASSESSED / COMPLIANT / WARNINGS / NON-COMPLIANT]\n```\n\nChoose the verdict by the findings, first match wins:\n- **NON-COMPLIANT** — any size violation, or any asset that code references but that does not exist\n- **WARNINGS** — only naming, format or orphaned-asset findings\n- **NOT ASSESSED** — the audit did not cover its scope: no data at all (the path\n  above), zero assets scanned, or any section `NOT ASSESSED` — name which. It\n  ranks below the two finding verdicts, because a measured violation is more\n  actionable than a gap, and above COMPLIANT\n- **COMPLIANT** — at least one asset scanned, every section assessed, no findings\n\nThis skill is read-only — it produces a report but does not write files.\n\n---\n\n## Phase 5: Next Steps\n\n- Fix naming violations using the Phase 3 patterns (or the art bible's, where it states its own).\n- If standards were missing, run `/art-bible` to wri",
+      "card": {
+        "title_zh": "资产审计",
+        "purpose_zh": "按命名规范、体积预算与格式标准审计游戏资产，找出孤立资产与缺失引用，并输出只读审计报告。",
+        "does": [
+          "读取美术圣经的资产标准，获取体积预算、格式与命名规则",
+          "按引擎资产根目录扫描美术、音频、特效、着色器与数据文件",
+          "检查命名规范、纹理尺寸与格式、音频格式与采样率、数据文件有效性",
+          "在代码根目录搜索引用，标记无引用的孤立资产与引用但缺失的资产",
+          "对无法测量的项目标注 NOT ASSESSED，不估算",
+          "按发现输出含违规表格、建议与结论的审计报告"
+        ],
+        "inputs": [
+          "美术圣经 design/art/art-bible.md 的 Asset Standards 章节",
+          "相关设计文档中的资产标准",
+          "引擎资产根目录下的资产文件",
+          "代码根目录中的源码引用",
+          "代码根目录解析文档 .claude/docs/code-root-resolution.md"
+        ],
+        "outputs": [
+          "资产审计报告 Markdown，含汇总、命名/体积/格式违规表、孤立与缺失资产表、建议与结论",
+          "结论枚举：NOT ASSESSED / COMPLIANT / WARNINGS / NON-COMPLIANT"
+        ],
+        "scenarios": [
+          "游戏项目资产命名与格式合规检查",
+          "清理无代码引用的孤立资产",
+          "核对代码引用但缺失的资产文件",
+          "在缺少标准或数据时明确报告无法评估"
+        ],
+        "prerequisites": [
+          "存在美术圣经或设计文档中的资产标准，否则体积部分为 NOT ASSESSED",
+          "能解析引擎与代码根目录，否则停止并提示 /setup-engine",
+          "资产位于对应引擎的资产根目录（assets/、Assets/、Content/）"
+        ],
+        "limits": [
+          "只读，不写文件",
+          "无法测量时长，音频时长预算为 NOT ASSESSED",
+          "Unreal 的 .uasset/.umap 不保留源格式与尺寸，格式为 NOT ASSESSED",
+          "Unity/Unreal 资产引用多在场景与预制体中，孤立资产为 NOT ASSESSED",
+          "Unity/Unreal 无美术圣经命名规则时命名为 NOT ASSESSED",
+          "代码根目录无源码时孤立与缺失检查为 NOT ASSESSED",
+          "不得估算，无法测量即 NOT ASSESSED"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "游戏",
+          "测试",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Audit assets against naming conventions, file size budgets, format standards. Finds orphaned assets, missing references."
+          },
+          {
+            "field": "does",
+            "quote": "Read the art bible's Asset Standards section (`design/art/art-bible.md`) and any asset standards in the relevant design docs — size budgets and format rules come from there."
+          },
+          {
+            "field": "does",
+            "quote": "Scan the asset root using Glob:"
+          },
+          {
+            "field": "does",
+            "quote": "**Orphaned assets:** Search the code root for references to each asset file. Flag any with no references."
+          },
+          {
+            "field": "does",
+            "quote": "**Missing assets:** Search the code root for asset references and verify the files exist."
+          },
+          {
+            "field": "does",
+            "quote": "**If you cannot take a measurement, the cell is `NOT ASSESSED`, never an estimate.**"
+          },
+          {
+            "field": "does",
+            "quote": "## Phase 4: Output Audit Report"
+          },
+          {
+            "field": "inputs",
+            "quote": "Resolve the engine and its code root per `.claude/docs/code-root-resolution.md`; that code root is the one Phase 3's orphan and missing-asset searches read."
+          },
+          {
+            "field": "outputs",
+            "quote": "## Verdict: [NOT ASSESSED / COMPLIANT / WARNINGS / NON-COMPLIANT]"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If neither states a size budget — or there is no art bible — the Size section is `NOT ASSESSED — no size budget set`, and the report names `/art-bible`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If it is unresolved, stop: `NOT ASSESSED — engine unresolved`, naming `/setup-engine`."
+          },
+          {
+            "field": "limits",
+            "quote": "This skill is read-only — it produces a report but does not write files."
+          },
+          {
+            "field": "limits",
+            "quote": "a duration budget is therefore `NOT ASSESSED — duration not measurable here`, naming the files it covers."
+          },
+          {
+            "field": "limits",
+            "quote": "On Unreal an asset file (`.uasset`, `.umap`) does not keep its source file's format or dimensions, so Format is `NOT ASSESSED` there; its size is still measured."
+          },
+          {
+            "field": "limits",
+            "quote": "On Unity and Unreal most asset references live in scenes, prefabs and other assets rather than code, so an asset no code names may still be in use: Orphaned is `NOT ASSESSED` there."
+          },
+          {
+            "field": "limits",
+            "quote": "Both searches need code: if the code root holds no source files, Orphaned and Missing are `NOT ASSESSED — no code to search`."
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Read, Glob, Grep, Bash(stat *), Bash(file *), Bash(od *), Bash(wc *), Bash(du *)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "the read-only measuring commands (`stat`, `file`, `od`, `wc`, `du`) are pre-approved above"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/asset-spec/SKILL.md",
+      "blob_sha": "f3b452989f181195f48edeab09c577b8da98cb6c",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/asset-spec/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "asset-spec",
+        "description": "Per-asset visual specs plus AI generation prompts from GDDs and character profiles. After the art bible."
+      },
+      "excerpt": "---\nname: asset-spec\ndescription: \"Per-asset visual specs plus AI generation prompts from GDDs and character profiles. After the art bible.\"\nargument-hint: \"[system:<name> | level:<name> | character:<name>] [--review full|lean|solo]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion, Bash(bash \"*/.claude/skills/asset-spec/../../hooks/yaml-helper.sh\" resolve_config *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys review_mode,automation`\n\n# Asset Spec\n\n\n\nIf no argument is provided, check whether `design/assets/entity-inventory.md` exists:\n- If it exists: read it, find the first entity or screen with status \"Needed\" but no spec file yet, and use `AskUserQuestion`:\n  - Prompt: \"The next unspecced item is **[name]**. Generate specs for it?\"\n  - Options: `[A] Yes — spec [name]` / `[B] Pick a different item` / `[C] Stop here`\n- If no entity inventory: check `design/assets/asset-manifest.md`. If manifest exists, same flow above but reading from manifest.\n- If neither exists: **start the Entity & Screen Inventory flow** (Phase 0b below) rather than failing.\n\n---\n\nEvery `AskUserQuestion` call follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt). **Note**: actually invoking an external image\ngenerator (calling an image API) always prompts regardless of\n`modes.automation` — it is an irreversible external action guarded\nunconditionally, independent of whether `external_calls` is listed in\n`automation_always_ask`. (Today this skill only emits generation-prompt\n*text*; the guard applies if live generation is ever wired in.)\n\n## Phase 0b: Entity & Screen Inventory (runs when no arguments and no existing inventory)\n\nThis flow produces `design/assets/entity-inventory.md` — the master list of everything\nthe game needs visually. Run once before asset spec work begins.\n\n### Step 1 — Gather from docs\nRead all available source material in parallel, each doc by section: find the\nheadings you need with the Grep tool (pattern `^#`, content mode) and Read those\nranges with offset and limit.\n- `design/gdd/systems-index.md` — extract every system listed\n- GDD asset content — do **not** full-read every GDD. The two wanted sections are\n  standard headings, and named entities live in the registry:\n  ```\n  Grep pattern=\"## (Visual/Audio Requirements|UI Requirements)\" glob=\"design/gdd/*.md\" output_mode=\"content\" -A 25\n  ```\n  For named entities (characters, enemies, buildings, items), read\n  `design/registry/entities.yaml` (`entities`/`items`) if it exists and has\n  entries; otherwise grep the GDDs for named content. Full-read a GDD only when\n  its Visual/Audio section is missing or reads `[To be designed]` (Phase 1 already\n  handles that case). VFX events surface in the Visual/Audio grep context.\n- `design/art/art-bible.md` — extract: any named visual categories, asset type expectations\n- `design/narrative/` — scan for any character or world entity documents if they exist (optional — not required)\n\n### Step 2 — Build proposed inventory\nOrganize everything found into categories:\n\n```\nCharacters / Protagonists\nEnemies / Creatures\nBuildings / Structures\nEnvironment / Terrain\nItems / Props\nVFX / Particles\nUI Screens (list each screen by name)\nHUD Elements\nAudio (SFX, music — descriptions only, no generation prompts)\nOther\n```\n\nFor each item, note the source doc it was found in.\n\n### Step 3 — Present and collaborate\nPresent the full proposed inventory to the user in conversation. Then use `AskUserQuestion`:\n- Prompt: \"I found **[N] visual entities and [N] UI screens** across your GDDs and art bible. Review the list — what's missing, what's not needed?\"\n- Options:\n  - `[A] Looks good — save this inventory`\n  - `[B] Add items I'll describe`\n  - `[C] Remove items that don't apply`\n  - `[D] Both add and remove — let me edit`\n\nIf [B] or [D]: ask the user to describe additional items. Accept brief descriptions (\"a medieval keep, used as a level background\") or detailed ones — either works. Work through them collaboratively until the user is satisfied.\n\nIf [C] or [D]: ask which items to remove and why. Remove them from the list.\n\n### Step 4 — Write inventory\nAfter user approval, ask: \"May I write the entity inventory to `design/assets/entity-inventory.md`?\"\n\nWrite the file:\n\n```markdown\n# Visual Entity & Screen Inventory\n\n> Generated: [date]\n> Sources: [list of source docs read]\n\n## Entities\n\n| # | Name | Type | Description | Source | Status |\n|---|------|------|-------------|--------|--------|\n| 1 | [name] | Character / Enemy / Building / Environment / Item / Other | [brief description] | [source doc] | Needed |\n\n## UI Screens\n\n| # | Screen Name | Description | Source | Status |\n|---|-------------|-------------|--------|--------|\n| 1 | Main Menu | [description] | [source] | Needed |\n\n## HUD Elements\n\n| # | Element | Description | Source | Status |\n|---|---------|-------------|--------|--------|\n\n## Audio\n\n| # | Name | Type (SFX / Music / Ambient) | Description | Source | Status |\n|---|------|------------------------------|-------------|--------|--------|\n```\n\nAfter writing, tell the user:\n> \"Entity inventory saved. Next steps:\n> - Run `/ux-design [screen name]` for each UI screen in the inventory\n> - Run `/asset-spec system:[name]`, `level:[name]` or `character:[name]` for each\n>   visual entity — whichever of the three the entity belongs to\n> - Or run `/asset-spec` again to work through the inventory one item at a time\"\n\n---\n\n## Phase 0: Parse Arguments\n\nExtract:\n- **Target type**: `system`, `level`, or `character`\n- **Target name**: the name after the colon (normalize to kebab-case)\n- **Review mode**: `--review [full|lean|solo]` if present\n\nThe effective mode is the one already resolved at the top of this skill via\n`resolve_config --keys review_mode`, which applies the full chain; with nothing\nset it follows `modes.rigor` — `solo` at `minimal` (the default), `lean` at\n`standard`, `full` at `full`. A `--review` argument overrides it for this\nrun only.\n\n**Mode behavior:**\n- `full`: spawn both `art-director` and `technical-artist` in parallel\n- `lean`: spawn `art-director` only — faster, skips technical constraint pass\n- `solo`: no agent spawning — main session writes specs from art bible rules alone. Use for simple asset categories or when speed matters more than depth.\n\n---\n\n## Phase 1: Gather Context\n\nRead all source material **before** asking the user anything. Read the art bible and\nthe GDD by section: find the headings you need with the Grep tool (pattern `^#`,\ncontent mode) and Read those ranges with offset and limit.\n\n### Required reads:\n- **Art bible**: Read `design/art/art-bible.md` — fail if missing:\n  > \"No art bible found. Run `/art-bible` first — asset specs are anchored to the art bible's visual rules and asset standards.\"\n\n  **Exception — the minimal path.** If there is no art bible but\n  `design/game-brief.md` exists (at `rigor: minimal` no art bible is required),\n  do not fail: anchor the specs in the brief's **Label** line (**Art & audio\n  direction** in older briefs),\n  and say so at the top of the output — \"Anchored to the brief's one-line art\n  direction; there is no art bible, so colour, shape and asset-standard rules\n  below are proposals, not constraints.\" Offer `/art-bible` once, as optional.\n  The written spec follows the same anchor: its header reads\n  `> **Art direction**: design/game-brief.md (Label) — no art bible`\n  in place of the `> **Art Bible**:` line, each asset carries\n  `**Brief anchor:** [the brief line applied]` in place of the **Art Bible\n  Anchors** block, and no spec cites an Art Bible section or §8 tier.\n  Extract: Visual Identity Statement, Color System (semantic colors), Shape Language, Asset Standards (art bible Section 8 — dimensions, formats, polycount budgets, texture resolution tiers).\n\n- **Project config**: Read `performance.*` and `n",
+      "card": {
+        "title_zh": "资产规格生成",
+        "purpose_zh": "依据美术圣经与GDD、角色档案，为游戏各视觉实体生成逐项资产规格及AI生成提示词文本，并维护实体与界面清单。",
+        "does": [
+          "无参数且无清单时，从GDD、美术圣经等文档汇总生成实体与界面清单文件",
+          "按system、level、character目标读取对应源文档并识别资产类型",
+          "按full、lean、solo三种审查模式生成资产规格，可并行调用美术指导等子代理",
+          "为资产输出尺寸、格式等规格及AI生成提示词文本",
+          "重跑时只提出新增或变更内容并就地更新已有规格文件"
+        ],
+        "inputs": [
+          "目标类型与名称参数（system:、level:、character:）",
+          "--review full|lean|solo 审查模式参数",
+          "design/art/art-bible.md 美术圣经",
+          "design/gdd/ 下系统GDD及design/levels/、design/narrative/ 源文档",
+          "project.yaml 的 performance、naming 配置或技术偏好文档",
+          "已有规格与资产清单文件"
+        ],
+        "outputs": [
+          "design/assets/entity-inventory.md 实体与界面清单",
+          "design/assets/specs/[target-name]-assets.md 资产规格文件",
+          "对话中呈现的资产清单与上下文摘要",
+          "AI生成提示词文本"
+        ],
+        "scenarios": [
+          "为游戏系统、关卡或角色生成视觉资产规格",
+          "项目初期建立视觉实体与UI界面总清单",
+          "为美术外包或AI图像生成准备逐资产提示词",
+          "在已有规格基础上增量更新资产规格"
+        ],
+        "prerequisites": [
+          "需先有美术圣经；minimal 严格度下可用游戏简报的一行美术方向替代",
+          "system 目标需对应GDD含Visual/Audio Requirements章节",
+          "character 目标无档案时需用户口头描述"
+        ],
+        "limits": [
+          "仅输出生成提示词文本，不实际调用图像生成API",
+          "音频仅作描述，不生成提示词",
+          "无美术圣经且无简报时失败",
+          "资产清单需用户确认后才写入"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "游戏",
+          "设计/UI",
+          "文档",
+          "图像"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Per-asset visual specs plus AI generation prompts from GDDs and character profiles. After the art bible."
+          },
+          {
+            "field": "does",
+            "quote": "This flow produces `design/assets/entity-inventory.md` — the master list of everything the game needs visually."
+          },
+          {
+            "field": "does",
+            "quote": "Today this skill only emits generation-prompt *text*"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"[system:<name> | level:<name> | character:<name>] [--review full|lean|solo]\""
+          },
+          {
+            "field": "inputs",
+            "quote": "Read `design/art/art-bible.md` — fail if missing"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "No art bible found. Run `/art-bible` first — asset specs are anchored to the art bible's visual rules and asset standards."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If there is no art bible but `design/game-brief.md` exists (at `rigor: minimal` no art bible is required), do not fail"
+          },
+          {
+            "field": "limits",
+            "quote": "actually invoking an external image generator (calling an image API) always prompts"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion, Bash(bash \"*/.claude/skills/asset-spec/../../hooks/yaml-helper.sh\" resolve_config *)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "May I write the entity inventory to `design/assets/entity-inventory.md`?"
+          },
+          {
+            "field": "hosts",
+            "quote": "${CLAUDE_SKILL_DIR}"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/balance-check/SKILL.md",
+      "blob_sha": "78e98c9f9f44a1844b39f67b0d8ef13aed03225a",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/balance-check/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "balance-check",
+        "description": "Find balance outliers, broken progressions, degenerate strategies, economy imbalances in formulas and data. 'Check game balance'."
+      },
+      "excerpt": "---\nname: balance-check\ndescription: \"Find balance outliers, broken progressions, degenerate strategies, economy imbalances in formulas and data. 'Check game balance'.\"\nargument-hint: \"[system-name|path-to-data-file]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, AskUserQuestion, Bash(bash \"*/.claude/skills/balance-check/../../hooks/yaml-helper.sh\" resolve_config *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys automation`\n\n# Balance Check\n\n\n\nEvery `AskUserQuestion` call follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n## Insufficient input — check this before producing any report\n\n**If the inputs this skill needs do not exist, the answer is \"could not run\" —\nnot a filled-in report.** Check first, and stop if the check fails.\n\n1. List the inputs this skill reads (data files, prior reports, profiler output,\n   test results, registries, source code).\n2. For each, record `FOUND` or `ABSENT` — not \"assumed present\".\n3. If any input required for a section is ABSENT, that section is\n   **`NOT ASSESSED — NO DATA`**. Do not estimate it, do not infer it from an\n   adjacent artifact, and do not leave a mandated cell to be filled by whoever\n   reads the template next.\n4. If **every** required input is ABSENT, stop and report\n   **`NOT ASSESSED — NO DATA`** as the whole verdict, naming what was missing and\n   which skill produces it.\n\n**A verdict of `NOT ASSESSED` is a success.** It is the correct, useful answer to\n\"what does the data say?\" when there is no data. The failure mode this prevents is\nspecific: a report whose verdict enum has no \"could not run\" state produces\n**false clean passes** — an asset audit returning COMPLIANT on a project with no\nassets and no standards, or a performance profile reporting \">99% headroom against\na 16.67ms budget\" with zero profiler data and no budget ever set.\n\n**Absence of evidence is never evidence of absence.** A scan that finds no\nmatches because there are no files to scan has not verified anything. Say which of\nthe two happened — a reader cannot tell from a green result.\n\n---\n\n## Phase 1: Identify Balance Domain\n\nDetermine the balance domain from `$ARGUMENTS` — the whole string, since a data-file path may contain spaces:\n\n- **Combat** → weapon/ability DPS, time-to-kill, damage type interactions\n- **Economy** → resource faucets/sinks, acquisition rates, item pricing\n- **Progression** → XP/power curves, dead zones, power spikes\n- **Loot** → rarity distribution, pity timers, inventory pressure\n- **File path given** → load that file directly and infer domain from content\n\nIf no argument, ask the user which system to check.\n\n---\n\n## Phase 2: Read Data Files\n\nRead relevant files from `assets/data/` (`data/` in a web game) and `design/balance/` for the identified domain.\nNote every file read — they will appear in the Data Sources section of the report.\n\n---\n\n## Phase 3: Read Design Document\n\n**Registry first.** If `design/registry/entities.yaml` exists, read it before the\nGDD. Its `constants` and `formulas` sections hold the cross-GDD named values and\noutput ranges — the balance targets — already distilled, each with a `source:`\nGDD and any `revised:` date:\n```\nGrep pattern=\"^  - name:\" path=\"design/registry/entities.yaml\" output_mode=\"content\" -A 6\n```\nTake the intended values from the registry for any constant or formula it lists\n(the `constants:` and `formulas:` blocks); these are the authoritative cross-doc\nfigures a GDD must not contradict. **If `design/registry/entities.yaml` does not\nexist or has no entries** (it ships as an empty stub until `/design-system`\npopulates it), skip this and use the GDD alone.\n\nThen read the GDD for the system from `design/gdd/` to understand intended design\ntargets, tuning knobs, and expected value ranges — for anything the registry did\nnot already supply. This is the baseline for \"correct\" behaviour. Read it by section:\nfind the headings you need with the Grep tool (pattern `^#`, content mode) and\nRead those ranges with offset and limit.\n\nIf the data files are FOUND but neither source gives targets for this domain,\nthe sections that judge against targets (Outliers Detected, and Progression\nAnalysis where the domain has a curve) are `NOT ASSESSED — NO DATA`. Each one names what was missing — the\nGDD it looked for in `design/gdd/`, and whether the registry was absent or empty\n— and names `/design-system`, which writes both.\n\n---\n\n## Phase 4: Perform Analysis\n\n**Every domain: compare each value with its target.** For each named value in the\ndata files, take its target from Phase 3 — a registry constant's `value`, a\nregistry formula's `output_range`, or the range the GDD states — and compare. A\nvalue outside its target is a row in Outliers Detected (`player_damage_base` 140\nagainst 90–110). A value with no target anywhere is neither in range nor an\noutlier: list it under Values That Need Attention as `no stated range — not judged`.\n\nThen run domain-specific checks:\n\n**Combat balance:**\n- Calculate DPS for all weapons/abilities at each power tier\n- Check time-to-kill at each tier\n- Identify any options that dominate all others (strictly better)\n- Check if defensive options can create unkillable states\n- Verify damage type/resistance interactions are balanced\n\n**Economy balance:**\n- Map all resource faucets and sinks with flow rates\n- Project resource accumulation over time\n- Check for infinite resource loops\n- Verify gold sinks scale with gold generation\n- Check if any items are never worth purchasing\n\n**Progression balance:**\n- Plot the XP curve and power curve\n- Check for dead zones (no meaningful progression for too long)\n- Check for power spikes (sudden jumps in capability)\n- Verify content gates align with expected player power\n- Check if skip/grind strategies break intended pacing\n\n**Loot balance:**\n- Calculate expected time to acquire each rarity tier\n- Check pity timer math\n- Verify no loot is strictly useless at any stage\n- Check inventory pressure vs acquisition rate\n\n---\n\n## Phase 5: Output the Analysis\n\n```\n## Balance Check: [System Name]\n\n### Data Sources Analyzed\n- [List of files read]\n\n### Health Summary: [NOT ASSESSED / HEALTHY / CONCERNS / CRITICAL ISSUES]\n\n### Outliers Detected\n| Item/Value | Expected Range | Actual | Issue |\n|-----------|---------------|--------|-------|\n\n### Degenerate Strategies Found\n- [Strategy description and why it is problematic]\n\n### Progression Analysis\n[Graph description or table showing progression curve health]\n\n### Recommendations\n| Priority | Issue | Suggested Fix | Impact |\n|----------|-------|--------------|--------|\n\n### Values That Need Attention\n[Specific values with suggested adjustments and rationale]\n```\n\nChoose the Health Summary by the worst finding, first match wins:\n- **CRITICAL ISSUES** — a degenerate strategy (one choice dominates every\n  alternative), a progression that stalls or cannot be completed, or an economy\n  loop with no sink\n- **CONCERNS** — outliers or curve problems a tuning pass can fix, with no\n  finding of the critical kind\n- **NOT ASSESSED** — nothing to analyze (the no-data path above), a section that\n  needs targets is `NOT ASSESSED — NO DATA`, or a value had no stated range to\n  judge it against; name which. It ranks below the two finding verdicts, because\n  a measured problem is more actionable than a gap, and above HEALTHY\n- **HEALTHY** — every value judged against a stated target, no outliers, no\n  degenerate strategies, progression within the stated targets\n\n---\n\n## Phase 6: Fix & Verify Cycle\n\nAfter presenting the report, use `AskUserQuestion`:\n- Prompt: \"Balance check complete. What would you like to do next?\"\n- Options:\n  - `[A] Fix highest-priority issue now — walk me through it`\n  - `[B] Save report to design/balance/balance-check-[system]-[date].md`\n  - `[C] Stop here — I'll review the findings manually`\n\n**Run as ",
+      "card": {
+        "title_zh": "游戏平衡检查",
+        "purpose_zh": "读取游戏数据文件与设计文档，对比目标值，检查战斗、经济、成长、掉落四类系统的数值异常、退化策略与曲线问题，并输出平衡报告。",
+        "does": [
+          "按参数或用户选择确定平衡域：战斗、经济、成长、掉落，或直接读取给定文件路径",
+          "读取 assets/data/（网页游戏为 data/）与 design/balance/ 下的相关数据文件",
+          "优先读取 design/registry/entities.yaml 的常量与公式目标，再读 design/gdd/ 中的设计目标",
+          "逐项将数据值与目标范围对比，标出越界异常值和无目标可判定的值",
+          "执行域内检查：DPS 与击杀时间、资源水槽与循环、经验与战力曲线、稀有度获取时间与保底",
+          "输出含数据来源、健康摘要、异常表、退化策略、成长分析、建议与待调整值的报告"
+        ],
+        "inputs": [
+          "系统名或数据文件路径参数",
+          "assets/data/ 或 data/ 下的数据文件",
+          "design/balance/ 下的平衡文件",
+          "design/registry/entities.yaml 中的常量与公式",
+          "design/gdd/ 下的设计文档"
+        ],
+        "outputs": [
+          "平衡检查报告（数据来源、健康摘要、异常检测表、退化策略、成长分析、建议、待调整值）",
+          "可选：写入 design/balance/balance-check-[system]-[date].md"
+        ],
+        "scenarios": [
+          "检查武器或技能数值是否失衡",
+          "检查游戏经济资源产出与消耗是否失衡",
+          "检查经验或战力成长曲线是否有断层或突增",
+          "检查掉落稀有度分布与保底机制",
+          "在修改数值后复跑验证是否引入新异常"
+        ],
+        "prerequisites": [
+          "存在可读的数据文件与设计文档；缺失时报告 NOT ASSESSED — NO DATA",
+          "设计目标来自 registry 或 GDD，二者皆无时相关章节无法评估"
+        ],
+        "limits": [
+          "输入缺失时不做估算或推断，直接判定无法评估",
+          "无目标范围的值只列为待关注，不判定为异常",
+          "健康摘要按最严重发现取值，NOT ASSESSED 低于 CONCERNS 高于 HEALTHY",
+          "子代理环境无 AskUserQuestion，需以文字列出选项并停止"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "游戏",
+          "数据分析",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Find balance outliers, broken progressions, degenerate strategies, economy imbalances in formulas and data."
+          },
+          {
+            "field": "does",
+            "quote": "Read relevant files from `assets/data/` (`data/` in a web game) and `design/balance/` for the identified domain."
+          },
+          {
+            "field": "does",
+            "quote": "If `design/registry/entities.yaml` exists, read it before the GDD."
+          },
+          {
+            "field": "does",
+            "quote": "Then read the GDD for the system from `design/gdd/` to understand intended design targets, tuning knobs, and expected value ranges"
+          },
+          {
+            "field": "does",
+            "quote": "Calculate DPS for all weapons/abilities at each power tier"
+          },
+          {
+            "field": "does",
+            "quote": "Map all resource faucets and sinks with flow rates"
+          },
+          {
+            "field": "does",
+            "quote": "Plot the XP curve and power curve"
+          },
+          {
+            "field": "does",
+            "quote": "Calculate expected time to acquire each rarity tier"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the inputs this skill needs do not exist, the answer is \"could not run\" — not a filled-in report."
+          },
+          {
+            "field": "limits",
+            "quote": "A value with no target anywhere is neither in range nor an outlier: list it under Values That Need Attention as `no stated range — not judged`."
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Read, Glob, Grep, Write, AskUserQuestion, Bash(bash \"*/.claude/skills/balance-check/../../hooks/yaml-helper.sh\" resolve_config *)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys automation`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/brainstorm/SKILL.md",
+      "blob_sha": "9dc633f8bccdb52f28694ffe6eb1a03a3ef7d01e",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/brainstorm/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "brainstorm",
+        "description": "Guides the user through finding and choosing a game concept. Use when the user wants game ideas, a new concept, a game jam idea, or to explore other directions, including dropping the current idea and starting over."
+      },
+      "excerpt": "---\nname: brainstorm\ndescription: \"Guides the user through finding and choosing a game concept. Use when the user wants game ideas, a new concept, a game jam idea, or to explore other directions, including dropping the current idea and starting over.\"\nargument-hint: \"[genre or theme hint, or 'open'] [--review full|lean|solo]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, WebSearch, Agent, AskUserQuestion, Bash(bash \"*/.claude/skills/brainstorm/../../hooks/yaml-helper.sh\" resolve_config *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys review_mode,automation,docs.density,workflow`\n\nResolved above; use as-is. No block → the defaults in `.claude/docs/config-resolution.md`\n(`workflow: minimal`, `review_mode: solo`, `automation: collaborative`, `docs.density: terse`), and\nsay that the settings were not read.\n\n# Brainstorm\n\nTurns no idea, or a rough one, into a written design the next step builds from. How much it writes\ndepends on `workflow`:\n\n- **`minimal`:** the Lean Brief flow below: a one-page `design/game-brief.md`, then stop. No\n  discovery questions, pillars, director gates or `game-concept.md`, and do not load\n  `references/full-concept.md`.\n- **`standard` or `full`:** read `references/full-concept.md` and follow it. It writes\n  `design/gdd/game-concept.md` from `.claude/docs/templates/game-concept.md`. Its gates follow\n  `.claude/docs/director-gates.md`; each director agent is given its own gate file,\n  `.claude/docs/director-gates/<gate-id in lower case>.md` (`cd-pillars.md`,\n  `ad-concept-visual.md`, `td-feasibility.md`, `pr-scope.md`), and you do not read those files\n  yourself.\n\n`--review` in the text typed after the skill name overrides `review_mode` for this run.\n`docs.density` sets each section's depth: `terse` = bullets; `balanced` = with brief rationale;\n`thorough` = rationale and alternatives. Questions follow `.claude/docs/automation-modes.md`\n(collaborative asks, guided asks only for major decisions, autonomous logs and proceeds; the\nalways-ask categories always ask).\n\nAsk with the question tool. Without one, list the options numbered and end your turn to wait. The\nquestion is the last thing in the reply: no advice or lean after it. A skipped or dismissed\nquestion is not an answer: ask again in plain text.\n\n## Lean Brief flow (`workflow: minimal`)\n\nA few exchanges, not fifteen: capture the thinking that carries the game on one page, then get to\na playable game. Write from the template `.claude/docs/templates/game-brief.md` (six required\nfields, the rest one line each). If `design/game-brief.md` exists, read it and refine it instead\nof starting over; its In your words section is never rewritten, only added to.\n\n1. **Concept.** From the hint typed after the skill name (or one quick open question if there is\n   none), propose **2 or 3 one-line concepts** (verb-first or a mashup of genre and theme), not\n   full concept cards. Ask the user to pick or combine them. This is the one creative question\n   every run asks.\n\n   **No engine set, at this tier:** the pick is the only question. (`engine.name` in\n   `project.yaml` absent, empty or `web`.) On the pick, write nothing and say, with the picked\n   concept and their hint in the brackets:\n   \"Type `/prototype <the picked concept, in their words>` to build it: it asks one round of\n   questions, writes the one-page brief from the genre's sheet and builds a playable browser\n   game.\" End with `Verdict: COMPLETE — concept picked; /prototype writes\n   the brief.` Go on to step 2 only when they ask to write the brief here first (\"write it\n   down\", \"formalize it\", or `/start`'s `Formalize it first`).\n2. **Fill the brief** in conversation, several fields per exchange:\n   - **In your words:** everything the user writes about the game, word for word: the hint, their\n     descriptions, their changes. Never your concept lines; when they only picked one, it holds\n     their hint and which concept they picked.\n   - **Working title:** the brief's title line. Offer one from the chosen concept and let the user\n     change it; `/create-stories` names the epic folder after it.\n   - **Pitch:** the excited one-liner.\n   - **Genre**, **Controls** (how you play) and **Look** (how it looks and sounds, in their\n     words, under Look and references): one line each.\n   - **Question** (what a first playable build must answer) and **Hooks** (what makes it this\n     game and not its genre): propose them from the concept; the user changes them.\n   - **Core loop:** the 2 to 4 steps the player repeats.\n   - **Goal & fail state**: what the player tries to do, and how they lose. `/create-stories` turns\n     it into acceptance criteria.\n   - **Features:** the short list that makes it the game, each `[ ]` (not built yet); each becomes\n     a story. **More than 7 items: push back.** Say it is too long for an MVP, propose which items\n     to cut (the ones the core loop works without), and keep the brief to 7 or fewer.\n   - **Out of scope:** what they are deliberately not building (the cut items go here).\n   - **Avoid:** every removal in their words (\"no combat\", \"no waiting\"), and anything they reject.\n   - **Build order:** the riskiest or least proven part first.\n   - **Intent:** only from their words or a game they name (\"no game over\", \"a toy, no goal\");\n     usually empty.\n   - **Kill condition** (when to drop it), **Who it's for / what they feel**, **Games you love /\n     don't** (any number, a word on why each): one line each; offer, don't force.\n\n   Mark each field the user did not give *(guessed)*, or *(provisional)* when they said \"you\n   pick\". **Keep** stays empty: it fills after they play.\n3. **Show the filled brief in full.** Then ask, as its own question: \"Brief is ready. May I write it\n   to `design/game-brief.md`?\" `Yes — write it` / `Revise a field first`. Write only on an explicit\n   yes to this question; agreeing to a cut or saying \"go on\" is not a yes to the write. On a\n   revision, change the named field, show it before and after, and ask again. Then write\n   `design/game-brief.md`, creating folders as needed. Never write `design/gdd/game-concept.md`\n   at this tier.\n4. **Next steps.** Read `engine.name` in `project.yaml`:\n   - **Absent, empty or `web`:** one step, `/prototype`: it builds the brief as a playable\n     browser game, after a card of what it will build. Say \"Type `/prototype` to build\n     it.\" and do not start it yourself: a typed `/brainstorm` runs its turn on this skill's model,\n     and the build must run on the session's.\n   - **An engine set:**\n     1. `/create-stories`: turn the Features list into stories. At `minimal` there is no separate\n        `/create-epics` or `/sprint-plan`; the build order is the plan.\n     2. `/dev-story`: the first line of game code.\n\n     Then one line: \"`/prototype --path html` makes a browser sketch first; not recommended, since\n     the game is rebuilt in [engine].\"\n\n   Then one summary line: the pitch, the number of Features, and `design/game-brief.md`. End with\n   the line `Verdict: COMPLETE — game brief written; next stop is code.`\n\nIf the user stops before the write, say the brief was not written, so it lives only in this\nconversation.\n",
+      "card": {
+        "title_zh": "游戏概念头脑风暴",
+        "purpose_zh": "把没有或粗略的游戏想法整理成可继续开发的书面设计：minimal 模式写一页 design/game-brief.md，standard/full 模式写 design/gdd/game-concept.md。",
+        "does": [
+          "按 workflow 配置选择精简简报流程或完整概念流程",
+          "提出2到3个一句话概念供用户挑选或组合",
+          "在对话中逐项填写简报字段并标注猜测或暂定内容",
+          "展示完整简报，仅在用户明确同意后写入文件",
+          "功能超过7项时建议裁剪以控制MVP范围",
+          "给出后续步骤建议，如 /prototype、/create-stories、/dev-story"
+        ],
+        "inputs": [
+          "技能名后输入的类型或主题提示，或 open",
+          "--review full|lean|solo 覆盖本次 review_mode",
+          "project.yaml 中的 engine.name",
+          "用户对概念、标题、玩法等字段的回答与修改"
+        ],
+        "outputs": [
+          "design/game-brief.md（minimal 模式）",
+          "design/gdd/game-concept.md（standard/full 模式）",
+          "对话中的完整简报展示与后续步骤建议"
+        ],
+        "scenarios": [
+          "用户想要游戏点子或新概念",
+          "用户需要游戏 jam 创意",
+          "用户想探索其他方向或推翻当前想法重来",
+          "用户想把粗略想法正式写成简报"
+        ],
+        "prerequisites": [
+          "技能声明可调用 Read、Glob、Grep、Write、WebSearch、Agent、AskUserQuestion 及 yaml-helper.sh 的 Bash",
+          "minimal 模式依赖模板 .claude/docs/templates/game-brief.md",
+          "standard/full 模式依赖 references/full-concept.md 与 game-concept 模板",
+          "写入文件需用户对该问题明确回答是"
+        ],
+        "limits": [
+          "minimal 模式不写 game-concept.md，也不加载 full-concept.md",
+          "简报 Features 超过7项时要求裁剪",
+          "未获明确同意不写入文件；跳过或关闭提问不算回答",
+          "In your words 部分只增不改",
+          "不自行启动 /prototype"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "产品规划",
+          "游戏",
+          "写作"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Turns no idea, or a rough one, into a written design the next step builds from."
+          },
+          {
+            "field": "does",
+            "quote": "**`minimal`:** the Lean Brief flow below: a one-page `design/game-brief.md`, then stop."
+          },
+          {
+            "field": "does",
+            "quote": "propose **2 or 3 one-line concepts** (verb-first or a mashup of genre and theme), not full concept cards."
+          },
+          {
+            "field": "does",
+            "quote": "**Show the filled brief in full.** Then ask, as its own question: \"Brief is ready. May I write it to `design/game-brief.md`?\""
+          },
+          {
+            "field": "does",
+            "quote": "**More than 7 items: push back.**"
+          },
+          {
+            "field": "inputs",
+            "quote": "`--review` in the text typed after the skill name overrides `review_mode` for this run."
+          },
+          {
+            "field": "outputs",
+            "quote": "It writes `design/gdd/game-concept.md` from `.claude/docs/templates/game-concept.md`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "allowed-tools: Read, Glob, Grep, Write, WebSearch, Agent, AskUserQuestion, Bash(bash \"*/.claude/skills/brainstorm/../../hooks/yaml-helper.sh\" resolve_config *)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Write from the template `.claude/docs/templates/game-brief.md` (six required fields, the rest one line each)."
+          },
+          {
+            "field": "limits",
+            "quote": "Never write `design/gdd/game-concept.md` at this tier."
+          },
+          {
+            "field": "limits",
+            "quote": "A skipped or dismissed question is not an answer: ask again in plain text."
+          },
+          {
+            "field": "limits",
+            "quote": "its In your words section is never rewritten, only added to."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Then write `design/game-brief.md`, creating folders as needed."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "WebSearch"
+          },
+          {
+            "field": "hosts",
+            "quote": "!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys review_mode,automation,docs.density,workflow`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/bug-report/SKILL.md",
+      "blob_sha": "78d80816dcc1cf69d9ebd907d99ed0a743e505f2",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/bug-report/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "bug-report",
+        "description": "Structured bug report from a description, or analyze code for potential bugs. Reproduction steps, severity."
+      },
+      "excerpt": "---\nname: bug-report\ndescription: \"Structured bug report from a description, or analyze code for potential bugs. Reproduction steps, severity.\"\nargument-hint: \"[description] | analyze [path-to-file] | verify [BUG-ID] | close [BUG-ID]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash(bash \"*/.claude/skills/bug-report/../../hooks/yaml-helper.sh\" resolve_config *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys automation`\n\n**Automation mode**: Resolve `modes.automation` (`project.local.yaml` →\n`project.yaml` → default `collaborative`). Every `AskUserQuestion` call and\nevery file write follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n# Bug Report\n\n**Drafts only.** This skill writes reports to `production/qa/bugs/`. When the\ncause is in the engine, a plugin or another vendor's code, add a draft for their\ntracker under **Notes** and stop there: never file, open or comment on an issue\nor pull request in their repository. The user submits it.\n\n## Phase 1: Parse Arguments\n\nDetermine the mode from the argument:\n\n- No keyword → **Description Mode**: generate a structured bug report from the provided description\n- `analyze [path]` → **Analyze Mode**: read the target file(s) and identify potential bugs\n- `verify [BUG-ID]` → **Verify Mode**: confirm a reported fix actually resolved the bug\n- `close [BUG-ID]` → **Close Mode**: mark a verified bug as closed with resolution record\n\nIf no argument is provided, ask the user for a bug description before proceeding.\n\n---\n\n## Phase 2A: Description Mode\n\n1. **Parse the description** for key information: what broke, when, how to reproduce it, and what the expected behavior is.\n\n2. **Search the codebase** for related files using Grep/Glob to add context (affected system, likely files).\n\n3. **Draft the bug report**:\n\n```markdown\n# Bug Report\n\n## Summary\n**Title**: [Concise, descriptive title]\n**ID**: BUG-[NNNN]\n**Severity**: [S1-Critical / S2-High / S3-Medium / S4-Low]\n**Priority**: [P1-Fix this sprint / P2-Fix soon / P3-Backlog / P4-Won't fix]\n**Status**: Open\n**Reported**: [Date]\n**Reporter**: [the reporter's name as the user gives it, else `—`; never an email address or account ID taken from the session]\n\n## Classification\n- **Category**: [Gameplay / UI / Audio / Visual / Performance / Crash / Network]\n- **System**: [Which game system is affected — when the bug spans systems, the one whose code must change; the others go under Related systems]\n- **Frequency**: [Always / Often (>50%) / Sometimes (10-50%) / Rare (<10%)]\n- **Regression**: [Yes/No/Unknown -- was this working before?]\n\n## Environment\n- **Build**: [Version or commit hash]\n- **Platform**: [OS, hardware if relevant]\n- **Scene/Level**: [Where in the game]\n- **Game State**: [Relevant state -- inventory, quest progress, etc.]\n\n## Reproduction Steps\n**Preconditions**: [Required state before starting]\n\n1. [Exact step 1]\n2. [Exact step 2]\n3. [Exact step 3]\n\n**Expected Result**: [What should happen]\n**Actual Result**: [What actually happens]\n\n## Technical Context\n- **Likely affected files**: [List of files based on codebase search]\n- **Related systems**: [What other systems might be involved]\n- **Possible root cause**: [If identifiable from the description]\n\n## Evidence\n- **Logs**: [Relevant log output if available]\n- **Visual**: [Description of visual evidence]\n\n## Related Issues\n- [Links to related bugs or design documents]\n\n## Notes\n[Any additional context or observations]\n```\n\nThe **Severity** and **Priority** labels use `/bug-triage`'s S and P numbers and\nnames, which it parses out of this file. `P4-Won't fix` is its `P4 — Won't fix /\nDeferred` (an accepted risk), not a wishlist. If you change either ladder, change\n`.claude/skills/bug-triage/SKILL.md` too.\n\n---\n\n## Phase 2B: Analyze Mode\n\n1. **Read the target file(s)** specified in the argument.\n\n2. **Identify potential bugs**: null references, off-by-one errors, race conditions, unhandled edge cases, resource leaks, incorrect state transitions.\n\n3. **For each potential bug**, generate a bug report using the template above, with the likely trigger scenario and recommended fix filled in.\n\n---\n\n## Phase 2C: Verify Mode\n\n**Find the bug file by its number**, here and in close mode: Glob\n`production/qa/bugs/BUG-*.md` and take the file whose number matches `[BUG-ID]`,\nwhatever its zero-padding — an older three-digit file with a slug is found by\nits number too. If none\nmatches, stop: \"No bug [BUG-ID] in `production/qa/bugs/`.\" Verdict: **BLOCKED**\n— no such bug.\n\nRead that file. Extract the reproduction steps and expected result.\n\n1. **Re-run reproduction steps** — use Grep/Glob to check whether the root cause code path still exists as described. If the fix removed or changed it, note the change.\n2. **Run the related test** — if the bug's system has a test file in the engine's test root (`tests/` Godot and Web, `Assets/Tests/` Unity, `Source/<Module>/Private/Tests/` Unreal — `.claude/docs/directory-structure.md`), run it via Bash with `commands.test` from `project.yaml`, narrowed to the affected suite where the runner allows — never a runner line written from memory, which drops the flags the engine needs (gdUnit4 hangs without `--remote-debug tcp://127.0.0.1:0`) — and report pass/fail. `commands.test` unset → no test ran: name the unset key and go on to step 3.\n3. **Check for regression** — grep the codebase for any new occurrence of the pattern that caused the bug.\n4. **Manual verification** — when no related test ran (none covers the bug — the usual case where `qa.level` waives tests — `commands.test` is unset, or the run did not complete), or the bug's Category is Visual or UI, whose look no automated test checks, ask via `AskUserQuestion`: \"Did you play the reproduction steps in [bug file] on a build with the fix? Which build?\" —\n   `[No longer occurs]` / `[Still occurs]` / `[Not played yet]`.\n   Record the answer and the build as the user gives them; a changed code path is never taken as their answer.\n   **Run as a subagent?** `qa-lead` preloads this skill, and a subagent has no\n   `AskUserQuestion`. End your reply with the question and its three options as\n   a short list, and give no verdict yet: whoever called you asks the user, and\n   the verdict waits for the answer.\n\nProduce a verification verdict:\n\n- **VERIFIED FIXED** — the bug is gone by every check that applies: any related test ran and passed, and, where step 4 asked, the user answered `[No longer occurs]` for a named build. With no test run, that play alone is the verification — a manual one, recorded as such: `[user], manual, build [X]`. A changed code path on its own is never a pass\n- **STILL PRESENT** — a related test fails on the bug's case, or the user answered `[Still occurs]`; the fix did not resolve the issue\n- **CANNOT VERIFY** — step 4 was answered `[Not played yet]`: name what is missing or could not run (no related test, `commands.test` unset, a run that did not complete, a Visual or UI bug), and say that playing the reproduction steps settles it — run `/bug-report verify [BUG-ID]` again once played\n\nAsk: \"May I update `production/qa/bugs/[bug file]` to set Status: Verified Fixed / Still Present / Cannot Verify?\" — naming the file found above, whatever its padding or slug. With the Status, write a `**Verified by**:` line under it: `[test file(s)] — ran and passed`, or `[user], manual, build [X]` for a manual verification.\n\nIf STILL PRESENT: reopen the bug, set Status back to Open, and suggest re-running `/hotfix [BUG-ID]`.\n\n---\n\n## Phase 2D: Close Mode\n\nRead the bug file, found by its number as in verify mode. Confirm Status is `Verified Fixed` before closing. If status is anything else, stop: \"Bug [ID] must be Verified Fixed before it can be closed. Run `/bug-report verify [BUG-ID]` first.\"\n\nShow the closure record below and the ",
+      "card": {
+        "title_zh": "结构化缺陷报告",
+        "purpose_zh": "从描述生成结构化缺陷报告，或分析代码找潜在缺陷，并支持验证修复与关闭缺陷记录。",
+        "does": [
+          "描述模式：解析缺陷描述并搜索代码库补充上下文，生成结构化缺陷报告",
+          "分析模式：读取指定文件，识别空引用、越界、竞态、资源泄漏等潜在缺陷并逐条生成报告",
+          "验证模式：按编号查找缺陷文件，重跑复现步骤、运行相关测试、检查回归，给出验证结论",
+          "关闭模式：确认状态为已验证修复后，追加关闭记录并更新状态",
+          "按编号分配缺陷 ID 并写入 production/qa/bugs/ 目录",
+          "保存后建议后续运行缺陷分诊或紧急修复流程"
+        ],
+        "inputs": [
+          "缺陷描述文本",
+          "analyze 模式下的目标文件路径",
+          "verify 或 close 模式下的 BUG-ID",
+          "用户对复现步骤是否仍出现的回答及构建版本",
+          "用户对写入或状态更新的确认"
+        ],
+        "outputs": [
+          "结构化缺陷报告 Markdown 文件（BUG-NNNN.md）",
+          "验证结论：VERIFIED FIXED、STILL PRESENT 或 CANNOT VERIFY",
+          "缺陷文件中的 Verified by 记录与关闭记录",
+          "运行状态结论：COMPLETE 或 BLOCKED"
+        ],
+        "scenarios": [
+          "用户口头描述一个缺陷，需要整理成规范报告",
+          "开发者想扫描某个文件寻找潜在缺陷",
+          "修复后需要确认缺陷是否真的解决",
+          "已验证修复的缺陷需要归档关闭"
+        ],
+        "prerequisites": [
+          "项目内存在 .claude/skills/bug-report 及配套 hooks/yaml-helper.sh",
+          "缺陷文件存放于 production/qa/bugs/ 目录",
+          "验证时可能需要 project.yaml 中的 commands.test 配置",
+          "关闭前缺陷状态必须为 Verified Fixed"
+        ],
+        "limits": [
+          "只写草稿，不代为在他人仓库提交 issue 或 PR",
+          "写入文件前必须获得用户确认",
+          "验证模式若无相关测试且未人工复现，只能给出 CANNOT VERIFY",
+          "子代理环境无 AskUserQuestion，需由调用方转问用户",
+          "报告人姓名不由会话中的邮箱或账号推断"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "文档",
+          "代码审查",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Structured bug report from a description, or analyze code for potential bugs. Reproduction steps, severity."
+          },
+          {
+            "field": "does",
+            "quote": "No keyword → **Description Mode**: generate a structured bug report from the provided description"
+          },
+          {
+            "field": "does",
+            "quote": "`analyze [path]` → **Analyze Mode**: read the target file(s) and identify potential bugs"
+          },
+          {
+            "field": "does",
+            "quote": "`verify [BUG-ID]` → **Verify Mode**: confirm a reported fix actually resolved the bug"
+          },
+          {
+            "field": "does",
+            "quote": "`close [BUG-ID]` → **Close Mode**: mark a verified bug as closed with resolution record"
+          },
+          {
+            "field": "inputs",
+            "quote": "If no argument is provided, ask the user for a bug description before proceeding."
+          },
+          {
+            "field": "outputs",
+            "quote": "- **VERIFIED FIXED** — the bug is gone by every check that applies"
+          },
+          {
+            "field": "outputs",
+            "quote": "- **CANNOT VERIFY** — step 4 was answered `[Not played yet]`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`commands.test` unset → no test ran: name the unset key and go on to step 3."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Confirm Status is `Verified Fixed` before closing."
+          },
+          {
+            "field": "limits",
+            "quote": "**Drafts only.** This skill writes reports to `production/qa/bugs/`."
+          },
+          {
+            "field": "limits",
+            "quote": "never file, open or comment on an issue or pull request in their repository. The user submits it."
+          },
+          {
+            "field": "limits",
+            "quote": "a subagent has no `AskUserQuestion`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "run it via Bash with `commands.test` from `project.yaml`"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash(bash \"*/.claude/skills/bug-report/../../hooks/yaml-helper.sh\" resolve_config *)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/bug-triage/SKILL.md",
+      "blob_sha": "b22c2d354e488ab4eef7cc4a9e4e4e0160f9d468",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/bug-triage/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "bug-triage",
+        "description": "Re-evaluate open bugs — priority vs severity, assign to sprints, surface systemic trends. Run when the count grows."
+      },
+      "excerpt": "---\nname: bug-triage\ndescription: \"Re-evaluate open bugs — priority vs severity, assign to sprints, surface systemic trends. Run when the count grows.\"\nargument-hint: \"[sprint | full | trend]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, Edit, Bash(bash \"*/.claude/skills/bug-triage/../../hooks/yaml-helper.sh\" resolve_config *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys automation,workflow`\n\n**Automation mode**: Resolve `modes.automation` (`project.local.yaml` →\n`project.yaml` → default `collaborative`). Every `AskUserQuestion` call and\nevery file write follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n# Bug Triage\n\nThis skill processes the open bug backlog into a prioritised, sprint-assigned\naction list. It distinguishes between **severity** (how bad is the impact?) and\n**priority** (how urgently must we fix it?), detects systemic trends, and\nensures no critical bug is lost between sprints.\n\n**Output:** `production/qa/bug-triage-[date].md`\n\n**When to run:**\n- Sprint start — assign open bugs to the new sprint or backlog\n- After `/team-qa` completes and new bugs have been filed\n- When the bug count crosses 10+ open items\n\n---\n\n## 1. Parse Arguments\n\n**Modes:**\n- `/bug-triage sprint` — triage against the current sprint; assign fixable bugs\n  to the sprint backlog; defer the rest\n- `/bug-triage full` — full triage of all bugs regardless of sprint scope\n- `/bug-triage trend` — trend analysis only (no assignment); read-only report\n- No argument — run sprint mode if a current sprint exists, else full mode\n\n---\n\n## 2. Load Bug Backlog\n\n### Step 2a — Discover bug files\n\nGlob for bug reports in priority order:\n1. `production/qa/bugs/*.md` — individual bug report files (preferred format)\n2. `production/qa/bugs.md` — single consolidated bug log (fallback)\n3. Any `production/qa/qa-plan-*.md` \"Bugs Found\" table (last resort)\n\nIf no bug files found:\n> \"No bug files found in `production/qa/bugs/`. If bugs are tracked in a\n> different location, adjust the glob pattern. If no bugs exist yet, there is\n> nothing to triage.\"\n\nStop and report. Do not proceed if no bugs exist. Verdict: **COMPLETE** — no bug files in `production/qa/bugs/`; nothing to triage.\n\n**In `trend` mode, do not read full bug bodies.** Trend metrics (volume, severity\nmix, by-system, by-date) are computable from the header fields alone:\n```\nGrep pattern=\"\\*\\*(Severity|Priority|Status|System|Category|Reported)\\*\\*\" glob=\"production/qa/bugs/*.md\" output_mode=\"content\"\n```\n(Bug-report fields are bolded — `**Severity**:`, `- **System**:` — so match the\n`**field**` form, not a bare line-start `Field:`.)\nFull bug bodies are needed only for the priority-vs-severity **re-evaluation** in\n`sprint`/`full` modes; `trend` is a read-only report and skips it. (The one\ndeviation check that needs a story's status — \"bug filed against a Complete\nstory\" — is a targeted story-status grep either way, not a bug-body read.)\n\n### Step 2b — Load sprint context\n\nRead the most recently modified file in `production/sprints/` to understand:\n- Current sprint number / name\n- Stories in scope (for assignment target)\n- Sprint capacity constraints (if noted)\n\nIf no sprint file exists: note \"No sprint plan found — assigning to backlog only.\" At `workflow: minimal` there are no sprints by design — say that instead, and name the P1 bugs as the next fixes, ahead of the next story in the brief's build order.\n\n### Step 2c — Load severity reference\n\nRead `.claude/docs/coding-standards.md` for severity/priority definitions if they\nexist. If they do not exist, use the standard definitions in Step 3.\n\n---\n\n## 3. Classify Each Bug\n\nFor each bug, extract or infer:\n\n### Severity (impact of the bug)\n\n| Severity | Definition |\n|----------|-----------|\n| **S1 — Critical** | Game crashes, data loss, or complete feature failure. Cannot proceed past this point. |\n| **S2 — High** | Major feature broken but game is still playable. Significant wrong behaviour. |\n| **S3 — Medium** | Feature degraded but a workaround exists. Minor wrong behaviour. |\n| **S4 — Low** | Visual glitch, cosmetic issue, typo. No gameplay impact. |\n\n### Priority (urgency of the fix)\n\n| Priority | Definition |\n|----------|-----------|\n| **P1 — Fix this sprint** | Blocks QA, blocks release, or is regression from last sprint |\n| **P2 — Fix soon** | Should be resolved before the next major milestone |\n| **P3 — Backlog** | Would be good to fix, but no active blocking impact |\n| **P4 — Won't fix / Deferred** | Accepted risk or out of scope for current product scope |\n\n### Assignment\n\nFor each P1/P2 bug in `sprint` mode:\n- Identify which story or epic the fix belongs to\n- Check whether the current sprint has remaining capacity\n- If capacity exists: assign to sprint (`Sprint: [current]`)\n- If capacity is full: flag as `Priority overflow — consider pulling from sprint`\n\nFor `full` mode: assign all P1 to current sprint, P2 to next sprint estimate,\nP3+ to backlog.\n\n### Deviation check\n\nFlag bugs that suggest **systematic problems**:\n- 3+ bugs from the same system in the same sprint → \"Potential design or\n  implementation quality issue in [system]\"\n- 2+ S1/S2 bugs in the same story → \"Story may need to be reopened and\n  re-reviewed before shipping\"\n- Bug filed against a story marked Complete → \"Regression in completed story —\n  story should be re-opened in sprint tracking\"\n\n---\n\n## 4. Trend Analysis\n\nAfter classifying all bugs, generate trend metrics:\n\n### Volume trends\n- Total open bugs: [N]\n- Opened this sprint: [N]\n- Closed this sprint: [N]\n- Net change: [+N / -N]\n\n### System hot spots\n- Which system has the most open bugs?\n- Which system has the highest S1/S2 ratio?\n\n### Age analysis\n- How many bugs are older than 2 sprints?\n- Are any S1/S2 bugs un-assigned (sprint = none)?\n\n### Regression indicator\n- Any bugs filed against previously-completed stories?\n- Count: [N] regression bugs (story reopened implied)\n\n---\n\n## 5. Generate Triage Report\n\n```markdown\n# Bug Triage Report\n\n> **Date**: [date]\n> **Mode**: [sprint | full | trend]\n> **Generated by**: /bug-triage\n> **Open bugs processed**: [N]\n> **Sprint in scope**: [sprint name, or \"N/A\"]\n\n---\n\n## Triage Summary\n\n| Priority | Count | Notes |\n|----------|-------|-------|\n| P1 — Fix this sprint | [N] | [N] assigned to sprint, [N] overflow |\n| P2 — Fix soon | [N] | Scheduled for next sprint |\n| P3 — Backlog | [N] | Deferred |\n| P4 — Won't fix | [N] | Accepted risk |\n\n**Critical (S1/S2) unfixed count**: [N]\n\n---\n\n## P1 Bugs — Fix This Sprint\n\n| ID | System | Severity | Summary | Assigned to | Story |\n|----|--------|----------|---------|-------------|-------|\n| BUG-NNNN | [system] | S[1-4] | [one-line description] | [sprint] | [story path] |\n\n---\n\n## P2 Bugs — Fix Soon\n\n| ID | System | Severity | Summary | Target Sprint |\n|----|--------|----------|---------|---------------|\n| BUG-NNNN | [system] | S[1-4] | [one-line description] | Sprint [N+1] |\n\n---\n\n## P3/P4 Bugs — Backlog / Won't Fix\n\n| ID | System | Severity | Summary | Disposition |\n|----|--------|----------|---------|-------------|\n| BUG-NNNN | [system] | S4 | [one-line description] | Backlog |\n\n---\n\n## Systemic Issues Flagged\n\n[List any patterns from Step 3 deviation check, or \"None identified.\"]\n\n---\n\n## Trend Analysis\n\n**Volume**: [N] open / [+N] net change this sprint\n**Hot spot**: [system with most bugs]\n**Regressions**: [N] bugs against completed stories\n**Aged bugs (>2 sprints old)**: [N]\n\n[If N aged S1/S2 bugs > 0:]\n> ⚠️ [N] high-severity bugs have been open for more than 2 sprints without\n> assignment. These represent accepted risk that should be explicitly reviewed.\n\n---\n\n## Recommended Actions\n\n1. [Most urgent action — usually \"fix P1 bugs before QA hand-off\"]\n2. [Second action — usually \"investigate [hot spot system] quality\"]\n3. [Third action — optional improvement]\n```\n\n---\n\n## 6. Write ",
+      "card": null
+    },
+    {
+      "skill_path": ".claude/skills/changelog/SKILL.md",
+      "blob_sha": "764dd3243198cf48738756ec19da948a6e616d7d",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/changelog/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "changelog",
+        "description": "Old name of /write-changelog. Prints one line, then runs /write-changelog."
+      },
+      "excerpt": "---\nname: changelog\ndescription: \"Old name of /write-changelog. Prints one line, then runs /write-changelog.\"\nargument-hint: \"[version|sprint-number]\"\nuser-invocable: true\ndisable-model-invocation: true\nallowed-tools: Skill(write-changelog)\nmodel: sonnet\n---\n\n# /changelog — old name of /write-changelog\n\nSeveral AI tools keep `/changelog` for a command of their own, so this skill is now\n`/write-changelog`.\n\n1. Print this line exactly, as the first line of your reply:\n\n   /changelog is now /write-changelog. Running /write-changelog.\n\n2. Run the `write-changelog` skill with the Skill tool, passing these arguments unchanged\n   (none, if this is empty): $ARGUMENTS\n\nDo nothing else here: `/write-changelog` does the work.\n",
+      "card": {
+        "title_zh": "变更日志旧命令别名",
+        "purpose_zh": "作为 /write-changelog 的旧名称入口，先打印一行迁移提示，再把原参数原样转交给 write-changelog 技能执行。",
+        "does": [
+          "在回复首行原样打印 /changelog 已更名为 /write-changelog 的提示",
+          "调用 write-changelog 技能并原样传递参数",
+          "自身不执行其他操作，实际工作交由 write-changelog 完成"
+        ],
+        "inputs": [
+          "可选参数：版本号或 sprint 编号（$ARGUMENTS）"
+        ],
+        "outputs": [
+          "首行固定迁移提示文本",
+          "由 write-changelog 技能产生的输出"
+        ],
+        "scenarios": [
+          "用户仍使用旧命令 /changelog 时自动转到新命令",
+          "需要兼容旧命令名的场景"
+        ],
+        "prerequisites": [
+          "环境中存在 write-changelog 技能",
+          "调用方允许使用 Skill 工具"
+        ],
+        "limits": [
+          "本技能只做转发，不自行生成变更日志",
+          "仅允许调用 Skill(write-changelog) 工具",
+          "参数为空时不传任何参数"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Old name of /write-changelog. Prints one line, then runs /write-changelog."
+          },
+          {
+            "field": "does",
+            "quote": "Print this line exactly, as the first line of your reply:"
+          },
+          {
+            "field": "does",
+            "quote": "Run the `write-changelog` skill with the Skill tool, passing these arguments unchanged"
+          },
+          {
+            "field": "does",
+            "quote": "Do nothing else here: `/write-changelog` does the work."
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"[version|sprint-number]\""
+          },
+          {
+            "field": "prerequisites",
+            "quote": "allowed-tools: Skill(write-changelog)"
+          },
+          {
+            "field": "limits",
+            "quote": "(none, if this is empty): $ARGUMENTS"
+          },
+          {
+            "field": "hosts",
+            "quote": "disable-model-invocation: true"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/code-review/SKILL.md",
+      "blob_sha": "e501f7baeb78c34733a43983c1ef881fe22c3112",
+      "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/code-review/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "code-review",
+        "description": "Architectural review of written code: coding standards, SOLID, testability, performance."
+      },
+      "excerpt": "---\nname: code-review\ndescription: \"Architectural review of written code: coding standards, SOLID, testability, performance.\"\nargument-hint: \"[path-to-file-or-directory]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Bash(git log *), Agent, AskUserQuestion, Bash(bash \"*/.claude/skills/code-review/../../hooks/yaml-helper.sh\" resolve_config *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys automation`\n\n# Code Review\n\n\n\nEvery question follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n## Insufficient input — check this before producing any report\n\n**If the inputs this skill needs do not exist, the answer is \"could not run\" —\nnot a filled-in report.** Check first, and stop if the check fails.\n\n1. List the inputs this skill reads (data files, prior reports, profiler output,\n   test results, registries, source code).\n2. For each, record `FOUND` or `ABSENT` — not \"assumed present\".\n3. If any input required for a section is ABSENT, that section is\n   **`NOT ASSESSED — NO DATA`**. Do not estimate it, do not infer it from an\n   adjacent artifact, and do not leave a mandated cell to be filled by whoever\n   reads the template next.\n4. If **every** required input is ABSENT, stop and report\n   **`NOT ASSESSED — NO DATA`** as the whole verdict, naming what was missing and\n   which skill produces it.\n\n**A verdict of `NOT ASSESSED` is a success.** It is the correct, useful answer to\n\"what does the data say?\" when there is no data. The failure mode this prevents is\nspecific: a report whose verdict enum has no \"could not run\" state produces\n**false clean passes** — an asset audit returning COMPLIANT on a project with no\nassets and no standards, or a performance profile reporting \">99% headroom against\na 16.67ms budget\" with zero profiler data and no budget ever set.\n\n**Absence of evidence is never evidence of absence.** A scan that finds no\nmatches because there are no files to scan has not verified anything. Say which of\nthe two happened — a reader cannot tell from a green result.\n\n---\n\n## Phase 1: Load Target Files\n\nRead the target file(s) in full. Read CLAUDE.md for project coding standards.\n\n---\n\n## Phase 2: Identify Engine Specialists\n\nRead the `specialists` block from `project.yaml`; if it is absent, fall back to the `## Engine Specialists` section of `.claude/docs/technical-preferences.md`. Note:\n\n- The **Primary** specialist — `<engine>-specialist` derived from `engine.name` (Godot→`godot-specialist`, Unity→`unity-specialist`, Unreal→`unreal-specialist`, Web→`lead-programmer`); used for architecture and broad engine concerns\n- The **Language/Code Specialist** — `specialists.code` — used when reviewing the project's primary language files\n- The **Shader Specialist** — `specialists.shader` — used when reviewing shader files\n- The **UI Specialist** — `specialists.ui` — used when reviewing UI code\n\n**A value of `null` means UNSET — treat that key as absent and skip its\nspecialist. Never start it as an agent name.** The v1.0 migration writes `null`\nfor any specialist the legacy file did not name, and it writes the whole block\nwhenever *one* member is set — so a project that configured only its code\nspecialist carries `shader: null` and `ui: null`. The config reader returns the\nfour-character string `\"null\"` for these, which is not empty and therefore reads\nas configured. `null`, empty, and missing are the same state here.\n\nIf no engine is configured (no `engine.name` in `project.yaml`, and `technical-preferences.md` reads `[TO BE CONFIGURED]` or is missing), skip engine specialist steps. **Record ``Engine validation: NOT ASSESSED — no engine configured (`engine.name` unset in `project.yaml`)`` in this run's output.** A skipped check that says nothing is indistinguishable from a check that passed; the reader cannot tell engine guidance was never sought.\n\n---\n\n## Phase 3: ADR Compliance Check\n\n**Argument:** `/code-review [file(s)]` may optionally include a story file path as the last argument (e.g., `/code-review Assets/Scripts/Combat/Attack.cs production/epics/combat/story-001.md`). If a story path is provided, read it to extract the governing ADR reference.\n\nSearch for ADR references in, in priority order:\n1. The story file (if provided as argument)\n2. Header comments at the top of the implementation files\n3. Commit messages referencing these files (`git log --oneline -- [file]`)\n\nLook for patterns like `ADR-NNNN` or `docs/architecture/adr-` (either case).\n\nIf no ADR references found, note: \"No ADR references found — ADR compliance check skipped. For full ADR compliance review, provide the story path: `/code-review [files] [story-path]`.\"\n\nFor each referenced ADR, load **only the sections this check needs — never an unbounded full read.** A substantial ADR exceeds the 25k-token read cap, and a capped read's only recovery is paging the remainder — the most expensive way to read a file. Use the same pattern as `/dev-story` and `/create-stories`:\n\n1. **Map the headings** (cheap — line numbers only): grep the ADR for `^## ` with line numbers\n2. **Bounded-read only `## Decision` and `## Consequences`**, using the line numbers to set offset-and-limit read spans that end where the next heading begins. If the heading map is empty (a nonstandard ADR predating the template), fall back to one full read; if that truncates at the cap, grep for the decision/consequence content directly rather than paging the remainder.\n\nA referenced ADR whose file is missing, or that cannot be read, makes ADR\nCompliance `NOT ASSESSED — [ADR] could not be read`: name it. No reference at\nall is `NO ADRS FOUND`, a different result.\n\nFrom those two sections, classify any deviation:\n\n- **ARCHITECTURAL VIOLATION** (BLOCKING): Uses a pattern explicitly rejected in the ADR\n- **ADR DRIFT** (WARNING): Meaningfully diverges from the chosen approach without using a forbidden pattern\n- **MINOR DEVIATION** (INFO): Small difference from ADR guidance that doesn't affect overall architecture\n\n---\n\n## Phase 4: Standards Compliance\n\nIdentify the system category (engine, gameplay, AI, networking, UI, tools) and evaluate:\n\n- [ ] Public methods and classes have doc comments\n- [ ] Cyclomatic complexity under 10 per method\n- [ ] No method exceeds 40 lines (excluding data declarations)\n- [ ] Dependencies are injected (no static singletons for game state)\n- [ ] Configuration values loaded from data files\n- [ ] Systems expose interfaces (not concrete class dependencies)\n\n---\n\n## Phase 5: Architecture and SOLID\n\n**Architecture:**\n- [ ] Correct dependency direction (engine <- gameplay, not reverse)\n- [ ] No circular dependencies between modules\n- [ ] Proper layer separation (UI does not own game state)\n- [ ] Events/signals used for cross-system communication\n- [ ] Consistent with established patterns in the codebase\n\n**SOLID:**\n- [ ] Single Responsibility: Each class has one reason to change\n- [ ] Open/Closed: Extendable without modification\n- [ ] Liskov Substitution: Subtypes substitutable for base types\n- [ ] Interface Segregation: No fat interfaces\n- [ ] Dependency Inversion: Depends on abstractions, not concretions\n\n---\n\n## Phase 6: Game-Specific Concerns\n\n- [ ] Frame-rate independence (delta time usage)\n- [ ] No allocations in hot paths (update loops)\n- [ ] Proper null/empty state handling\n- [ ] Thread safety where required\n- [ ] Resource cleanup (no leaks)\n\n---\n\n## Phase 7: Engine Review and Testability\n\nThis phase starts **one** helper agent at most: the engine reviewer below.\nTestability is yours; never start `qa-tester` or a second specialist.\n\n### Engine review (one fresh-context helper)\n\nIf an engine is configured, start **one** helper agent of the Primary\nspecialist's type from Phase 2. It reviews in a context that did not write the\ncode; that is why it stays a helper. Its brief names, as fields:\n\n- `files`: every file under review, ",
+      "card": {
+        "title_zh": "代码架构审查",
+        "purpose_zh": "对已写代码做架构级审查：编码规范、SOLID、可测试性、性能与游戏引擎相关关注点，并输出带结论的审查报告。",
+        "does": [
+          "读取目标文件全文与项目编码规范",
+          "检查ADR合规并分类偏差严重度",
+          "按6项标准检查编码规范合规",
+          "检查架构分层与SOLID原则",
+          "检查游戏特有事项如帧率无关与热路径分配",
+          "启动引擎专家助手审查并核验其发现"
+        ],
+        "inputs": [
+          "待审查的文件或目录路径",
+          "可选的故事文件路径以提取ADR引用",
+          "CLAUDE.md项目编码规范",
+          "project.yaml中的specialists与engine配置",
+          "ADR文档",
+          "QA测试用例与验收标准"
+        ],
+        "outputs": [
+          "结构化代码审查报告",
+          "引擎专家发现",
+          "可测试性结论",
+          "ADR合规结论",
+          "规范合规X/6",
+          "架构与SOLID结论",
+          "结论枚举：NOT ASSESSED/APPROVED/APPROVED WITH SUGGESTIONS/CHANGES REQUIRED"
+        ],
+        "scenarios": [
+          "提交代码前做架构与规范审查",
+          "核对实现是否符合ADR决策",
+          "评估故事实现的可测试性",
+          "审查游戏引擎相关代码质量"
+        ],
+        "prerequisites": [
+          "目标文件存在且可读",
+          "项目配置了engine.name与specialists（否则跳过引擎审查）",
+          "提供故事路径才能做完整ADR合规审查"
+        ],
+        "limits": [
+          "输入缺失时输出NOT ASSESSED而非估算",
+          "specialist为null视为未设置并跳过",
+          "无ADR引用时跳过ADR合规检查",
+          "每阶段最多启动一个引擎审查助手",
+          "未核验的发现只能标为UNVERIFIED或丢弃"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "代码审查",
+          "后端",
+          "测试",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Architectural review of written code: coding standards, SOLID, testability, performance."
+          },
+          {
+            "field": "does",
+            "quote": "Read the target file(s) in full. Read CLAUDE.md for project coding standards."
+          },
+          {
+            "field": "does",
+            "quote": "Search for ADR references in, in priority order:"
+          },
+          {
+            "field": "does",
+            "quote": "Identify the system category (engine, gameplay, AI, networking, UI, tools) and evaluate:"
+          },
+          {
+            "field": "does",
+            "quote": "**SOLID:**"
+          },
+          {
+            "field": "does",
+            "quote": "If an engine is configured, start **one** helper agent of the Primary\nspecialist's type from Phase 2."
+          },
+          {
+            "field": "inputs",
+            "quote": "`/code-review [file(s)]` may optionally include a story file path as the last argument"
+          },
+          {
+            "field": "inputs",
+            "quote": "Read the `specialists` block from `project.yaml`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If no engine is configured (no `engine.name` in `project.yaml`, and `technical-preferences.md` reads `[TO BE CONFIGURED]` or is missing), skip engine specialist steps."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If no ADR references found, note: \"No ADR references found — ADR compliance check skipped."
+          },
+          {
+            "field": "limits",
+            "quote": "**If the inputs this skill needs do not exist, the answer is \"could not run\" —\nnot a filled-in report.**"
+          },
+          {
+            "field": "limits",
+            "quote": "**A value of `null` means UNSET — treat that key as absent and skip its\nspecialist."
+          },
+          {
+            "field": "limits",
+            "quote": "This phase starts **one** helper agent at most: the engine reviewer below."
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Read, Glob, Grep, Bash(git log *), Agent, AskUserQuestion"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Bash(git log *)"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,272 @@
+{
+  "schema": 1,
+  "repo": "dsx-ai-factory/nvke",
+  "tree_sha": "0d25debd425be613ef86f0648c9ddc4aa9e22c74",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": ".claude/skills/open-pr/SKILL.md",
+      "blob_sha": "d547c5c48335d9c92c34e3f83c6de7f6d4f71f8a",
+      "source_url": "https://github.com/dsx-ai-factory/nvke/blob/230d67b058537626a9d02dfbd1276a02b75fd7bf/.claude/skills/open-pr/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "open-pr",
+        "description": "Open or update a pull request on dsx-ai-factory/nvke following the repository's fork, squash-merge, DCO, labeling, and CI-presence rules. Use when asked to open a PR, push a branch for review, or check why PR checks look wrong."
+      },
+      "excerpt": "---\nname: open-pr\ndescription: Open or update a pull request on dsx-ai-factory/nvke following the repository's fork, squash-merge, DCO, labeling, and CI-presence rules. Use when asked to open a PR, push a branch for review, or check why PR checks look wrong.\ndisable-model-invocation: true\n---\n\n# Open a pull request\n\nFollow [CONTRIBUTING.md](../../../CONTRIBUTING.md) — this skill is the\nexecutable checklist, not a replacement for it.\n\n## Before pushing\n\n1. Branch name is `<type>/<short-description>` (`feat/`, `fix/`, `docs/`,\n   `refactor/`, `test/`, `chore/`). Push it to your fork, never to\n   `dsx-ai-factory/nvke`, even with write access, and open the PR from there:\n   `gh pr create --repo dsx-ai-factory/nvke --head <your-user>:<branch>`.\n2. Run `make preflight` from the repository root. It lints and tests the\n   modules you changed and adds workspace and license checks when relevant.\n3. Every commit carries a DCO sign-off (`git commit -s`). Missing one on an\n   existing branch: `git rebase --keep-base --signoff main` then\n   `git push --force-with-lease`. Organization members are relaxed only when\n   the commit is also verified-signed (`-S`) — relaxed, not exempt.\n\n## Opening the PR\n\n4. **The PR title is the commit.** This repository squash-merges, so the title\n   becomes the one commit subject on `main` and is what the `pr-title` check\n   and the branch rule validate. It must be a Conventional Commit\n   (`type(scope): description`, lower case). Branch commits are discarded by\n   the squash; do not polish them.\n5. Reference the issue with `Closes #<N>` for non-trivial changes (the repo is\n   issue-first — open one before a significant PR).\n6. Apply exactly one change-category label: `feature`, `bug`, or\n   `documentation`. There is no `breaking` label; mark a breaking change\n   with `!` in the title or a `BREAKING CHANGE:` footer.\n7. If a substantial portion of the change was AI-generated, disclose that in\n   the PR description (required by CONTRIBUTING.md). Do not add agent\n   attribution: no `Co-Authored-By` trailer naming an agent in any commit, and\n   no \"Generated with …\" footer in the PR description.\n\n## After opening — verify checks are PRESENT, not just green\n\nMost checks build through a `pull-request/<number>` branch created by\ncopy-pr-bot, which gates on **author vetting**. For unvetted authors those\nchecks are never created, and **their absence looks identical to success**: a\ncolumn of green ticks with checks simply missing.\n\n```bash\ngh pr checks <number> --repo dsx-ai-factory/nvke --json name,workflow\n```\n\nWhich checks block a merge is a repository setting. Read it with\n`gh api repos/dsx-ai-factory/nvke/rules/branches/main --jq '[.[].type]'`. `gate` and DCO always report; golangci-lint,\nCodeQL, govulncheck, gitleaks, grype, actionlint, shellcheck, the image build,\nand the notices gate depend on the mirror and are legitimately absent for\nunvetted authors — flag that state rather than treating it as passing.\n",
+      "card": {
+        "title_zh": "提交拉取请求",
+        "purpose_zh": "按仓库的 fork、squash-merge、DCO、标签与 CI 存在性规则，在 dsx-ai-factory/nvke 上创建或更新拉取请求，并核查检查项是否真正存在。",
+        "does": [
+          "推送前检查分支命名规范，并推送到个人 fork 而非主仓库",
+          "运行 make preflight 对改动模块做 lint 与测试",
+          "确保每个提交带 DCO 签署，缺失时用 rebase 补签",
+          "以 Conventional Commit 规范撰写 PR 标题并引用相关 issue",
+          "只应用一个变更类别标签，破坏性变更用感叹号或 footer 标注",
+          "披露 AI 生成内容，并核查 CI 检查项是否存在而非仅看是否通过"
+        ],
+        "inputs": [
+          "分支名与改动内容",
+          "PR 标题（Conventional Commit 格式）",
+          "关联 issue 编号",
+          "变更类别标签",
+          "AI 生成内容披露说明"
+        ],
+        "outputs": [
+          "推送到 fork 的分支",
+          "创建的拉取请求",
+          "PR 检查项存在性核查结果"
+        ],
+        "scenarios": [
+          "被要求打开 PR 或推送分支以供评审",
+          "检查 PR 检查项为何看起来异常",
+          "为重要改动提交符合仓库规范的拉取请求"
+        ],
+        "prerequisites": [
+          "已安装并登录 gh CLI",
+          "已 fork dsx-ai-factory/nvke 仓库",
+          "本地仓库根目录可运行 make preflight"
+        ],
+        "limits": [
+          "仅为 CONTRIBUTING.md 的可执行清单，不替代该文档",
+          "禁止直接推送到主仓库，即使有写权限",
+          "未通过作者审核时部分检查不会创建，缺失与通过外观相同",
+          "无 breaking 标签，破坏性变更需用标题感叹号或 footer 标注"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network"
+        ],
+        "tags": [
+          "代码审查",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Open or update a pull request on dsx-ai-factory/nvke following the repository's fork, squash-merge, DCO, labeling, and CI-presence rules."
+          },
+          {
+            "field": "does",
+            "quote": "Push it to your fork, never to `dsx-ai-factory/nvke`, even with write access, and open the PR from there"
+          },
+          {
+            "field": "does",
+            "quote": "Run `make preflight` from the repository root. It lints and tests the modules you changed"
+          },
+          {
+            "field": "does",
+            "quote": "Every commit carries a DCO sign-off (`git commit -s`)."
+          },
+          {
+            "field": "does",
+            "quote": "It must be a Conventional Commit (`type(scope): description`, lower case)."
+          },
+          {
+            "field": "does",
+            "quote": "Apply exactly one change-category label: `feature`, `bug`, or `documentation`."
+          },
+          {
+            "field": "does",
+            "quote": "If a substantial portion of the change was AI-generated, disclose that in the PR description"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "gh pr checks <number> --repo dsx-ai-factory/nvke --json name,workflow"
+          },
+          {
+            "field": "limits",
+            "quote": "this skill is the executable checklist, not a replacement for it."
+          },
+          {
+            "field": "limits",
+            "quote": "For unvetted authors those checks are never created, and **their absence looks identical to success**"
+          },
+          {
+            "field": "limits",
+            "quote": "There is no `breaking` label; mark a breaking change with `!` in the title or a `BREAKING CHANGE:` footer."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "gh api repos/dsx-ai-factory/nvke/rules/branches/main --jq '[.[].type]'"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/regenerate/SKILL.md",
+      "blob_sha": "48c5c2a54feaa789d9da9bbb633ae8b906e2b2ad",
+      "source_url": "https://github.com/dsx-ai-factory/nvke/blob/230d67b058537626a9d02dfbd1276a02b75fd7bf/.claude/skills/regenerate/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "regenerate",
+        "description": "Regenerate generated artifacts (OpenAPI Go code, gRPC protos, CAPI deepcopy/CRD/RBAC, the controller chart's release CRDs, third-party notices, go.work) after editing their sources. Use whenever a change touches openapi.yaml, a .proto file, CAPI types/markers, the release CRD types, dependencies, or when a *-check CI gate reports drift."
+      },
+      "excerpt": "---\nname: regenerate\ndescription: Regenerate generated artifacts (OpenAPI Go code, gRPC protos, CAPI deepcopy/CRD/RBAC, the controller chart's release CRDs, third-party notices, go.work) after editing their sources. Use whenever a change touches openapi.yaml, a .proto file, CAPI types/markers, the release CRD types, dependencies, or when a *-check CI gate reports drift.\n---\n\n# Regenerate, never hand-edit\n\nGenerated files are listed in the root [AGENTS.md](../../../AGENTS.md)\ndirectory table. Change the source, run the matching generator, and commit\nsource + output together.\n\n| You changed | Run | Commit together |\n|---|---|---|\n| `controller/api/openapi.yaml` | `make generate` in `controller/` | spec + `api/*.gen.go` |\n| `agent/pkg/agent/proto/node_agent.proto` | `make protos` in `agent/` | `.proto` + `*.pb.go` |\n| CAPI types/markers in `cluster-api-provider-provisioned/` | `make generate manifests` there | types + deepcopy, CRDs, `config/rbac/role.yaml` |\n| `MachineImage`, `ClusterRelease` or `NodePoolRelease` types/markers in `management-engine/apis/v1/` | `make -C management-engine manifests`, then `make chart-crds` at the root | types + `config/crd/bases` + the chart's `files/crds.yaml` |\n| `controller/deploy/release-crds/kustomization.yaml` | `make chart-crds` at the root | overlay + `files/crds.yaml` |\n| any module `go.mod`/`go.sum` | `make work-sync`, then `make notices`, at the root | `go.work` + `go.work.sum` + every changed `THIRD_PARTY_NOTICES.md` |\n\nRules that trip people up:\n\n- **Use `make generate`, never invoke `oapi-codegen` directly.** The generator\n  version is pinned in `api/oapi-codegen.mod` and run through `go generate`,\n  so the output does not depend on whatever `oapi-codegen` is on `PATH`.\n- **Prefer Flox when available.** If `flox` is on `PATH` and you are not\n  already inside the environment (`FLOX_ENV` is unset), run generators as\n  `flox activate -- make <target>` so the rest of the toolchain matches CI.\n  Flox is optional — plain `make` works without it. If you do activate it,\n  match the CLI version in `.flox-cli-version`.\n- Drift gates in CI: `make check-protos` (agent), `make notices-check` (root),\n  `make generate-check` (provisioned provider), `make chart-crds-check` (the\n  controller chart's release CRDs), `go-work-check` (workspace).\n  If one fails, regenerate and commit the result — do not revert the output.\n- `controller/deploy/charts/` READMEs are helm-docs output of `values.yaml`\n  comments; edit the comment, not just the README.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".claude/skills/write-docs-page/SKILL.md",
+      "blob_sha": "5f99f503a90faaa91e41cf9cd62ed0070d577c9f",
+      "source_url": "https://github.com/dsx-ai-factory/nvke/blob/230d67b058537626a9d02dfbd1276a02b75fd7bf/.claude/skills/write-docs-page/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "write-docs-page",
+        "description": "Write or revise a page in the NVKE documentation site (docs/, rendered with Fern). Use when drafting a new docs page, rewriting a scaffold page, or checking a page against the documentation conventions. Covers page types, voice, terminology, Markdown and Fern conventions, and how to verify every claim against the code."
+      },
+      "excerpt": "---\nname: write-docs-page\ndescription: Write or revise a page in the NVKE documentation site (docs/, rendered with Fern). Use when drafting a new docs page, rewriting a scaffold page, or checking a page against the documentation conventions. Covers page types, voice, terminology, Markdown and Fern conventions, and how to verify every claim against the code.\n---\n\n# Write an NVKE docs page\n\nThe documentation site is built from Markdown under `docs/` and rendered by\nFern (`fern/docs.yml`, navigation in `docs/index.yml`). Pages are read on the\nsite and on GitHub, so they must render correctly in both.\n\nThe model page is [docs/overview/what-is-nvke.md](../../../docs/overview/what-is-nvke.md).\nRead it before you write. Match its voice, density and structure.\n\n## 1. Before you write\n\n1. Read the model page.\n2. Read the page you are replacing, if one exists, including any\n   \"Source material\" excerpts in it. Excerpts are input, not output.\n3. Read the source files the excerpts cite, at the current commit. The code is\n   the authority: when an excerpt and the code disagree, the code wins, and you\n   say so in your summary.\n4. List every page you intend to link to, and check that each one exists in\n   `docs/index.yml` or is being written in the same change.\n\n## 2. Page types\n\nEvery page is exactly one type. Do not mix them.\n\n| Type | Answers | Shape |\n|---|---|---|\n| Explanation | What is it and why? | Definition first, then sections that each answer one question. No procedures. |\n| Tutorial | Can I get a first success? | One path, numbered steps, a visible result at the end. No options or branches. |\n| How-to | How do I do this task? | Goal, prerequisites, numbered steps, verification, next steps. |\n| Reference | What exactly is supported or available? | Tables and lists, no narrative. Generated from source where possible. |\n\n### How-to template\n\n<!-- Four backticks on purpose: the template holds ``` blocks, which would close a three-backtick fence early. -->\n````markdown\n# <Verb phrase: Bootstrap the management cluster>\n\nThis page describes how to <task>. <When you do it: after which page, before which page.>\n\n## Before you begin\n\n- <Pages the reader must have completed, in path order, first: \"You have read Plan your installation\", as a link to that page.>\n- <Then each remaining prerequisite, with a link to the page that satisfies it.>\n\n## <Step group, if the task has phases>\n\n1. <One action per step. Imperative mood.>\n\n   ```bash\n   <command the reader can paste>\n   ```\n\n   <What they should see, or how to tell the step worked.>\n\n## Verify\n\n<How to confirm the whole task succeeded.>\n\n## Next steps\n\n- <One to four links, in the order the reader needs them.>\n````\n\nA how-to may include one short \"What happens during `<task>`\" section (a\ndiagram and a paragraph) when later steps, failure handling or verification\ndepend on the reader understanding the sequence. Keep it after the main steps\nand before failure handling. Anything longer belongs on an explanation page.\n\nThe tutorial template is the same, but with no options and a single path.\nExplanation and reference pages follow the model page.\n\n## 3. Voice\n\n- Address the reader as \"you\". Use the imperative in steps (\"Run\", \"Set\",\n  \"Confirm\").\n- Present tense. Describe what the software does now. No roadmap, no\n  \"currently\", \"soon\", \"will be able to\", \"new\".\n- Open with the conclusion: the first sentence of a page or section says the\n  thing the reader most needs.\n- Be specific. Replace \"significantly\", \"robust\", \"simple\", \"easy\",\n  \"seamless\", \"powerful\", \"just\" and \"leverage\" with the fact, or delete them.\n- No metaphors where a literal word works.\n- Use at most one em dash in a paragraph, and none in headings.\n- Number of list items matches the content, not a rhythm of three.\n- Spell out NVIDIA, product and project-specific acronyms on their first use\n  on each page, with the acronym in parentheses: \"NVIDIA Infra Controller\n  (NICo)\". Industry-standard terms (API, CLI, IP, VIP, CPU, GPU, TPM, YAML,\n  mTLS, KVM, QEMU, LVM, UEFI) need no expansion.\n- The page is not the actor. Write \"This page describes how to...\" or address\n  the reader, not \"This page turns...\".\n- No \"we\" except in the preview statement on the model page.\n- Do not repeat preview caveats. Link to\n  [Preview status and known limitations](../../../docs/overview/preview-status.md)\n  where a limitation affects the task, in one sentence.\n\n## 4. Terminology\n\n| Use | Not | Notes |\n|---|---|---|\n| NVIDIA Kubernetes Engine (NVKE) on first use, then NVKE | the pre-rename product name | Product name in prose. |\n| NVIDIA Kubernetes Recipes (NVKR) on first use, then NVKR | the pre-rename build-system names, NKD | Build system. |\n| operator | admin, SRE | The AI factory team that installs and runs NVKE. |\n| customer | tenant, end user | The person or team that receives a workload cluster. |\n| management cluster | site controller, site cluster, seed | The cluster that runs the management plane. |\n| management plane | control plane (for NVKE itself), CWE | The NVKE API and controllers. |\n| seed cluster | bootstrap cluster, kind cluster | The temporary cluster during bootstrap. |\n| workload cluster | tenant cluster | A cluster NVKE creates for a customer. \"NVKE cluster\" is acceptable in overview prose. |\n| node pool | node set, machine deployment | |\n| infrastructure provider | infra provider, backend | NICo by default; LaunchLayer when a deployment enables it. |\n| NVIDIA Infra Controller (NICo) | Forge, Carbide | |\n\n**Code literals keep their real names.** Commands, binaries, packages, flags,\nAPI fields and repository names are written exactly as they exist in the code\n(`nvkectl`, `nvke-agent`, `nvkr`, `cniPlugin`, `dsx-ai-factory/nvke`), in\nbackticks. Never rename a literal to match the product name.\n\nDo not describe implementation internals that operators do not act on: the\nworkflow engine, its database, the outbox, internal service names. Name an\ninternal component only when the reader has to run, configure or inspect it.\n\nDo not mention internal NVIDIA programs, sites, teams, people, channels,\ntrackers or hostnames. Do not describe air-gapped or offline installation.\n\n## 5. Markdown and Fern conventions\n\n- One `#` title per page, sentence case, matching the `page:` name in\n  `docs/index.yml`. Section headings are `##` and `###`, sentence case.\n- GitHub-flavored Markdown only, so pages render on GitHub as well as the\n  site: no Fern MDX components. Notes are blockquotes that start with a bold\n  label: `> **Note:**`, `> **Warning:**`, `> **Preview:**`.\n- Diagrams are Mermaid code blocks. Every diagram has one sentence above it\n  saying what it shows.\n- Link to other pages with relative paths to the `.md` file\n  (from a page in `docs/workload-clusters/`, Prepare nodes is\n  `../operate/prepare-nodes.md`). Use the target page's\n  title as the link text. Do not link to a page that is not in the\n  navigation; `fern check` treats broken links as errors.\n- Code blocks have a language (`bash`, `yaml`, `json`, `text`). One command\n  per block where the reader runs them separately.\n- Placeholders are `<UPPER_SNAKE_CASE>` and are explained right after the\n  block. Example values use `example-` names, RFC 1918 or documentation\n  addresses, and `REDACTED` or `example-token` for anything resembling a\n  credential. Never include a real hostname, IP address, token or key.\n- Tables need a header row. Keep cells to one or two sentences.\n- No `TODO`, no editor notes, no source lists, no draft banners in the page.\n\n## 6. Verify every claim\n\nBefore you finish:\n\n1. Every command, flag, field, default and output you show exists in the code\n   at the current commit. Record the file and line for each in your summary,\n   not in the page.\n2. Every behavior you describe (\"NVKE retries\", \"the cluster becomes Ready\")\n   is backed by code or a test. If you cannot find it, remove it or raise it\n   as an open question.\n3. Run the terminology check if your session has it, and search the p",
+      "card": {
+        "title_zh": "NVKE 文档页撰写",
+        "purpose_zh": "指导撰写或修订 NVKE 文档站点中由 Fern 渲染的 Markdown 页面，涵盖页面类型、语气、术语、Markdown 与 Fern 约定，并要求逐条对照代码核验内容。",
+        "does": [
+          "按解释、教程、操作指南、参考四类页面模板撰写或改写文档页",
+          "统一语气与术语，使用规定产品名并保留代码字面量原名",
+          "遵循 Markdown 与 Fern 约定，包括标题、提示块、Mermaid 图、相对链接与占位符",
+          "逐条核验命令、字段、默认值与行为是否存在于当前提交的代码中",
+          "检查链接是否在导航中，并确认新页面已登记到 docs/README.md 与 docs/index.yml",
+          "运行 make docs-check 与 name-check.py 等合并门禁检查，并输出摘要、证据、改动说明与待决问题"
+        ],
+        "inputs": [
+          "待撰写或修订的文档页及其现有 Source material 摘录",
+          "模型页 docs/overview/what-is-nvke.md",
+          "摘录所引用的源代码文件（当前提交）",
+          "docs/index.yml 导航与 docs/README.md",
+          "docs/overview/preview-status.md 等关联页面"
+        ],
+        "outputs": [
+          "符合模板与约定的 Markdown 文档页",
+          "含 path:line 的声明与证据清单",
+          "相对源材料的改动说明",
+          "未核验事项或需产品决策的待决问题"
+        ],
+        "scenarios": [
+          "起草新的 NVKE 文档页",
+          "重写脚手架页面",
+          "按文档约定检查已有页面",
+          "核验页面中的命令、字段与行为是否与代码一致"
+        ],
+        "prerequisites": [
+          "已阅读模型页 docs/overview/what-is-nvke.md",
+          "已阅读被替换页面及其 Source material 摘录",
+          "已阅读摘录引用的源代码文件",
+          "已列出拟链接页面并确认其存在于 docs/index.yml 或同批变更中"
+        ],
+        "limits": [
+          "仅适用于 NVKE 文档站点（docs/ 下由 Fern 渲染的 Markdown）",
+          "每页只能属于一种页面类型，不得混用",
+          "仅用 GitHub 风格 Markdown，不使用 Fern MDX 组件",
+          "不得写入真实主机名、IP、令牌或密钥",
+          "不得提及内部 NVIDIA 项目、站点、团队、人员、渠道、跟踪器或主机名",
+          "不描述气隙或离线安装",
+          "不描述操作者无需处理的实现内部细节",
+          "不得在页面中留下 TODO、编辑注记、来源列表或草稿横幅"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "写作",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Covers page types, voice, terminology, Markdown and Fern conventions, and how to verify every claim against the code."
+          },
+          {
+            "field": "does",
+            "quote": "Every page is exactly one type. Do not mix them."
+          },
+          {
+            "field": "does",
+            "quote": "The code is the authority: when an excerpt and the code disagree, the code wins, and you say so in your summary."
+          },
+          {
+            "field": "does",
+            "quote": "Code literals keep their real names."
+          },
+          {
+            "field": "does",
+            "quote": "GitHub-flavored Markdown only, so pages render on GitHub as well as the site: no Fern MDX components."
+          },
+          {
+            "field": "does",
+            "quote": "Every command, flag, field, default and output you show exists in the code at the current commit."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the model page."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the page you are replacing, if one exists, including any \"Source material\" excerpts in it."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the source files the excerpts cite, at the current commit."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "List every page you intend to link to, and check that each one exists in `docs/index.yml` or is being written in the same change."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not mention internal NVIDIA programs, sites, teams, people, channels, trackers or hostnames. Do not describe air-gapped or offline installation."
+          },
+          {
+            "field": "limits",
+            "quote": "Never include a real hostname, IP address, token or key."
+          },
+          {
+            "field": "limits",
+            "quote": "No `TODO`, no editor notes, no source lists, no draft banners in the page."
+          }
+        ]
+      }
+    }
+  ]
+}

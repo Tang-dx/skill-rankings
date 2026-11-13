@@ -1,0 +1,903 @@
+{
+  "schema": 1,
+  "repo": "dotslashsimran/simcraft",
+  "tree_sha": "a394b07f3bee06843975e6f0a65fbfa1b646ebde",
+  "truncated_paths": 12,
+  "skills": [
+    {
+      "skill_path": "skills/coding/api-design-review/SKILL.md",
+      "blob_sha": "f3c182cf42401c17e13386ffed7639cdc539720e",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/coding/api-design-review/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "api-design-review",
+        "description": "Review the design of an API surface, meaning an HTTP API (OpenAPI spec or route code), an SDK's public classes and functions, or a CLI. Checks naming and consistency, resource modelling, error design (stable codes, RFC 9457 problem details, request ids), versioning and breaking changes, pagination, filtering, idempotency and retries, rate limits, timeouts, long-running operations, webhooks, auth, partial updates, ID, time and money formats, SDK ergonomics and CLI conventions. Uses scripts to lin"
+      },
+      "excerpt": "---\nname: api-design-review\ndescription: Review the design of an API surface, meaning an HTTP API (OpenAPI spec or route code), an SDK's public classes and functions, or a CLI. Checks naming and consistency, resource modelling, error design (stable codes, RFC 9457 problem details, request ids), versioning and breaking changes, pagination, filtering, idempotency and retries, rate limits, timeouts, long-running operations, webhooks, auth, partial updates, ID, time and money formats, SDK ergonomics and CLI conventions. Uses scripts to lint OpenAPI files, classify changes between two spec versions as breaking or safe, and dump an SDK's public surface. Writes review.md with a scorecard, ranked findings with rewrites, a breaking-change risk list and what is good. Use when the user says \"review my API\", \"API design\", \"is this a breaking change\", \"OpenAPI review\", \"check my spec\", \"SDK ergonomics\", \"review my SDK\", \"review my CLI\", or asks whether an API change is safe to ship. For onboarding and time to first success, use dx-audit instead.\n---\n\n# API design review\n\nThis skill reviews the shape of an API, which is the names, resources, errors, formats and rules that every user has to learn. Most API design mistakes are cheap to fix before launch and expensive after it, because fixing them breaks clients. The review therefore puts the findings that would be breaking to fix later at the top.\n\nThe judgement lives in `reference.md`, which has the scoring rubric, the severity scale, the rules for each area with citations to public guidelines (Google AIP, Microsoft REST API Guidelines, Stripe's API conventions, Zalando RESTful API Guidelines, IETF RFCs), and before and after rewrites. Read the sections that match the API before writing findings.\n\nThe scripts need only Python 3.9 or newer and the standard library. They read JSON, and they read YAML with PyYAML if it is installed or with a small built-in parser if it is not. Files that use YAML anchors or tags need PyYAML or a JSON copy.\n\n## 1. Find out what to review\n\nAsk one question at a time, and only for what is missing:\n\n- **What is the surface?** It can be an OpenAPI file, route code, an SDK (a Python package name or a `.d.ts` file), or a CLI (`--help` output or the command source).\n- **Who uses it?** Public, partner, or internal with one client. This sets severity (reference.md section 2).\n- **Is it launched?** Before launch, recommend breaking fixes freely. After launch, every fix must come with a migration path.\n- **Is there an old version to compare against?** If yes, run the diff in step 3.\n\n## 2. Run the tools\n\nSet `S=~/simcraft/skills/coding/api-design-review/scripts`.\n\n**OpenAPI lint:**\n```\npython3 $S/lint_openapi.py openapi.yaml            # text\npython3 $S/lint_openapi.py openapi.yaml --format md\npython3 $S/lint_openapi.py openapi.yaml --fail-on high   # exit 1 for CI\n```\nIt checks path and field case consistency, plural collections, verbs in paths, error schemas (missing, inconsistent, no machine code, no request id), undocumented 4xx and 5xx, list endpoints with no pagination or a bare array response, mixed ID and time formats, money as floats, creating POSTs without an Idempotency-Key, PATCH bodies with required fields, 429 without Retry-After, duplicate or missing operationIds, and unsigned webhooks.\n\n**SDK surface:**\n```\npython3 $S/sdk_surface.py my_package [--path src] [--depth 2]\npython3 $S/sdk_surface.py dist/index.d.ts\n```\nIt prints the public tree (modules, classes, signatures, properties, constants) and hints about boolean flag arguments, long positional parameter lists, mutable defaults, `any`, optional parameters before required ones, timeouts that default to waiting forever, error classes with no common base, and missing docs. Importing a Python package runs its import code, so only run it on code the user trusts.\n\n**For a CLI**, there is no script. Run `<tool> --help` and the help for each subcommand, try one command with `--json` and with output piped to a file, check the exit code after a failing command (`echo $?`), and compare against reference.md section 17.\n\n**For route code with no spec**, export a spec if the framework can (reference.md section 18). Otherwise build the endpoint list by reading the routes.\n\nThe scripts find patterns, and they also produce false positives. Read every finding, drop the ones that are wrong for this API, and say which areas the scripts cannot check (behaviour, defaults, docs quality, real latency).\n\n## 3. Check breaking changes\n\nWhen there are two versions:\n```\npython3 $S/breaking_diff.py old.json new.yaml [--format md]\n```\nIt sorts every change into BREAKING, RISKY or SAFE, says why, shows where changed shared schemas are used, and says what semver bump the changes need. It exits 1 if anything is breaking, so it can run in CI on every pull request.\n\nThe script cannot see behaviour changes such as a new default value, a different sort order, stricter server-side validation that the spec does not show, or new side effects. Ask about those directly.\n\nWhen there is only one version, write the breaking-change risk list from the lint instead. It lists the findings whose fix would itself be breaking (bare array lists, integer IDs, missing pagination, error shape, field renames), so the user knows what to fix before launch.\n\n## 4. Write review.md\n\nWrite `review.md` next to the API source unless the user says otherwise. Use this structure, and see `examples/review.md` for a full example:\n\n1. **Summary.** Two or three sentences with the overall verdict and the top three fixes.\n2. **Scorecard.** A table with each area from the reference.md rubric, a 0 to 3 score, and one line of reason. Mark areas that do not apply as n/a.\n3. **Findings, ranked by severity (P0 to P3).** For each finding, give where it is, what is wrong, why it costs users something, the precedent from a public guideline, and a concrete rewrite (before and after for the path, schema, error body or call site). Group repeated cases into one finding with a list of locations.\n4. **Breaking-change risk list.** Diff results if there were two versions. Otherwise, the fixes from the findings that would break clients, each with a migration path (alias, deprecation header, sunset date, new version).\n5. **What's good.** Specific things the API does well, so the team keeps doing them. Write this section honestly and specifically, with no padding.\n6. **Not checked.** What the review could not see.\n\nKeep findings concrete. \"Errors are inconsistent\" is not a finding. \"`POST /orders` returns `{error: {msg}}` and `GET /orders/{id}` returns `{message}`, so clients need two error handlers\" is a finding.\n\n## 5. Hand over\n\nShow the user the summary and the top findings in chat, and give the path to `review.md`. If they want to fix things, start with the P0 findings, then the P1 findings that are breaking, and re-run the lint and the diff after each change.\n",
+      "card": {
+        "title_zh": "API 设计评审",
+        "purpose_zh": "评审 HTTP API、SDK 或 CLI 的接口设计，检查命名、资源建模、错误设计、版本与破坏性变更、分页、幂等、鉴权等，并用脚本做 OpenAPI lint、版本差异分类和 SDK 公开面导出，最终写出 review.md。",
+        "does": [
+          "按 OpenAPI 文件、路由代码、SDK 或 CLI 确定评审对象并询问使用者范围与是否已上线",
+          "用 lint_openapi.py 检查路径与字段命名、错误 schema、分页、ID 与时间格式、金额浮点、幂等键、429 Retry-After、operationId、webhook 签名等",
+          "用 sdk_surface.py 导出 SDK 公开树并提示布尔标志参数、长位置参数、可变默认值、any、错误类无共同基类等问题",
+          "用 breaking_diff.py 对比两个版本，把变更分为 BREAKING、RISKY、SAFE 并给出 semver 建议",
+          "对 CLI 运行 --help、子命令帮助、--json 输出、失败退出码并与参考规范比对",
+          "写出 review.md，含摘要、评分卡、按 P0–P3 排序的发现与改写、破坏性变更风险清单、优点与未检查项"
+        ],
+        "inputs": [
+          "OpenAPI 文件（JSON 或 YAML）",
+          "路由代码或可导出的 spec",
+          "SDK 的 Python 包名或 .d.ts 文件",
+          "CLI 的 --help 输出或命令源码",
+          "使用者范围（公开、合作方、内部）与是否已上线",
+          "用于对比的旧版本 spec"
+        ],
+        "outputs": [
+          "review.md 评审报告",
+          "lint 文本或 Markdown 输出，可 --fail-on high 供 CI 使用",
+          "SDK 公开面树与提示",
+          "破坏性变更分类结果与 semver 建议",
+          "CLI 检查结论"
+        ],
+        "scenarios": [
+          "用户说 review my API 或 API design 时评审接口设计",
+          "判断某次 API 变更是否为破坏性变更、能否安全发布",
+          "评审 OpenAPI spec 或 SDK 人体工学、CLI 约定",
+          "在 CI 中对 spec 做 lint 或版本 diff 拦截"
+        ],
+        "prerequisites": [
+          "Python 3.9 或更新版本及标准库",
+          "解析 YAML 需 PyYAML，或用内置小解析器；含锚点或标签的 YAML 需 PyYAML 或 JSON 副本",
+          "脚本路径设为 ~/simcraft/skills/coding/api-design-review/scripts",
+          "SDK 脚本会执行 Python 包导入代码，只对可信代码运行"
+        ],
+        "limits": [
+          "脚本只能发现模式，也会产生误报，需逐条人工判断",
+          "脚本无法检查行为、默认值、文档质量、真实延迟",
+          "breaking_diff 看不到新默认值、排序变化、spec 未体现的更严格校验、新副作用等行为变化",
+          "CLI 没有专用脚本，需手动运行帮助与命令",
+          "SDK 导入会执行包代码，存在风险"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "后端",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Review the design of an API surface, meaning an HTTP API (OpenAPI spec or route code), an SDK's public classes and functions, or a CLI."
+          },
+          {
+            "field": "does",
+            "quote": "It sorts every change into BREAKING, RISKY or SAFE, says why, shows where changed shared schemas are used, and says what semver bump the changes need."
+          },
+          {
+            "field": "does",
+            "quote": "Write `review.md` next to the API source unless the user says otherwise."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Importing a Python package runs its import code, so only run it on code the user trusts."
+          },
+          {
+            "field": "limits",
+            "quote": "The script cannot see behaviour changes such as a new default value, a different sort order, stricter server-side validation that the spec does not show, or new side effects."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Set `S=~/simcraft/skills/coding/api-design-review/scripts`."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Write `review.md` next to the API source unless the user says otherwise."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/coding/benchmark-honestly/SKILL.md",
+      "blob_sha": "258987fa5a63c53c9090fb20ee188aff1cf34dce",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/coding/benchmark-honestly/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "benchmark-honestly",
+        "description": "Build benchmarks that survive scrutiny and catch the classic lies (dead code elimination, lazy results, constant folding, warm caches, coordinated omission, averages hiding GC pauses, unequal work, noisy machines). Defines the question first, controls and discloses the environment, uses warmups, interleaved repeats, medians, bootstrap confidence intervals and Mann-Whitney tests, and ends with a one-line verdict that includes the CI. Bundles a command runner, an environment reporter and an open-l"
+      },
+      "excerpt": "---\nname: benchmark-honestly\ndescription: Build benchmarks that survive scrutiny and catch the classic lies (dead code elimination, lazy results, constant folding, warm caches, coordinated omission, averages hiding GC pauses, unequal work, noisy machines). Defines the question first, controls and discloses the environment, uses warmups, interleaved repeats, medians, bootstrap confidence intervals and Mann-Whitney tests, and ends with a one-line verdict that includes the CI. Bundles a command runner, an environment reporter and an open-loop latency tester. Use when the user says \"benchmark this\", \"is this faster\", \"compare performance\", \"did my change speed it up\", \"load test\", \"latency percentiles\", \"p99\", or posts a speedup claim to check.\n---\n\n# Benchmark honestly\n\nA benchmark is a claim: \"under these conditions, A takes this long, and B is this much faster, give or take this much\". Most published benchmark numbers are wrong because one of those parts is missing. This skill makes every part explicit and runs checks that catch the usual mistakes. Deeper explanations are in `reference.md`.\n\nScripts live in `~/simcraft/skills/coding/benchmark-honestly/scripts/`. They need only Python 3.9+.\n\n## 1. Write the question down first\n\nBefore running anything, agree on these with the user and write them at the top of the report:\n- **What is measured:** throughput (work per second) or latency (time per request). For latency, **which percentile** matters (p50 for typical, p99 or p99.9 for the tail users complain about).\n- **Cold or warm:** first run after start (caches empty, JIT not compiled) or steady state. These are different questions with different answers.\n- **The workload:** realistic input sizes and shapes. A 100-element input fits in L1 cache and says nothing about a 10 GB one.\n- **What difference matters:** \"a 2% gain is worth shipping\" or \"only 20% matters\". Pass it as `--min-effect`.\n- **Microbenchmark or end to end:** a 3x faster function inside a request that spends 95% of its time on the network changes nothing. Measure end to end before celebrating a micro result.\n\n## 2. Pick the tool\n\nUse the ecosystem's own tool if it is installed, because it runs in-process with less overhead:\n\n| Ecosystem | Tool | Compare two versions with |\n|---|---|---|\n| Any command | `hyperfine --warmup 3 -N 'a' 'b'` | its relative output, or `bench.py` for CIs |\n| Python | `pyperf` (or `pytest-benchmark`) | `pyperf compare_to old.json new.json` |\n| JS / TS | `mitata` or `tinybench` | run both in one file |\n| Go | `go test -bench . -count 20` | `benchstat old.txt new.txt` |\n| Rust | `criterion` | `--save-baseline` then `--baseline` |\n\nOtherwise, or to get the statistics and the checks, use the bundled runner:\n\n```\npython3 scripts/bench.py -n old -n new \"python3 old.py\" \"python3 new.py\" \\\n  --runs 30 --warmup 3 --floor \"python3 -c pass\" --same-output \\\n  --md report.md --json report.json --chart chart.svg --redact\n```\n\nThe first command is the baseline. It runs warmups, then shuffled rounds so drift hits every variant equally, records wall time, CPU time and peak memory, and prints medians, bootstrap CIs, a Mann-Whitney test, Cliff's delta and a verdict. `--floor` takes an empty version of the program (same startup, no work) and flags any variant that is not clearly slower than it. `--same-output` flags variants that print different results. `--prepare CMD` runs before every timed run (for example to evict a cache). `--subtract-floor` compares the work alone, without startup.\n\nFor latency under load, use the open-loop tester, never a loop that waits for each reply before sending the next:\n\n```\npython3 scripts/latency_test.py --url http://127.0.0.1:8080/ --rate 200 --duration 30 --md latency.md\n```\n\n## 3. Control the environment, then disclose it\n\nRun `python3 scripts/env_report.py --redact` before and after (bench.py includes it automatically). Fix what it warns about: plug in the laptop, turn off low power mode, close busy apps, on Linux set the governor to performance and pin with `taskset`. On macOS you cannot pin cores or turn off turbo, and Apple Silicon may put the run on slow efficiency cores; say so in the report. Check that you are timing a release build (`-O2`, `--release`, `NODE_ENV=production`), not a debug build.\n\n## 4. Check for the lies\n\nGo through the list in `reference.md` (\"The lies\") for the code at hand. The short version:\n- Is the result used? (dead code, lazy iterators, constant folding). Print or return a checksum.\n- Is every variant doing the same work on the same input? Compare outputs.\n- Did the previous run warm a cache for the next one? Shuffle the order, and say if the numbers are warm or cold.\n- Is the work bigger than the timer and startup cost? Compare against the floor.\n- Is latency measured from the intended send time? Is the tail reported, not just the mean?\n\n## 5. Report\n\nEvery report has: the question, a chart showing every run (not just a bar), the setup table, the exact command to reproduce, and one honest line, for example \"new is 1.18x faster than old (95% CI 1.09x to 1.27x, 30 runs each, warm cache, M2 laptop on AC power)\". If the CI includes 1.0, the line says there is no clear difference. Never report a speedup from a single run or from means alone.\n\n## Examples\n\n`examples/` has four real cases run on a busy laptop, each with the naive result next to the honest one: a lazy `map()` that looks 100,000x faster, two identical sorts where single runs give a different \"winner\" each time, a file read where whichever variant runs first loses, and a server with GC-like pauses whose p99 looks fine in a closed loop. See `examples/README.md`.\n",
+      "card": {
+        "title_zh": "诚实基准测试",
+        "purpose_zh": "把性能对比当作可检验的声明：先写清测量问题，控制并披露环境，用预热、交错重复、中位数、自助置信区间与Mann-Whitney检验，识别死代码消除、惰性求值、缓存预热、协调遗漏等常见陷阱，最后给出一行含置信区间的结论。",
+        "does": [
+          "先与用户确认测量对象：吞吐或延迟、哪个百分位、冷启动或稳态、工作负载、最小有意义差异、微基准或端到端",
+          "优先使用生态自带工具（hyperfine、pyperf、mitata、go benchstat、criterion），否则用捆绑的 bench.py 运行器",
+          "bench.py 执行预热与打乱顺序的多轮运行，记录墙钟、CPU时间与峰值内存，输出中位数、自助置信区间、Mann-Whitney检验、Cliff's delta 与结论",
+          "用 --floor 对比空程序、--same-output 检查输出一致、--prepare 在每次计时前执行命令、--subtract-floor 扣除启动开销",
+          "用 env_report.py 报告环境并提示需修正项（电源、低功耗模式、CPU调速器、taskset、release构建）",
+          "用 latency_test.py 做开环延迟测试，按指定速率与时长测量并输出延迟百分位报告"
+        ],
+        "inputs": [
+          "用户提出的性能问题与可接受的最小差异（--min-effect）",
+          "要对比的命令或程序（第一个为基线）",
+          "运行参数：--runs、--warmup、--floor、--same-output、--prepare、--subtract-floor",
+          "延迟测试参数：--url、--rate、--duration",
+          "环境信息（由 env_report.py 采集，可 --redact）"
+        ],
+        "outputs": [
+          "控制台打印的中位数、自助置信区间、Mann-Whitney检验、Cliff's delta 与结论",
+          "Markdown 报告（--md）、JSON 报告（--json）、图表（--chart）",
+          "延迟测试的 Markdown 报告（--md）",
+          "环境报告（env_report.py，可脱敏）",
+          "一行含置信区间的诚实结论，如 new 比 old 快 1.18 倍（95% CI 1.09x–1.27x）"
+        ],
+        "scenarios": [
+          "用户说 benchmark this、is this faster、compare performance 时对比两个版本",
+          "检查别人贴出的加速声明是否成立",
+          "对服务做负载测试并报告 p99 等延迟百分位",
+          "判断某次改动是否真的提速",
+          "排查基准测试中的死代码消除、惰性求值、缓存预热、协调遗漏等陷阱"
+        ],
+        "prerequisites": [
+          "Python 3.9+（脚本仅需此依赖）",
+          "脚本位于 ~/simcraft/skills/coding/benchmark-honestly/scripts/",
+          "可选：已安装生态自带基准工具（hyperfine、pyperf、mitata、go、criterion）",
+          "被测程序需为 release 构建（-O2、--release、NODE_ENV=production）"
+        ],
+        "limits": [
+          "macOS 上无法绑核或关闭 turbo，Apple Silicon 可能把运行放到能效核，只能在报告中说明",
+          "置信区间包含 1.0 时只能报告无明确差异",
+          "不得用单次运行或仅用均值报告加速",
+          "微基准结果不能替代端到端测量",
+          "示例在繁忙笔记本上运行，结果受机器噪声影响"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "数据分析",
+          "后端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A benchmark is a claim: \"under these conditions, A takes this long, and B is this much faster, give or take this much\"."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "This skill makes every part explicit and runs checks that catch the usual mistakes."
+          },
+          {
+            "field": "does",
+            "quote": "`--floor` takes an empty version of the program (same startup, no work) and flags any variant that is not clearly slower than it."
+          },
+          {
+            "field": "does",
+            "quote": "For latency under load, use the open-loop tester, never a loop that waits for each reply before sending the next:"
+          },
+          {
+            "field": "does",
+            "quote": "Run `python3 scripts/env_report.py --redact` before and after (bench.py includes it automatically)."
+          },
+          {
+            "field": "does",
+            "quote": "Use the ecosystem's own tool if it is installed, because it runs in-process with less overhead:"
+          },
+          {
+            "field": "inputs",
+            "quote": "python3 scripts/latency_test.py --url http://127.0.0.1:8080/ --rate 200 --duration 30 --md latency.md"
+          },
+          {
+            "field": "outputs",
+            "quote": "Every report has: the question, a chart showing every run (not just a bar), the setup table, the exact command to reproduce, and one honest line"
+          },
+          {
+            "field": "outputs",
+            "quote": "\"new is 1.18x faster than old (95% CI 1.09x to 1.27x, 30 runs each, warm cache, M2 laptop on AC power)\""
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user says \"benchmark this\", \"is this faster\", \"compare performance\", \"did my change speed it up\", \"load test\", \"latency percentiles\", \"p99\", or posts a speedup claim to check."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Scripts live in `~/simcraft/skills/coding/benchmark-honestly/scripts/`. They need only Python 3.9+."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Check that you are timing a release build (`-O2`, `--release`, `NODE_ENV=production`), not a debug build."
+          },
+          {
+            "field": "limits",
+            "quote": "On macOS you cannot pin cores or turn off turbo, and Apple Silicon may put the run on slow efficiency cores; say so in the report."
+          },
+          {
+            "field": "limits",
+            "quote": "If the CI includes 1.0, the line says there is no clear difference. Never report a speedup from a single run or from means alone."
+          },
+          {
+            "field": "limits",
+            "quote": "a 3x faster function inside a request that spends 95% of its time on the network changes nothing. Measure end to end before celebrating a micro result."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/coding/bisect-anything/SKILL.md",
+      "blob_sha": "bd2b033de981b34bc71d16247a385d25bf7465a0",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/coding/bisect-anything/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "bisect-anything",
+        "description": "Find the exact commit (or dependency version, config value, or input) that caused a regression by turning it into an automatic pass/fail check and running git bisect run in a separate worktree, then shrink the bad commit to the hunk that matters and explain it. Handles failing tests, changed output, slowdowns, crashes, visual changes, server behaviour, flaky checks, unbuildable commits and merge-heavy history. Use when the user says \"what broke this\", \"find the commit that\", \"when did this start"
+      },
+      "excerpt": "---\nname: bisect-anything\ndescription: Find the exact commit (or dependency version, config value, or input) that caused a regression by turning it into an automatic pass/fail check and running git bisect run in a separate worktree, then shrink the bad commit to the hunk that matters and explain it. Handles failing tests, changed output, slowdowns, crashes, visual changes, server behaviour, flaky checks, unbuildable commits and merge-heavy history. Use when the user says \"what broke this\", \"find the commit that\", \"when did this start\", \"it used to work\", \"regression\", \"git bisect\", \"which version broke it\", or \"which change made it slow\".\n---\n\n# Bisect anything\n\nA bisect is only as good as its oracle: the command that says \"good\" or \"bad\" for one commit. Almost every wrong bisect answer comes from an oracle that is flaky, tests the wrong thing, or calls a broken build \"bad\". So spend most of the effort on the oracle, prove it on both ends, and let the scripts do the rest.\n\nScripts are in `~/simcraft/skills/coding/bisect-anything/scripts/` (Python 3.9+, standard library only). Details, recipes and pitfalls are in `reference.md` next to this file.\n\n## 1. Pin down the regression\n\nAsk only for what is missing, one question at a time:\n- **What is wrong**, as something a command can check (a failing test, a wrong number, a slow page, a crash, a changed screenshot).\n- **A good point**: a tag, release, date or commit where it worked. If nobody knows, try an old tag; checking one old commit is cheap.\n- **The bad point**: usually `HEAD`.\n- **How to build and install** at an old commit.\n\n## 2. Write the oracle\n\nExit `0` good, `125` cannot test this commit, any other code bad. Keep the oracle script **outside the repo** (or pass it with `--overlay`), because old commits do not have it. Pick the recipe that fits; full versions are in `reference.md`:\n\n| Regression | Oracle |\n|---|---|\n| A test fails | run that one test only, with `--overlay` if the test is new |\n| Output changed | `oracles/golden_oracle.py`, with `--ignore` for times, versions and ids |\n| Got slower | `oracles/bench_oracle.py`: measure both ends first, threshold between the medians |\n| Crash | exit 1 only for the crash signature (signal or message), 0 otherwise |\n| Looks different | render a screenshot, then `oracles/img_diff.py` with a tolerance and masks |\n| Server behaviour | `oracles/serve_oracle.py`: free port, wait until ready, probe, always kill |\n\nNarrow the oracle to this one bug. \"The whole test suite passes\" finds the first commit that broke anything, which is rarely the one the user cares about.\n\n## 3. Run it\n\n```\npython3 scripts/bisect.py --good v2.3.0 --bad HEAD \\\n  --install \"npm ci\" --build \"npm run build\" \\\n  --oracle \"node /path/outside/repo/repro.js\" --repeats 3 --timeout 120\n```\n\nIt works in a separate worktree, so the user's checkout and uncommitted work are untouched. It first checks the oracle says good on `--good` and bad on `--bad`, and stops if not. Install runs only when a lockfile or manifest changes; a failed install or build marks the commit as skip (125).\n\nChoose flags with judgement:\n- Flaky oracle: `--repeats 5` (majority vote). A bug that only shows sometimes: `--repeats 10 --vote any-bad`.\n- Hangs: `--timeout`; a timeout counts as bad unless `--timeout-means skip`.\n- Merge-heavy history, or \"which PR broke it\": `--first-parent`, then bisect inside the merge it names.\n- Stale build output fools you: `--clean --keep node_modules`.\n- Looking for the fix instead: `--find-fix`.\n\nFor things that are not commits (package versions, nightly builds, config values, data rows), use `scripts/bisect_list.py` over an ordered list, or `--minimise` to find the smallest set of flags or inputs that still fails.\n\n## 4. Explain the commit\n\n1. Read the found commit with `git show`. If the report says \"not conclusive\", the answer is one of the listed commits next to a skipped one. Say so honestly, do not pick one.\n2. Shrink it: `scripts/hunk_minimise.py --commit <sha> --oracle ... --build ...` finds the smallest set of hunks that still causes the problem.\n3. Tell the user, in plain words: the commit (hash, title, author, date), the exact hunk, **why** that change causes the symptom, and how sure you are (steps, skips, repeats). Suggest a fix or a revert, and a regression test built from the oracle.\n\n## Check your work\n\nRun `python3 examples/selftest.py`. It builds a 40-commit demo repo with a planted bug, slowdown, visual change and unbuildable commits, and checks that every scenario finds the right commit (about one minute).\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/coding/codebase-map/SKILL.md",
+      "blob_sha": "ee8727ab5977b16c7f059d1fbf58e38110561d15",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/coding/codebase-map/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "codebase-map",
+        "description": "Understand an unfamiliar codebase fast, the way senior engineers do. Reads the orientation signals (README, manifests, CI, Dockerfiles, routes, migrations), mines git history for hotspots, hidden coupling and ownership, builds the import graph to find layers, cycles, load-bearing and dead code, then traces one real request or command end to end by actually running it. Writes MAP.md with a one-paragraph purpose, a Mermaid architecture diagram, the traced path as file:line hops, hotspot and coupli"
+      },
+      "excerpt": "---\nname: codebase-map\ndescription: Understand an unfamiliar codebase fast, the way senior engineers do. Reads the orientation signals (README, manifests, CI, Dockerfiles, routes, migrations), mines git history for hotspots, hidden coupling and ownership, builds the import graph to find layers, cycles, load-bearing and dead code, then traces one real request or command end to end by actually running it. Writes MAP.md with a one-paragraph purpose, a Mermaid architecture diagram, the traced path as file:line hops, hotspot and coupling tables, a glossary, gotchas and first tasks, plus an optional SVG. Use when the user says \"explain this codebase\", \"I'm new to this repo\", \"map the architecture\", \"onboard me\", \"where does X happen\", \"how is this project structured\", or joins a new team or project.\n---\n\n# Codebase map\n\nReading files top to bottom is the slow way in. Senior engineers ask four questions instead, in this order: **what does it do, how is it run, where does the important work happen, and what path does one real request take.** The first three come from cheap signals (manifests, CI, git history, imports). The fourth only comes from running the code. Everything ends up in one file, `MAP.md`, that a new person can read in ten minutes.\n\nWork **read-only** on the repo. Put every output in a temp folder (`out=$(mktemp -d)`) unless the user asks for `MAP.md` in the repo. Never run migrations, deploys or anything that touches a shared database or real credentials.\n\nScripts are in `scripts/`, Python 3.9+ standard library and git only. `S=~/simcraft/skills/coding/codebase-map/scripts`.\n\n## 0. Ask one thing\n\n\"Is there a specific thing you need to do here (fix a bug, own an area, review a change), or a general map?\" A goal decides which path to trace. If there is no answer, map the whole repo and trace its most important user action.\n\n## 1. Orient (15 minutes)\n\n```\npython3 $S/entrypoints.py <repo> > $out/entry.md\n```\nIt lists docs to read first, build and run commands (package.json scripts, console scripts, Makefile, Procfile, Dockerfile CMD, compose services), CI pipelines and the commands they run, mains, servers, CLI commands, HTTP routes, background jobs, the data model, environment variables (with a flag when the `.env` template is missing one), and tests. Every hit is `file:line`.\n\nThen read, in this order: README and contributor docs, **the CI file** (it is the only build recipe that is known to work), the main manifest, the entrypoint files. Write the **one-paragraph purpose** now, before reading more code: who uses it, what goes in, what comes out, what it talks to.\n\n## 2. The data model is the backbone\n\nRead the schema before the logic. Migrations (oldest shows the original core, newest shows where the product is going), ORM models, Prisma or SQL files, or, if there is no database, the main data shapes (pydantic models, TS types, JSON files on disk). Write down the 3 to 7 core entities and how they relate. Most business logic is \"load these, change them, save them\", so knowing the nouns makes the code readable.\n\n## 3. Structure from imports\n\n```\npython3 $S/deps.py <repo> --json $out/deps.json --mermaid $out/deps.mmd --svg $out/deps.svg > $out/deps.md\n```\nRead: the **layers** (level 0 is the foundation, top is entry code), **folder cycles** (tangled modules, with the cheapest edge to cut), **load-bearing files** (most importers: change carefully), **possibly dead files** (no importers), and the main external packages. If one folder holds most of the code, run again with `--under <that folder>` to see inside it.\n\n## 4. History: where the work and the risk are\n\n```\npython3 $S/hotspots.py <repo> --deps $out/deps.json > $out/hot.md\n```\n- **Hotspots** (changes x complexity): the few files where most bugs and most of your future work will be.\n- **Change coupling**: files that change in the same commits. A pair with `import link = NO` is a hidden dependency, for example two copies of the same logic, or a client and server that share a format. These are the best gotchas.\n- **Ownership** and **knowledge at risk**: who to ask about each area, and complex files whose main author has gone quiet.\n- **Bug magnets**, **frozen code** and **new code**.\n\nAdd `--anonymize` if the map will be shared outside the team. Under about 30 commits, git signals are weak: say so and lean on steps 3 and 5.\n\n## 5. Trace one real path by running it\n\nThis is the step that turns guesses into knowledge. Pick one real user action (the one the top hotspots serve, or the user's goal). Get it running using the CI steps. Then either:\n- find the **sink** (the DB write, the HTTP response, the output file), put a stack dump or breakpoint there (`breakpoint()`, `traceback.print_stack()`, `console.trace()`, `debug.PrintStack()`), trigger the action once, and read the stack bottom-up; or\n- for Python, run it under the tracer: `python3 $S/trace_py.py --repo <repo> --out $out/trace.txt -- <script or -m module> <args>`. It prints every repo function the run touched, by depth, as `file:line`.\n\nIf the path calls paid or external services, stub them at the edge (patch the HTTP call to return a canned response) instead of using real keys. Record each hop as `file:line  what happens here`, and mark anything surprising.\n\n## 6. Load-bearing vs dead\n\nLoad-bearing = many importers, on the traced path, or a hotspot. Dead candidates = no importers and frozen for a year. Before calling anything dead, grep for its name as a string (plugin registries, `getattr`, dynamic imports, config files, framework conventions). Say \"probably dead, because...\" rather than \"dead\".\n\n## 7. Write MAP.md\n\nUse the template in [reference.md](reference.md#mapmd-template): purpose, how to run it, architecture diagram (Mermaid, drawn from what you learned, not just the raw import graph), the traced path, data model, hotspots, coupling pairs, who knows what, glossary, gotchas, first tasks. Mark each claim **ran** (you saw it happen) or **read** (from the code). Then check every reference:\n```\npython3 $S/check_map.py $out/MAP.md <repo>\n```\nFix every broken one. Finish with a five-line summary in chat and the path to `MAP.md` (and the SVG if made).\n\n## Rules\n\n- Never claim a hop you did not see in code or in a run. A wrong map is worse than none.\n- Explain jargon the first time it appears, and put every project-specific term in the glossary.\n- First tasks must be small, real and safe: a test to add for a hotspot, a log line on the traced path, a dead file to confirm.\n- Depth, per-language tracing recipes, heuristics and their limits: [reference.md](reference.md). A real example: [examples/MAP.md](examples/MAP.md).\n",
+      "card": {
+        "title_zh": "代码库地图生成",
+        "purpose_zh": "快速理解陌生代码库：读取入口信号、挖掘 git 历史热点与耦合、构建导入图，并实际运行追踪一条真实请求路径，最终写出 MAP.md。",
+        "does": [
+          "运行 entrypoints.py 列出文档、构建运行命令、CI、入口、路由、数据模型、环境变量与测试",
+          "阅读 schema 与迁移，梳理 3 到 7 个核心实体及其关系",
+          "运行 deps.py 生成分层、循环依赖、承重文件、疑似死代码与 Mermaid/SVG 图",
+          "运行 hotspots.py 分析热点、变更耦合、归属、知识风险、bug 磁铁与冻结代码",
+          "实际运行一条真实用户路径，用断点栈或 trace_py.py 记录 file:line 跳转",
+          "写出 MAP.md 并用 check_map.py 校验引用"
+        ],
+        "inputs": [
+          "代码库路径",
+          "用户的具体目标（修 bug、负责某区域、审查改动或整体地图）",
+          "可选 --anonymize 匿名化",
+          "可选 --under 指定子目录",
+          "可选 --deps 依赖 JSON 路径"
+        ],
+        "outputs": [
+          "MAP.md（用途、运行方式、架构图、追踪路径、数据模型、热点、耦合、术语表、坑点、首批任务）",
+          "Mermaid 架构图与可选 SVG",
+          "deps.json、deps.md、hot.md、entry.md、trace.txt 等中间文件",
+          "聊天中的五行摘要"
+        ],
+        "scenarios": [
+          "用户说解释这个代码库或我是这个仓库的新人",
+          "用户要求梳理架构或入职引导",
+          "用户问某功能在哪里发生或项目如何组织",
+          "加入新团队或新项目时快速上手",
+          "需要定位热点、隐藏耦合与承重代码"
+        ],
+        "prerequisites": [
+          "Python 3.9+ 标准库与 git",
+          "脚本位于 scripts/ 目录",
+          "对仓库只读操作，输出默认放临时目录",
+          "追踪路径需按 CI 步骤把项目跑起来"
+        ],
+        "limits": [
+          "提交少于约 30 条时 git 信号弱，需依赖导入图与追踪",
+          "死代码只能标为疑似，需先 grep 字符串确认",
+          "不得运行迁移、部署或触碰共享数据库与真实凭证",
+          "外部付费服务需在边界打桩，不用真实密钥",
+          "不得声称未在代码或运行中见到的跳转"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "调研",
+          "代码审查",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Understand an unfamiliar codebase fast, the way senior engineers do."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Writes MAP.md with a one-paragraph purpose, a Mermaid architecture diagram, the traced path as file:line hops, hotspot and coupling tables, a glossary, gotchas and first tasks, plus an optional SVG."
+          },
+          {
+            "field": "does",
+            "quote": "Write down the 3 to 7 core entities and how they relate."
+          },
+          {
+            "field": "does",
+            "quote": "**Hotspots** (changes x complexity): the few files where most bugs and most of your future work will be."
+          },
+          {
+            "field": "does",
+            "quote": "Record each hop as `file:line  what happens here`, and mark anything surprising."
+          },
+          {
+            "field": "does",
+            "quote": "Then check every reference:"
+          },
+          {
+            "field": "inputs",
+            "quote": "\"Is there a specific thing you need to do here (fix a bug, own an area, review a change), or a general map?\""
+          },
+          {
+            "field": "outputs",
+            "quote": "Finish with a five-line summary in chat and the path to `MAP.md` (and the SVG if made)."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user says \"explain this codebase\", \"I'm new to this repo\", \"map the architecture\", \"onboard me\", \"where does X happen\", \"how is this project structured\", or joins a new team or project."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Scripts are in `scripts/`, Python 3.9+ standard library and git only."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Work **read-only** on the repo. Put every output in a temp folder (`out=$(mktemp -d)`) unless the user asks for `MAP.md` in the repo."
+          },
+          {
+            "field": "limits",
+            "quote": "Under about 30 commits, git signals are weak: say so and lean on steps 3 and 5."
+          },
+          {
+            "field": "limits",
+            "quote": "Before calling anything dead, grep for its name as a string (plugin registries, `getattr`, dynamic imports, config files, framework conventions)."
+          },
+          {
+            "field": "limits",
+            "quote": "Never run migrations, deploys or anything that touches a shared database or real credentials."
+          },
+          {
+            "field": "limits",
+            "quote": "If the path calls paid or external services, stub them at the edge (patch the HTTP call to return a canned response) instead of using real keys."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/coding/dx-audit/SKILL.md",
+      "blob_sha": "f1143ec8f80956da8e44faeba70523359e2c41d4",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/coding/dx-audit/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "dx-audit",
+        "description": "Audit the developer experience of a developer tool (SDK, API, CLI, framework) by trying it exactly like a brand-new developer, from the official docs only, in a fresh empty environment. Logs every step with timestamps and friction tags, measures time to first success, steps, page switches, errors and lines of code, finds where people would give up, grades three error messages, and writes a fair teardown with the top 5 fixes as ready-to-paste doc and error rewrites. Use when the user says \"audit "
+      },
+      "excerpt": "---\nname: dx-audit\ndescription: Audit the developer experience of a developer tool (SDK, API, CLI, framework) by trying it exactly like a brand-new developer, from the official docs only, in a fresh empty environment. Logs every step with timestamps and friction tags, measures time to first success, steps, page switches, errors and lines of code, finds where people would give up, grades three error messages, and writes a fair teardown with the top 5 fixes as ready-to-paste doc and error rewrites. Use when the user says \"audit the developer experience of X\", \"DX teardown\", \"DX audit\", \"try this SDK like a new user\", \"onboarding friction\", \"time to first success\", \"how good are X's docs\", or wants a teardown to send to a company's DevRel team.\n---\n\n# DX audit\n\nYou play a competent developer who has never seen this tool. You follow the official docs literally, write down everything that happens, and turn it into a teardown the company's DevRel team would want to read. The output is evidence, not opinion: every complaint has a timestamp, a URL, the exact output, and a fix.\n\nScripts (Python is standard library only, Node uses the repo's `playwright`):\n```\npython3 ~/simcraft/skills/coding/dx-audit/scripts/friction.py   # written \"friction.py\" below\nnode ~/simcraft/skills/coding/dx-audit/scripts/snapshot.mjs      # written \"snapshot.mjs\" below\n```\nIf `playwright` does not resolve, run `npm install` in `~/simcraft` once. Read `reference.md` for the tag definitions, grading rubric, time model and a worked example.\n\n## 1. Set up (ask the user, one question at a time)\n\n1. **The tool and ONE goal.** A real first task, such as \"send my first traced LLM call\", \"deploy hello world\", \"create a project and add a package\". Not \"evaluate everything\".\n2. **Success, defined before you start.** One observable result: an exact output, an HTTP 200, a trace visible in a dashboard. Write it down. Do not change it halfway to make the run look better.\n3. **The entry point.** Where a newcomer lands: usually the docs home or the \"Quickstart\" link on the homepage.\n\n## 2. A clean environment\n\n- A fresh empty temp folder, never inside a real project.\n- Hide what this machine already has. The cheapest way: run every command with an empty home and a bare PATH, e.g. `env -i HOME=$SB/home PATH=/usr/bin:/bin TERM=dumb /bin/zsh -c '...'`. Use Docker (`docker run --rm -it python:3.12-slim`) or a new venv when the tool needs it. Never let an installer touch the user's real home folder or shell config.\n- Write the environment down (OS, shell, runtime versions) with `--env` at init.\n- Use only what the docs tell you. If you know a shortcut from training, don't use it; if the docs miss a step, that is a finding.\n\n```\nfriction.py init <audit_dir> --tool \"<name>\" --goal \"<goal>\" --success \"<exact result>\" --docs <entry url> --env \"<os, shell, versions, sandbox>\" --redact \"<sandbox path>=~\"\n```\n`--redact` scrubs your sandbox path from everything saved. The home folder and login name are always scrubbed.\n\n## 3. Follow the docs literally\n\nFor every page you open:\n```\nsnapshot.mjs <url> <audit_dir> --links --copy --name 02-quickstart\n```\nIt saves a screenshot, the page text (`snapshots/<name>.md`, read this instead of guessing), every code block, every link with dead ones re-checked in a real browser, and what each copy button really puts on the clipboard. Name snapshots in order (`01-`, `02-`) so the screenshots tell the story.\n\nFor every action, log it as you go, not afterwards:\n```\nfriction.py step <dir> --url <page> --action \"Open the quickstart from the home page\" --shot screenshots/02-quickstart.png\nfriction.py run  <dir> --url <page> --action \"Install the SDK\" --cwd <work> --show \"pip install foo\" -- \"<real wrapped command>\"\nfriction.py step <dir> --url <page> --action \"Write app.py from the docs snippet\" --loc 6\nfriction.py run  <dir> --url <page> --action \"Run the example\" --cwd <work> --show \"python app.py\" --success-if-ok -- \"<command>\"\n```\n`run` executes the command, saves the output to `outputs/`, times it, and marks a non-zero exit as an error. `--show` is what the developer typed when your real command is wrapped in a sandbox.\n\nWhen something goes wrong or feels wrong, tag it right away with a fix:\n```\nfriction.py amend <dir> 4 --tag missing-step --sev 2 --note \"what happened, quoting the output\" --fix \"the exact text or change that would have prevented it\"\n```\nTags: `missing-step`, `wrong-snippet`, `unclear-error`, `version-mismatch`, `auth-wall`, `naming-confusion`, `slow-feedback`, `dead-link`, `copy-paste-hazard`, `other`. Severity: 1 annoying, 2 costs real time, 3 likely to make people quit.\n\nRules while following:\n- Do exactly what the page says, in order. When the docs are wrong, first log what happens when you follow them, then recover the way a newcomer would (reread the output, search the same docs) and log each recovery step. Leaving the docs for GitHub issues or a search engine is a context switch: log it with its URL.\n- Copy code with what the copy button gives (the `--copy` result), not a cleaned-up version.\n- Count lines of code you write or edit with `--loc`.\n\n## 4. Walls: stop and ask\n\nNever type real credentials, card details, or a phone number, and never create an account on the user's behalf. When the path needs a signup, an API key, a card, or an approval:\n1. Log it: `friction.py step <dir> --url <page> --action \"Needs an API key\" --outcome blocked --tag auth-wall --sev <n> --note \"...\"` with a screenshot. Note what the wall asks for, whether there is a free tier or test mode, and how many steps it adds.\n2. Ask the user whether they want to get a key themselves and put it in an env var for you, or whether the audit ends at the wall. A wall with no sandbox key or test mode is itself a top finding.\n\n## 5. Break it on purpose: three error checks\n\nAfter success (or at the wall), make three common mistakes and grade what the tool says. Pick the three most likely for this tool, usually: a wrong or expired key, a missing env var or config, and a wrong version (old runtime, incompatible package). For a tool without keys, use a typo in a name and a wrong file or path instead.\n```\nfriction.py errcheck <dir> --mistake \"Wrong API key\" --cwd <work> --show \"FOO_KEY=bad python app.py\" -- \"<command>\"\nfriction.py grade <dir> 1 --what 2 --why 1 --fix 0 --note \"what a newcomer would think\" --better \"a rewritten message that would score 6/6\"\n```\nEach of what happened, why, and how to fix is scored 0 (missing or wrong), 1 (partly, or buried), 2 (clear and early). Test the fix the message suggests before you score it.\n\n## 6. Write the teardown\n\n```\nfriction.py metrics <dir>     # check the numbers\nfriction.py render <dir>      # audit.md skeleton, timeline.svg and timeline.png\nfriction.py reel <dir>        # optional: journey.mp4 from the step screenshots (ffmpeg, or $FFMPEG)\n```\nLook at `timeline.png` before using it. Then fill every TODO in `audit.md`:\n- **Summary:** did a newcomer reach the goal, how long it took, where it hurt most, the one change that helps most.\n- **The journey:** a few short paragraphs under the table, quoting exact output and linking screenshots.\n- **Top 5 fixes:** ranked by impact over effort. Each has the current text, the problem in one sentence, and a rewritten doc snippet or error message ready to paste.\n- **What they do well:** specific, with step numbers. Name what to keep so the fixes don't break it.\n\nDeliverables in `<audit_dir>`: `audit.md`, `friction.json`, `timeline.png`, `screenshots/`, `snapshots/`, `outputs/`, and optionally `journey.mp4`. Do not publish `.redact.json`; it holds the private paths.\n\n## Tone\n\nWrite for the company's DevRel team, so it can be published or sent as is. Be fair and specific. Credit what is good, and say it first if it is the bigger story. Every complaint comes with a fix. Quote output instead of describing it. No sarcasm, no \"obviously\", no guessing at internal reasons. Plain words, complete sentences. If the tool di",
+      "card": {
+        "title_zh": "开发者体验审计",
+        "purpose_zh": "以全新开发者身份仅按官方文档在干净环境试用开发者工具，记录每步摩擦与耗时，产出带证据的体验拆解报告。",
+        "does": [
+          "按用户设定单一目标与可观察成功标准，从文档入口开始试用",
+          "在空临时目录与隔离环境中执行文档命令，记录步骤、耗时、错误与代码行数",
+          "用快照脚本保存页面截图、正文、代码块、链接与复制按钮内容",
+          "对摩擦点打标签与严重度并给出具体修复文本",
+          "在成功或受阻后故意制造三类错误并给错误信息评分",
+          "生成 audit.md、时间线图与可选旅程视频，汇总指标与Top 5修复"
+        ],
+        "inputs": [
+          "工具名称与一个真实首个任务目标",
+          "开始前定义的可观察成功结果",
+          "文档入口URL",
+          "环境信息（OS、shell、运行时版本、沙箱）",
+          "需脱敏的沙箱路径",
+          "用户提供的API密钥环境变量（可选）"
+        ],
+        "outputs": [
+          "audit.md 体验拆解报告",
+          "friction.json 步骤与摩擦记录",
+          "timeline.png 时间线图",
+          "screenshots/ 与 snapshots/ 页面快照",
+          "outputs/ 命令输出",
+          "可选 journey.mp4 旅程视频"
+        ],
+        "scenarios": [
+          "审计SDK、API、CLI或框架的新手引导体验",
+          "评估文档质量与首次成功耗时",
+          "定位用户可能放弃的摩擦点",
+          "为DevRel团队准备可发布的体验拆解",
+          "对错误信息质量做评分与改写"
+        ],
+        "prerequisites": [
+          "Python3标准库与Node环境",
+          "playwright可用，否则在~/simcraft运行npm install",
+          "需要时可使用Docker或新建venv隔离环境",
+          "用户确认目标、成功标准与入口点"
+        ],
+        "limits": [
+          "不输入真实凭证、卡号或手机号，不代用户注册账号",
+          "遇到注册或密钥墙需停下询问用户",
+          "仅依据官方文档，不使用训练知识中的捷径",
+          "不发布含私有路径的.redact.json",
+          "发送报告给公司由用户决定"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "文档",
+          "调研",
+          "测试",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Audit the developer experience of a developer tool (SDK, API, CLI, framework) by trying it exactly like a brand-new developer, from the official docs only, in a fresh empty environment."
+          },
+          {
+            "field": "does",
+            "quote": "`run` executes the command, saves the output to `outputs/`, times it, and marks a non-zero exit as an error."
+          },
+          {
+            "field": "does",
+            "quote": "After success (or at the wall), make three common mistakes and grade what the tool says."
+          },
+          {
+            "field": "does",
+            "quote": "friction.py render <dir>      # audit.md skeleton, timeline.svg and timeline.png"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If `playwright` does not resolve, run `npm install` in `~/simcraft` once."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use Docker (`docker run --rm -it python:3.12-slim`) or a new venv when the tool needs it."
+          },
+          {
+            "field": "limits",
+            "quote": "Never type real credentials, card details, or a phone number, and never create an account on the user's behalf."
+          },
+          {
+            "field": "limits",
+            "quote": "Use only what the docs tell you. If you know a shortcut from training, don't use it; if the docs miss a step, that is a finding."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not publish `.redact.json`; it holds the private paths."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "run every command with an empty home and a bare PATH, e.g. `env -i HOME=$SB/home PATH=/usr/bin:/bin TERM=dumb /bin/zsh -c '...'`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "every link with dead ones re-checked in a real browser"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "It saves a screenshot, the page text (`snapshots/<name>.md`, read this instead of guessing), every code block"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "If `playwright` does not resolve, run `npm install` in `~/simcraft` once."
+          },
+          {
+            "field": "outputs",
+            "quote": "Deliverables in `<audit_dir>`: `audit.md`, `friction.json`, `timeline.png`, `screenshots/`, `snapshots/`, `outputs/`, and optionally `journey.mp4`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/coding/flaky-test-killer/SKILL.md",
+      "blob_sha": "2e7915aa5838cfb721204e6dc6e7365dfc5603ec",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/coding/flaky-test-killer/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "flaky-test-killer",
+        "description": "Find why a test is flaky and fix the root cause, never by adding retries, sleeps or bigger timeouts. Measures the flake rate with a confidence interval, runs the test under stressors (random order, timezone, fake clock at month end or DST, CPU load, fresh temp dir, low file limits), bisects for the test that pollutes it, and proves the fix with before and after numbers. Use when the user says \"flaky test\", \"test passes locally fails in CI\", \"intermittent failure\", \"random test failure\", \"works o"
+      },
+      "excerpt": "---\nname: flaky-test-killer\ndescription: Find why a test is flaky and fix the root cause, never by adding retries, sleeps or bigger timeouts. Measures the flake rate with a confidence interval, runs the test under stressors (random order, timezone, fake clock at month end or DST, CPU load, fresh temp dir, low file limits), bisects for the test that pollutes it, and proves the fix with before and after numbers. Use when the user says \"flaky test\", \"test passes locally fails in CI\", \"intermittent failure\", \"random test failure\", \"works on my machine\", \"test fails sometimes\", \"only fails in the full suite\", or wants to quarantine or retry a test.\n---\n\n# Flaky test killer\n\nA flaky test is a real bug: in the test, in the code, or in the environment. Retries hide it, and the same bug will later show up in production or in another test. The job is to make the failure happen on demand, name the cause, fix it, and prove with numbers that it is gone.\n\nScripts are Python 3.9+ standard library only. `S=~/simcraft/skills/coding/flaky-test-killer/scripts`.\n\n## Rules\n\n- **No retries, no sleeps, no longer timeouts, no `skip`** as the fix. A wait is fine only when it waits for the actual condition (an event, a join, a poll with a deadline).\n- **Measure before you change anything.** Without a \"before\" rate you cannot prove an \"after\".\n- **One cause at a time.** Many flaky tests have two bugs. Fix one, measure, and look again.\n- **Keep an evidence log** (see below). Every claim needs a command and a number.\n\n## Steps\n\n1. **Reproduce and measure.** Run the single test, then the whole suite, many times.\n   ```\n   python3 $S/flake_rate.py -n 50 --json before.json -- <test command>\n   python3 $S/flake_rate.py -n 200 -j 8 --json before.json -- <suite command with shuffle seed {seed}>\n   ```\n   It prints the failure rate with a 95% Wilson interval, groups distinct failure messages, counts failures per test name, compares pass and fail durations, and gives cause hints. `{seed}` becomes a new random seed every run, and failing seeds are printed so you can replay the exact order. `--until-fail` stops at the first failure and shows the output. If the rate is 0 after 50 runs, go to step 2: the trigger is something your machine does not do.\n\n2. **Run alone vs in the suite vs in parallel.** Fails only in the suite means order or shared state (go to step 4). Fails only with `-j` means a shared resource such as a port, file or database. Fails alone means time, randomness, a race, or the environment.\n\n3. **Sweep the stressors** to see which one moves the rate:\n   ```\n   python3 $S/stress.py --sweep -k 5 -- <test command>\n   ```\n   It runs a baseline and then each stressor on its own: five timezones, nine fake clocks (midnight, month end, Feb 28, leap day, year end, both DST switches, 2038), heavy CPU load, a fresh temp dir, a low open-files limit and a Turkish locale. A stressor is flagged only when a Fisher exact test says it really changed the rate. If the baseline always fails, it tells you which setting makes it pass (say `tz=UTC`, the classic \"passes in CI, fails locally\") and which settings make it fail with a different message (a second, hidden bug). Pin the first cause and sweep again: `stress.py --sweep --tz UTC --only clock -- ...`. Use the same flags without `--sweep` for a single stressed run.\n\n4. **Find the polluter** when the test passes alone but fails after others. Save the order of a failing run (the test ids that ran before the victim, in order) and bisect:\n   ```\n   python3 $S/find_polluter.py --tests order.txt --victim <id> --cmd \"<runner> {tests}\" [--fail-pattern \"<victim's failure text>\"] [--repeat 3]\n   ```\n   It checks the victim passes alone and fails after the list, then shrinks the list with delta debugging to the one test (or smallest group) that breaks it. If the victim fails alone and passes after the list, it finds the \"state setter\" the victim secretly depends on. Use `--fail-pattern` so another flaky test in the list does not confuse the search.\n\n5. **Name the cause and fix it at the root.** Look up the failure signature in the cause table in [reference.md](reference.md). Each row gives the signature, the stressor that exposes it, and the right fix.\n\n6. **Prove it.** Run the same command again with enough runs and compare:\n   ```\n   python3 $S/flake_rate.py -n 300 -j 8 --json after.json --compare before.json -- <same command>\n   python3 $S/flake_rate.py --plan 0.01     # clean runs needed to claim rate < 1%\n   ```\n   \"Fixed\" means the Fisher test says the drop is real AND the stressor that exposed the bug now passes. To claim a rate below X with 95% confidence you need about 3/X clean runs in a row (299 for 1%). Ten green runs prove almost nothing for a 5% flake.\n\n## Evidence log\n\nKeep a short log in the PR or issue, one line per step:\n```\nbefore: 42/60 failed (70%, CI 57-80%) cmd: run_tests.py --seed {seed}\ncause 1: polluter tests.test_users...test_enable_eu leaves SETTINGS[\"symbol\"]=\"€\" (find_polluter, 7 probes)\ncause 2: test_export sleeps 10ms, worker takes 0-20ms (fails alone, rate 60%, not moved by any stressor)\nfix: patch.dict around the polluter; victim sets its own state; worker returns an Event, test waits on it\nafter: 0/300 failed (rate < 1.0% at 95%), Fisher p = 7e-41; sweep clean on tz, clock, cpu\n```\n\n## Practise\n\n`python3 ~/simcraft/skills/coding/flaky-test-killer/examples/make_examples.py --out /some/tmp/dir` makes a unittest project and a node:test project with an order dependency, a month end bug, a timezone bug, a sleep race and an unawaited promise. `--variant fixed` writes the fixed versions to compare against.\n\nPer-ecosystem commands (pytest, jest, vitest, node:test, go, cargo, JUnit), the full cause taxonomy, and the statistics are in [reference.md](reference.md).\n",
+      "card": {
+        "title_zh": "不稳定测试根因修复",
+        "purpose_zh": "定位测试偶发失败的真实根因并修复，禁止用重试、sleep 或加长超时掩盖；先量化失败率，再用压力因子与二分法找诱因，最后用前后数据证明修复。",
+        "does": [
+          "用 flake_rate.py 多次运行单测或整套测试，输出失败率、95% Wilson 置信区间、失败信息分组与耗时对比",
+          "用 stress.py 扫描时区、假时钟、CPU 负载、临时目录、文件句柄限制、土耳其语区域等压力因子，并用 Fisher 精确检验判断是否真的改变失败率",
+          "用 find_polluter.py 对失败运行顺序做 delta debugging，找出污染该测试的其它测试或它依赖的状态设置者",
+          "按 reference.md 的失败签名表命名根因并在根因处修复",
+          "用同一命令重跑并对比 before/after，用 Fisher 检验与压力因子复测证明修复",
+          "生成含顺序依赖、月末、时区、sleep 竞态、未 await promise 的示例项目用于练习"
+        ],
+        "inputs": [
+          "测试命令或整套测试命令（可含 {seed} 占位符）",
+          "运行次数 -n、并行度 -j、--until-fail 等参数",
+          "失败运行的测试顺序文件与受害者测试 id（找污染者时）",
+          "可选的失败文本匹配 --fail-pattern",
+          "压力因子参数如 --tz、--only clock"
+        ],
+        "outputs": [
+          "失败率及 95% Wilson 置信区间",
+          "按失败信息与测试名分组的统计和原因提示",
+          "失败种子，可复现具体执行顺序",
+          "被标记为显著的压力因子及 Fisher 检验结果",
+          "被二分定位到的最小污染测试或测试组",
+          "before/after JSON 对比与证据日志"
+        ],
+        "scenarios": [
+          "用户说 flaky test、间歇性失败、本地通过 CI 失败",
+          "测试只在整套测试中失败",
+          "测试只在并行运行时失败",
+          "需要隔离或重试某个测试前先查根因",
+          "需要证明修复后失败率确实下降"
+        ],
+        "prerequisites": [
+          "Python 3.9+ 且仅用标准库",
+          "脚本位于 ~/simcraft/skills/coding/flaky-test-killer/scripts",
+          "修改前必须先测出 before 失败率"
+        ],
+        "limits": [
+          "禁止以重试、sleep、加长超时或 skip 作为修复手段",
+          "一次只处理一个原因，多因需逐个修复并复测",
+          "50 次运行失败率为 0 时需转向压力因子排查",
+          "声称失败率低于 1% 需约 299 次连续干净运行",
+          "压力因子仅在 Fisher 精确检验显著时才判定有效"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "测试",
+          "自动化",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Find why a test is flaky and fix the root cause, never by adding retries, sleeps or bigger timeouts."
+          },
+          {
+            "field": "does",
+            "quote": "It prints the failure rate with a 95% Wilson interval, groups distinct failure messages, counts failures per test name, compares pass and fail durations, and gives cause hints."
+          },
+          {
+            "field": "does",
+            "quote": "It checks the victim passes alone and fails after the list, then shrinks the list with delta debugging to the one test (or smallest group) that breaks it."
+          },
+          {
+            "field": "does",
+            "quote": "Look up the failure signature in the cause table in [reference.md](reference.md)."
+          },
+          {
+            "field": "does",
+            "quote": "\"Fixed\" means the Fisher test says the drop is real AND the stressor that exposed the bug now passes."
+          },
+          {
+            "field": "does",
+            "quote": "makes a unittest project and a node:test project with an order dependency, a month end bug, a timezone bug, a sleep race and an unawaited promise."
+          },
+          {
+            "field": "inputs",
+            "quote": "python3 $S/flake_rate.py -n 50 --json before.json -- <test command>"
+          },
+          {
+            "field": "inputs",
+            "quote": "python3 $S/find_polluter.py --tests order.txt --victim <id> --cmd \"<runner> {tests}\" [--fail-pattern \"<victim's failure text>\"] [--repeat 3]"
+          },
+          {
+            "field": "outputs",
+            "quote": "failing seeds are printed so you can replay the exact order."
+          },
+          {
+            "field": "outputs",
+            "quote": "A stressor is flagged only when a Fisher exact test says it really changed the rate."
+          },
+          {
+            "field": "outputs",
+            "quote": "python3 $S/flake_rate.py -n 300 -j 8 --json after.json --compare before.json -- <same command>"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Scripts are Python 3.9+ standard library only."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Measure before you change anything.** Without a \"before\" rate you cannot prove an \"after\"."
+          },
+          {
+            "field": "limits",
+            "quote": "**No retries, no sleeps, no longer timeouts, no `skip`** as the fix."
+          },
+          {
+            "field": "limits",
+            "quote": "To claim a rate below X with 95% confidence you need about 3/X clean runs in a row (299 for 1%)."
+          },
+          {
+            "field": "limits",
+            "quote": "**One cause at a time.** Many flaky tests have two bugs. Fix one, measure, and look again."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/coding/security-threat-model/SKILL.md",
+      "blob_sha": "956e078ecc57b5b90446aac41e425c2d4b83fcac",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/coding/security-threat-model/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "security-threat-model",
+        "description": "Threat-model the user's own app from its real code. Draws the data flow (actors, trust boundaries, data stores, external services) as a Mermaid diagram, finds threats per element with STRIDE, ranks them by likelihood times impact, then proves each top risk with a local failing test, fixes it, and keeps the test as a regression test. Covers auth, IDOR and tenant isolation, injection, SSRF, secrets, CORS/CSRF, uploads, webhooks, dependencies, abuse, and LLM-app risks like prompt injection through "
+      },
+      "excerpt": "---\nname: security-threat-model\ndescription: Threat-model the user's own app from its real code. Draws the data flow (actors, trust boundaries, data stores, external services) as a Mermaid diagram, finds threats per element with STRIDE, ranks them by likelihood times impact, then proves each top risk with a local failing test, fixes it, and keeps the test as a regression test. Covers auth, IDOR and tenant isolation, injection, SSRF, secrets, CORS/CSRF, uploads, webhooks, dependencies, abuse, and LLM-app risks like prompt injection through tool output. Writes THREAT_MODEL.md. Use when the user says \"threat model\", \"security review of my app\", \"is this secure\", \"STRIDE\", \"find vulnerabilities in my code\", or before launching something that holds other people's data or money.\n---\n\n# Security threat model\n\nThe goal is not a long list of everything that could go wrong. It is the three to six things that would actually hurt, proven real on the user's own machine, fixed, and locked in with tests. A threat without a proof is a guess. A fix without a regression test comes back in six months.\n\nOnly for code and systems the user owns. Every proof runs against local code or a local dev server with throwaway data. Never send a proof to production, a staging server shared with others, or any third-party service, even one the app calls.\n\n## 1. Scope (ask, one question at a time)\n\n- What does the app do, who uses it, and what would be bad news (leaked data, lost money, someone else's account, a big bill)?\n- What is in scope (which repo, which services) and how does it run locally?\n- How is it deployed (behind a proxy, serverless, single box)? This decides which threats are the app's job.\n\nWrite the answers at the top of `THREAT_MODEL.md`.\n\n## 2. Map the surface from the code\n\n```\npython3 ~/simcraft/skills/coding/security-threat-model/scripts/surface.py <repo>\npython3 ~/simcraft/skills/coding/security-threat-model/scripts/secrets_scan.py <repo> --history\n```\n`surface.py` lists routes with flags (`NO-AUTH-SEEN`, `IDOR?`, `WEBHOOK-UNVERIFIED?`, `ABUSE-TARGET`, `LLM-COST`) and leads grouped by category, with `[input]` on lines that use request data. `secrets_scan.py` finds keys in files and history and prints them masked. Both are regex heuristics: they point at code to read, they never decide anything. Then read by hand, in this order: the auth middleware and how a request becomes a user, the data access layer and how queries are scoped, every route that takes an id, and every place the app calls out (HTTP, shell, files, LLM tools). If there is a lockfile, run `npm audit` or `pip-audit` if installed (see reference).\n\n## 3. Draw the data flow\n\nWrite a short `dataflow.yaml` from what the code actually does (actors, processes, stores, externals, boundaries, flows), then:\n```\npython3 ~/simcraft/skills/coding/security-threat-model/scripts/dataflow.py dataflow.yaml --stride\n```\nIt prints the Mermaid diagram, the flows that cross a trust boundary, and a STRIDE-per-element table to fill in. Every boundary crossing is where threats live. If the diagram has no boundaries, it is wrong.\n\n## 4. Find and rank threats\n\nGo element by element with STRIDE, but spend most of the time on these, because they are where real apps break: authorization (can user A touch user B's or tenant B's object?), injection into SQL, shell, templates and paths, unverified inbound trust (webhooks, JWTs, callbacks), and, for AI apps, what a hijacked model can do with its tools. The reference has what to look for in code for each area.\n\nRate each threat: likelihood 1 to 3 times impact 1 to 3, with a one-line reason. Anything reachable by any logged-in user or anyone on the internet in one request is likelihood 3. Anything that exposes other customers' data, money or code execution is impact 3. Drop theoretical threats with a one-line reason instead of padding the table.\n\n## 5. Prove, fix, keep the test\n\nFor each threat scoring 6 or more (and cheap wins below that):\n1. **Prove it.** Write a test that asserts the secure behaviour (\"Alice gets 404 for Bob's invoice\"), run it, and watch it fail. The failure output is the evidence. Use the app's test framework, or plain HTTP to the local dev server. Add a control test for the normal case so a fix cannot pass by breaking the feature.\n2. **Fix it** at the layer where it cannot be forgotten (scope the query by owner, parameterise, resolve and contain the path, verify the signature before parsing). Smallest change that closes the class of bug, not just the payload.\n3. **Rerun.** The proof now passes, the controls still pass, and the test stays in the suite.\n\nIf a real secret turns up, tell the user to revoke and rotate it at the provider first. Never print it back in full.\n\n## 6. Write THREAT_MODEL.md\n\nSections: scope, data flow diagram, assets, trust boundaries, threats table (ID, element, STRIDE, threat, L, I, score, status), proofs and fixes (proof, before output, fix), residual risks with the next fix for each, and what to recheck when the system changes. Use the template in `reference.md`.\n\nA complete worked example (an invoice API with an IDOR, SQL injection, path traversal, forged webhook, hardcoded fake key and error leak, plus the fixed copy and 18 tests) is in `examples/invoice-api/`.\n",
+      "card": {
+        "title_zh": "安全威胁建模",
+        "purpose_zh": "从用户自有应用的真实代码出发做威胁建模：绘制数据流与信任边界，按 STRIDE 逐元素找威胁并按可能性乘影响排序，用本地失败测试证明高危风险、修复并保留为回归测试，最后写出 THREAT_MODEL.md。",
+        "does": [
+          "用脚本扫描仓库路由与线索，并扫描文件和历史中的密钥（掩码输出）",
+          "手工阅读鉴权中间件、数据访问层、带 id 的路由和对外调用点",
+          "编写 dataflow.yaml 并生成 Mermaid 数据流图、跨边界流和 STRIDE 逐元素表",
+          "按可能性1-3乘影响1-3给威胁打分排序，丢弃纯理论威胁",
+          "对高分威胁写断言安全行为的测试并观察其失败，再修复并保留为回归测试",
+          "撰写 THREAT_MODEL.md，含范围、数据流图、威胁表、证明与修复、残余风险"
+        ],
+        "inputs": [
+          "用户自有应用的代码仓库及本地运行方式",
+          "应用功能、用户、最坏后果与部署方式等范围问答",
+          "手写的 dataflow.yaml（参与者、进程、存储、外部服务、边界、流）",
+          "本地开发服务器与一次性测试数据"
+        ],
+        "outputs": [
+          "THREAT_MODEL.md 威胁模型文档",
+          "Mermaid 数据流图与 STRIDE 逐元素威胁表",
+          "带评分的威胁表（ID、元素、STRIDE、威胁、L、I、分数、状态）",
+          "证明漏洞的失败测试输出与修复后的回归测试",
+          "掩码显示的密钥扫描结果"
+        ],
+        "scenarios": [
+          "用户说“threat model”“对我的应用做安全审查”“这安全吗”“STRIDE”“在我的代码里找漏洞”时",
+          "上线会持有他人数据或资金的功能之前",
+          "审查授权、IDOR 与租户隔离、注入、SSRF、密钥、CORS/CSRF、上传、webhook、依赖与滥用风险",
+          "评估 LLM 应用经工具输出被提示注入等风险"
+        ],
+        "prerequisites": [
+          "仅限用户自己拥有的代码和系统",
+          "所有证明只针对本地代码或本地开发服务器并使用一次性数据",
+          "仓库内存在 scripts/surface.py、secrets_scan.py、dataflow.py 等脚本",
+          "如已安装可运行 npm audit 或 pip-audit"
+        ],
+        "limits": [
+          "脚本均为正则启发式，只指向需阅读的代码，不自行判定结论",
+          "绝不把证明发往生产、共享预发环境或任何第三方服务",
+          "发现真实密钥时先让用户在服务商处吊销轮换，且不完整回显",
+          "只覆盖三到六项真正会造成伤害的风险，不追求穷举清单"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "安全",
+          "代码审查",
+          "测试",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Threat-model the user's own app from its real code."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "ranks them by likelihood times impact, then proves each top risk with a local failing test, fixes it, and keeps the test as a regression test."
+          },
+          {
+            "field": "does",
+            "quote": "`surface.py` lists routes with flags (`NO-AUTH-SEEN`, `IDOR?`, `WEBHOOK-UNVERIFIED?`, `ABUSE-TARGET`, `LLM-COST`) and leads grouped by category"
+          },
+          {
+            "field": "does",
+            "quote": "`secrets_scan.py` finds keys in files and history and prints them masked."
+          },
+          {
+            "field": "does",
+            "quote": "It prints the Mermaid diagram, the flows that cross a trust boundary, and a STRIDE-per-element table to fill in."
+          },
+          {
+            "field": "does",
+            "quote": "Write a test that asserts the secure behaviour (\"Alice gets 404 for Bob's invoice\"), run it, and watch it fail."
+          },
+          {
+            "field": "does",
+            "quote": "Sections: scope, data flow diagram, assets, trust boundaries, threats table (ID, element, STRIDE, threat, L, I, score, status), proofs and fixes"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Only for code and systems the user owns."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Every proof runs against local code or a local dev server with throwaway data."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If there is a lockfile, run `npm audit` or `pip-audit` if installed"
+          },
+          {
+            "field": "limits",
+            "quote": "Both are regex heuristics: they point at code to read, they never decide anything."
+          },
+          {
+            "field": "limits",
+            "quote": "Never send a proof to production, a staging server shared with others, or any third-party service, even one the app calls."
+          },
+          {
+            "field": "limits",
+            "quote": "If a real secret turns up, tell the user to revoke and rotate it at the provider first. Never print it back in full."
+          },
+          {
+            "field": "limits",
+            "quote": "The goal is not a long list of everything that could go wrong. It is the three to six things that would actually hurt"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 ~/simcraft/skills/coding/security-threat-model/scripts/surface.py <repo>"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Write the answers at the top of `THREAT_MODEL.md`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/design/brand-kit/SKILL.md",
+      "blob_sha": "78a7a4c8a9d00ca14e1e9ee6e26075f18c6ffb67",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/design/brand-kit/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "brand-kit",
+        "description": "Learn a company's brand design from its live website (colours, fonts with the real font files, logo, button and card shapes, texture, image style) and save it as a reusable kit that vox-explainer and image-gen apply automatically. Use FIRST, before any brand or sponsored video, sticker, graphic or asset for a company (e.g. \"a video for Devin\", \"ChatGPT-style stickers\", \"match their brand\"), or when asked to get, learn, extract or match a brand's look."
+      },
+      "excerpt": "---\nname: brand-kit\ndescription: Learn a company's brand design from its live website (colours, fonts with the real font files, logo, button and card shapes, texture, image style) and save it as a reusable kit that vox-explainer and image-gen apply automatically. Use FIRST, before any brand or sponsored video, sticker, graphic or asset for a company (e.g. \"a video for Devin\", \"ChatGPT-style stickers\", \"match their brand\"), or when asked to get, learn, extract or match a brand's look.\n---\n\n# Brand kit\n\n**Run this before making anything for a brand.** vox-explainer refuses a `\"brand\"` scene with no kit, and image-gen refuses `--brand` with no kit.\n\nKits live in `~/.local/share/simcraft/brands/<slug>/`, outside the public repo, because they hold other companies' fonts and logos. Use them only for work with or about that brand, and never commit or share the font files.\n\n## Steps\n\n1. **Extract.** Give the main site, plus the product or marketing page if it looks different. The second page often holds the real brand font (chatgpt.com uses system fonts, openai.com ships OpenAI Sans).\n   ```\n   node ~/simcraft/skills/design/brand-kit/scripts/extract.mjs https://devin.ai ~/.local/share/simcraft/brands/devin [more urls]\n   ```\n   It reads the CSS design tokens (resolving nested ones), the computed styles of headings, body, buttons, code and cards, the `@font-face` files (downloaded locally), the logo, the favicon, and the colours that cover the screen by area.\n2. **Propose:** `python3 ~/simcraft/skills/design/brand-kit/scripts/propose.py <brand_dir> --name \"Devin\"` writes `brand.json`.\n3. **Board:** `python3 ~/simcraft/skills/design/brand-kit/scripts/board.py <brand_dir>` writes `board.png`. It shows the palette, the real fonts, the logo, the site, and two sample explainer frames in the brand's look. **Look at it** next to the site screenshot and fix `brand.json` by hand where it's off:\n   - **accent:** the one colour the brand is known for. If the brand is monochrome (like ChatGPT), the accent is black, and that's correct.\n   - **vox.field_a / field_b:** the two background fields. Usually the brand's surface plus either its ink or its accent.\n   - **fonts.display:** the face, weight and case of their headlines.\n   - **image_style:** one sentence describing how their illustrations look. Write it from their site, not from the template.\n   - Note anything else in `notes`, such as \"never use the logo on blue\" or \"emoji-free\".\n   Then re-run the board, and show it to the user before using the kit.\n4. **Check official guidelines** if the brand publishes them (search \"<brand> brand guidelines\" or \"press kit\"). Official colours and logo files beat what the website happens to use.\n\n## Using a kit\n\n- **vox-explainer:** add `\"brand\": \"devin\"` to the scene. Colours, fonts, edges (clean or torn), grain and highlight all switch over. Background names become `a`, `b`, `paper` and `accent`.\n- **image-gen:** add `--brand devin`. The kit's image style and palette are added to every prompt.\n- For anything else (stickers, thumbnails, slides), read `brand.json` and use its colours, font files and shapes.\n\n## What the kit holds\n\n`colors` (surface, paper, ink, muted, accent, on_accent, extras), `fonts` (display, body, mono, and serif if any, each with its family, weight, case, tracking and local files), `shape` (button and card radius, texture), `logo`, `icon`, `vox` (the explainer theme), `image_style` and `notes`.\n\nHow each choice is made, and what testing on Devin and ChatGPT showed: [reference.md](reference.md).\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/design/image-gen/SKILL.md",
+      "blob_sha": "8300cdd8a6b00580b17774f0b42adeb1f3055f7f",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/design/image-gen/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "image-gen",
+        "description": "Generate images with the user's own API keys (Google Gemini \"Nano Banana\" or OpenAI gpt-image). Use when asked to generate, create or make an image, illustration, icon, cut-out, sticker, thumbnail, texture, mockup or visual asset, to edit an image, or to make several images that stay consistent (same character or object). Also used by the vox-explainer skill for collage cut-outs."
+      },
+      "excerpt": "---\nname: image-gen\ndescription: Generate images with the user's own API keys (Google Gemini \"Nano Banana\" or OpenAI gpt-image). Use when asked to generate, create or make an image, illustration, icon, cut-out, sticker, thumbnail, texture, mockup or visual asset, to edit an image, or to make several images that stay consistent (same character or object). Also used by the vox-explainer skill for collage cut-outs.\n---\n\n# Image gen\n\n```\npython3 ~/simcraft/skills/design/image-gen/scripts/gen_image.py \"<prompt>\" --out <dir> --name <name> [options]\n```\nStandard library only, so any `python3` works.\n\n## Keys\n\nThe script reads `GEMINI_API_KEY` and `OPENAI_API_KEY` from the environment, or from `~/.config/simcraft/keys.env` (one `NAME=value` per line, chmod 600).\n- Run `--check` to see which keys are set. It never prints a key.\n- If no key is set, tell the user to open the file themselves (`open -e ~/.config/simcraft/keys.env`) and paste it in. Never ask them to paste a key into chat, and never read keys out of other projects' files.\n- Keys go only in request headers. They never go in a URL, a log, or a sidecar file.\n- Get a Gemini key at aistudio.google.com/apikey (it has a free tier). Get an OpenAI key at platform.openai.com/api-keys.\n\n## Options\n\n| Option | What it does |\n|---|---|\n| `--n 4` | Makes 4 variations in parallel, plus `<name>_sheet.png` to pick from. Use this for anything that matters. |\n| `--aspect 16:9` | Sets the shape: 16:9, 9:16, 1:1, 4:3 or 3:4. Match it to where the image goes. |\n| `--ref a.png b.png` | Reference images. Use them to edit an image, match a style, or keep the same character or object across images. |\n| `--cutout` | Gives a transparent PNG for collages. Gemini generates on chroma green and the script keys it out with clean edges. OpenAI makes real transparency. |\n| `--provider gemini\\|openai` | Picks the provider. Default: Gemini if its key is set. |\n| `--model M` | Picks the model. By default Gemini picks the newest image model the key can use (`--models` lists them), and OpenAI uses gpt-image-2. |\n| `--quality low\\|medium\\|high` | OpenAI only. Default high. |\n| `--brand devin` | Adds a brand kit's image style and palette to the prompt. **For any brand work, run the brand-kit skill first.** |\n\nEvery image gets a `<name>.json` sidecar with the exact prompt, model and settings, so it can be remade or tweaked later.\n\n## Which provider\n\n- **Gemini:** fast and cheap. Best for iterating, for edits, and for keeping things consistent with `--ref`.\n- **OpenAI gpt-image:** best for images with text in them, and for true transparent cut-outs.\n\n## Prompting\n\n- Describe the subject, the medium, the light and the framing, in that order. Say what to leave out.\n- **No text in images** unless the user asks for it. Models still misspell words. Add type afterwards in code.\n- For a series, generate one anchor image first. Then pass that same anchor as `--ref` to every other image. Never chain image 2 into image 3, because small errors pile up.\n- Show the user the contact sheet before using images anywhere. Regenerate one variation instead of all of them.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/learning/from-scratch/SKILL.md",
+      "blob_sha": "4e906d0034095e950f7e1665fb3a25dd215adc8b",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/learning/from-scratch/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "from-scratch",
+        "description": "Learn how something really works by building the smallest working version of it from scratch, Karpathy style, one small step at a time, with the user predicting what each step will do before running it. Works for ML and AI ideas (attention, tokenizers, backprop, RAG, agents), systems (a database, an HTTP server, git, a shell) and anything else that can be coded. Use when the user says \"teach me how X works\", \"build X from scratch\", \"I want to really understand X\", \"explain X from first principle"
+      },
+      "excerpt": "---\nname: from-scratch\ndescription: Learn how something really works by building the smallest working version of it from scratch, Karpathy style, one small step at a time, with the user predicting what each step will do before running it. Works for ML and AI ideas (attention, tokenizers, backprop, RAG, agents), systems (a database, an HTTP server, git, a shell) and anything else that can be coded. Use when the user says \"teach me how X works\", \"build X from scratch\", \"I want to really understand X\", \"explain X from first principles\", or \"implement X without the library\".\n---\n\n# From scratch\n\nReading about a thing gives you the words. Building it gives you the understanding. The fastest way to really get attention, a tokenizer, a vector database or git is to write the smallest version that works, in plain code, and watch it run.\n\nThe goal is understanding, not a finished library. Small and readable beats complete.\n\n## 1. Find the core\n\nAsk one question first: what does the user already know? (For example: \"Comfortable with Python and numpy? Seen matrix multiplication before?\") Then name, in one or two sentences, **the one mechanism that makes the thing work**. Examples:\n- Attention: every token scores every other token, and takes a weighted average of their values.\n- Git: files are stored by the hash of their contents, and a commit is a file that points at a tree and a parent.\n- RAG: turn text into vectors, find the nearest ones to the question, paste them into the prompt.\n\nEverything that isn't the core (speed, edge cases, config, error handling) is left out on purpose. Say what's left out and why.\n\n## 2. Plan the build\n\nBreak it into 4 to 8 steps. Each step adds one idea and ends with something that runs and prints a result. Target the whole thing at **under 200 lines**, one file, standard library or numpy only unless the idea needs more. Show the step list, then start step 1.\n\n## 3. Each step\n\n1. **Say the idea** in two or three plain sentences.\n2. **Ask for a prediction** before running anything: \"What do you think this prints?\" or \"Which word will get the highest score?\" Wrong guesses are where the learning happens, so wait for one.\n3. **Write the code** for that step only. Short functions, honest variable names, a comment only where the why isn't obvious.\n4. **Run it** and show the real output. Use tiny inputs (3 tokens, 2 files, a 4-word vocabulary) so every number can be checked by eye.\n5. **Compare with the prediction.** If it was wrong, explain what they missed, in one or two sentences.\n\nNever write two steps at once. The user can say \"faster\" to combine steps.\n\n## 4. Check against the real thing\n\nWhen the toy works, run the same input through the real library or tool (PyTorch attention, real git, a real tokenizer) and show that the answers match, or explain exactly why they differ. This is what turns \"I made a toy\" into \"I know how it works\".\n\n## 5. Lock it in\n\nEnd with:\n- A **one-paragraph explanation in the user's words**: ask them to explain it back first, then tidy what they wrote rather than replacing it.\n- **Three questions** that test the core idea, answers hidden until they try. (The `teach-back` skill can take it from here.)\n- **Where the real version is more complicated**, as a short list, so they know what they skipped.\n\nKeep the code file. It's their reference implementation.\n\n## Rules\n\n- Never paste a big finished implementation. The steps are the lesson.\n- No magic: if a line uses something they haven't seen, either explain it in one sentence or replace it with something simpler.\n- Run every line of code you show. Never show output you didn't get.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/learning/paper-to-runnable/SKILL.md",
+      "blob_sha": "ae9d9e15dc6981cd4c100fd404e0dfc1ee05ca43",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/learning/paper-to-runnable/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "paper-to-runnable",
+        "description": "Turn a research paper (arXiv id, arXiv URL or local PDF) into the smallest honest working implementation of its core idea, checked with a sanity ladder and a toy reproduction of the paper's main result, plus plots or an animation of what happens inside and a short explainer. Use when the user says \"implement this paper\", \"reproduce this paper\", \"explain this paper by building it\", \"code up this arXiv paper\", \"make this paper runnable\", \"does this paper's result hold\", or pastes an arXiv link and"
+      },
+      "excerpt": "---\nname: paper-to-runnable\ndescription: Turn a research paper (arXiv id, arXiv URL or local PDF) into the smallest honest working implementation of its core idea, checked with a sanity ladder and a toy reproduction of the paper's main result, plus plots or an animation of what happens inside and a short explainer. Use when the user says \"implement this paper\", \"reproduce this paper\", \"explain this paper by building it\", \"code up this arXiv paper\", \"make this paper runnable\", \"does this paper's result hold\", or pastes an arXiv link and wants to understand how it works.\n---\n\n# Paper to runnable\n\nA paper is a claim. The way to understand it is to find the one mechanism the claim rests on, build only that, and watch it produce the paper's result at toy scale. Everything else in the paper is supporting detail.\n\nThe output is a folder with five things: `notes.md`, one code file, a sanity ladder that passes, a toy result next to the paper's figure, and visuals plus `explainer.md`. A full worked example (Grokking, arXiv 2201.02177) is in `examples/grokking/` and walked through in `reference.md`. Read it before the first build.\n\n## Setup\n\n```\nsh <skill>/setup.sh          # .venv with numpy, matplotlib, pypdf\nsh <skill>/setup.sh torch    # only if the build truly needs autograd\nPY=<skill>/.venv/bin/python\n```\n\nCheck first: if the system `python3` already has numpy and matplotlib, it can be used instead. Default to numpy. Reach for PyTorch only when hand-written backprop would be longer than the idea itself (a multi-layer transformer, a conv net). ffmpeg comes from `$FFMPEG` or `ffmpeg` on the PATH.\n\n## 1. Fetch the paper\n\n```\npython3 <skill>/scripts/fetch_paper.py <arxiv id | arxiv url | local.pdf> --out <work>/paper\n```\n\nIt writes `paper.txt`, `meta.json`, the LaTeX `source/` and `equations.md` (every display equation with its number, label and source line, plus the author's macros). LaTeX gives exact equations, so read `equations.md` over the PDF text for math. If a paper has no numbered equations, the script says so: cite sections, figures, algorithms and appendix tables instead.\n\nThe script only downloads from arXiv. For any other link, ask the user before downloading anything, then pass the local PDF.\n\n## 2. Find the core claim, write `notes.md`\n\nRead the abstract, the figure captions, the main method section and the experiment setup (usually an appendix). Then write `notes.md` with these headings:\n\n- **Claim**: one sentence, falsifiable. \"X causes Y under Z.\"\n- **Mechanism**: the one thing that makes it work. If removing it should break the result, it is the mechanism.\n- **Equations to code**: a table of each equation used, its number, and the variable names it becomes.\n- **Result to reproduce**: which figure or table, and what qualitative shape counts as success. Decide this before running anything.\n- **Ablation**: the one switch that turns the mechanism off. This is the experiment that proves the mechanism matters.\n- **Not reproduced, and why**: scale, architecture swaps, datasets, extra experiments. Be specific.\n\nShow the user the claim, the mechanism and the planned result before writing code. They may know what they care about.\n\n## 3. Build the minimal version\n\nOne file, under about 300 lines, from scratch. Every line that implements part of the paper gets a comment citing it: `# Eq. 3`, `# Sec 4.2`, `# A.1.2: lr 1e-3, wd 1`. Use the paper's hyperparameters where they are given. When you swap something out (a smaller model, a different task variant), say so in a comment at the swap and in `notes.md`.\n\nKeep the paper's names for variables where they are readable (`Q, K, V`, `beta`, `alpha`). Write the backward pass by hand in numpy when it is short, because that is where understanding comes from.\n\n## 4. Verify with a sanity ladder, then the toy result\n\nPut the ladder behind a `--check` flag and run it before any long run. Each rung must pass before the next:\n\n1. **Shapes**: every tensor has the shape the paper implies. Check the data generator against a few hand-computed examples.\n2. **Gradient check** (if you wrote gradients): analytic versus central finite differences in float64, worst relative error under 1e-5.\n3. **Overfit one small batch**: loss goes near zero, accuracy reaches 100%. If it cannot, the model or optimiser is broken.\n4. **Chance at init**: the untrained model scores near chance. If it doesn't, there is leakage.\n5. **Toy result**: the main run and the ablation, same seed, same budget. Report the numbers that define the result (for example \"train 99% at step 1700, validation 99% at step 6100; with the switch off, validation stays at 0%\").\n\nAim for a full run under a few minutes on CPU. Shrink the problem, not the idea. If the qualitative result does not appear, try the paper's settings first, then do a small sweep, and report what you tried. Never tune until it works and then hide the sweep: list every setting tried in `notes.md`.\n\nBe honest about gaps. Write down what matched, what did not, and what the toy cannot tell us.\n\n## 5. Visualise the internals, write `explainer.md`\n\nCurves show that it works. Internals show why. Plot the quantity the mechanism acts on (attention weights, an embedding, a loss landscape slice, a hidden state over time) as training goes, with the mechanism on and off side by side.\n\nFor motion, use the helper. It writes PNG frames and stitches them with ffmpeg:\n\n```python\nsys.path.insert(0, \"<skill>/scripts\"); from animate import animate\nanimate(draw, n_frames, \"out/mechanism.mp4\", fps=12, size=(13, 7), preview=True)  # look first\n```\n\nRender with `preview=True` first, open one frame from the `_frames/` folder, then render full size. Look at the output image yourself before describing it.\n\nThen write `explainer.md`: one question, one story, one lesson, about 300 words, plain words, for a smart reader who has not read the paper. The story is what the visual shows happening. End with what the toy does not show.\n\n## Rules\n\n- Run everything you show. Never quote a number you did not get.\n- The ablation is not optional. Without it you have a training curve, not evidence.\n- A toy reproduction supports the mechanism, not the paper's exact numbers. Say so.\n- If the result fails to reproduce after honest effort, that is a valid outcome. Report it with what you tried.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/learning/system-design-from-scratch/SKILL.md",
+      "blob_sha": "3553f14a564f3e3d3a6d6325b118cbed7bc2fedf",
+      "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/learning/system-design-from-scratch/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "system-design-from-scratch",
+        "description": "Design a backend or distributed system by building a tiny but real working version of it, proving its properties with invariant tests, a load test (throughput and p50/p95/p99 latency) and fault injection (crashed nodes, dropped or delayed messages, partitions, clock skew, full disks), then writing a design doc with the numbers, alternatives, where it breaks, how Redis, Kafka, Cassandra or etcd do it, and an interview-ready summary. Works for rate limiters, job queues with retries and visibility "
+      },
+      "excerpt": "---\nname: system-design-from-scratch\ndescription: Design a backend or distributed system by building a tiny but real working version of it, proving its properties with invariant tests, a load test (throughput and p50/p95/p99 latency) and fault injection (crashed nodes, dropped or delayed messages, partitions, clock skew, full disks), then writing a design doc with the numbers, alternatives, where it breaks, how Redis, Kafka, Cassandra or etcd do it, and an interview-ready summary. Works for rate limiters, job queues with retries and visibility timeouts, consistent hashing, LSM-tree key-value stores, write-ahead logs, Raft leader election, caches with eviction policies, pub/sub, URL shorteners and similar. Use when the user says \"build a rate limiter from scratch\", \"system design practice\", \"how does Raft work, let's build it\", \"design X and prove it\", \"load test my design\", \"what happens to X when a node dies\", or is preparing for a system design interview and wants more than boxes and arrows.\n---\n\n# System design from scratch\n\nA whiteboard design is a guess. This skill turns it into evidence: a small system that actually runs, tests that state what must always be true, a load test that measures it, and faults that try to break it. The design doc at the end only contains claims that something in the folder proved.\n\nThe sibling skill `from-scratch` teaches one concept step by step. This skill is for systems with load, failure and trade-offs. Use `from-scratch` first if the user has never seen the core idea.\n\n## Tools in this skill\n\n- `scripts/loadgen.py`: async load generator for a Python function or an HTTP endpoint. Open loop (`--rate`, fixed schedule, latency counted from the scheduled time) or closed loop (`--concurrency`). Reports throughput, outcome counts and p50/p90/p95/p99/p99.9 from HdrHistogram-style buckets, plus the generator's own lag. `--rates 200,400,800` sweeps load to find the knee. Text chart always, PNG with `--plot` if matplotlib is installed.\n- `scripts/faultsim.py`: deterministic discrete event simulator for message passing nodes. Delay, drop, duplicate, partition, one-way block, crash and restart (disk survives), clock offset and drift, disk full, a random fault schedule (`random_faults`), and invariants checked after every event. Same seed, same run. `python3 scripts/faultsim.py --demo` shows the basics.\n- `examples/rate-limiter/` and `examples/raft-election/`: two complete runs of this workflow, each with a `DESIGN.md` of real results. Read the matching one before starting a similar system.\n\nCheck what is installed first: `python3 --version`, `go version`, `python3 -c \"import matplotlib\"`. Default to Python 3.9+ standard library. Use Go only if it is installed and the user wants it (the scripts still work against a Go server over HTTP).\n\n## Workflow\n\nDo the steps in order. Show the user each step's output before moving on, and ask one question at a time when something is unclear.\n\n1. **Requirements and numbers.** Write a short table: what the system does, scale (QPS, keys, data size), latency budget, durability and consistency needs, and what happens on failure. Then do the back-of-envelope math out loud: memory per item times items, requests per second per node, round trips per request, disk bytes per day. Note which numbers already rule a design out. Patterns and reference figures are in [reference.md](reference.md#1-numbers).\n\n2. **Smallest correct version.** One file per component, plain Python. Make time injectable (a `clock` parameter or a faultsim node) so tests can control it. For anything with more than one node, build it as `faultsim.Node` subclasses first; only add real sockets for the load test. Leave out everything not needed to show the core trade-off, and list what was left out.\n\n3. **Invariants and property tests.** Write down what must always be true (for example \"never more than burst + rate x T admitted\", \"at most one leader per term\", \"a read after an acknowledged write returns it\"). Test each over hundreds of seeded random inputs, compare against a brute force oracle where one exists, and keep one test per known weakness that shows it on purpose. [reference.md](reference.md#3-invariants-by-system) lists invariants for each common system.\n\n4. **Load test.** Use `loadgen.py`. Prefer open loop for latency claims; closed loop hides queueing (coordinated omission). Sweep offered load to find where latency bends. Always look at the generator lag line: if it is high, the numbers describe the laptop, not the system. Say so in the doc.\n\n5. **Fault injection.** In faultsim: crash the leader or a replica, partition minority from majority, drop 10 to 30% of messages, slow one link, skew or speed up one clock, fill one disk. Then run `random_faults` across 100+ seeds with invariants on. Plant one realistic bug (skip an fsync, forget a check) and confirm the tests catch it; if they do not, the nemesis or the invariant is too weak. Keep every failing seed as a regression test.\n\n6. **Design doc.** Write `DESIGN.md` next to the code with these sections: requirements and numbers; what was built; invariants and test results; load results; fault results; the decision; where it breaks; what production systems do differently (cite their public docs, see [reference.md](reference.md#4-what-production-systems-do)); a five sentence interview summary that uses the measured numbers; and the commands to reproduce. Every number in it must come from a run in this session. Mark machine-dependent numbers with the machine's load.\n\n## Rules\n\n- Never write a result you did not get. Never round a bad number into a good one.\n- Simulated time for correctness and distributed behaviour; real time only for cost and throughput, and report how busy the machine was.\n- A test that has never failed proves little. Show each invariant failing at least once (a planted bug or a removed check).\n- \"0 failures in N seeds\" means the failure rate is probably below about 3/N, not zero. Say that.\n- Compare at least two designs on the same workload. The trade-off is the point.\n- When citing a production system, describe only what its public docs or papers say.\n",
+      "card": null
+    }
+  ]
+}

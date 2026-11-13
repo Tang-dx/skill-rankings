@@ -1,0 +1,641 @@
+{
+  "schema": 1,
+  "repo": "daveebbelaar/bama",
+  "tree_sha": "8a762059f128731ce6c7704074426baef73ea867",
+  "truncated_paths": 9,
+  "skills": [
+    {
+      "skill_path": "skills/code/agent-cli/SKILL.md",
+      "blob_sha": "443cdbb5096dcdb269ac9b6a24a92cf43eaedee4",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/code/agent-cli/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agent-cli",
+        "description": "Optional command line and MCP server for a macOS app, so Claude Code, Codex, and scripts can drive it (list, add, change, search, act) through the running app. Use when the user wants agents to work with their app or its data, asks for a CLI, an MCP server, or automation for the app, or says \"Claude should be able to use my app\"."
+      },
+      "excerpt": "---\nname: agent-cli\ndescription: Optional command line and MCP server for a macOS app, so Claude Code, Codex, and scripts can drive it (list, add, change, search, act) through the running app. Use when the user wants agents to work with their app or its data, asks for a CLI, an MCP server, or automation for the app, or says \"Claude should be able to use my app\".\nargument-hint: \"<cli-name, like tasks or mail>\"\n---\n\n# Agent CLI\n\nGive the app a command line, so an agent can do everything a person can\ndo in the window: `tasks items add --title \"Call the dentist\"`. The app\nbinary is the CLI. Each command goes to the running app over a private\nsocket, runs there like a button press, and the window updates live.\n\n```text\nClaude Code --bash--> tasks items add ...  --socket--> Tasks.app (runs the command, saves, redraws)\nClaude Desktop --MCP--> tasks mcp           --socket--> same commands, same app\n```\n\n## CLI, MCP, or App Intents\n\n| Way in | Who uses it | Ship it |\n| --- | --- | --- |\n| CLI | Claude Code, Codex, scripts, people in Terminal | Always. Agents learn it from `--help`, and it costs no context until used |\n| MCP (`tasks mcp`) | Claude Desktop and other clients with no shell | Optional. The same commands, one tool each. One line to register |\n| App Intents | Siri, Spotlight, Shortcuts | Separate work. Agents cannot call them |\n\nThe CLI talks to the running app, never to the database file. Then there is\none writer, the app's checks and side effects run, and the window shows the\nchange at once. If the app is closed, the CLI opens it in the background.\nRules and reasons: [rules.md](rules.md).\n\n## 1. List the commands\n\nRead the user stories (`docs/stories/`). Write each thing a person does as\na command, `<noun> <verb>`, and mark it:\n\n- **read**: `items list`, `items show`, `status`. Safe to run any time.\n- **write**: `items add`, `items update`, `open`. Changes data, can be undone.\n- **destructive**: `items delete`, `mail send`. Only reports what it would\n  do until `--yes` is given.\n\nAdd `status` (is it running, what is open, counts) and `open <page>` (show\na page in the window), so an agent can see and steer the app.\n\nCheck: every M1 story has its commands, and each command is marked.\n\n## 2. Add the files\n\n```bash\n\"${CLAUDE_SKILL_DIR}/scripts/add-agent-cli.sh\" <app-folder> <cli-name>\n```\n\nIt copies `Sources/<App>/Agent/` (core, socket, CLI, MCP, example\ncommands) and `Main.swift`, moves `@main` to `Main.swift`, starts the socket\nin the main view's `.task`, and makes `build.sh` link\n`~/.local/bin/<cli-name>`. Apps not made from the template: do the same\nby hand, following the script.\n\nCheck: the script printed \"added the agent CLI\", and `swift build` passes.\n\n## 3. Write the commands\n\nReplace the examples in `Agent/AgentCommands.swift`. Each command has a\nname, a one-line summary, its params, a full example, its mark\n(`readOnly` or `destructive`), and a `run` that uses the same model code\nas the window's buttons. Never copy logic: call the function the button\ncalls.\n\n- Every model an agent touches gets `var uuid: UUID = UUID()`. Commands\n  show the first 8 characters as `id`, and accept any unique start of it.\n- Results are small JSON objects: the fields an agent needs, not the\n  whole model. Lists take `--limit` and `--offset`, and return `total`\n  and `nextOffset`.\n- Errors throw `AgentError` with a message that says how to fix it:\n  \"no item with id 3f2a. Run `tasks items list`\".\n\nAll the rules: [rules.md](rules.md).\n\nCheck: `<cli-name> help` lists every command from step 1, and\n`<cli-name> help <command>` shows its params and example.\n\n## 4. Build and install\n\n```bash\n./build.sh\n<cli-name> help\n```\n\n`build.sh` installs the app and links `~/.local/bin/<cli-name>` to the\nbinary inside it, so the CLI always matches the app. If the shell cannot\nfind it, add `~/.local/bin` to `PATH` in `~/.zshrc`.\n\nCheck: `<cli-name> --version` prints the app's version.\n\n## 5. Test\n\n```bash\n\"${CLAUDE_SKILL_DIR}/scripts/check-agent-cli.sh\" <cli-name>\n```\n\nIt starts a test copy of the app on a temporary database, checks help,\nJSON output, error codes, every read command, and the MCP tool list, then\nquits the test copy. Then run each write command once by hand, with\n`APP_STORE=/tmp/<App>-test.store`, and look at the window: the change shows\nwithout a reload.\n\nCheck: the script prints `PASS agent CLI`.\n\n## 6. Teach agents\n\nWrite `.claude/skills/<cli-name>/SKILL.md` in the app's repo from\n[teach-agents.md](teach-agents.md): what the app is, the safety rules,\nthe main commands, and \"run `<cli-name> help` for the rest\". To use the\napp from any folder, also copy it to `~/.claude/skills/<cli-name>/`. Add\none line to the app's `CLAUDE.md`: \"Drive the app with `<cli-name>`. See\n`.claude/skills/<cli-name>/SKILL.md`.\"\n\nCheck: a fresh `claude -p \"List my starred items with <cli-name>\"` finds\nthe CLI and answers from real data.\n\n## 7. MCP, when the user wants it\n\nFor Claude Desktop, or to get one approval prompt per tool:\n\n```bash\nclaude mcp add --scope user <cli-name> -- ~/Applications/<App>.app/Contents/MacOS/<App> mcp\ncodex mcp add <cli-name> -- ~/Applications/<App>.app/Contents/MacOS/<App> mcp\n```\n\nClaude Desktop: add it to `~/Library/Application Support/Claude/claude_desktop_config.json`\nunder `mcpServers`, with the full path and `\"args\": [\"mcp\"]`. More in\n[teach-agents.md](teach-agents.md).\n\nCheck: `claude mcp list` shows the server as connected.\n\nDone when every command from step 1 runs through the CLI against the\nrunning app, `check-agent-cli.sh` prints `PASS agent CLI`, the app's repo\nhas the agent skill from step 6, and a fresh Claude Code session can do a\nreal task with it.\n",
+      "card": {
+        "title_zh": "应用代理CLI与MCP",
+        "purpose_zh": "为macOS应用添加命令行与MCP服务器，让Claude Code、Codex和脚本通过运行中的应用执行列表、添加、修改、搜索等操作。",
+        "does": [
+          "按用户故事规划read、write、destructive三类命令",
+          "用脚本向应用加入Agent目录、socket、CLI与MCP代码",
+          "编写命令实现，复用窗口按钮的模型代码，输出小JSON",
+          "构建安装并把CLI链接到~/.local/bin",
+          "用检查脚本测试help、JSON输出、错误码与MCP工具列表",
+          "编写SKILL.md教代理使用CLI，并可选注册MCP服务器"
+        ],
+        "inputs": [
+          "应用文件夹路径",
+          "CLI名称（如tasks或mail）",
+          "docs/stories/中的用户故事",
+          "命令参数与示例"
+        ],
+        "outputs": [
+          "应用内的Agent命令源码",
+          "可执行的CLI二进制与~/.local/bin链接",
+          "MCP服务器",
+          "应用仓库中的SKILL.md",
+          "测试结果PASS agent CLI"
+        ],
+        "scenarios": [
+          "希望代理操作自己的macOS应用及其数据",
+          "需要为应用提供CLI或MCP自动化入口",
+          "让Claude Code或Codex通过命令行驱动应用"
+        ],
+        "prerequisites": [
+          "macOS应用，最好由模板生成",
+          "Swift构建环境，swift build可通过",
+          "~/.local/bin在PATH中"
+        ],
+        "limits": [
+          "CLI只与运行中的应用通信，不直接访问数据库文件",
+          "应用关闭时CLI会在后台打开它",
+          "destructive命令需--yes才真正执行",
+          "App Intents需另行开发，代理无法调用"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "后端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Give the app a command line, so an agent can do everything a person can do in the window"
+          },
+          {
+            "field": "does",
+            "quote": "Read the user stories (`docs/stories/`). Write each thing a person does as a command, `<noun> <verb>`, and mark it"
+          },
+          {
+            "field": "does",
+            "quote": "It copies `Sources/<App>/Agent/` (core, socket, CLI, MCP, example commands) and `Main.swift`"
+          },
+          {
+            "field": "does",
+            "quote": "`build.sh` installs the app and links `~/.local/bin/<cli-name>` to the binary inside it"
+          },
+          {
+            "field": "does",
+            "quote": "It starts a test copy of the app on a temporary database, checks help, JSON output, error codes, every read command, and the MCP tool list"
+          },
+          {
+            "field": "does",
+            "quote": "Write `.claude/skills/<cli-name>/SKILL.md` in the app's repo from [teach-agents.md](teach-agents.md)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Check: the script printed \"added the agent CLI\", and `swift build` passes."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the shell cannot find it, add `~/.local/bin` to `PATH` in `~/.zshrc`."
+          },
+          {
+            "field": "limits",
+            "quote": "The CLI talks to the running app, never to the database file."
+          },
+          {
+            "field": "limits",
+            "quote": "If the app is closed, the CLI opens it in the background."
+          },
+          {
+            "field": "limits",
+            "quote": "Only reports what it would do until `--yes` is given."
+          },
+          {
+            "field": "limits",
+            "quote": "App Intents | Siri, Spotlight, Shortcuts | Separate work. Agents cannot call them"
+          },
+          {
+            "field": "hosts",
+            "quote": "Optional command line and MCP server for a macOS app, so Claude Code, Codex, and scripts can drive it"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "\"${CLAUDE_SKILL_DIR}/scripts/add-agent-cli.sh\" <app-folder> <cli-name>"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`build.sh` installs the app and links `~/.local/bin/<cli-name>` to the binary inside it"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/code/improve-architecture/SKILL.md",
+      "blob_sha": "fb45bffff33569b21cab89e06aaa7d98e9638b3b",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/code/improve-architecture/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "improve-architecture",
+        "description": "Architecture check-in for a growing macOS Swift codebase. Finds hot spots, proposes deeper modules, and refactors one step per commit with behavior proven unchanged. Use at the end of a milestone, before a big feature, when a file passes 600 lines, when one feature touches many files, when bugs repeat in one area, or when the user asks to refactor or clean up the code."
+      },
+      "excerpt": "---\nname: improve-architecture\ndescription: Architecture check-in for a growing macOS Swift codebase. Finds hot spots, proposes deeper modules, and refactors one step per commit with behavior proven unchanged. Use at the end of a milestone, before a big feature, when a file passes 600 lines, when one feature touches many files, when bugs repeat in one area, or when the user asks to refactor or clean up the code.\n---\n\n# Improve architecture\n\nFeatures pile up, and an app that was easy to change gets hard to change.\nA **check-in** catches that early: survey, propose, let the user pick, then\nrefactor in small steps that keep behavior the same. The target shape for\napps that grow is in [architecture.md](architecture.md).\n\n## When to run\n\nAny one signal is enough:\n\n- The end of a milestone (the `improve-loop` skill calls this skill there).\n- Before a big feature. Ask: \"What change to the code would make this\n  feature easy?\"\n- A Swift file over 600 lines (act at 1,000), a type over 400 lines, or\n  \"unable to type-check this expression\".\n- One feature touched more than 6 files or more than 2 targets.\n- The same area shows up in 3 fix-log entries, or the same kind of bug\n  happens twice.\n- State that changes more than 10 times a second sits on a model that many\n  views observe.\n- A dependency cannot be replaced in a test.\n\n## Vocabulary\n\nUse these words exactly, so proposals stay comparable:\n\n- **Module**: anything with an interface and an implementation (a type, a\n  file group, a target).\n- **Interface**: everything a caller must know: signatures, ordering,\n  error modes, threading, performance.\n- **Depth**: how much a module does per unit of interface. Deep modules hide\n  a lot behind a small interface. Shallow modules are pass-throughs.\n- **Seam**: a place where you can swap behavior without editing callers.\n- **Adapter**: one implementation behind a seam. One adapter is a\n  hypothetical seam. Two (production and test) make it real.\n- **Locality**: a change touches one place. **Leverage**: callers get a lot\n  for little.\n\n## 1. Survey\n\nChange no code in this step.\n\n1. Read `CLAUDE.md`, `ARCHITECTURE.md`, `docs/adr/`, and `docs/FIXLOG.md`\n   where they exist.\n2. Find hot spots:\n\n   ```bash\n   git log --since=30.days --name-only --format= | sort | uniq -c | sort -rn | head -20\n   find Sources -name '*.swift' | xargs wc -l | sort -n | tail -20\n   ```\n\n3. Map the structure: targets and their dependencies, protocols and their\n   conformers, `@MainActor` types that do I/O, and what runs on which\n   queue.\n4. Look for Swift friction:\n   - A view model that owns everything (a god model).\n   - Wrappers that only forward calls.\n   - App code that reaches into a library's internals.\n   - Test hooks in the app target.\n   - Fast-changing state published to every view.\n   - Slow work on the main thread or a real-time queue.\n   - Protocols with one conformer and no test adapter.\n   - Drifted copies: the same `private struct <Name>` defined in two files\n     (`grep -rn 'private struct' Sources/ | awk '{print $3}' | sort | uniq -d`).\n   - A settings or detail page that lives far from its feature. Pages live\n     in the feature's folder.\n   - Pure logic inside a `@MainActor` store, which tests cannot compile\n     alone. Move it into a plain type that takes plain values.\n5. **Deletion test** for each candidate: if you deleted this module, would\n   its complexity concentrate in one place (keep it) or spread to every\n   caller (it earns its place)? Pass-throughs fail the test.\n\n## 2. Propose\n\nWrite `docs/architecture-review-<YYYY-MM-DD>.md`, one card per candidate:\n\n```markdown\n## <Title in domain nouns>  [Strong | Worth exploring | Speculative]\n\nFiles: Sources/App/EditorModel.swift (1,750 lines), ...\nSignal: <which trigger above>\nProblem: <what is hard to change today, with one example>\nProposal: <the new module and its interface, 15 lines of Swift at most>\nBenefits: <locality and leverage; which tests get simpler>\nProof of same behavior: <tests, golden files, snapshots, perf baseline>\nPlan: <one commit per step>\n```\n\nEnd with a **top recommendation** and a short \"considered, not\nrecommended\" list. Saying \"the code is fine\" is a valid result: then\nevery card is `Speculative` or there are none.\n\nStop and ask the user which candidate to do. In an unattended loop, do the\ntop recommendation only if it is `Strong`. Leave the rest in the file.\n\n## 3. Refactor\n\n- **Before:** record the proof: tests at the interface, golden outputs\n  (file bytes or hashes, snapshot PNGs, old files that must still load),\n  and a performance baseline where speed matters.\n- One refactor per commit. Behavior stays the same. No features mixed in.\n- New types go in new files that compile first. Then move callers over.\n  The project builds after every step.\n- Replacing an engine: keep the old path behind a flag for one milestone,\n  then delete it.\n- Replace tests, do not layer them: delete the old shallow tests that the\n  new interface tests cover.\n- If a diff passes about 10 files, split it.\n- If the interface is open, design it twice: sketch two or three\n  interfaces under different constraints (fewest entry points, simplest\n  common caller, ports and adapters) and pick one with a reason.\n\n## 4. Record\n\n- Update `ARCHITECTURE.md`: targets, layers, dependency direction, seams.\n- Add an ADR in `docs/adr/` only when the decision is hard to reverse,\n  surprising without context, and a real trade-off.\n- Add a `docs/FIXLOG.md` entry for any bug the refactor found. Every entry\n  ends with a `Rule:` line.\n\nDone when the review file exists, the chosen refactor is committed in\nsteps, the proof gives the same results before and after, and\n`ARCHITECTURE.md` matches the code.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/code/os-integrations/SKILL.md",
+      "blob_sha": "630f994da1aba75398cbdd1a6a6cefdcdd18c54f",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/code/os-integrations/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "os-integrations",
+        "description": "Deep macOS integrations for a native app, such as global hotkeys, menu bar items, floating panels, window control with Accessibility, screen capture and recording, clipboard, Shortcuts and Spotlight, URL schemes, login items, a CLI, and the permissions each one needs. Use when an app must reach outside its own window or control other apps."
+      },
+      "excerpt": "---\nname: os-integrations\ndescription: Deep macOS integrations for a native app, such as global hotkeys, menu bar items, floating panels, window control with Accessibility, screen capture and recording, clipboard, Shortcuts and Spotlight, URL schemes, login items, a CLI, and the permissions each one needs. Use when an app must reach outside its own window or control other apps.\n---\n\n# macOS integrations\n\nA Mac app is a set of entry points around the system, not one window. This\nskill picks the API for each entry point and the permission it costs.\nCode for every row is in [recipes.md](recipes.md).\n\n## Pick the API\n\n| Want | API | Permission |\n| --- | --- | --- |\n| Global shortcut (key combo) | Carbon `RegisterEventHotKey` | None |\n| Hold-to-show (hold Option, press Tab) or key remapping | `CGEvent.tapCreate` event tap | Accessibility |\n| Watch keys without changing them (keystroke overlay) | Listen-only event tap | Input Monitoring (`CGRequestListenEventAccess`) |\n| List other apps' windows | `CGWindowListCopyWindowInfo` | None (titles need Screen Recording) |\n| Menu bar item | `MenuBarExtra` (SwiftUI) or `NSStatusItem` | None |\n| Live status in the menu bar (a timer, a sync) | `MenuBarExtra` with a changing label. Live Activities on a Mac only mirror a paired iPhone | None |\n| Desktop and Notification Center widgets | WidgetKit extension target (Xcode build, like App Intents) | None |\n| Find the app's content in Spotlight | Core Spotlight `CSSearchableIndex` | None |\n| Preview the app's own file type in Finder (Space) | Quick Look preview extension | None |\n| Menu-bar-only app, no Dock icon | `LSUIElement = YES` in Info.plist | None |\n| Spotlight-style panel that keeps the other app in front | `NSPanel` with `.nonactivatingPanel` | None |\n| Move and resize other apps' windows | `AXUIElement` (`kAXPositionAttribute`, `kAXSizeAttribute`) | Accessibility |\n| Paste into the front app | Write `NSPasteboard`, then post Command-V with `CGEvent` | Accessibility |\n| Screenshot | ScreenCaptureKit `SCScreenshotManager` | Screen Recording |\n| Window thumbnails | `SCScreenshotManager` with an `SCContentFilter` per window | Screen Recording |\n| Screen recording to MP4 | `SCStream` + `SCRecordingOutput` (`AVAssetWriter` when you edit frames) | Screen Recording, Microphone |\n| Clipboard history | Poll `NSPasteboard.general.changeCount` | None |\n| Text in images | Vision `RecognizeTextRequest` | None |\n| Launch at login | `SMAppService.mainApp.register()` | User approves once |\n| Links from scripts, Stream Deck, Raycast | `CFBundleURLTypes` + `.onOpenURL` | None |\n| Shortcuts app and Spotlight actions | `AppIntent` (App Shortcuts are not supported on macOS). A result or confirmation view is a snippet | None |\n| Agent or script reads and changes data | The app binary as a CLI, talking to the running app (`agent-cli` skill) | None |\n| A CLI that writes plain files or its own SQLite tells the app to reload | Darwin notification (`notify_post`) | None |\n| Keep the Mac awake | `IOPMAssertionCreateWithName` | None |\n| System stats | `host_statistics64`, `proc_pid_rusage`, `IOPSCopyPowerSourcesInfo` | None |\n| Audio devices | CoreAudio `AudioObjectGetPropertyData` | None |\n| Toggle dark mode and other system settings | Apple Events to System Events | Automation |\n| Notifications | `UNUserNotificationCenter` | User approves once |\n| Dock menu | `applicationDockMenu(_:)` in the app delegate | None |\n| Services and Share menu | `NSServices` in Info.plist, `ShareLink` | None |\n\nPrefer the row with no permission when two rows solve the same job.\n\n## Permissions\n\n- Ask at the moment of use. Explain in one line what breaks without it.\n  The exception: an app whose core job needs the permission (a window\n  manager needs Accessibility) shows its permissions page on first launch.\n- Show the state of every permission on one Settings page, with a button\n  that opens the right pane:\n  `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`\n  (or `Privacy_ScreenCapture`, `Privacy_AllFiles`).\n- The user grants it in System Settings, and nothing calls your app back.\n  Check every 1 to 2 seconds while a permission is missing or a view that\n  shows it is open. Otherwise check every 20 seconds, with a timer\n  tolerance. Check once more right when such a view opens.\n- Every `NS...UsageDescription` key (camera, microphone, Apple Events)\n  must be in Info.plist before the first request, or the app crashes.\n\n## Menu bar items, widgets, and snippets\n\n- A menu bar item shows a menu, unless the feature is too complex for one.\n  Its icon is a template image (an SF Symbol works). People can turn it\n  off in Settings, and nothing is reachable only through it: the Dock menu\n  and the main window offer the same actions. `MenuBarExtra` already works\n  with keyboard navigation; an `NSStatusItem` that opens a custom window\n  must too (WWDC26-289).\n- A widget shows one idea from the app's purpose, with content that\n  changes through the day. Sizes small, medium, large, and extra large. On\n  the desktop it renders vibrant and nearly gray, so it must read without\n  color. Standard margins 16 pt. A click deep-links to the exact place;\n  buttons and toggles in it run App Intents. Never a whole app squeezed\n  into a widget.\n- A snippet is the view an App Intent shows in Spotlight, Siri, or\n  Shortcuts: a result (with Done) or a confirmation (Cancel plus a button\n  that names the action, never \"OK\"). At most 400 pt tall, readable in\n  light and dark, and clear without the spoken text.\n- Badge the Dock icon only with a count of unread notifications.\n\n## Signing keeps grants\n\nmacOS stores Accessibility and Screen Recording grants per code signature\nand path. To keep them across rebuilds:\n\n- Sign with one stable \"Apple Development\" certificate. Ad hoc signing asks\n  again after every build.\n- Install to the same path every time (`/Applications/<App>.app` or\n  `~/Applications/<App>.app`).\n- No App Sandbox for apps that use Accessibility, event taps, or other\n  apps' windows. The sandbox blocks them.\n- After an install, refresh Launch Services so the Dock shows the new icon:\n  `lsregister -f -R -trusted /Applications/<App>.app` (the tool lives in\n  `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/`).\n\nIf a grant looks on but the API fails, the signature changed. Remove the\napp from the list in System Settings, add it again, restart the app.\n\n## Make every feature reachable three ways\n\nEach feature gets: a menu item with a shortcut, a URL\n(`<app>://action/<name>`), and an App Intent. The same action enum backs all\nthree, so a new action shows up everywhere at once. App Intent enum titles\nmust be literals, so they can drift from menu titles: add a self-test check\nthat they match. The URL also lets\n`test-mac-app` drive the feature from a script.\n\nDone when every entry point in the brief's \"System hooks\" works from a\nclean install, and Settings shows the state of every permission it needs.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/code/performance/SKILL.md",
+      "blob_sha": "ea87a59ca5f77bdcf41e5097480bc6c3f8e03a25",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/code/performance/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "performance",
+        "description": "Make a macOS app fast by measuring hangs, stutter, CPU, memory, and energy, then moving work off the main thread and onto the GPU. Use when the app freezes, a shortcut feels slow, dragging stutters, the fan spins, memory grows, or the user asks to optimize or profile."
+      },
+      "excerpt": "---\nname: performance\ndescription: Make a macOS app fast by measuring hangs, stutter, CPU, memory, and energy, then moving work off the main thread and onto the GPU. Use when the app freezes, a shortcut feels slow, dragging stutters, the fan spins, memory grows, or the user asks to optimize or profile.\n---\n\n# Performance\n\nFast means two numbers: the first frame after a key press shows in under\n100 ms, and nothing on the main thread blocks for more than 50 ms. Every\nchange in this skill starts and ends with a **measurement**, so you know it\nhelped. Symptom-by-symptom fixes are in [recipes.md](recipes.md). For\nvideo, audio, camera, Metal, or large image pipelines, also read\n[gpu-media.md](gpu-media.md).\n\n## The loop\n\n```text\nreproduce -> measure (release build) -> find the line -> fix -> measure again -> commit with the numbers\n```\n\n1. **Reproduce.** Write the exact steps, or add a probe command to the\n   debug bridge (`test-mac-app` skill) that runs the slow action and logs\n   the time of each step.\n2. **Measure the release build.** Debug Swift is 3 to 10 times slower and\n   points at the wrong code.\n3. **Find the line.** Pick the tool for the symptom:\n\n   | Symptom | Tool |\n   | --- | --- |\n   | App freezes, spinning pointer | `sample <App> 5`, then read the main thread stack |\n   | Slow action | Time Profiler: `xcrun xctrace record --template 'Time Profiler' --attach <App> --time-limit 10s` |\n   | Short freezes while typing or dragging | `--template 'Hangs'` |\n   | Stutter while moving or animating | `--template 'Animation Hitches'` |\n   | Memory grows | `footprint <App>`, `leaks <App>`, `--template 'Allocations'` |\n   | Fan, battery | `--template 'Energy Log'`, look for timers and polling |\n\n   Read traces as text, not in the Instruments GUI: see \"Measuring\" in\n   [recipes.md](recipes.md). Delete every `.trace` after reading. A trace\n   stores the app's full environment, and an app opened from an agent's\n   shell inherits that shell's tokens. Never commit or share one.\n\n4. **Fix** with the matching recipe.\n5. **Measure again** with the same steps. Put before and after in the\n   commit message: \"Picker opens in 40 ms, was 600 ms\".\n\n## The rules that fix most problems\n\n- **Main thread does UI only.** File, network, database, image decoding,\n  Accessibility calls, and audio go elsewhere. A main-thread call that waits\n  on another process (CoreAudio, AX) can freeze the app for minutes.\n- **Show first, work after.** Put the window or panel on screen in the same\n  frame as the key press, then load. Never make the UI wait for the work.\n- **Let the GPU composite.** Large images go in a `CALayer` once. Pointer\n  movement changes only small layers. Never redraw a full-screen picture per\n  mouse event.\n- **Decode at display size.** ImageIO thumbnails, cached in `NSCache`.\n- **Do not animate what must be fast.** Search results and switchers\n  update in place.\n- **No polling without a reason.** Timers get a tolerance and stop when\n  nothing on screen needs them.\n\n## Apple silicon notes\n\n- Core Animation, Core Image (one shared `CIContext`), Vision, and\n  AVFoundation already run on the GPU or the Neural Engine. Hand them the\n  work instead of looping over pixels in Swift.\n- Write Metal (`MTKView`, compute shaders) only when a measurement shows\n  Core Animation or Core Image is too slow. Most apps never need it.\n- Unified memory means a `CGImage` from ScreenCaptureKit passes to a layer\n  without a copy. Keep it as a `CGImage` or `IOSurface`. Converting to\n  `NSImage` and back costs copies.\n\nDone when the slow action has a measured before and after, the after meets\nthe two numbers at the top, and the commit message names both.\n",
+      "card": {
+        "title_zh": "macOS 应用性能优化",
+        "purpose_zh": "通过测量卡顿、掉帧、CPU、内存和能耗，把工作移出主线程并交给 GPU，让 macOS 应用变快；适用于应用冻结、快捷键变慢、拖动卡顿、风扇转动、内存增长或用户要求优化与性能分析时。",
+        "does": [
+          "按复现、测量 release 构建、定位代码、修复、复测、带数据提交的循环优化性能",
+          "按症状选择工具：sample、Time Profiler、Hangs、Animation Hitches、footprint、leaks、Allocations、Energy Log",
+          "以文本方式读取 trace，读取后删除 .trace，避免提交或分享",
+          "应用主线程只做 UI、先显示后加载、GPU 合成、按显示尺寸解码、避免无理由轮询等规则",
+          "在 Apple silicon 上优先使用 Core Animation、Core Image、Vision、AVFoundation，仅在测量证明必要时写 Metal",
+          "在提交信息中记录优化前后的测量数字"
+        ],
+        "inputs": [
+          "需要优化的 macOS 应用",
+          "可复现慢操作的步骤或调试桥探针命令",
+          "release 构建",
+          "性能分析工具输出（sample、xctrace trace、footprint、leaks 等）"
+        ],
+        "outputs": [
+          "定位到具体代码行的性能问题",
+          "按症状匹配的修复方案",
+          "优化前后测量数据",
+          "包含前后数字的提交信息"
+        ],
+        "scenarios": [
+          "应用冻结或出现转圈指针",
+          "快捷键或操作感觉慢",
+          "拖动或动画时卡顿掉帧",
+          "内存持续增长",
+          "风扇转动或耗电异常"
+        ],
+        "prerequisites": [
+          "使用 release 构建进行测量，因为 debug Swift 慢 3 到 10 倍且指向错误代码",
+          "可复现慢操作的步骤，或通过 test-mac-app 技能的调试桥添加探针命令",
+          "可用的 Xcode 命令行工具（xcrun xctrace、sample、footprint、leaks）"
+        ],
+        "limits": [
+          "仅针对 macOS 应用",
+          "trace 以文本读取而非 Instruments GUI",
+          "读取后必须删除 .trace，不得提交或分享，因为其中包含应用完整环境及 shell 令牌",
+          "仅在测量显示 Core Animation 或 Core Image 太慢时才写 Metal",
+          "多数应用不需要 Metal"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "运维部署",
+          "测试",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Make a macOS app fast by measuring hangs, stutter, CPU, memory, and energy, then moving work off the main thread and onto the GPU."
+          },
+          {
+            "field": "does",
+            "quote": "reproduce -> measure (release build) -> find the line -> fix -> measure again -> commit with the numbers"
+          },
+          {
+            "field": "does",
+            "quote": "Read traces as text, not in the Instruments GUI: see \"Measuring\" in [recipes.md](recipes.md). Delete every `.trace` after reading."
+          },
+          {
+            "field": "does",
+            "quote": "**Main thread does UI only.** File, network, database, image decoding, Accessibility calls, and audio go elsewhere."
+          },
+          {
+            "field": "does",
+            "quote": "Write Metal (`MTKView`, compute shaders) only when a measurement shows Core Animation or Core Image is too slow."
+          },
+          {
+            "field": "does",
+            "quote": "Put before and after in the commit message: \"Picker opens in 40 ms, was 600 ms\"."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Measure the release build.** Debug Swift is 3 to 10 times slower and points at the wrong code."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Write the exact steps, or add a probe command to the debug bridge (`test-mac-app` skill) that runs the slow action and logs the time of each step."
+          },
+          {
+            "field": "limits",
+            "quote": "A trace stores the app's full environment, and an app opened from an agent's shell inherits that shell's tokens. Never commit or share one."
+          },
+          {
+            "field": "limits",
+            "quote": "Most apps never need it."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/code/swift-swiftui/SKILL.md",
+      "blob_sha": "6f421a5cae3edf9070c383d4f7316b8ea907681d",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/code/swift-swiftui/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "swift-swiftui",
+        "description": "Swift 6 and SwiftUI code rules for macOS apps, including concurrency, state, SwiftData, AppKit bridges, and fixes for common compiler errors. Use when writing, reviewing, or debugging Swift code in a Mac app, or on concurrency, Sendable, or \"not in scope\" errors."
+      },
+      "excerpt": "---\nname: swift-swiftui\ndescription: Swift 6 and SwiftUI code rules for macOS apps, including concurrency, state, SwiftData, AppKit bridges, and fixes for common compiler errors. Use when writing, reviewing, or debugging Swift code in a Mac app, or on concurrency, Sendable, or \"not in scope\" errors.\n---\n\n# Swift and SwiftUI\n\nThe code is right when it compiles with zero warnings in Swift 6 language\nmode and the app does what the story says. For how it should look, call the\nSkill tool with `mac-design`. For copyable view code, read\n[../../design/mac-design/patterns.md](../../design/mac-design/patterns.md).\n\n## Concurrency\n\nThe template sets main-actor default isolation: every type and function runs\non the main actor unless you say otherwise. UI code needs no annotations.\n\n| Work | Put it in |\n| --- | --- |\n| UI state, views, view models | Default (main actor) |\n| CPU-heavy pure work (parsing, image work, diffing) | A `nonisolated` function marked `@concurrent` |\n| Shared mutable state used off the main thread | An `actor` |\n| A C callback (event tap, Carbon hotkey, CoreAudio listener) | A `nonisolated` static func that hops back with `Task { @MainActor in ... }` |\n\n- Data that crosses actors is `Sendable`: structs and enums of `Sendable`\n  values, or `final class` with only `let` properties.\n- `MainActor.assumeIsolated { }` inside a callback you know runs on the main\n  thread (a main run loop `Timer`, a main queue notification).\n- `Task { }` inherits the actor. `Task.detached` only when it must not.\n- Fix a concurrency error at its type, not with `@unchecked Sendable` or\n  `nonisolated(unsafe)`. Those two are a last resort, with a comment why.\n- **Runtime trap the compiler misses.** A closure created inside a\n  `@MainActor` type and passed to an API without a `@Sendable` closure\n  parameter (`DispatchSource.setEventHandler`, `DispatchWorkItem`,\n  `addPeriodicTimeObserver`, CoreAudio listener blocks) inherits the main\n  actor. When it runs on a background queue, Swift 6 crashes the app. Write\n  it as `{ @Sendable in ... }`, and run every background path once after\n  any concurrency change.\n\n## State\n\n- `@Observable` classes for models. `@State` in the view that owns one,\n  `@Bindable` to bind to its properties, `.environment(model)` to share it.\n- `@ObservationIgnored` on caches, timers, and handles, so they never\n  trigger a redraw.\n- `@State` for view-local values. `@AppStorage` for small preferences.\n  Keychain for secrets.\n- `ForEach(items)` over values, never `ForEach($items)` for data the user\n  can delete: a row can read an index that no longer exists and crash. Get\n  a binding by looking the item up by id.\n\n## SwiftData\n\n- `@Model` classes, `.modelContainer` on the scene, `@Query` in views,\n  `@Environment(\\.modelContext)` to insert and delete.\n- Every new property has a default value, so existing stores still open.\n- Store at `~/Library/Application Support/<AppName>/`. Allow an override\n  (`APP_STORE`) so tests never touch the real data.\n- Give every model its own `uid: UUID`. `persistentModelID` changes on the\n  first save, so it breaks selection and lookups.\n- Undo: register the reverse of each action on the window's undo manager.\n  SwiftData's automatic undo is not reliable. Code in\n  [../../design/mac-design/patterns.md](../../design/mac-design/patterns.md) (Undo with SwiftData).\n- Need SQL, a CLI, or several processes on one file? Use SQLite with WAL\n  through a small library target instead.\n\n## Menu commands\n\nSwiftUI `Commands` do not observe `@Observable` models, so a title or a\n`.disabled(...)` that reads the model goes stale. In testing, neither\n`@FocusedValue` (from `.focusedSceneValue`) nor an `@ObservedObject` inside\nthe commands updated reliably: the menu stayed disabled with a row\nselected. What works: mirror the selection into a small `ObservableObject`,\nobserve it in the `App`, and pass the values into the commands. The App's\nbody then rebuilds the menus when they change.\n\n```swift\n@MainActor final class MenuState: ObservableObject {\n    static let shared = MenuState()\n    @Published private(set) var selection: Set<UUID> = []\n    func update(_ s: Set<UUID>) { if selection != s { selection = s } }\n}\n// AppModel: var selection: Set<UUID> = [] { didSet { MenuState.shared.update(selection) } }\n\nstruct MyApp: App {\n    @ObservedObject private var menu = MenuState.shared\n    var body: some Scene {\n        Window(\"App\", id: \"main\") { ContentView() }\n            .commands { AppCommands(model: model, selectedIDs: menu.selection) }\n    }\n}\n```\n\nDisable items with `.disabled(selectedIDs.isEmpty)` and resolve the target\nagain when the item fires. Never ship items that stay enabled and do\nnothing. Check the menu from outside the app (`test-mac-app` skill, \"Menu\ncheck\").\n\nA menu shortcut also fires while a text field has focus. Never use Delete,\nCommand-Delete, arrows, or Return as menu shortcuts. Handle them on the\nlist with `.onDeleteCommand` and `.onKeyPress`.\n\n## Names Swift already uses\n\nNever name a type `Task`, `View`, `Color`, `Image`, `Text`, `Section`,\n`Label`, `Menu`, `Group`, or `Settings`. `Task` breaks every `Task { }`.\nUse `Todo`, `TaskItem`, `NoteSection`.\n\n## AppKit bridges\n\nSwiftUI covers windows, lists, and forms. AppKit is still the answer for:\n\n- Floating panels that do not steal focus: `NSPanel` with\n  `.nonactivatingPanel` hosting a SwiftUI view (`NSHostingView`, with\n  `sizingOptions = []` for a fixed frame).\n- Text views with custom behavior: `NSViewRepresentable` around `NSTextView`.\n- Status items with custom click handling: `NSStatusItem`.\n- Key and mouse monitors: `NSEvent.addLocalMonitorForEvents`. Remove the\n  monitor when the view goes away.\n\nFor system hooks (hotkeys, Accessibility, screen capture), call the Skill\ntool with `os-integrations`.\n\n## Compiler errors\n\n| Error | Fix |\n| --- | --- |\n| `cannot find 'X' in scope` right after adding a file | `swift package clean --scratch-path ~/Library/Developer/<AppName>/build` |\n| `Main actor-isolated ... from a nonisolated context` | Make the caller main-actor, or `await` the call |\n| `Sending 'x' risks causing data races` | Make the type `Sendable`, or keep it on one actor |\n| `The compiler is unable to type-check this expression` | Split the view into smaller subviews or `let` constants |\n| `ambiguous use of 'Task'` | A type in your code is named `Task`; rename it |\n\nFix the first error first. Later errors often come from it.\n\n## Swift 6 errors\n\nMoving an existing Swift 5 app? Read\n[../../ship/build-and-verify/existing-app.md](../../ship/build-and-verify/existing-app.md)\nfirst: expect several build rounds, then hunt the runtime trap above.\n\n| Error | Fix |\n| --- | --- |\n| Static `let` of a non-Sendable type (formatter, `NSFont`, `CFString`) | `@MainActor` on the enclosing type, a computed `var`, or a commented `nonisolated(unsafe)` |\n| `sending 'note' risks causing data races` in a main-queue observer | Copy the Sendable parts (an id, a pid) out of the notification before `MainActor.assumeIsolated` |\n| Observer token captured before it is assigned | Keep the token in a small `@MainActor` class |\n| \"pattern that the region-based isolation checker does not understand\" in a task group | Use an array of `Task { @MainActor in ... }` and await each one |\n| Vars changed from `OperationQueue` blocks under `NSLock` | `OSAllocatedUnfairLock(initialState:)` |\n| `@objc` action on an `NSMenuItem` subclass | `@MainActor @objc func` |\n\nDone when the app builds with zero warnings in Swift 6 language mode and\nthe story's acceptance checks pass.\n",
+      "card": {
+        "title_zh": "Swift 6与SwiftUI规范",
+        "purpose_zh": "为macOS应用的Swift 6与SwiftUI代码提供编写、审查和调试规则，涵盖并发隔离、状态管理、SwiftData、菜单命令、AppKit桥接及常见编译器错误修复。",
+        "does": [
+          "给出并发隔离规则：主actor默认、nonisolated与@concurrent、actor、Sendable及回调跳回主线程",
+          "规定状态管理用法：@Observable、@State、@Bindable、@AppStorage、@ObservationIgnored及ForEach取值",
+          "说明SwiftData建模、容器、查询、默认值、uid与撤销注册方式",
+          "说明菜单命令中镜像选择到ObservableObject的做法及快捷键禁用项",
+          "列出不应使用的Swift已有类型名如Task、View、Color等",
+          "提供AppKit桥接场景与编译器错误、Swift 6错误的对照修复表"
+        ],
+        "inputs": [
+          "Swift 6与SwiftUI代码",
+          "macOS应用开发中的并发、Sendable或not in scope等编译错误信息"
+        ],
+        "outputs": [
+          "符合规则的代码写法与修复建议",
+          "编译器错误对应的修复方案"
+        ],
+        "scenarios": [
+          "编写macOS应用的SwiftUI视图与模型代码",
+          "审查Swift并发与Sendable相关代码",
+          "调试Swift 6语言模式下的编译错误",
+          "设计SwiftData持久化与撤销逻辑",
+          "实现菜单命令与AppKit桥接"
+        ],
+        "prerequisites": [
+          "使用Swift 6语言模式",
+          "开发macOS应用"
+        ],
+        "limits": [
+          "未提供具体平台版本或工具链版本要求",
+          "部分内容引用外部文件与其它Skill（mac-design、os-integrations、test-mac-app等），原文未展开",
+          "SwiftData自动撤销不可靠，需手动注册反向操作",
+          "菜单命令无法直接观察@Observable模型，需镜像到ObservableObject"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "前端",
+          "代码审查",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Swift 6 and SwiftUI code rules for macOS apps, including concurrency, state, SwiftData, AppKit bridges, and fixes for common compiler errors."
+          },
+          {
+            "field": "does",
+            "quote": "The template sets main-actor default isolation: every type and function runs on the main actor unless you say otherwise. UI code needs no annotations."
+          },
+          {
+            "field": "does",
+            "quote": "`@Observable` classes for models. `@State` in the view that owns one, `@Bindable` to bind to its properties, `.environment(model)` to share it."
+          },
+          {
+            "field": "does",
+            "quote": "`@Model` classes, `.modelContainer` on the scene, `@Query` in views, `@Environment(\\.modelContext)` to insert and delete."
+          },
+          {
+            "field": "does",
+            "quote": "SwiftUI `Commands` do not observe `@Observable` models, so a title or a `.disabled(...)` that reads the model goes stale."
+          },
+          {
+            "field": "does",
+            "quote": "Never name a type `Task`, `View`, `Color`, `Image`, `Text`, `Section`, `Label`, `Menu`, `Group`, or `Settings`."
+          },
+          {
+            "field": "does",
+            "quote": "SwiftUI covers windows, lists, and forms. AppKit is still the answer for:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The code is right when it compiles with zero warnings in Swift 6 language mode and the app does what the story says."
+          },
+          {
+            "field": "limits",
+            "quote": "SwiftData's automatic undo is not reliable."
+          },
+          {
+            "field": "limits",
+            "quote": "For system hooks (hotkeys, Accessibility, screen capture), call the Skill tool with `os-integrations`."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`swift package clean --scratch-path ~/Library/Developer/<AppName>/build`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/design/app-icon/SKILL.md",
+      "blob_sha": "000c870d89314e5c7893f92b75e99a4eac5e1eed",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/design/app-icon/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "app-icon",
+        "description": "Liquid Glass macOS app icon made as an Icon Composer file (Icon/AppIcon.icon, JSON plus SVG layers), compiled with actool, and reviewed in every look with ictool. Use when the user wants an app icon, a better icon, or a Dock icon."
+      },
+      "excerpt": "---\nname: app-icon\ndescription: Liquid Glass macOS app icon made as an Icon Composer file (Icon/AppIcon.icon, JSON plus SVG layers), compiled with actool, and reviewed in every look with ictool. Use when the user wants an app icon, a better icon, or a Dock icon.\nallowed-tools: Bash(tools/make_icon.sh) Bash(tools/icon_review.sh) Bash(./build.sh *) Read Edit Write\n---\n\n# App icon\n\nThe icon is an Icon Composer file in git: `Icon/AppIcon.icon`, a folder\nwith `icon.json` and SVG layers in `Assets/`. You write both by hand.\nmacOS adds the glass, the highlights, the shadow, the mask, and the dark,\ntinted, and clear looks. You never draw those yourself.\n\n- `tools/make_icon.sh` compiles it with `actool` into `Resources/Assets.car`\n  and `Resources/AppIcon.icns`. `build.sh` runs it when the icon changed.\n- `tools/icon_review.sh` renders it with `ictool` (Icon Composer's command\n  line tool, inside Xcode) into one contact sheet you read.\n\nOlder app without these files: copy `Icon/`, `tools/make_icon.sh`,\n`tools/icon_review.sh`, and `tools/icon_sheet.swift` from the\n`new-mac-app` template, the icon block of its `build.sh`, and\n`CFBundleIconName` = `AppIcon` from its `Info.plist.in`.\n\nOther cases: [more-cases.md](more-cases.md).\n- An Xcode or XcodeGen project (Xcode compiles the `.icon` itself).\n- Converting an existing flat icon into layers.\n- A Dock icon that changes with a theme or style. `NSApp.applicationIconImage`\n  shows a flat picture, so render glass versions ahead of time.\n\n## The file\n\n```text\nIcon/AppIcon.icon/\n  icon.json\n  Assets/front.svg     1024 x 1024 canvas, same as the icon\n  Assets/back.svg\n```\n\n```json\n{\n  \"fill\" : { \"automatic-gradient\" : \"srgb:0.20000,0.42000,0.96000,1.00000\" },\n  \"groups\" : [\n    {\n      \"layers\" : [\n        { \"glass\" : true, \"image-name\" : \"front.svg\", \"name\" : \"front\" },\n        { \"glass\" : true, \"image-name\" : \"back.svg\", \"name\" : \"back\", \"opacity\" : 0.6 }\n      ],\n      \"shadow\" : { \"kind\" : \"neutral\", \"opacity\" : 0.5 },\n      \"translucency\" : { \"enabled\" : true, \"value\" : 0.5 }\n    }\n  ],\n  \"supported-platforms\" : { \"squares\" : [ \"macOS\" ] }\n}\n```\n\n- `fill` is the background: `solid`, `automatic-gradient` (one color, the\n  system adds a soft gradient), or `linear-gradient` with two colors.\n  Colors are `srgb:r,g,b,a` or `display-p3:r,g,b,a`.\n- The first layer in the list sits on top.\n- Shadow `kind`: `neutral`, `layer-color`, or `none`.\n- A different look per appearance goes in `<key>-specializations`, for\n  example `fill-specializations` with an entry for `dark`.\n- The art fills the whole square. Never draw the rounded square, a margin,\n  a shadow, or a sheen: the system adds them.\n\n## What makes it look like Apple made it\n\n1. One idea. One object that says what the app does: a check for tasks, a\n   stack of cards for a reader, a waveform for audio.\n2. No text, no letters, no screenshots of the UI.\n3. The glyph is your own drawing. Never use an SF Symbol, or a shape that\n   looks like one: the SF Symbols license forbids symbols in app icons.\n4. Two or three layers, each one flat shape in white or one tint. Glass\n   gives the depth. Put the main shape on top, a softer one behind it.\n5. The glyph is large: about 45 to 55 percent of the canvas width. Thin\n   parts vanish at 16 px.\n6. Filled shapes only. A stroke on an open path leaves a faint glass line.\n7. One background hue. `automatic-gradient` looks right almost every time.\n8. Distinct from the apps next to it in the Dock. List Dock apps without a\n   screenshot: `defaults read com.apple.dock persistent-apps | grep file-label`.\n\n## Steps\n\n1. Read `docs/BRIEF.md`. Write three icon concepts in one line each: the\n   object, the background color, the layers. Pick one with the user, or\n   pick the one that is easiest to recognize at 16 px.\n\n   Check: one concept is chosen and it uses no SF Symbol.\n\n2. Write the layers as SVG files in `Icon/AppIcon.icon/Assets/`, on a\n   1024 x 1024 canvas, white filled shapes (`rect` with `rx`, `circle`,\n   `path`). Write `icon.json` to list them. Delete layer files you no\n   longer use.\n\n   Check: every `image-name` in `icon.json` has a file in `Assets/`.\n\n3. Compile:\n\n   ```bash\n   tools/make_icon.sh\n   # wrote Resources/Assets.car and Resources/AppIcon.icns\n   ```\n\n   Check: the line above prints. On an error, fix the file it names.\n\n4. Review every look:\n\n   ```bash\n   tools/icon_review.sh\n   # wrote /tmp/<AppName>-icon.png\n   ```\n\n   Read the PNG. It shows Default, Dark, Tinted, and Clear at 256 pt, then\n   Default at 32 and 16 pt. The glyph reads in every look and is still\n   recognizable at 16 pt. If not, make it bigger, bolder, or simpler.\n\n5. Iterate two or three times. Change one thing per round: glyph size,\n   layer opacity, background color.\n\n6. Install and look at the Dock:\n\n   ```bash\n   ./build.sh --open\n   ```\n\n   If the Dock still shows the old icon, macOS cached it. Run\n   `touch ~/Applications/<AppName>.app` and restart the app. As a last\n   resort, `killall Dock`.\n\nThe user can fine-tune the file by hand in Icon Composer:\n`open -a \"Icon Composer\" Icon/AppIcon.icon`. Run `tools/make_icon.sh`\nafter they save.\n\n## Gotchas\n\n- The folder must be named `AppIcon.icon`. With another name, `actool`\n  writes nothing and still exits 0. `make_icon.sh` checks for that.\n- A missing layer file: `actool` fails with the name, but `ictool` exits 0\n  and renders an empty background. Compile before you review.\n- PDF layers do not render. Use SVG or PNG.\n- `xcrun ictool` is a different tool. Icon Composer's `ictool` lives at\n  `$(xcode-select -p)/../Applications/Icon Composer.app/Contents/Executables/ictool`.\n- The icon needs `CFBundleIconName` = `AppIcon` in `Info.plist` and\n  `Assets.car` in `Contents/Resources`. `AppIcon.icns` covers older Finder\n  views and macOS 15.\n\nDone when `tools/make_icon.sh` succeeds, the contact sheet shows a clear\nglyph in all four looks and at 16 pt, the icon uses no SF Symbol, and the\nDock shows the new icon.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/design/design-from-app/SKILL.md",
+      "blob_sha": "e37b09191f5394b62e7b07be610ab65673119c53",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/design/design-from-app/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": "2026-11-13T10:37:06.156Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "design-from-app",
+        "description": "Rebuild the look of an app the user likes as a native SwiftUI design kit, by measuring its screenshots (sizes, spacing, type, colors, icons), building its parts, and comparing pixel by pixel until they match. Use when the user names an app whose look they want, shares screenshots of one, or says \"make it look like X\"."
+      },
+      "excerpt": "---\nname: design-from-app\ndescription: Rebuild the look of an app the user likes as a native SwiftUI design kit, by measuring its screenshots (sizes, spacing, type, colors, icons), building its parts, and comparing pixel by pixel until they match. Use when the user names an app whose look they want, shares screenshots of one, or says \"make it look like X\".\nargument-hint: \"<app name or screenshot paths>\"\n---\n\n# Design from app\n\nLook at an app, measure it, and rebuild its design system in SwiftUI. The\nresult is a design kit (`design-kit` skill) with the reference app's\nnumbers, and one reference screen that matches the screenshot.\n\nGuessing gets close. Measuring gets it right. Two scripts do the\nmeasuring, next to this skill:\n\n- `scripts/measure.swift`: sizes, positions, text heights, and colors from\n  a screenshot.\n- `scripts/compare.swift`: a side-by-side, a diff, and the share of pixels\n  that differ.\n\nRun them with `swift \"${CLAUDE_SKILL_DIR}/scripts/measure.swift\" ...`.\nAll coordinates are points (pixels / 2 for a Retina capture).\n\n## 1. Get the screenshots\n\nAsk for screenshots, or take them with the `clone` skill. You need:\n\n- The window only, at 2x, no desktop. Save them in `design/reference/`.\n- One screen with the most parts on it (a sidebar, a list, a toolbar),\n  plus close-ups of menus, dialogs, and dark mode if they matter.\n- The window size: `measure.swift info shot.png`.\n\nCheck: `info` prints the window size in points, and every screenshot uses\nthe same scale.\n\n## 2. List the parts\n\nLook at each screenshot and name every distinct part: window chrome,\nsidebar row, section header, primary action, list row, checkbox, date\nchip, icon button, divider. Start `design/KIT.md` from the `design-kit`\nskill's kit-spec.md with one section per part.\n\nCheck: every visible element on the main screenshot belongs to a part.\n\n## 3. Measure\n\nFill `design/KIT.md` with numbers, not estimates. The recipes and the\ntraps are in [measuring.md](measuring.md). In short:\n\n| To find | Command |\n| --- | --- |\n| Sidebar width, panes | `hline shot.png <y in an empty area>` |\n| Row positions and pitch | `rows shot.png <x0> <x1> [y0 y1]` |\n| Left edges, gaps | `cols shot.png <y0> <y1> [x0 x1]` |\n| Selection pill, dividers | `vline` and `hline` through it, `--tolerance 4` |\n| Text and icon colors | `ink shot.png x y w h` |\n| Surface colors | `palette shot.png x y w h` |\n| A close look | `crop shot.png x y w h out.png 4` |\n\nCheck: every token and every part size in `design/KIT.md` has a number\nfrom a command.\n\n## 4. Find the font and the icons\n\n- Most apps on the Mac use the system font, even web apps. Start there.\n  When the letters differ (a, g, t, digits), name the font and pick it or\n  an open alternative with a license that allows bundling.\n- Text sizes come from step 6: build, measure the same word in both\n  images, scale.\n- Icons: note the size, stroke weight, corners, and whether selected rows\n  switch to a filled form. Match with SF Symbols at a light weight first;\n  draw the ones that do not match as shapes (`design-kit` parts.md, Icons).\n\nCheck: `design/KIT.md` names the font, the icon source, and the icon size\nand weight.\n\n## 5. Build the kit and one screen\n\nCall the Skill tool with `design-kit` and build the tokens, the parts, the\nwindow chrome, and the gallery from `design/KIT.md`. Then build the main\nscreenshot's screen from kit parts only, with the same data and the same\nwindow size.\n\nCheck: a snapshot of that screen has the same size in pixels as the\nreference.\n\n## 6. Compare until it matches\n\n```bash\nswift \"${CLAUDE_SKILL_DIR}/scripts/compare.swift\" design/reference/main.png /tmp/<App>-shots/<page>-light.png /tmp/<App>-compare\nswift \"${CLAUDE_SKILL_DIR}/scripts/compare.swift\" ... /tmp/<App>-compare-sidebar 0 0 220 300\n```\n\nOpen `side-by-side.png` and `diff.png` with the Read tool. Then measure\nthe same rows, edges, and words in both images, and fix the tokens, not\nthe views. Order: window size, text sizes, columns and left edges, row\nheights, colors, icons.\n\nCheck: under 2% of pixels differ on the whole window, and every row and\nleft edge is within 1.5 pt of the reference.\n\n## 7. Make it yours\n\nBefore the app ships to anyone else, replace what belongs to the other\ncompany: its name, logo, illustrations, and any font or icon it owns.\nKeep the structure, the spacing, and the feel. Write the replacements in\n`design/KIT.md`.\n\nDone when `design/KIT.md` has a measured number for every token and part,\nthe kit's gallery shows every part, the reference screen passes step 6,\nand step 7 lists what was replaced.\n",
+      "card": {
+        "title_zh": "应用外观复刻设计套件",
+        "purpose_zh": "通过测量用户喜欢的一款应用的截图（尺寸、间距、字体、颜色、图标），在 SwiftUI 中重建其设计系统，并逐像素比对直到匹配。",
+        "does": [
+          "获取或截取目标应用窗口截图，保存到 design/reference/",
+          "列出截图中每个独立部件，建立 design/KIT.md 部件清单",
+          "用 measure.swift 测量尺寸、行距、列边距、颜色等数值",
+          "识别字体与图标来源、尺寸和粗细",
+          "调用 design-kit 构建设计令牌、部件、窗口外框与画廊，并搭建参考屏幕",
+          "用 compare.swift 生成并排图与差异图，反复修正令牌直至像素差异低于 2%"
+        ],
+        "inputs": [
+          "应用名称或截图路径",
+          "目标应用窗口截图（2x、仅窗口、无桌面）",
+          "窗口尺寸（由 measure.swift info 输出）"
+        ],
+        "outputs": [
+          "design/KIT.md 设计规范文档（含每个令牌与部件的测量数值）",
+          "SwiftUI 设计套件（令牌、部件、窗口外框、画廊）",
+          "与截图匹配的参考屏幕",
+          "并排对比图 side-by-side.png 与差异图 diff.png"
+        ],
+        "scenarios": [
+          "用户点名某款应用，希望复刻其外观",
+          "用户提供某应用的截图",
+          "用户说“让它看起来像 X”"
+        ],
+        "prerequisites": [
+          "可运行 swift 命令执行 scripts/measure.swift 与 scripts/compare.swift",
+          "已安装或可调用 design-kit 技能",
+          "截图需为 2x 且同一缩放比例"
+        ],
+        "limits": [
+          "仅面向 SwiftUI 与 macOS 应用外观",
+          "匹配标准为整窗像素差异低于 2%、每行与左边缘误差在 1.5 pt 内",
+          "发布前需替换原公司的名称、标志、插画及自有字体图标",
+          "坐标以点为单位（Retina 截图需除以 2）"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "图像"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Look at an app, measure it, and rebuild its design system in SwiftUI."
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/measure.swift`: sizes, positions, text heights, and colors from a screenshot."
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/compare.swift`: a side-by-side, a diff, and the share of pixels that differ."
+          },
+          {
+            "field": "does",
+            "quote": "Look at each screenshot and name every distinct part: window chrome, sidebar row, section header, primary action, list row, checkbox, date chip, icon button, divider."
+          },
+          {
+            "field": "does",
+            "quote": "Call the Skill tool with `design-kit` and build the tokens, the parts, the window chrome, and the gallery from `design/KIT.md`."
+          },
+          {
+            "field": "does",
+            "quote": "Then measure the same rows, edges, and words in both images, and fix the tokens, not the views."
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"<app name or screenshot paths>\""
+          },
+          {
+            "field": "inputs",
+            "quote": "The window only, at 2x, no desktop. Save them in `design/reference/`."
+          },
+          {
+            "field": "outputs",
+            "quote": "The result is a design kit (`design-kit` skill) with the reference app's numbers, and one reference screen that matches the screenshot."
+          },
+          {
+            "field": "outputs",
+            "quote": "Open `side-by-side.png` and `diff.png` with the Read tool."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user names an app whose look they want, shares screenshots of one, or says \"make it look like X\"."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run them with `swift \"${CLAUDE_SKILL_DIR}/scripts/measure.swift\" ...`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Check: `info` prints the window size in points, and every screenshot uses the same scale."
+          },
+          {
+            "field": "limits",
+            "quote": "Check: under 2% of pixels differ on the whole window, and every row and left edge is within 1.5 pt of the reference."
+          },
+          {
+            "field": "limits",
+            "quote": "Before the app ships to anyone else, replace what belongs to the other company: its name, logo, illustrations, and any font or icon it owns."
+          },
+          {
+            "field": "limits",
+            "quote": "All coordinates are points (pixels / 2 for a Retina capture)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "swift \"${CLAUDE_SKILL_DIR}/scripts/compare.swift\" design/reference/main.png /tmp/<App>-shots/<page>-light.png /tmp/<App>-compare"
+          },
+          {
+            "field": "hosts",
+            "quote": "Run them with `swift \"${CLAUDE_SKILL_DIR}/scripts/measure.swift\" ...`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/design/design-kit/SKILL.md",
+      "blob_sha": "62d9c8550667df7f7412ab41406a266d292eabdf",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/design/design-kit/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "design-kit",
+        "description": "Custom design system for a macOS SwiftUI app with its own parts, not Apple's, covering three token layers, type, an icon set, every part in every state, custom window chrome, a parts gallery, and checks. Use when the user wants the app to have its own look and feel, a brand, or custom buttons, rows, and sidebars, when design-from-app has measured a reference app, or when the user asks for a design system or component library."
+      },
+      "excerpt": "---\nname: design-kit\ndescription: Custom design system for a macOS SwiftUI app with its own parts, not Apple's, covering three token layers, type, an icon set, every part in every state, custom window chrome, a parts gallery, and checks. Use when the user wants the app to have its own look and feel, a brand, or custom buttons, rows, and sidebars, when design-from-app has measured a reference app, or when the user asks for a design system or component library.\n---\n\n# Design kit\n\nA native look comes from Apple's parts. A custom look comes from your own\nparts: your sidebar row, your button, your checkbox, your icons. SwiftUI\ndraws all of them. A kit is those parts, the numbers behind them, and one\npage that shows every part in every state.\n\nMost apps keep Apple's parts and only pick an accent color (`design-system`\nskill). Build a kit when the parts themselves must change. To copy the look of an existing app,\ncall the Skill tool with `design-from-app` first: it measures the app and\nthen comes back here.\n\nEverything lives in `Sources/<App>/DesignKit/`. Code for every step:\n[parts.md](parts.md).\n\n## 1. Write the spec\n\nWrite `design/KIT.md` from [kit-spec.md](kit-spec.md): three words for the\nfeel, the tokens, the type scale, the icon rules, and one section per part\nwith its sizes and states. Agents build from this page and review against it.\n\nCheck: every part the app's screens need has a section with its sizes and\nits states.\n\n## 2. Tokens in three layers\n\n`DesignKit/Tokens.swift`:\n\n1. **Palette**: raw colors, named by hue and step (`gray50`, `blue600`).\n   Only this file reads it.\n2. **Meaning**: `Ink.text`, `Ink.accent`, `Ink.selection`, `Ink.divider`,\n   with a light and a dark value each. Parts read only this layer.\n3. **Scales**: `KitType` (type roles), `Metric` (sizes), `Motion`\n   (named intents like `hover` and `check`).\n\nA rebrand changes the palette. A dark mode fix changes the meaning layer.\nNeither touches a part.\n\nCheck: `grep -rn 'Palette\\.' Sources/ | grep -v Tokens.swift` finds nothing.\n\n## 3. Type\n\nName styles by role (`title`, `body`, `label`, `section`, `meta`), never\nby size. Use the system font unless the brand needs its own; a bundled\nfont goes in `Resources/Fonts/` with `ATSApplicationFontsPath` in\n`Info.plist.in`. Half-point sizes are fine when a reference needs them.\n\nCheck: views set fonts only through `.kitType(...)`.\n\n## 4. Icons\n\nIcons decide the feel more than color does. Views name a `KitIcon`, never\nan SF Symbol or a file, so the whole set can change in one place.\n\n- Start from SF Symbols at a fixed size and weight. Light weights read\n  less like Apple.\n- For a set of your own, draw each icon as a SwiftUI `Shape` from its SVG\n  path, or make custom symbols in the SF Symbols app.\n- One size, one stroke weight, one corner style for the whole set.\n- A selected row may switch to the filled form.\n\nCheck: `grep -rn 'systemName:' Sources/ | grep -v DesignKit/` finds nothing.\n\n## 5. Parts\n\nOne file per family in `DesignKit/Components/`: sidebar, rows, buttons,\nfields, menus. Each part:\n\n- Is a real control. Style a `Button` with a `ButtonStyle`, a `Toggle`\n  with a `ToggleStyle`, a field with a `TextFieldStyle`. Never a shape with\n  a tap gesture: it loses the keyboard, focus, and VoiceOver.\n- Has every state: rest, hover, pressed, selected, focused, disabled, in\n  light and dark. Hover uses `onHover`, pressed uses\n  `configuration.isPressed`, disabled reads `isEnabled`.\n- Takes a forced state for the gallery, so hover and pressed show up in a\n  snapshot.\n- Reads only meaning tokens, `KitType`, `Metric`, `Motion`, and `KitIcon`.\n\nCheck: the part matches its section in `design/KIT.md` in every state.\n\n## 6. Window chrome\n\nFor a fully custom look, hide the title bar and draw your own top bar,\nand build the sidebar from kit rows instead of `List`. Keep the traffic\nlights, menus, context menus, sheets, and alerts native: users depend on\nthem. SwiftUI cannot move the traffic lights; a small `NSViewRepresentable`\nreaches the `NSWindow` (parts.md, Window chrome).\n\nA custom sidebar matches the macOS 27 system one where people would\nnotice: the selected row's text turns semibold, the selection fill dims\nwhen the window is inactive (`@Environment(\\.appearsActive)`), and row\ncorners stay concentric with the sidebar (mac-design patterns.md, \"Custom\nchrome that follows the window\"). Custom glass bounces on click only on\ncontrols.\n\nCheck: the window opens at its default size, the traffic lights sit where\nthe spec says, the custom sidebar moves with the arrow keys, and its\nselection dims when another window is in front.\n\n## 7. Gallery\n\n`DesignKit/KitGallery.swift` shows every part in every state, in light and\ndark, the way a storybook does. The app shows it instead of its pages when\n`APP_KIT_GALLERY=1` is set, so the normal snapshot command captures it.\nReview a new part here before it goes into a screen.\n\nCheck: the gallery snapshot shows every part from `design/KIT.md`, and the\nuser has seen it.\n\n## 8. Checks\n\n```bash\ntools/grid-lint.sh\ngrep -rnE 'Color\\(hex|Color\\(red|\\.font\\(\\.system|systemName:' Sources/ | grep -v DesignKit/\n```\n\nBoth come back clean. Then build, snapshot, and run the `layout-grid`\nchecks on the screens (`build-and-verify` skill).\n\nDone when `design/KIT.md` covers every part, every part is a real control\nwith every state, the gallery shows them all in light and dark, and the\nchecks above come back clean.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/design/design-system/SKILL.md",
+      "blob_sha": "e0801eb0931601f9a75d05dbfed7a552a1272027",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/design/design-system/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "design-system",
+        "description": "Accent color and design system for a macOS app, from the app's accent and the accent picker in Settings to Swift tokens in code plus a design/DESIGN-SYSTEM.md that says which token to use when. Use when the user wants a brand or accent color, wants people to pick a color, when an app has more than a few screens, when screens drift apart or animations feel inconsistent, or when the user asks for themes, a style guide, or design tokens."
+      },
+      "excerpt": "---\nname: design-system\ndescription: Accent color and design system for a macOS app, from the app's accent and the accent picker in Settings to Swift tokens in code plus a design/DESIGN-SYSTEM.md that says which token to use when. Use when the user wants a brand or accent color, wants people to pick a color, when an app has more than a few screens, when screens drift apart or animations feel inconsistent, or when the user asks for themes, a style guide, or design tokens.\n---\n\n# Design system\n\nA design system is a short list of **tokens** in code and one page that\nsays which token to use when. Every screen uses tokens, never raw values.\nThen a change in one place changes the whole app, and an agent can review a\nscreen against one page.\n\nStart from `mac-design`. Tokens cover only what the system does not:\nthe accent, custom surfaces, radii, motion, overlays, and custom controls.\n\nThe app keeps Apple's look. Only the accent color changes. For parts of\nyour own (a custom sidebar, buttons, icons), call the Skill tool with\n`design-kit`. To copy the look of an app the user names, call it with\n`design-from-app`.\n\nThe template already has the base in `Sources/<App>/UI/`:\n\n- `Theme.swift`: the accent colors (`Theme.all`), the saved choice\n  (`ThemeStore`), the tokens `Palette.accent`, `Palette.accentText`,\n  `Palette.onAccent`, and `.themed()`, which tints every scene.\n- `AppearanceSettings.swift`: Settings > Appearance, where people pick the\n  accent. Light and dark mode follow the Mac. Apple advises against an\n  app-specific mode setting; add a System/Light/Dark picker only when the\n  owner asks for one, with System as the default. [HIG Dark Mode]\n- `Grid.swift`: spacing (see the `layout-grid` skill).\n\n## 1. Pick the accent\n\nRead `## Look` in `docs/BRIEF.md`. With no color named, keep `system`: it\nfollows the accent color the person set for their Mac.\n\nFor a brand color, set `ThemeStore.brand` to a `Theme` with three shades:\n`light` (accent text in dark mode), `base` (fills and tint), and `deep`\n(accent text in light mode). Set `darkText: true` when white text on\n`base` is hard to read (yellow, mint, cyan). Keep\n`ThemeStore.defaultID = \"system\"`. The brand then shows only while the\nMac's accent is Multicolor, as in Apple's apps. Any other accent the person\nchose for their Mac wins, and so do sidebar icons, which people expect in\ntheir own accent. [HIG Color, Sidebars]\n\nUse brand color sparingly: the app icon, an empty state, one hero element\nin the content. Keep it off most controls. [HIG Branding]\n\nTo compare colors, take snapshots with `APP_ACCENT=<id>` for two or three\nof them and show the user the PNGs. Keep the picker in Settings, so people\ncan still choose their own color.\n\nCheck: `ThemeStore.defaultID` is \"system\", and the snapshots show the\naccent on buttons, toggles, and selection in light and dark mode.\n\n## 2. Collect\n\nNew app with no views yet? Skip this step: write the token files with the\ndefaults below before the first view.\n\nExisting app: read every view. List each raw value you find: hex colors, opacities,\ncorner radii, paddings, frame widths, animation durations and curves,\ncustom button styles. Group them. Most apps have 3 to 5 of each where 1 or\n2 are meant.\n\n## 3. Write the tokens\n\nAccent values live in `Theme.swift`. The rest get one file per group in\n`Sources/<App>/UI/`. Add each token when the app first needs it:\n\n| File | Holds |\n| --- | --- |\n| `Theme.swift` | the accents, `ThemeStore`, `.themed()`, and `Palette`: `accent`, `onAccent` (text and symbols on accent fills), `accentText` (accent-colored text: deep shade in light mode, light shade in dark mode) |\n| `Grid.swift` | the spacing scale (`Space`) and the layout probes |\n| `Surfaces.swift` | `surface`, `surfaceHover`, `hairline`, one warning color |\n| `Radius.swift` | `xs 6` chips and key caps, `sm 8` controls, `row 10` row hover fills, `md 12` cards, `lg 18` widgets, `xl 26` floating glass |\n| `Layout.swift` | `contentWidth`, fixed column and sheet widths |\n| `Motion.swift` | `hover`, `quick` (presses, small flips), `ui`, `select` (selection moving through a live list), `appear`, `dismiss`, `glide`, `numberRoll`, `listChange`, loops (`pulse`) that stop under Reduce Motion |\n| `Components.swift` | more control styles: `HoverButtonStyle`, `.hoverFill`, toggles, chips |\n| `Overlay.swift` | one panel builder, one entrance, one exit |\n\nSurfaces adapt to light and dark. Views read the accent through `.tint` or\n`Palette`, so a new choice in Settings redraws the whole app.\n\n## 4. Write design/DESIGN-SYSTEM.md\n\nOne section per file above. Each section says which token to use when, and\nthe rules that go with it. Keep it under 100 lines. Rules that transfer to\nmost apps:\n\n- Never hard-code a hex accent. Use `.tint` or `Palette.accent`.\n- Every custom color has four values: light, dark, and a stronger one of\n  each for Increase Contrast (`Color(light:dark:highContrastLight:highContrastDark:)`\n  in `Theme.swift`). [HIG Color]\n- Never redefine or copy a semantic color (`.separator` as text, a label\n  color as a fill). Their values change per release.\n- A custom surface in its neutral state is a little translucent, so it\n  picks up the desktop tint like system surfaces. A colored state is\n  opaque.\n- A custom font only for headings. Body and captions stay in the system\n  font, and every custom font has a bold weight for the Bold Text setting.\n- Accent-colored text uses `Palette.accentText`. Text on an accent fill\n  uses `Palette.onAccent`, never a fixed white.\n- Style controls with `ButtonStyle` and `ToggleStyle`. Never rebuild a\n  control from shapes: it loses the keyboard, focus, and VoiceOver.\n- Inner corners are concentric: inner radius = outer radius - inset.\n- Every animation goes through `Motion`, so a per-feature \"Full, Fast,\n  Off\" setting and Reduce Motion apply everywhere.\n- Search results and switchers do not animate. Speed wins.\n- Hover never moves a selection. Only a click or a key does.\n- Units (\"KB/s\", \"%\") never animate. Only the number does\n  (`.contentTransition(.numericText())`).\n- Never animate a view's first layout. Overlays wait one frame, then\n  animate opacity, scale, and a few points of travel.\n- Leave room around glass for its shadow (about 3 times the shadow radius).\n- One primary button per page or card.\n\n## 5. Migrate\n\nReplace raw values screen by screen, one commit per screen. After each,\nbuild and snapshot (`build-and-verify` skill). The screen looks the same or\nbetter, never worse.\n\n## 6. Point agents at it\n\nAdd one line to the app's `CLAUDE.md` (create the file if it is missing):\n\"Design rules: `design/DESIGN-SYSTEM.md`. Use its tokens; never raw colors,\nradii, or durations.\"\n\nDone when this finds no hits outside the token files:\n\n```bash\ngrep -rnE 'cornerRadius: [0-9]{1,2}\\b|duration: [0-9]|\\.spring\\(response|\\.snappy\\b|\\.easeInOut|\\.easeOut\\(|Color\\(hex:|Color\\(red:' Sources/ \\\n  | grep -v 'Path(roundedRect'\n```\n\n(hex strings in data and comments are fine), and DESIGN-SYSTEM.md has a section\nfor every token file.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/design/layout-grid/SKILL.md",
+      "blob_sha": "cc7a7eac129880ac9c118c13ce3dcd4d80018564",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/design/layout-grid/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "layout-grid",
+        "description": "Grid and alignment rules for a macOS SwiftUI app, with three checks that catch misalignment (a lint for off-grid numbers, a layout probe that measures real frames in snapshot mode, and a grid overlay). Use when building or reviewing a custom page, card, row, form, or sheet, after every build that touched layout, or when the user says something looks misaligned, crooked, cramped, or unevenly spaced."
+      },
+      "excerpt": "---\nname: layout-grid\ndescription: Grid and alignment rules for a macOS SwiftUI app, with three checks that catch misalignment (a lint for off-grid numbers, a layout probe that measures real frames in snapshot mode, and a grid overlay). Use when building or reviewing a custom page, card, row, form, or sheet, after every build that touched layout, or when the user says something looks misaligned, crooked, cramped, or unevenly spaced.\n---\n\n# Layout grid\n\nAgents guess numbers. A guessed `.padding(13)` looks almost right and\nmakes the whole app feel slightly off. This skill replaces guessing with\none scale and three checks that fail when something is off.\n\nThe template has everything in place: `Sources/<App>/UI/Grid.swift` and\n`tools/`. For an app made before this skill, copy `UI/Grid.swift`,\n`tools/grid-lint.sh`, and `tools/check-layout.swift` from the `new-mac-app`\nskill's template, and the layout file line from its `Snapshot.swift`.\n\n## The rules\n\n1. Every padding, spacing, and size comes from `Space`: `xs 4`, `sm 8`,\n   `md 12`, `lg 16`, `xl 20`, `xxl 24`, `section 32`. Raw numbers are\n   0, 1, 2, or a multiple of 4.\n2. Pages and windows have a 20 pt margin (`Space.margin`). Cards pad 16\n   (`Space.lg`). Related controls sit 8 apart, groups 20 to 24, sections 32.\n3. Each column has one leading edge. Titles, text, cards, and buttons in a\n   column start on the same x. Indent on purpose, by a step of the scale.\n4. Let containers do the aligning:\n   - Labels with controls: `Form` with `.formStyle(.grouped)`, or\n     `.columns` for the Mac layout of right-aligned labels.\n   - Rows and columns of values: `Grid` and `GridRow`.\n   - A label with a value: `LabeledContent`.\n   - Text of different sizes in one row: `HStack(alignment: .firstTextBaseline)`.\n   - Numbers in a column: `.monospacedDigit()`, trailing aligned.\n   - An icon with text: `Label`.\n5. Sheets are 360, 480, or 640 wide. Controls take their height from\n   `.controlSize`, never from a fixed height.\n6. Nested corners are concentric: inner radius = outer radius - padding.\n7. `.offset` and `.position` move a view after layout, so nothing lines up\n   with it. Use them only for motion and drag previews, with\n   `// grid: ok <why>` on the line.\n8. Long text truncates with its full value in a tooltip. Nothing clips.\n\n## Check 1: lint the code\n\nRun it after every build that touched views:\n\n```bash\ntools/grid-lint.sh\n# Sources/Tasks/TaskRow.swift:14: off grid (10): .padding(.horizontal, 10)\n# FAIL grid-lint: 1 lines off the grid\n```\n\nFix each line with a `Space` token.\n\n## Check 2: probe the real layout\n\nMark what you lay out yourself: the page, its sections, cards, rows in a\ncard, sheet content. System lists, forms, sidebars, and toolbars align\nthemselves and need no probes. Your own rows beside them do.\n\nA check only sees what has probes. A screen with two probes passes while\neverything else is off, so read the count in the PASS line.\n\n```swift\nVStack(alignment: .leading, spacing: Space.xxl) {\n    Text(\"Today\").gridProbe(\"title\", area: \"page\")\n    StatsRow().gridProbe(\"stats\", area: \"page\")\n    TaskCard()\n        .gridArea(\"card\", inset: Space.lg)\n        .gridProbe(\"card\", area: \"page\")\n}\n.padding(Space.margin)\n.gridArea(\"page\")\n```\n\n`.gridArea` marks a container and its inset. `.gridProbe` marks a view in\nit. Probes with the same `edge` (default `\"lead\"`) must share one leading\nedge. Pass `edge: nil` for views that sit side by side.\n\nSnapshot mode writes a `<page>-<mode>-layout.json` next to every PNG.\nCheck them:\n\n```bash\nswift tools/check-layout.swift /tmp/<App>-shots/*-layout.json\n# PASS today-light-layout.json: 12 probes in 2 areas\n# FAIL inbox-light-layout.json\n#   - edge page/lead has 2 leading edges: title 320, list 324\n```\n\nIt checks that every probe:\n\n1. Starts on a whole or half point, so its edges stay sharp.\n2. Starts a multiple of 4 pt from its area's edge.\n3. Stays inside its area's inset on both sides.\n4. Shares one leading edge with the others on its edge.\n5. Sits a multiple of 4 pt below the probe above it.\n6. Never overlaps another probe in its area.\n\n### Line up across areas\n\nRules 2 to 6 stay inside one area. Views in different areas, like text in a scroll\nview and a chat box outside it, need an edge that starts with `=`:\n\n```swift\nTextColumn().gridProbe(\"column\", area: \"\", edge: \"=reading\")\nComposer().gridProbe(\"composer\", area: \"\", edge: \"=reading\")\n```\n\n| Edge | Must match |\n| --- | --- |\n| `=name` | left and right |\n| `=name<` | left |\n| `=name>` | right |\n| `=name\\|` | center |\n| `=name_` | bottom |\n\nThese probes skip rules 2 to 6, so a view off the 4 pt grid can still match a\nsystem edge. To check one view against two groups, add a second `.gridProbe` with\na different name, because a probe with the same name replaces the first.\n\nRun the snapshots once with scroll bars on, because a scroll bar that takes width\nmoves centered content (`mac-design`, app-shell.md):\n\n```bash\ntools/snap.sh -AppleShowScrollBars Always\n```\n\nThe probes keep one frame per name across all windows. When a second window shows\nthe same views, its layout file mixes both windows, so check that window by its PNG.\n\n## Check 3: look at the grid\n\nWhen a check fails and the cause is not clear, draw the grid over the\nwindow:\n\n```bash\nAPP_GRID=1 APP_STORE=/tmp/<App>-test.store APP_SNAPSHOT=/tmp/<App>-grid \\\n  ~/Applications/<App>.app/Contents/MacOS/<App>\n```\n\nThe PNGs show an 8 pt grid, each area in blue with its inset dashed, and\neach probe in pink with its name. Open them with the Read tool.\n\n## Fix a failure\n\n| Message | Usual cause | Fix |\n| --- | --- | --- |\n| starts 23 pt into page | a raw padding on one child | remove it, use the stack's `Space` padding |\n| 2 leading edges | a centered stack, or one child with extra padding | `alignment: .leading` on the stack |\n| gap 10 pt | `spacing: 10`, or a `Spacer(minLength:)` | a `Space` token |\n| inside its 20 pt inset | a missing margin, or a fixed width wider than the parent | `.padding(Space.margin)`, `maxWidth` instead of `width` |\n| overlap | `.offset`, `.position`, or a fixed height | remove it, let the stack size the view |\n| x between pixels | a fractional number | a whole number from `Space` |\n| `=name` has different left edges | a scroll bar that takes width, or a panel's gap on the content's side | `mac-design`, app-shell.md, \"Line up the content\" |\n\nDone when `tools/grid-lint.sh` passes, `tools/check-layout.swift` passes\non the layout files of every page you touched, and every custom page and\ncard has a `.gridArea` with probes on its main parts.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/design/mac-design/SKILL.md",
+      "blob_sha": "bd5b7542419f34dd8c4e760bcc35db04091c083d",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/design/mac-design/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "mac-design",
+        "description": "Design rules that make a SwiftUI app look and feel like a native Mac app on macOS 26 and later, from Apple's eight design principles to Liquid Glass, layout, toolbars, menus, search, keyboard, type, color, and dark mode. Use when building or reviewing any window, sidebar, toolbar, menu, panel, or settings screen, or when the user asks for a more native, Apple-like, or better designed app."
+      },
+      "excerpt": "---\nname: mac-design\ndescription: Design rules that make a SwiftUI app look and feel like a native Mac app on macOS 26 and later, from Apple's eight design principles to Liquid Glass, layout, toolbars, menus, search, keyboard, type, color, and dark mode. Use when building or reviewing any window, sidebar, toolbar, menu, panel, or settings screen, or when the user asks for a more native, Apple-like, or better designed app.\n---\n\n# Mac design\n\nApple already designed your app. Pick the right system parts, arrange them,\nand stay out of their way. Use the system first. Add custom design only\nwhere the system has nothing.\n\n- The full checklist with sources: [design-rules.md](design-rules.md).\n  Use it for reviews.\n- Copyable SwiftUI code: [patterns.md](patterns.md).\n- The Settings window: [settings.md](settings.md).\n- Toolbars: which item goes where, per column: [toolbars.md](toolbars.md).\n- A left sidebar, a right panel, and a top bar that fit together, or no top\n  bar: [app-shell.md](app-shell.md).\n- The menu bar, context menus, and the Dock menu: [menus.md](menus.md).\n- Apple's current text on one topic, when a rule here is not enough:\n  `\"${CLAUDE_SKILL_DIR}/scripts/hig.sh\" <topic>` (for example `toolbars`,\n  `sheets`). It prints the HIG page as plain text.\n- App-wide tokens (colors, radii, motion): call the Skill tool with\n  `design-system`.\n- How a feature works and what it says (names, flow, modals, errors,\n  accessibility): call the Skill tool with `ux-design`.\n- Spacing, alignment, and the checks that catch misalignment: call the\n  Skill tool with `layout-grid`.\n- Parts of your own instead of Apple's: call the Skill tool with\n  `design-kit`, or `design-from-app` to match an app the user names.\n\n## Apple's eight principles\n\nUse them as the review lens for every screen (HIG Design principles, 2026):\n\n1. **Purpose**: each feature costs people time, attention, and trust. Cut what does not earn it.\n2. **Agency**: people choose their path. Undo forgives mistakes. No forced tours.\n3. **Responsibility**: ask for permissions at first use, keep data private, guard AI output.\n4. **Familiarity**: things that look the same work the same. Standard parts, standard symbols.\n5. **Flexibility**: keyboard, pointer, and resizing all work. People can customize what they use daily.\n6. **Simplicity**: simple is not minimal. Hierarchy comes from order, space, and contrast.\n7. **Craft**: instant response, smooth scrolling, aligned edges, layouts that survive resizing.\n8. **Delight**: the sum of the other seven, aimed at one feeling. Never decoration added at the end.\n\nEvery screen answers: Where am I? What can I do? Where can I go?\n\n## Before you write views\n\nWrite these four under `## Design plan` in `docs/BRIEF.md`, or in\n`docs/DESIGN.md` when the brief would pass one page:\n\n1. **Archetype**: sidebar window, single-window document, menu bar extra, or\n   quick-capture panel. Most personal apps are a sidebar window plus one\n   quick-capture entry point. A menu bar utility is \"menu bar extra +\n   panels + Settings window\": the toolbar and sidebar rules then apply to\n   the Settings window only.\n2. **Information architecture**: sidebar pages, at most two levels.\n3. **Command map**: every action, its menu, its shortcut.\n4. **Empty states**: what each page shows before there is data.\n5. **Feeling**: the one feeling the app aims for (calm, quick, confident).\n   Motion, words, and color all reinforce it.\n\n## Entry points first\n\nA Mac app is used through its small entry points: a global shortcut, the\nmenu bar, a quick panel, drag and drop, the Share menu. Design those first.\nA to-do app lives in its quick-add panel.\n\n- Quick capture: one floating panel, one input, opened by a global shortcut,\n  closed by Escape or Return.\n- **Optimistic UI**: on Return, close and show the result at once. Save in the\n  background. Offer Undo, not a spinner.\n\n## Layout\n\n- `NavigationSplitView`: sidebar, content, detail. Global actions in the\n  toolbar. No sidebar when navigation is one level.\n- Selection details in `.inspector` or the detail column. An inspector looks\n  flat beside the floating sidebar. To make both sides match, call on\n  [app-shell.md](app-shell.md) before you build the toolbar.\n- The UI frames the user's content. Ask what the least UI is that lets it\n  stand out.\n- Progressive disclosure: an empty page shows one `ContentUnavailableView`\n  with the first action. Filters appear once there is content.\n- Keep the top 50 pt free for dragging the window.\n- Spacing from `Space`, on a 4 pt grid: 20 pt window margins, 8 pt\n  between related controls, 20 pt between groups. `.controlSize` for dense\n  areas, never hard-coded heights.\n\n## Liquid Glass\n\n- Glass is for the navigation and control layer: toolbars, sidebars,\n  floating buttons, popovers. Content (rows, cards, documents) gets none.\n- Never glass on glass. Group neighboring custom glass in\n  `GlassEffectContainer`.\n- Standard components get glass on their own. Delete custom backgrounds\n  behind bars and sheets.\n- `.glassEffect()` only for a custom floating control. Tint only to carry\n  meaning. Interactive glass (the bounce on click) only on controls, and\n  sparingly.\n- Custom chrome dims with the window: read `@Environment(\\.appearsActive)`\n  (patterns.md, \"Custom chrome that follows the window\").\n\n## Toolbars and menus\n\n- Each toolbar item sits over the column it acts on: nothing of your own\n  over the sidebar, New and Sort over the list, actions on the selection\n  over the detail, the inspector toggle over the inspector. Full rules and\n  a checked example: [toolbars.md](toolbars.md).\n- At most three toolbar groups, split with `ToolbarSpacer`. Monochrome SF\n  Symbols, each with a title and `.help`. At most one prominent action,\n  only for a completing action like Done or Send. Most main windows have\n  none.\n- `SidebarCommands()`, `ToolbarCommands()`, and (with an inspector)\n  `InspectorCommands()` in `.commands`, so the View menu can show and hide\n  each part.\n- Every toolbar button and feature also lives in the menu bar with a\n  shortcut (`.commands`, `CommandGroup`, `CommandMenu`). Apple's menu order\n  and labels: [menus.md](menus.md).\n- Menu icons only on key actions, all or none in a group.\n- Standard shortcuts keep their meaning: Command-C, V, X, Z, W, Q, N, comma.\n- Disable menu items that do not apply; keep them visible. SwiftUI menus\n  only update when the selection is passed into the commands from the App\n  (`swift-swiftui`, \"Menu commands\").\n- Window titles name the content (\"Today\"), not the app.\n\n## Windows open calm\n\n- Nothing is focused when a window or sheet opens: no focus ring, no\n  blinking cursor, no selected text. Put `.noInitialFocus()` on every\n  window and sheet. The one exception is a window whose only job is\n  typing, like a search or quick-add panel: it focuses its field.\n- A sidebar list may hold focus at launch. It shows as a selected row, not\n  a ring, and the arrow keys work at once.\n- A sheet, popover, or Settings tab grows to fit its content\n  (`.fitsContent()`). It scrolls only when the content is taller than\n  the screen allows, about 640 pt.\n- System scroll bars. The \"Show scroll bars\" setting decides when they\n  show. Do not restyle them.\n\n## Keyboard first\n\n- Every frequent action has a shortcut, and every shortcut shows feedback\n  in the same frame.\n- Return is the default action, Escape cancels, Delete removes, Space\n  previews, arrows move.\n- New items get focus (`@FocusState`) so the user can type at once.\n- Teach shortcuts in menus, `.help` tooltips, and a list in Settings.\n\n## Color, type, dark mode\n\n- Text is `.primary`, `.secondary`, `.tertiary`. System backgrounds. No\n  fixed white, black, or gray in chrome.\n- One accent color. Status color always comes with an icon or a word.\n- macOS text styles: body 13 pt, nothing under 10 pt. Never iOS sizes.\n  Headline is bold 13 pt, the same size as Body. Full table:\n  design-rules.md rule 29.\n- Dark mode is its own palette with more distance b",
+      "card": null
+    },
+    {
+      "skill_path": "skills/design/ux-design/SKILL.md",
+      "blob_sha": "8211d3d5cd9942dd9fe850334093896c00b3c0fb",
+      "source_url": "https://github.com/daveebbelaar/bama/blob/22dc792ea040a35270c219c669f626594267aa1f/skills/design/ux-design/SKILL.md",
+      "fetched_at": "2026-11-13T10:37:06.156Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ux-design",
+        "description": "UX pass for one feature of a macOS app, covering names, flow, where it opens (inline, popover, sheet, window, alert), states, words, hover help, accessibility, and AI features. Use before coding a story that adds a screen, an action, or text, when user-stories or improve-loop call it, or when the user asks for a UX review, clearer wording, better names, or whether something should be a modal."
+      },
+      "excerpt": "---\nname: ux-design\ndescription: UX pass for one feature of a macOS app, covering names, flow, where it opens (inline, popover, sheet, window, alert), states, words, hover help, accessibility, and AI features. Use before coding a story that adds a screen, an action, or text, when user-stories or improve-loop call it, or when the user asks for a UX review, clearer wording, better names, or whether something should be a modal.\nargument-hint: \"[story ID or screen]\"\n---\n\n# UX design\n\nA feature that works can still confuse people. This pass decides what\nthings are called, how a person moves through the feature, where it opens,\nand what it says, before any code exists.\n\nRun it once per story that adds a screen, an action, or words. The output\nis a `UX:` block in the story in `docs/STORIES.md`, plus new terms in\n`docs/GLOSSARY.md`. To review a built screen, run the same steps against\nits snapshot and list what fails, most serious first.\n\n## 0. Read\n\nRead `docs/BRIEF.md`, `docs/GLOSSARY.md` (create it if missing), the story,\nand its reference screenshots.\n\n## 1. Name it\n\nEvery thing in the app has exactly one name, and every name lives in the\nglossary.\n\n```markdown\n| Term | Means | Not |\n| --- | --- | --- |\n| Task | One thing to do, with an optional due date | to-do, item, entry |\n| Complete | Mark a task done; it leaves the list | check, finish, close |\n```\n\n- Name the things first (the nouns in the brief), then the actions on them.\n- Use the user's words, not the code's: \"Task\", not \"TaskEntity\" or \"record\".\n- Use Apple's words for system actions: Settings, Quit, Close, Undo, Move\n  to Trash (when it can come back), Delete (when it cannot).\n- One word per idea across buttons, menus, titles, tooltips, and errors.\n- Name a feature for what it does for the person, not the technology. A\n  toggle gets a verb phrase that says what and for whom (\"Enhance\n  Dialogue\", not \"Isolate Vocals\"). Say the name in a sentence out loud.\n  Method: [writing.md](writing.md#names).\n\nCheck: every noun and verb the story puts on screen is in the glossary,\nand no glossary term has a second name anywhere.\n\n## 2. Map the flow\n\nWrite the flow as one line, from every way in to a clear end.\n\n```text\nCommand-N, toolbar +, File > New Task -> title field has focus -> Return saves, row appears -> focus stays for the next task\n```\n\n- List every entry point: menu command, shortcut, toolbar, context menu,\n  drag and drop.\n- Cut steps: fill in good defaults, ask only for what you cannot guess.\n- Every step has a way back: Escape cancels, Command-Z undoes.\n- The end is visible: the new row, a checkmark, the window closing.\n\nCheck: the flow fits on one line, and each step names its way back.\n\n## 3. Pick the surface\n\nGo down this list and use the first one that fits. Lighter is better.\n\n| The feature | Use |\n| --- | --- |\n| Changes one value on something already on screen | Inline (field, toggle, menu in the row) |\n| Shows details of the selection while people keep working | Inspector |\n| A few related choices tied to one control | Popover |\n| Input people repeat while they watch the result, or a tool kept open beside the work | Panel |\n| One short task that must finish or cancel before going on | Sheet |\n| A long or self-contained task, or one people keep open beside the main window | New window |\n| A place people come back to, like a list or a collection | Sidebar page |\n| A rare action that destroys data and cannot be undone | Confirmation dialog |\n| A problem people must act on right now | Alert |\n\n- Show one modal at a time. Never open a popover from a popover, or a\n  sheet from a sheet.\n- A modal's title names its task: \"Rename Project\", not \"Edit\".\n- Return confirms, Escape cancels, and the confirm button names the action.\n- Ask before closing only when people would lose what they typed.\n- Information that needs no action goes inline, never in an alert.\n\nDetails and SwiftUI code for each surface: [presentation.md](presentation.md).\n\nCheck: the `UX:` block names the surface and the table row that picked it.\n\n## 4. Cover the states\n\nEvery view the story touches has words and a look for each state:\n\n- **Empty**: what it is for, plus the first action as a button.\n- **Loading**: only when it can take longer than half a second. Show\n  cached content first. A bar when the length is known, with words for\n  what is happening (\"Importing 12 photos\"), and Cancel when it is safe.\n- **Error**: inline, next to the problem, with the fix.\n- **Too much**: long names truncate with the full text in a tooltip; a\n  thousand rows still scroll smoothly.\n- **Done**: visible feedback in the same frame, and Undo where it applies.\n\nCheck: each state has a snapshot page or seed data that shows it.\n\n## 5. Write the words\n\n- Buttons and menu items start with a verb: \"Add Task\", \"Export…\".\n- Add an ellipsis when the command asks for more input before it acts.\n- Title case for buttons, menu items, and window titles. Sentence case for\n  labels, descriptions, and messages.\n- Errors say what happened and how to fix it, without blame. Write\n  \"Unable to load tasks\", never \"We're having trouble\".\n- Confirmations repeat the action: \"Delete 3 Tasks?\" with buttons \"Delete\"\n  and \"Cancel\", never \"Yes\" and \"No\".\n\nPatterns and before and after examples: [writing.md](writing.md).\n\nA feature that uses AI (a summary, generated text, a model's suggestion)\nalso follows [ai-features.md](ai-features.md).\n\nCheck: read every string aloud. Each one is short, uses glossary terms\nonly, and a new user could say what each button does.\n\n## 6. Add hover help\n\n- Every icon-only button gets `.help(\"Add a task to this list (⌘N)\")`:\n  what it does, starting with a verb, then its shortcut. Not its name\n  again. Rules: [writing.md](writing.md#tooltips).\n- Hover can reveal secondary actions on a row. The same actions are also in\n  the context menu and on the keyboard.\n- Hover feedback shows at once and never shifts the layout.\n- Information people need is always visible. Hover only adds detail.\n\nCheck: hover every icon-only control on the snapshot build. Each one shows\na tooltip.\n\n## 7. Check accessibility\n\n- The whole flow works with the keyboard alone, in a logical focus order.\n- VoiceOver reads every control with the same words as the screen.\n- Meaning never rests on color alone: add an icon or a word.\n- Text is 10 pt or larger and readable in Increase Contrast.\n- Reduce Motion replaces slides and bounces with fades.\n- Every custom control has a label, a value, actions, and feedback.\n\nThe audit steps and SwiftUI modifiers: [accessibility.md](accessibility.md).\n\nCheck: you ran the flow keyboard-only and with VoiceOver, and the\nAccessibility Inspector audit shows no issues for the new views.\n\n## 8. Write the UX block\n\nAdd the result under the story's acceptance lines:\n\n```markdown\nUX:\n- Flow: Command-N, toolbar +, File > New Task -> title field -> Return saves -> focus stays\n- Surface: inline row at the top of the list (changes one value on screen)\n- States: empty \"No Tasks\" with \"Add Task\"; error \"Give the task a title.\" under the field\n- Words: \"Add Task\", tooltip \"Add a task to this list (⌘N)\", \"Undo Add Task\"\n- Access: Return saves, Escape cancels; VoiceOver \"New task title\"\n```\n\nDone when the story has a `UX:` block, every term it uses is in\n`docs/GLOSSARY.md`, and steps 1 to 7 pass on its snapshots.\n",
+      "card": null
+    }
+  ]
+}
