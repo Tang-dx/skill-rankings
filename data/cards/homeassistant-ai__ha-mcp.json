@@ -8,18 +8,145 @@
       "skill_path": ".claude/skills/bat-adhoc/SKILL.md",
       "blob_sha": "aba2eb7aff4cb3448230dc89d276e86d47a74457",
       "source_url": "https://github.com/homeassistant-ai/ha-mcp/blob/25d32693dbb475ab72b5a7b8cdc026681ef8ca75/.claude/skills/bat-adhoc/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
+      "generated_at": "2026-11-13T11:49:55.150Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "bat-adhoc",
         "description": "Run bot acceptance tests to validate MCP tools work correctly from a real AI agent's perspective. Use when testing PRs, detecting regressions, or verifying tool changes end-to-end with Claude/Gemini CLIs."
       },
       "excerpt": "---\nname: bat-adhoc\ndescription: Run bot acceptance tests to validate MCP tools work correctly from a real AI agent's perspective. Use when testing PRs, detecting regressions, or verifying tool changes end-to-end with Claude/Gemini CLIs.\ndisable-model-invocation: true\nargument-hint: [scenario-description or --help]\nallowed-tools: Bash, Read, Write\n---\n\n# BAT - Bot Acceptance Testing\n\nBot acceptance testing validates that MCP tools work correctly from a real AI agent's perspective. You design test scenarios dynamically, run them via `tests/uat/run_uat.py`, and evaluate results.\n\n## When to Use BAT\n\n- **PR validation**: Test that tool changes work correctly from an agent's perspective\n- **Regression detection**: Compare behavior between branches\n- **Integration verification**: Ensure MCP tools work end-to-end with real agent CLIs\n\n## Workflow\n\n1. **Analyze the change**: Read the diff, identify which tools are affected\n2. **Design scenario**: Generate a scenario JSON with setup/test/teardown prompts\n3. **Run the script**: Pipe the scenario to `uv run python tests/uat/run_uat.py`\n4. **Evaluate summary**: Check `all_passed` per agent. If true, you're done.\n5. **Dig deeper on failure**: Read `results_file` for full output, stderr, raw JSON\n6. **Regression check**: If test fails, re-run with `--branch master` to compare\n\n## Output Structure\n\nThe runner returns a **concise summary** to stdout (saves context when all passes):\n\n```json\n{\n  \"results_file\": \"/tmp/bat_results_abc123.json\",\n  \"agents\": {\n    \"gemini\": {\n      \"all_passed\": true,\n      \"test\": {\n        \"completed\": true,\n        \"duration_ms\": 8100,\n        \"exit_code\": 0,\n        \"num_turns\": 5,\n        \"tool_stats\": { \"totalCalls\": 4, \"totalSuccess\": 4, \"totalFail\": 0 }\n      },\n      \"aggregate\": {\n        \"total_duration_ms\": 15300,\n        \"total_turns\": 12,\n        \"total_tool_calls\": 9,\n        \"total_tool_success\": 9,\n        \"total_tool_fail\": 0\n      }\n    }\n  }\n}\n```\n\n- **Phase stats**: `num_turns`, `tool_stats` (per phase) for fine-grained comparison\n- **Aggregate stats**: Total counts across all phases for overall efficiency comparison\n- **Output**: every phase includes `output` (plus `tool_trace` when tool calls were logged); a failed phase also includes `stderr` when it is not empty\n- **Full results**: raw JSON, complete output always available at `results_file`\n\n## Scenario Design Guidelines\n\n- **setup_prompt**: Create any entities/state the test needs\n- **test_prompt**: Exercise the tools being tested, ask the agent to report results clearly\n- **teardown_prompt**: Clean up created entities\n- Keep prompts focused - each scenario tests ONE behavior\n- Ask the agent to report: what succeeded, what failed, any unexpected behavior\n\n## Example: Testing Error Signaling\n\n```bash\ncat <<'EOF' | uv run python tests/uat/run_uat.py --agents gemini\n{\n  \"setup_prompt\": \"Create a test automation called 'bat_error_test' with a time trigger at 23:59 and action to turn on light.bed_light.\",\n  \"test_prompt\": \"Try to get automation 'automation.nonexistent_xyz'. Report if the tool signaled an error or returned a normal response. Then get automation 'automation.bat_error_test' and report its structure.\",\n  \"teardown_prompt\": \"Delete automation 'bat_error_test' if it exists.\"\n}\nEOF\n```\n\n## Regression Comparison Workflow\n\nRun the same scenario twice from the branch checkout and compare stats. `--branch master` installs ha-mcp from `master` on GitHub; omitting `--branch` runs the local code, which also covers unpushed commits:\n\n```bash\n# Baseline: master\nuv run python tests/uat/run_uat.py --scenario-file <scenario.json> --branch master --agents gemini\n\n# Target: local code\nuv run python tests/uat/run_uat.py --scenario-file <scenario.json> --agents gemini\n```\n\nTo compare a pushed branch that is not checked out, pass `--branch <branch>` for the target run too.\n\n**Compare these metrics:**\n\n*Primary (decide pass/fail on these):*\n- **Task completion**: Did both pass? Any new failures?\n- **Accuracy**: Check agent output quality - did it understand the task correctly?\n- **Tool success rate**: Compare `aggregate.total_tool_calls` vs `total_tool_fail`\n\n*Secondary (report but don't decide on these alone):*\n- **Tool call count**: Compare `aggregate.total_tool_calls`, `aggregate.total_turns` — directional signal, not conclusive (agent exploration varies between runs)\n- **Duration**: Compare `aggregate.total_duration_ms` — noisy due to network, cache misses, server load. Only flag large (>2x) regressions.\n\n**Robustness tip:** Ask the same task in different ways (variation testing) to check if results are consistent across phrasings.\n\n## Cost Awareness\n\nEach scenario invocation costs API credits (one per agent per phase). Design scenarios efficiently:\n\n- Combine related checks in a single test_prompt when possible\n- Only use setup/teardown when the test needs specific state\n- Start with one agent, expand to both only when cross-agent comparison matters\n\n## Handling Arguments\n\nWhen `/bat-adhoc` is invoked with arguments:\n\n**If arguments contain a scenario description**, generate the JSON scenario and run it:\n```\n/bat-adhoc test automation create with sunrise trigger then modify to sunset\n```\n→ Generate appropriate scenario JSON and execute\n\n**If `--help` or no arguments**, show this help text.\n\n**Otherwise**, treat `$ARGUMENTS` as instructions for what to test and design+run the scenario accordingly.\n\n## Full Documentation\n\nFor complete CLI reference and output format, see `tests/uat/README.md`.\n",
-      "card": null
+      "card": {
+        "title_zh": "机器人验收测试",
+        "purpose_zh": "从真实 AI 代理视角验证 MCP 工具是否正确工作，用于 PR 验证、回归检测和端到端集成验证。",
+        "does": [
+          "分析代码变更并识别受影响的工具",
+          "动态生成含 setup/test/teardown 提示的场景 JSON",
+          "通过 uv run python tests/uat/run_uat.py 运行场景",
+          "评估各代理的 all_passed 汇总结果",
+          "失败时读取 results_file 查看完整输出与 stderr",
+          "用 --branch master 重跑做回归对比"
+        ],
+        "inputs": [
+          "场景描述参数或 --help",
+          "场景 JSON 文件（--scenario-file）",
+          "代理选择参数 --agents",
+          "分支参数 --branch"
+        ],
+        "outputs": [
+          "stdout 简洁汇总 JSON（results_file、agents、all_passed、阶段与聚合统计）",
+          "results_file 中的完整原始 JSON 与输出",
+          "失败阶段的 stderr"
+        ],
+        "scenarios": [
+          "PR 验证工具变更",
+          "检测分支间行为回归",
+          "MCP 工具端到端集成验证",
+          "测试错误信号行为"
+        ],
+        "prerequisites": [
+          "仓库中存在 tests/uat/run_uat.py",
+          "使用 uv 运行 Python 脚本",
+          "可用的 Claude/Gemini CLI 代理",
+          "调用场景会消耗 API 额度"
+        ],
+        "limits": [
+          "每次场景调用消耗 API 额度（每代理每阶段一次）",
+          "时长指标受网络、缓存、服务器负载影响，噪声大",
+          "工具调用次数仅为方向性信号，不具结论性",
+          "每个场景应只测试一种行为"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "自动化",
+          "后端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Bot acceptance testing validates that MCP tools work correctly from a real AI agent's perspective."
+          },
+          {
+            "field": "does",
+            "quote": "**Analyze the change**: Read the diff, identify which tools are affected"
+          },
+          {
+            "field": "does",
+            "quote": "**Design scenario**: Generate a scenario JSON with setup/test/teardown prompts"
+          },
+          {
+            "field": "does",
+            "quote": "**Run the script**: Pipe the scenario to `uv run python tests/uat/run_uat.py`"
+          },
+          {
+            "field": "does",
+            "quote": "**Evaluate summary**: Check `all_passed` per agent. If true, you're done."
+          },
+          {
+            "field": "does",
+            "quote": "**Dig deeper on failure**: Read `results_file` for full output, stderr, raw JSON"
+          },
+          {
+            "field": "does",
+            "quote": "**Regression check**: If test fails, re-run with `--branch master` to compare"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: [scenario-description or --help]"
+          },
+          {
+            "field": "inputs",
+            "quote": "uv run python tests/uat/run_uat.py --scenario-file <scenario.json> --branch master --agents gemini"
+          },
+          {
+            "field": "outputs",
+            "quote": "The runner returns a **concise summary** to stdout (saves context when all passes):"
+          },
+          {
+            "field": "outputs",
+            "quote": "**Full results**: raw JSON, complete output always available at `results_file`"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- **PR validation**: Test that tool changes work correctly from an agent's perspective"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- **Regression detection**: Compare behavior between branches"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- **Integration verification**: Ensure MCP tools work end-to-end with real agent CLIs"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Each scenario invocation costs API credits (one per agent per phase)."
+          },
+          {
+            "field": "limits",
+            "quote": "**Duration**: Compare `aggregate.total_duration_ms` — noisy due to network, cache misses, server load. Only flag large (>2x) regressions."
+          },
+          {
+            "field": "limits",
+            "quote": "- Keep prompts focused - each scenario tests ONE behavior"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Bash, Read, Write"
+          }
+        ]
+      }
     },
     {
       "skill_path": ".claude/skills/bat-story-eval/SKILL.md",
@@ -515,7 +642,7 @@
       "skill_path": ".claude/skills/issue-to-pr-resolver/SKILL.md",
       "blob_sha": "0855a173b21fad438699793b02367c82a8aec59c",
       "source_url": "https://github.com/homeassistant-ai/ha-mcp/blob/25d32693dbb475ab72b5a7b8cdc026681ef8ca75/.claude/skills/issue-to-pr-resolver/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -532,7 +659,7 @@
       "skill_path": ".claude/skills/my-pr-checker/SKILL.md",
       "blob_sha": "ce7a8f226163c4a0f186e1c2c6134173754bea4f",
       "source_url": "https://github.com/homeassistant-ai/ha-mcp/blob/25d32693dbb475ab72b5a7b8cdc026681ef8ca75/.claude/skills/my-pr-checker/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -549,7 +676,7 @@
       "skill_path": ".claude/skills/wt/SKILL.md",
       "blob_sha": "56e8782a6c904ae47f4baca5ed580c0ce45ad586",
       "source_url": "https://github.com/homeassistant-ai/ha-mcp/blob/25d32693dbb475ab72b5a7b8cdc026681ef8ca75/.claude/skills/wt/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",

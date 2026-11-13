@@ -152,7 +152,7 @@
       "skill_path": "trader-analyst/SKILL.md",
       "blob_sha": "9d9b95a4a722a348e50de6a7ae69956fe128b64f",
       "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-analyst/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -437,18 +437,139 @@
       "skill_path": "trader-entry/SKILL.md",
       "blob_sha": "8eb646220bb13a2732838faaa829db514a0440fa",
       "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-entry/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
+      "generated_at": "2026-11-13T11:49:55.150Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "trader-entry",
         "description": "Entry Timer. Watches a setup bar by bar and tells you the moment to get in. Reads free Yahoo 1-minute or 5-minute bars, builds the opening range (the first 15 minutes by default) and calls the entry on the first completed bar that CLOSES above the range high, or above a level you give it (like a 20-day high from the scanner), with an optional volume check. Says waiting and how far, triggered with the time and the price, expired, or not open yet, and writes trader/entry.json for /trader-exit. Lon"
       },
       "excerpt": "---\nname: trader-entry\ndescription: >-\n  Entry Timer. Watches a setup bar by bar and tells you the moment to get in.\n  Reads free Yahoo 1-minute or 5-minute bars, builds the opening range (the\n  first 15 minutes by default) and calls the entry on the first completed bar\n  that CLOSES above the range high, or above a level you give it (like a\n  20-day high from the scanner), with an optional volume check. Says waiting\n  and how far, triggered with the time and the price, expired, or not open\n  yet, and writes trader/entry.json for /trader-exit. Long side only. It never\n  places an order. Use when the user says \"tell me when to get in\", \"watch\n  TSLA\", \"has it broken out\", \"did it break the opening range\", \"entry\n  signal\", \"time my entry\", \"check my watchlist\", or after /trader-scanner\n  and /trader-news, before /trader-exit.\nargument-hint: \"[TICKER] [--setup orb|level] [--interval 5m|1m]\"\n---\n\n# trader-entry\n\nThe Entry Timer turns a setup into one moment: the bar that confirms it. It\nreads bars, 1-minute or 5-minute, and waits for each one to finish. A price\nthat pokes above the high in the middle of a bar is not an entry. A bar that\nCLOSES above it is. Then it says the time and the price, writes them down for\nthe Exit Planner, and stops. It never buys anything. Day trading loses most\npeople money, and a clean signal does not change that.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA                  # 15-minute opening range, 5-minute bars\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA --write          # also save trader/entry.json\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA --setup level --level 371.20\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA --interval 1m --min-volume-x 1.5\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" watch TSLA --until 15:30    # one line per closed bar, stops on the trigger\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" watchlist                   # every hit in trader/watchlist.json\n```\n\nOther flags: `--or-minutes N` (default 15), `--json`, `--offline FILE` (a\nsaved Yahoo chart JSON, `.json` or `.json.gz`, or a folder of\n`<TICKER>.json`), `--now \"2026-10-19 10:15\"` (New York time) to replay a day.\n`watch` with `--now` or `--offline` runs on a simulated clock and replays the\nday bar by bar without waiting.\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/watchlist.json` | the scanner's hits (`hits[].symbol`), for `watchlist` |\n| `trader/config.json` | `no_entries_before` (09:45) and `no_entries_after` (15:30), New York time. Optional |\n| Yahoo chart API | today's bars, `range=1d&interval=5m` (or `1m`): free, unofficial, can lag |\n| `trader/entry.json` | with `check --write`, or when `watch` triggers: symbol, setup, status, time, bar, price, level, opening range |\n\n## The rule\n\n- **Opening range (orb).** The high and low of the first 15 minutes: the\n  9:30, 9:35 and 9:40 five-minute bars, or fifteen 1-minute bars. The level\n  to beat is the range high.\n- **Level.** A price you give, like a 20-day high from `/trader-scanner`.\n- **The trigger** is the first completed bar after the range that CLOSES\n  above the level. A wick above is not a trigger. A close exactly at the\n  level is not above it.\n- **The time** is that bar's close time (the 10:10 bar closes at 10:15 AM).\n  The price is its close, to the cent.\n- **Only closed bars count.** A bar is closed when the clock passes its start\n  plus 5 (or 1) minutes and Yahoo has caught up to that moment (it waits a\n  minute at most). Yahoo's live tick, like 10:49:45, is never a bar.\n- **Volume, if you want it.** `--min-volume-x 1.5` also needs the trigger\n  bar's volume at 1.5 times the range bars' average. The 9:30 bar holds the\n  opening auction, so 1.0 is already strict.\n- **Time limits.** No entries before 9:45 or after 15:30 (config). On a 1:00\n  p.m. early close the cutoff moves up with the close, to 12:30.\n- **What it says.** Waiting (and how far the last close is from the level),\n  triggered, expired, or no data. Before 9:30: not open yet. Before 9:45: the\n  range is still forming. Weekends and NYSE holidays: the market is closed.\n\n## Steps\n\n1. Get the symbol from the user, or run `entry.py watchlist` after\n   `/trader-scanner`. Check `/trader-news` for it first.\n2. Run `entry.py check SYMBOL`. Tell the user the status in one line:\n   waiting and how far, triggered at what time and price, or expired.\n3. To wait for it, Claude can run `entry.py watch SYMBOL --until 15:30` in\n   the background, or `entry.py check SYMBOL --write` on a `/loop` every 5\n   minutes. `watch` wakes just after each bar closes, prints one line per\n   bar, and exits 0 on the trigger (it writes `trader/entry.json`) or 1 when\n   the setup expires. Keep the computer awake while it watches: a sleeping\n   laptop pauses it, and it catches up, late, when it wakes.\n4. When it triggers, say the time and the price, and that nothing was placed.\n   If the trigger is more than a bar old, say that too: a late entry is a\n   different trade.\n5. Hand off to `/trader-exit` to set the stop and the target BEFORE anything\n   is bought.\n\n## Example: the reel\n\nTSLA, Monday 2026-10-19, 5-minute bars. The opening range is 354.47 to\n362.18. At 10:12 the 10:10 bar is still open, so it waits:\n\n```\nWAITING  last close $361.68 (10:05 bar), $0.50 under the range high $362.18 (-0.14%).\nThe 10:10 bar is still forming ($364.18 so far, closes 10:15 AM); it does not count until it closes.\n```\n\nAt 10:15 the bar has closed:\n\n```\nTSLA  Mon 2026-10-19 10:15 ET  opening-range breakout (15-minute range) on 5-minute bars (Yahoo, free, can lag)\nOpening range 9:30-9:45: high $362.18, low $354.47 (3 of 3 bars).\nTRIGGERED 10:15 AM at $364.18: the 10:10 bar (bar 8) closed above the range high $362.18 (+0.55%).\nThis is the moment to get in, if you take the trade. Nothing was placed.\nNext: set the stop and target BEFORE you buy: /trader-exit (exit.py plan --from trader/entry.json).\n```\n\nWith `--min-volume-x 1` the 10:10 bar is too thin (0.60x the range's volume)\nand the trigger moves to 10:35 AM at 365.75 (the 10:30 bar, 7.98x).\n\n## Rules\n\n- Bar by bar, on free Yahoo 1-minute or 5-minute bars. They are unofficial\n  and can lag. Say so when a minute matters.\n- A signal is information, not an order, and not a promise. Nothing here\n  promises winning trades or money.\n- Long side only. v2 plans longs only. If the user wants a short, say that.\n- One trigger per setup per day: the first close above. Later closes do not\n  reset it.\n- Never call an entry early because a bar looks like it will close above.\n\n## What it never does\n\nIt never places an order, never sizes a position, never sets the stop (that\nis `/trader-exit`), never moves the level after the fact, and never counts a\nbar that has not closed. It never runs `/trader-broker` from a background\nwatch: nobody is there to say yes.\n\n## Safety\n\n- Education and tooling, not financial advice. A PASS is a rules check, not a recommendation.\n- Paper trading by default (`\"paper\": true`). Going live is the user's own decision, in their own config.\n- Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk\n  passed that exact order today, the user typed an explicit yes for that one order in the chat, and the\n  user clicked Allow once on Claude's own card because the order tool is set to \"Needs approval\"\n  (Customize > Connectors > tool permissions). Never set an order tool to \"Always allow\".\n- No options, margin, short selling or leverage unless the config allows it and the user confirms.\n- Broker keys live in environment variables or the Claude Desktop config, never in the chat.\n",
-      "card": null
+      "card": {
+        "title_zh": "入场时机计时器",
+        "purpose_zh": "逐根读取免费 Yahoo 1分钟或5分钟K线，构建开盘区间或用户给定价位，在首根收盘价突破该价位的已完成K线上给出入场时间与价格，并写出 trader/entry.json 供退出规划使用。",
+        "does": [
+          "读取 Yahoo 1分钟或5分钟K线，构建默认15分钟开盘区间高低点",
+          "以首根收盘价高于区间高点或指定价位的已完成K线作为触发信号",
+          "可选成交量校验，要求触发K线成交量达到区间K线均量的指定倍数",
+          "输出等待中及距价位差距、已触发时间与价格、已过期或未开盘等状态",
+          "watch 模式逐根K线输出并在触发时写出 trader/entry.json",
+          "支持 watchlist 批量检查 trader/watchlist.json 中的标的"
+        ],
+        "inputs": [
+          "股票代码 TICKER",
+          "--setup orb 或 level 及 --level 价位",
+          "--interval 5m 或 1m",
+          "--min-volume-x 成交量倍数",
+          "--or-minutes 开盘区间分钟数",
+          "--offline 本地 Yahoo 图表 JSON 文件或目录",
+          "--now 纽约时间用于回放",
+          "trader/config.json 中的入场时间限制"
+        ],
+        "outputs": [
+          "一行状态文本：等待中及差距、触发时间与价格、过期、无数据、未开盘",
+          "trader/entry.json：代码、setup、状态、时间、K线、价格、价位、开盘区间",
+          "watch 模式每根收盘K线一行输出，触发退出码0，过期退出码1"
+        ],
+        "scenarios": [
+          "用户询问何时入场或要求盯盘某只股票",
+          "判断是否突破开盘区间或指定价位",
+          "在 trader-scanner 和 trader-news 之后、trader-exit 之前确认入场时机",
+          "用 --now 或 --offline 回放某日行情逐根验证"
+        ],
+        "prerequisites": [
+          "本机可运行 python3 及 entry.py",
+          "可访问免费非官方 Yahoo 图表 API，或提供 --offline 本地数据",
+          "watch 期间电脑需保持唤醒"
+        ],
+        "limits": [
+          "仅做多，不支持做空",
+          "每个 setup 每天只触发一次，取首次收盘突破",
+          "未收盘K线不计入，影线突破不算触发",
+          "Yahoo 数据免费非官方且可能延迟",
+          "不自动下单、不计算仓位、不设止损",
+          "默认9:45前和15:30后不入场，提前收盘时截止时间前移",
+          "信号仅为信息，不构成投资建议或盈利承诺"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "数据分析",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Reads free Yahoo 1-minute or 5-minute bars, builds the opening range (the first 15 minutes by default) and calls the entry on the first completed bar that CLOSES above the range high"
+          },
+          {
+            "field": "does",
+            "quote": "Says waiting and how far, triggered with the time and the price, expired, or not open yet, and writes trader/entry.json for /trader-exit."
+          },
+          {
+            "field": "does",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/entry.py\" watchlist                   # every hit in trader/watchlist.json"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"[TICKER] [--setup orb|level] [--interval 5m|1m]\""
+          },
+          {
+            "field": "inputs",
+            "quote": "`--offline FILE` (a saved Yahoo chart JSON, `.json` or `.json.gz`, or a folder of `<TICKER>.json`), `--now \"2026-10-19 10:15\"` (New York time) to replay a day."
+          },
+          {
+            "field": "outputs",
+            "quote": "`trader/entry.json` | with `check --write`, or when `watch` triggers: symbol, setup, status, time, bar, price, level, opening range"
+          },
+          {
+            "field": "outputs",
+            "quote": "exits 0 on the trigger (it writes `trader/entry.json`) or 1 when the setup expires"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA                  # 15-minute opening range, 5-minute bars"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Yahoo chart API | today's bars, `range=1d&interval=5m` (or `1m`): free, unofficial, can lag"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Keep the computer awake while it watches: a sleeping laptop pauses it, and it catches up, late, when it wakes."
+          },
+          {
+            "field": "limits",
+            "quote": "Long side only. v2 plans longs only. If the user wants a short, say that."
+          },
+          {
+            "field": "limits",
+            "quote": "One trigger per setup per day: the first close above. Later closes do not reset it."
+          },
+          {
+            "field": "limits",
+            "quote": "It never places an order, never sizes a position, never sets the stop (that is `/trader-exit`), never moves the level after the fact, and never counts a bar that has not closed."
+          },
+          {
+            "field": "limits",
+            "quote": "No entries before 9:45 or after 15:30 (config). On a 1:00 p.m. early close the cutoff moves up with the close, to 12:30."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA --write          # also save trader/entry.json"
+          }
+        ]
+      }
     },
     {
       "skill_path": "trader-exit/SKILL.md",
@@ -732,18 +853,136 @@
       "skill_path": "trader-pelosi/SKILL.md",
       "blob_sha": "f09348d540816d25620e339f00ee13169a0733a1",
       "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-pelosi/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
+      "generated_at": "2026-11-13T11:49:55.150Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "trader-pelosi",
         "description": "The Pelosi Tracker. Watches the stock trades members of Congress must disclose under the STOCK Act: reads the House Clerk's public Periodic Transaction Reports (PTRs) as soon as they are posted, alerts once per new filing, and turns each PDF into clean rows (who, owner, stock, ticker, buy or sell, options strike and expiry, trade date, amount range, how many days it took to disclose). Flags trades in stocks you hold. Senate reports are covered by a documented manual route. Use when the user says"
       },
       "excerpt": "---\nname: trader-pelosi\ndescription: >-\n  The Pelosi Tracker. Watches the stock trades members of Congress must\n  disclose under the STOCK Act: reads the House Clerk's public Periodic\n  Transaction Reports (PTRs) as soon as they are posted, alerts once per new\n  filing, and turns each PDF into clean rows (who, owner, stock, ticker,\n  buy or sell, options strike and expiry, trade date, amount range, how many\n  days it took to disclose). Flags trades in stocks you hold. Senate reports\n  are covered by a documented manual route. Use when the user says \"what is\n  Pelosi buying\", \"track Nancy Pelosi\", \"Congress trades\", \"politician stock\n  trades\", \"did any congressman buy X\", \"alert me when Pelosi files\", or\n  \"run the Pelosi skill\".\nargument-hint: \"[member name] [--read]\"\n---\n\n# trader-pelosi\n\nMembers of Congress have to report their trades, their spouse's and their\ndependent children's. The House Clerk posts every report as a PDF and lists\nthem all in one index file per year. This skill reads that index, notices the\nmoment a new report appears, and reads the report for you.\n\nIt is fast. It is not early. A PTR is due within 30 days of the member\nlearning of the trade and never more than 45 days after it, so by the time\nanyone can read it the trade is days or weeks old. There is no inside\ninformation here: only public filings, read quickly. Say that every time.\n\nTool in this folder (standard library Python; `pdftotext` from poppler is\noptional, to read the PDFs locally):\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" --help\n```\n\n## What it reads and writes\n\n- Reads `https://disclosures-clerk.house.gov/public_disc/financial-pdfs/<YEAR>FD.zip`\n  (one `<Member>` per filing: name, district, FilingType, FilingDate, DocID)\n  and each PTR at `.../public_disc/ptr-pdfs/<YEAR>/<DocID>.pdf`.\n- Writes `trader/state/pelosi.json` (the DocIDs already shown, so each PTR\n  alerts once) and keeps downloaded PDFs in `trader/state/ptr-pdfs/`.\n- Reads `trader/portfolio.json` (if it exists) to flag trades in what you hold.\n\n## The rules\n\n- **Quote the filing, not a tracker.** Every row comes from the PTR PDF on the\n  Clerk's site, with its DocID and link. Third-party trackers are fine for\n  browsing but can be off (Capitol Trades showed Pelosi's trade dates one day\n  earlier than her PTRs). The PTR wins.\n- **Amounts are ranges.** \"$1,000,001 - $5,000,000\", never \"$3 million\".\n- **Owner matters.** SP is the spouse, JT joint, DC a dependent child, blank\n  the member. Pelosi's 2026 trades are all SP: Paul Pelosi.\n- **Say the delay.** Each row shows how many days passed between the trade\n  and the filing; over 45 is flagged as late.\n- **Options are options.** A call bought with a strike and an expiry is not\n  a share purchase. The tool reads contracts, strike and expiry from the\n  description and marks exercises.\n\n## Step 1: what has been filed\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" index --member pelosi\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" index --since 2026-10-01        # every member\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" index --member \"Josh Gottheimer\" --year 2025\n```\n\n`--member` takes a last name, \"First Last\" or \"Last, First\", and repeats.\n`--type ''` lists every filing type (annual reports are type O).\n\n## Step 2: watch for new ones\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" new --member pelosi --read\n```\n\nShows only PTRs not seen at the last check (the first run shows the last 45\ndays), downloads and reads them with `--read`, and records them in the state\nfile. Exit code 1 means nothing new. In January it also checks last year's\nindex. The Clerk rebuilds the index file about once a day (the copy read on\n2026-10-13 was stamped 09:00 that morning), so checking every hour on weekdays\nis plenty: run it with `/loop 1h` or a scheduled task.\n\n## Step 3: read a report\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" fetch 20035143\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" parse ptr.txt --filed 2026-08-21 --json\n```\n\n`fetch` saves the PDF and, if `pdftotext` is installed, prints the rows. If it\nis not installed, open the saved PDF and read it directly: you can read PDFs.\n`parse` turns `pdftotext -layout` text into rows. Check the row count against\nthe PDF when a report runs over several pages.\n\n## Example: a real alert\n\n```\nNEW Periodic Transaction Report: Hon. Nancy Pelosi (CA11) filed 2026-08-21, doc 20035143\n  - spouse purchase, Bloom Energy Corporation Class A Common Stock (BE): 100 call\n    options, $100 strike, expires 2027-06-17, $1,000,001 - $5,000,000, traded\n    2026-07-24, disclosed 28 days later\n```\n\nThe same PTR also shows 10,000 and 5,000 BE shares, a second block of 100 BE\ncalls on 07/28, Intel shares and 50 Intel calls ($50 strike, 6/17/27), and a\nprivate real estate LLC with no ticker. Her other 2026 PTRs: 20033725\n(01/23), 20034836 (06/23, Intel and Uber calls) and 20035553 (10/02, a real\nestate LLC). Then: \"This is a public disclosure filed 28 days after the trade.\nIt says what Paul Pelosi bought in July, not what anyone will buy next.\"\n\nIf the user wants to act on it, it goes the long way: a disclosure is weeks\nold, so it is a reason to look at a chart, not a setup. `/trader-scanner`\nand `/trader-entry` decide if there is a trade today; then shares only (the\nconfig has `allow_options: false`), sized by `/trader-budget`, checked by\n`/trader-risk`, placed by `/trader-broker` only after their yes.\n\n## The Senate: the manual route\n\nSenate reports live at `https://efdsearch.senate.gov`. Before searching, the\nsite asks you to tick a box agreeing to the legal limits on how the reports\nmay be used. That is an agreement for the person to accept, so this skill\ndoes not click it or automate it. The route:\n\n1. The user opens `https://efdsearch.senate.gov/search/` in their browser and\n   accepts the agreement themselves.\n2. They pick the report type \"Periodic Transactions\", type the senator's last\n   name, set the date range and search.\n3. They open the report: electronic filings show a table of transactions,\n   paper filings are scanned images.\n4. They paste the table (or a screenshot, or the saved page) into the chat,\n   and you write it up in the same shape as the House rows, with the report\n   link, and the same 45-day caveat.\n\n## What it never does\n\n- Never says or implies a member has inside information, or that copying a\n  politician beats the market. No return claims.\n- Never presents a range as an exact dollar figure or a tracker's date as the\n  trade date.\n- Never places an order, and never copies options trades.\n- Never automates the Senate agreement or any login.\n\n## Safety\n\n- Education and tooling, not financial advice. Nothing in this pack is a\n  recommendation to buy or sell anything.\n- Paper trading by default (`\"paper\": true` in `trader/config.json`).\n- Nothing places an order except `/trader-broker`, and only after\n  `/trader-risk` passes AND the user types an explicit yes for that order in\n  the chat, AND the brokerage tool is set to \"Needs approval\" in Claude\n  (Customize > Connectors > tool permissions) so Claude's own \"Allow once /\n  Deny\" card appears too. Never \"Always allow\" an order tool.\n- No options, margin, shorting or leverage unless the config allows it and\n  the user confirms.\n- Congressional trades are PUBLIC disclosures filed up to 45 days after the\n  trade (STOCK Act). This skill reads them fast; it has no inside\n  information, and it says so.\n",
-      "card": null
+      "card": {
+        "title_zh": "国会交易披露追踪",
+        "purpose_zh": "读取众议院书记官公开的定期交易报告索引与PDF，发现新申报并解析为结构化交易行，标注持仓相关交易；参议院部分仅提供人工操作路径。",
+        "does": [
+          "读取众议院年度索引文件，按议员、日期或年份筛选申报",
+          "检测上次检查后新出现的PTR，下载并用pdftotext解析为交易行",
+          "解析出持有人、股票、代码、买卖、期权行权价与到期、交易日期、金额区间、披露延迟天数",
+          "用本地portfolio.json标记与用户持仓相关的交易",
+          "将已展示的DocID记录到状态文件，保证每份申报只提醒一次",
+          "对参议院报告给出用户自行接受协议并检索、粘贴结果的人工流程"
+        ],
+        "inputs": [
+          "议员姓名（姓、名姓或姓,名）",
+          "日期范围或年份",
+          "DocID（用于fetch）",
+          "pdftotext -layout 文本（用于parse）",
+          "可选 trader/portfolio.json 持仓文件",
+          "用户粘贴的参议院交易表格或截图"
+        ],
+        "outputs": [
+          "新申报提醒文本（含DocID、申报日期、交易明细与披露延迟）",
+          "结构化交易行（JSON或文本）",
+          "下载的PTR PDF文件",
+          "状态文件 trader/state/pelosi.json",
+          "持仓相关交易标记"
+        ],
+        "scenarios": [
+          "用户询问某议员近期买卖了什么股票",
+          "按日期查看所有议员的新披露",
+          "监控指定议员新申报并自动读取",
+          "核对某笔交易的实际申报日期与延迟天数",
+          "将参议院报告内容整理成与众议院一致的行格式"
+        ],
+        "prerequisites": [
+          "Python 3 标准库环境",
+          "可选安装 poppler 的 pdftotext 以本地解析PDF",
+          "访问 disclosures-clerk.house.gov 的网络",
+          "参议院部分需用户自行在浏览器接受协议"
+        ],
+        "limits": [
+          "披露滞后：交易后最长45天才申报，信息非实时",
+          "金额仅为区间，不给出精确金额",
+          "不自动化参议院协议勾选或任何登录",
+          "不下单、不复制期权交易，默认模拟盘",
+          "不声称内幕信息或收益优势",
+          "索引文件约每日重建一次，无需高频轮询"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "调研",
+          "数据分析",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill reads that index, notices the moment a new report appears, and reads the report for you."
+          },
+          {
+            "field": "does",
+            "quote": "Reads `https://disclosures-clerk.house.gov/public_disc/financial-pdfs/<YEAR>FD.zip`"
+          },
+          {
+            "field": "does",
+            "quote": "Writes `trader/state/pelosi.json` (the DocIDs already shown, so each PTR alerts once) and keeps downloaded PDFs in `trader/state/ptr-pdfs/`."
+          },
+          {
+            "field": "does",
+            "quote": "Reads `trader/portfolio.json` (if it exists) to flag trades in what you hold."
+          },
+          {
+            "field": "does",
+            "quote": "Shows only PTRs not seen at the last check (the first run shows the last 45 days), downloads and reads them with `--read`, and records them in the state file."
+          },
+          {
+            "field": "does",
+            "quote": "`parse` turns `pdftotext -layout` text into rows."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Tool in this folder (standard library Python; `pdftotext` from poppler is optional, to read the PDFs locally)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The user opens `https://efdsearch.senate.gov/search/` in their browser and accepts the agreement themselves."
+          },
+          {
+            "field": "limits",
+            "quote": "A PTR is due within 30 days of the member learning of the trade and never more than 45 days after it"
+          },
+          {
+            "field": "limits",
+            "quote": "Never automates the Senate agreement or any login."
+          },
+          {
+            "field": "limits",
+            "quote": "Never places an order, and never copies options trades."
+          },
+          {
+            "field": "limits",
+            "quote": "The Clerk rebuilds the index file about once a day"
+          },
+          {
+            "field": "hosts",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/ptr.py\" --help"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`fetch` saves the PDF and, if `pdftotext` is installed, prints the rows."
+          }
+        ]
+      }
     },
     {
       "skill_path": "trader-risk/SKILL.md",
@@ -1002,7 +1241,7 @@
       "skill_path": "trader-timemachine/SKILL.md",
       "blob_sha": "ecef8b13f13ac43e4bb8d79886faef05ea0fdf04",
       "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-timemachine/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",

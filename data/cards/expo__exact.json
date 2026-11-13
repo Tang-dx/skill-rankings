@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "repo": "expo/exact",
-  "tree_sha": "6e2eb3e865e8b9b06b96e940051ffe9d9ad85a52",
+  "tree_sha": "14dc8984e76ff0934a030bc12320963d9cccba9e",
   "truncated_paths": 0,
   "skills": [
     {
       "skill_path": ".claude/skills/llp-adopt/SKILL.md",
       "blob_sha": "a8dbf8d86163ead038efe4da2274dbb6cc0d897e",
-      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-adopt/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "source_url": "https://github.com/expo/exact/blob/2743a430dcfd8f78e73ea76869df0bd137f68176/.claude/skills/llp-adopt/SKILL.md",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": "2026-11-13T10:45:31.701Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -138,25 +138,135 @@
     {
       "skill_path": ".claude/skills/llp-create/SKILL.md",
       "blob_sha": "848de5a93517e27d8f4e6ba1b703c56b8cdd0130",
-      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-create/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "source_url": "https://github.com/expo/exact/blob/2743a430dcfd8f78e73ea76869df0bd137f68176/.claude/skills/llp-create/SKILL.md",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
+      "generated_at": "2026-11-13T11:49:55.150Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "llp-create",
         "description": "Create a new LLP document with the next available number (top-level NNNN or a dotted sub-LLP under a parent), the NNNN-slug.type.md filename convention, and a scaffolded metadata header, linked into llp/current/ — or extend an existing LLP when one already covers the topic."
       },
       "excerpt": "---\nname: llp-create\ndescription: Create a new LLP document with the next available number (top-level NNNN or a dotted sub-LLP under a parent), the NNNN-slug.type.md filename convention, and a scaffolded metadata header, linked into llp/current/ — or extend an existing LLP when one already covers the topic.\nsource: ccheever/llp@v0.5.2\n---\n\n# llp-create\n\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#1-llp-documents — numbering, metadata, types, statuses -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0008-distributed-agent-skills.rfc.md#the-skills--core-five-plus-flags — skill contract -->\n\nAuthor one LLP in a corpus that already exists. Handles numbering, filename, and the metadata scaffold so the author can focus on content.\n\nInvoke as `/llp-create <title>`, `/llp-create --under NNNN <title>` for a sub-LLP, or bare and the skill asks.\n\n## Trigger\n\n\"Capture this decision\" / \"write an LLP for this\" — during or after a design conversation.\n\n## Invariants\n\n- MUST check for a covering document first: `Grep` the `**Systems:**` and `**Related:**` headers across `llp/` and propose *extending* an existing LLP over creating a new one when the topic is already covered.\n- MUST derive the next number as `max(ever allocated) + 1` — top-level `NNNN`, or for a sub-LLP of `P`: `P.` + `max(ever allocated children of P) + 1` as three digits (`000` if none) — where \"ever allocated\" scans all of `llp/` recursively (excluding `current/`, `foundation/`, `reviews/`) **and** history for deleted documents (`git log --all --diff-filter=D --name-only -- llp`). Numbers are never reused, never invented, and a parent must already exist.\n- MUST name the file `NNNN(.NNN)*-slug.type.md` with the lowercased type matching the header's `**Type:**`, put the full dotted number in the title, and start every new LLP as `Draft`.\n- MUST link the new document into `llp/current/` with a relative symlink (`mkdir -p llp/current && ln -s ../<file> llp/current/<file>`; on a checkout without symlink support, a regular file containing `../<file>` is equivalent) — new work is in the working set by definition (LLP 0000 [Current and foundation](https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#current-and-foundation)).\n- MUST propose a sub-LLP, not a new top-level number, when the document refines, specifies, or plans an existing LLP (spec for an RFC → `NNNN.000-….spec.md`). Never re-parent by renaming.\n- MUST NOT overwrite an existing file — if the name collides, stop and ask.\n- MUST NOT silently pick a document type when the choice is ambiguous — propose one and confirm.\n\n## Workflow\n\n> **Recipe (advisory)** — next top-level number: `{ find llp -name '[0-9]*.md' -not -path 'llp/reviews/*' -not -path 'llp/current/*' -not -path 'llp/foundation/*'; git log --all --diff-filter=D --name-only --format= -- llp; } | grep -oE '(^|/)[0-9]{4}' | grep -oE '[0-9]{4}' | sort -n | tail -1` (+1); next child of `0011`: same pipeline with `0011\\.[0-9]{3}` (+1, or `000`). Slug: lowercase, non-alphanumerics → `-`, collapse repeats, keep it under ~6 words. Type cues: proposal → `rfc`; requirements → `spec`; settled choice → `decision`; steps → `plan`; teaching → `explainer`; always/never → `principles`; how-to → `guide`; bug → `issue`; findings → `research`. Scaffold sections: Summary · Motivation · Design · Open questions (Decisions use Context/Options/Decision/Consequences; Research uses Findings/Confidence).\n\n## Artifact\n\nA new `Draft` LLP with a complete metadata header (`Type`, `Status`, `Systems`, `Author`, `Date`; `Related:` where relevant) — plus an offer to draft the body from the current conversation. Confirm the assigned number and path back to the user.\n\n## Hand-offs\n\n- No corpus to add the document to → `llp-adopt`.\n- The document is foundational or contentious → `llp-review`, scaled to stakes (LLP 0005).\n",
-      "card": null
+      "card": {
+        "title_zh": "LLP文档创建",
+        "purpose_zh": "在已有LLP语料库中新建或扩展LLP文档，自动处理编号、文件名与元数据骨架，让作者专注内容。",
+        "does": [
+          "先检索llp/中Systems与Related头，若主题已被覆盖则建议扩展现有LLP",
+          "按max(已分配)+1计算下一个顶层NNNN或父文档下的点号子编号，含已删除文档历史",
+          "按NNNN(.NNN)*-slug.type.md命名，标题含完整点号编号，新文档状态为Draft",
+          "生成含Type、Status、Systems、Author、Date及可选Related的元数据头",
+          "用相对符号链接把新文档接入llp/current/",
+          "可提议从当前对话起草正文，并向用户确认编号与路径"
+        ],
+        "inputs": [
+          "标题",
+          "可选--under NNNN指定父LLP",
+          "可选文档类型（不明确时提议并确认）",
+          "当前设计对话内容（用于起草正文）"
+        ],
+        "outputs": [
+          "新的Draft LLP文件",
+          "完整元数据头",
+          "llp/current/下的相对符号链接",
+          "分配给用户的编号与路径确认"
+        ],
+        "scenarios": [
+          "设计讨论中或之后记录决策",
+          "为已有RFC编写spec子文档",
+          "把需求、计划、研究等整理为LLP文档"
+        ],
+        "prerequisites": [
+          "已存在LLP语料库（否则转llp-adopt）",
+          "子LLP的父文档必须已存在",
+          "环境支持符号链接，或可用含相对路径的普通文件替代"
+        ],
+        "limits": [
+          "不得覆盖已存在文件，命名冲突时停止并询问",
+          "编号不得复用或臆造",
+          "类型选择不明确时不得静默决定",
+          "不得通过重命名改变父级关系",
+          "仅适用于已有语料库"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "写作",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Author one LLP in a corpus that already exists. Handles numbering, filename, and the metadata scaffold so the author can focus on content."
+          },
+          {
+            "field": "does",
+            "quote": "MUST derive the next number as `max(ever allocated) + 1`"
+          },
+          {
+            "field": "does",
+            "quote": "MUST name the file `NNNN(.NNN)*-slug.type.md` with the lowercased type matching the header's `**Type:**`, put the full dotted number in the title, and start every new LLP as `Draft`."
+          },
+          {
+            "field": "does",
+            "quote": "MUST link the new document into `llp/current/` with a relative symlink (`mkdir -p llp/current && ln -s ../<file> llp/current/<file>`"
+          },
+          {
+            "field": "does",
+            "quote": "A new `Draft` LLP with a complete metadata header (`Type`, `Status`, `Systems`, `Author`, `Date`; `Related:` where relevant) — plus an offer to draft the body from the current conversation."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "a parent must already exist"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "on a checkout without symlink support, a regular file containing `../<file>` is equivalent"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "No corpus to add the document to → `llp-adopt`."
+          },
+          {
+            "field": "limits",
+            "quote": "MUST NOT overwrite an existing file — if the name collides, stop and ask."
+          },
+          {
+            "field": "limits",
+            "quote": "Numbers are never reused, never invented"
+          },
+          {
+            "field": "limits",
+            "quote": "MUST NOT silently pick a document type when the choice is ambiguous — propose one and confirm."
+          },
+          {
+            "field": "limits",
+            "quote": "Never re-parent by renaming."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`mkdir -p llp/current && ln -s ../<file> llp/current/<file>`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`git log --all --diff-filter=D --name-only -- llp`"
+          }
+        ]
+      }
     },
     {
       "skill_path": ".claude/skills/llp-maintain/SKILL.md",
       "blob_sha": "9e3203df7bdd02ed284388f7973712308e80545d",
-      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-maintain/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "source_url": "https://github.com/expo/exact/blob/2743a430dcfd8f78e73ea76869df0bd137f68176/.claude/skills/llp-maintain/SKILL.md",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -172,8 +282,8 @@
     {
       "skill_path": ".claude/skills/llp-orient/SKILL.md",
       "blob_sha": "8384ea53a2717116350a1e3774955f2938e2cea7",
-      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-orient/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "source_url": "https://github.com/expo/exact/blob/2743a430dcfd8f78e73ea76869df0bd137f68176/.claude/skills/llp-orient/SKILL.md",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -189,8 +299,8 @@
     {
       "skill_path": ".claude/skills/llp-review/SKILL.md",
       "blob_sha": "95e1d1e198d1abd1efa005a7332ea2ee92673c1a",
-      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-review/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "source_url": "https://github.com/expo/exact/blob/2743a430dcfd8f78e73ea76869df0bd137f68176/.claude/skills/llp-review/SKILL.md",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -206,8 +316,8 @@
     {
       "skill_path": ".claude/skills/llp-super-refine/SKILL.md",
       "blob_sha": "bcfbb37cae52e75452ab2e3ee9906bf393723774",
-      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-super-refine/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "source_url": "https://github.com/expo/exact/blob/2743a430dcfd8f78e73ea76869df0bd137f68176/.claude/skills/llp-super-refine/SKILL.md",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -223,8 +333,8 @@
     {
       "skill_path": "skills/orchestrate/SKILL.md",
       "blob_sha": "717af9f82bfc7c5fc6dc05baae93947d3874c7d5",
-      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/skills/orchestrate/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "source_url": "https://github.com/expo/exact/blob/2743a430dcfd8f78e73ea76869df0bd137f68176/skills/orchestrate/SKILL.md",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": "2026-11-13T10:45:31.701Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -363,8 +473,8 @@
     {
       "skill_path": "skills/panel/SKILL.md",
       "blob_sha": "517935d304dd9516aeb47409293c8f9c8cab3719",
-      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/skills/panel/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "source_url": "https://github.com/expo/exact/blob/2743a430dcfd8f78e73ea76869df0bd137f68176/skills/panel/SKILL.md",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": "2026-11-13T10:45:31.701Z",
       "model": "deepseek-flash",
       "status": "ok",

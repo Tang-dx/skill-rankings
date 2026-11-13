@@ -264,18 +264,95 @@
       "skill_path": "skills/disciplines/camera-systems/SKILL.md",
       "blob_sha": "5f8a09963e006459c1ce559c6f5d3c9b24243d84",
       "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/camera-systems/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
+      "generated_at": "2026-11-13T11:49:55.150Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "camera-systems",
         "description": "Builds and tunes game cameras, engine-neutral with Godot and Cinemachine 3 mappings: 2D follow with deadzone and look-ahead, third-person orbit, first-person look and split-screen. Use when the camera lags, jitters while following, shows past the level edge, clips through walls or changes with frame rate. Not for shake (`game-feel`) or physics timestep jitter (`physics-tuning`)."
       },
       "excerpt": "---\nname: camera-systems\ndescription: >\n  Builds and tunes game cameras, engine-neutral with Godot and Cinemachine 3 mappings: 2D follow\n  with deadzone and look-ahead, third-person orbit, first-person look and split-screen. Use when\n  the camera lags, jitters while following, shows past the level edge, clips through walls or\n  changes with frame rate. Not for shake (`game-feel`) or physics timestep jitter\n  (`physics-tuning`).\n---\n\n# Camera systems\n\nA good camera follows smoothly at any frame rate, leads the action, never shows outside the\nlevel and never clips through walls. This skill owns those techniques and maps them onto each\nengine's camera node or rig; prefer the engine's built-in rig before hand-rolling one.\n\n## When to use\n\n- A 2D camera should follow smoothly, ignore small movements, lead motion and stay in bounds.\n- A 3D third-person orbit or first-person look controller, or framing several targets.\n- Fixing jitter, snapping, motion sickness or a camera that peeks past the level.\n\n**Not this skill:** shake magnitude and triggers (`game-feel`; this skill only exposes the\noffset), physics jitter of the body itself (`physics-tuning`), `Camera3D` and environment setup\n(`godot-3d-essentials`), player movement (`godot-2d-movement` or the engine movement skill),\nlook-sensitivity input curves (`input-systems`).\n\n## Core workflow\n\n1. **Decide what the camera serves.** Platformer (lead the jump, see hazards), top-down (centre\n   with deadzone), third-person (orbit plus collision), first-person (look only).\n2. **Use the built-in rig first**: Godot `Camera2D` smoothing, limits and drag margins, or\n   `SpringArm3D`; Unity Cinemachine 3 (`CinemachineCamera` plus Position Composer, Orbital\n   Follow, Deoccluder, Confiner). Hand-roll only what the rig cannot do.\n3. **Smooth with `1 - exp(-rate * dt)`** or a critically damped spring (`SmoothDamp`), never a\n   fixed `lerp(a, b, 0.1)` per frame.\n4. **Add a deadzone, then look-ahead** eased toward its goal so direction flips don't whip.\n5. **Clamp the view, not the centre**, to the level rectangle, accounting for zoom.\n6. **For 3D, separate look from collision**: yaw and pitch on a pivot, a spring arm or ray pulls\n   the camera in, pitch clamped.\n7. **Update after the target moves** (late update, or after physics) and follow the target's\n   interpolated transform when physics interpolation is on.\n8. **Verify with a runnable check, then by eye.** Step the follow code headless with a target\n   moving at 300 px/s for 2 s at `dt = 1/30` and at `dt = 1/144`, and compare how far the camera\n   trails the target. With `rate = 8` exponential smoothing the lag is about 33 px and 37 px; a\n   fixed `lerp(..., 0.1)` gives about 90 px and 19 px, a sign the follow is frame-rate\n   dependent. Then ask the user to run into corners, walls and level edges at low and high frame\n   rates and report any jitter, peeking or snapping.\n\n## Patterns\n\n### 1. Godot 2D built-in follow: smoothing + bounds (don't hand-roll first)\n\n```gdscript\n# Godot 4.7 Camera2D. Engine-provided smoothing + hard limits + drag margins.\n@onready var cam := $Camera2D\nfunc _ready() -> void:\n    cam.make_current()\n    cam.position_smoothing_enabled = true\n    cam.position_smoothing_speed = 6.0           # higher = snappier; lower = floatier\n    cam.limit_left = 0; cam.limit_top = 0        # clamp to the level rect (pixels)\n    cam.limit_right = level_width; cam.limit_bottom = level_height\n    cam.drag_horizontal_enabled = true           # built-in deadzone via drag margins\n```\n\n### 2. Frame-rate-independent smooth follow (when you hand-roll it)\n\n```gdscript\n# RIGHT: exponential smoothing — same feel at any FPS. `rate` ~ 5..12.\nfunc _follow(dt: float) -> void:\n    var t := 1.0 - exp(-rate * dt)               # converges correctly regardless of dt\n    global_position = global_position.lerp(target.global_position, t)\n# WRONG: global_position = global_position.lerp(target.global_position, 0.1)\n#        → faster smoothing at higher FPS; different feel on every machine.\n# Unity 6.3 LTS: Vector3.SmoothDamp(transform.position, target.position, ref vel, smoothTime) in\n# LateUpdate gives the same spring behavior with built-in frame-rate correction.\n```\n\n### 3. Deadzone + look-ahead (lead the player, ignore jitter)\n\n```gdscript\n# Camera only chases once the target leaves the deadzone box, then aims AHEAD of motion.\nfunc _camera_target(dt: float) -> Vector2:\n    var to := target.global_position - _focus\n    var dz := deadzone_half_extents                  # e.g. Vector2(48, 32)\n    # Only move the focus by the overflow beyond the deadzone (per axis).\n    _focus.x += clampf(absf(to.x) - dz.x, 0, INF) * signf(to.x)\n    _focus.y += clampf(absf(to.y) - dz.y, 0, INF) * signf(to.y)\n    var lead := target.velocity.normalized() * look_ahead_dist    # aim ahead of travel\n    return _focus + lead\n```\n\n### 4. 3D third-person orbit with collision push-in\n\n```gdscript\n# Godot 4.7. Yaw/pitch a pivot; a SpringArm3D auto-pulls the camera in when blocked.\nfunc _unhandled_input(e):\n    if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:\n        # screen_relative is unscaled; `relative` is scaled by the stretch settings, so\n        # sensitivity would change with window size. The docs recommend screen_relative\n        # for captured-mouse aiming.\n        _yaw -= e.screen_relative.x * sensitivity\n        _pitch = clampf(_pitch - e.screen_relative.y * sensitivity,\n                        deg_to_rad(-80.0), deg_to_rad(45.0))       # clamp pitch!\nfunc _process(_dt):\n    pivot.rotation = Vector3(_pitch, _yaw, 0)\n    # $SpringArm3D handles wall collision: set spring_length + collision_mask; the child\n    # Camera3D slides in automatically. RIGHT: spring arm. WRONG: camera clips through walls.\n# Unity 6.3 LTS: a Cinemachine 3 CinemachineCamera (namespace Unity.Cinemachine) with an Orbital\n# Follow + Cinemachine Deoccluder; the CinemachineBrain on the Camera blends automatically.\n```\n\n### 5. Screen shake hook (owned trigger lives in `game-feel`)\n\n```gdscript\n# Expose an additive offset the game-feel trauma model writes to; follow + shake compose.\nvar shake_offset := Vector2.ZERO                 # set each frame by game-feel (trauma^2 * noise)\nfunc _apply(final_focus: Vector2) -> void:\n    global_position = final_focus + shake_offset  # shake rides ON TOP of smooth follow\n# Unity Cinemachine 3: CinemachineBasicMultiChannelPerlin (AmplitudeGain/FrequencyGain) for\n# continuous noise driven by trauma; for one-off impacts, a CinemachineImpulseSource on the\n# hitter plus a CinemachineImpulseListener on the camera.\n```\n\n## Gotchas\n\n- **`lerp(pos, target, const)` per frame** is frame-rate dependent: floatier at 30 FPS,\n  snappier at 144. Use `1 - exp(-rate * dt)` or `SmoothDamp`.\n- **Jitter while following a physics body**: the body moves at the physics tick (60 Hz) and the\n  camera at the display rate. Turn on physics interpolation (Godot\n  `physics/common/physics_interpolation`) and follow the body's interpolated transform in\n  `_process` (`get_global_transform_interpolated()` in 3D), or follow in the physics step with\n  `Camera2D.process_callback = CAMERA2D_PROCESS_PHYSICS`. Mixing the two is what jitters.\n- **One-frame lag** when following in the normal update before the target has moved. Follow in\n  `LateUpdate` (Unity) or after movement and physics resolve.\n- **Camera parented to the moving player** inherits every bump and fights interpolation. Keep\n  the camera on its own branch (or `top_level = true`) and follow in code or with a rig.\n- **Clamping the centre instead of the view** shows black past the edge. Clamp to\n  `[min + half_view, max - half_view]`, and centre on any axis where the level is smaller than\n  the view.\n- **No deadzone in twitchy games** makes the camera twitch with every micro-movement; a box\n  deadzone and a circular one feel different, so pick deliberately.\n- **Unclamped pitch** flips the camera over the top. About -80° to +45° for an orbit, ±80° ",
-      "card": null
+      "card": {
+        "title_zh": "游戏相机系统调优",
+        "purpose_zh": "构建并调优游戏相机，覆盖2D跟随、第三人称环绕、第一人称视角与分屏，并映射到Godot与Cinemachine 3；用于解决相机延迟、抖动、越界、穿墙和帧率相关手感问题。",
+        "does": [
+          "指导2D相机平滑跟随、死区、前瞻与关卡边界限制",
+          "指导3D第三人称环绕与第一人称视角控制器及多目标取景",
+          "用指数平滑或临界阻尼弹簧实现帧率无关的跟随",
+          "用弹簧臂或遮挡射线解决相机穿墙并限制俯仰角",
+          "排查跟随抖动、瞬移甩镜、越界露黑与帧率依赖问题",
+          "提供Godot与Unity Cinemachine 3的组件映射与内置装置优先建议"
+        ],
+        "inputs": [
+          "相机需求类型（平台跳跃、俯视、第三人称、第一人称）",
+          "目标移动速度与帧率等运行参数",
+          "关卡矩形边界与缩放信息",
+          "引擎与版本（Godot 4.7、Unity 6.3 LTS + Cinemachine 3.1）"
+        ],
+        "outputs": [
+          "相机跟随与取景的实现方案与代码示例",
+          "帧率无关平滑、死区、前瞻、边界钳制的具体做法",
+          "抖动、穿墙、甩镜等问题的排查与修复建议",
+          "无头步进对比与人工试玩的验证方法"
+        ],
+        "scenarios": [
+          "2D相机跟随卡顿或越出关卡边缘",
+          "第三人称环绕相机穿墙或俯仰翻转",
+          "第一人称视角灵敏度随窗口大小变化",
+          "相机跟随物理刚体时抖动",
+          "传送或重生后相机甩镜"
+        ],
+        "prerequisites": [
+          "使用Godot 4.7或Unity 6.3 LTS配Cinemachine 3.1",
+          "已具备可运行的目标移动与场景",
+          "优先使用引擎内置相机装置再考虑手写"
+        ],
+        "limits": [
+          "不负责震屏幅度与触发（属game-feel）",
+          "不负责刚体物理时间步抖动（属physics-tuning）",
+          "不负责Camera3D与环境搭建",
+          "不负责玩家移动与视角灵敏度输入曲线",
+          "仅给出方法指导，未提供可直接运行的完整工程"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "游戏",
+          "前端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Builds and tunes game cameras, engine-neutral with Godot and Cinemachine 3 mappings: 2D follow with deadzone and look-ahead, third-person orbit, first-person look and split-screen."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Use when the camera lags, jitters while following, shows past the level edge, clips through walls or changes with frame rate."
+          },
+          {
+            "field": "does",
+            "quote": "Verify with a runnable check, then by eye."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "prefer the engine's built-in rig before hand-rolling one."
+          },
+          {
+            "field": "limits",
+            "quote": "`Camera3D` and environment setup (`godot-3d-essentials`), player movement (`godot-2d-movement` or the engine movement skill), look-sensitivity input curves (`input-systems`)."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Jitter while following a physics body"
+          }
+        ]
+      }
     },
     {
       "skill_path": "skills/disciplines/create-game-assets/SKILL.md",
@@ -763,7 +840,7 @@
       "skill_path": "skills/disciplines/game-ui-ux/SKILL.md",
       "blob_sha": "f17857e60afd18f6de0f0a5c77bc00361b07c27f",
       "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/game-ui-ux/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -780,7 +857,7 @@
       "skill_path": "skills/disciplines/input-systems/SKILL.md",
       "blob_sha": "06f41674a3469e24a39d83c4aa689671f42c3b65",
       "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/input-systems/SKILL.md",
-      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "fetched_at": "2026-11-13T11:49:55.150Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
