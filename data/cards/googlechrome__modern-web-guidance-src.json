@@ -390,7 +390,7 @@
       "skill_path": ".agents/skills/nightly-eval-investigation/SKILL.md",
       "blob_sha": "0c6c08998220204245cc8bd04356b02994e9ae5a",
       "source_url": "https://github.com/GoogleChrome/modern-web-guidance-src/blob/3bb177a6de62b7fd8cd0432c33756e6f3c9ece9d/.agents/skills/nightly-eval-investigation/SKILL.md",
-      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -534,7 +534,7 @@
       "skill_path": ".agents/skills/project-discipline-guides/SKILL.md",
       "blob_sha": "99cfab37c7b6c90e091db68af3ae00915bb76d90",
       "source_url": "https://github.com/GoogleChrome/modern-web-guidance-src/blob/3bb177a6de62b7fd8cd0432c33756e6f3c9ece9d/.agents/skills/project-discipline-guides/SKILL.md",
-      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -545,6 +545,473 @@
         "description": "Workflow for refactoring discipline-level guides (e.g., JavaScript, CSS) to remove \"Common Knowledge\" by generating and comparing against model-specific \"Knowledge Mirrors\"."
       },
       "excerpt": "---\nname: project-discipline-guides\ndescription: Workflow for refactoring discipline-level guides (e.g., JavaScript, CSS) to remove \"Common Knowledge\" by generating and comparing against model-specific \"Knowledge Mirrors\".\n---\n\n# Project Discipline Guides\n\nA **discipline guide** serves as the conceptual orientation \"hub\" for a category or domain, establishing the coding agent's mental model and routing to granular use-case subguides via the `{{ GUIDE_REF(\"guide-slug\") }}` macro. A guide is recognized as a discipline guide once registered in `DISCIPLINE_GUIDES` in [`src/core/guide-validation.ts`](../../../src/core/guide-validation.ts), which includes:\n- **Category root guides** that orient an entire discipline (such as `guides/css/css/guide.md`).\n- **Named orientation guides** for cross-cutting feature horizontals or subdisciplines (such as `guides/wasm/cpp-on-the-web/guide.md`).\n\nDiscipline guides are exempt from the `description` and `web-feature-ids` frontmatter requirements and are reported as bundled core guides by `src/build/audit-build.ts`.\n\nThis skill also facilitates the \"Differential Knowledge Refactor\" of discipline guides to ensure they remain lean, context-efficient, and strictly additive to what modern AI models already know natively.\n\n## Workflow: The Inverse Knowledge Filter\n\nThe goal is to aggressively \"whittle down\" a target guide (the **Target**) by removing any content that is natively understood by modern coding models.\n\n### 1. Generate Knowledge Mirrors\nUse the provided script to generate \"Redundancy Mirrors\"—comprehensive guides of what Gemini, Claude, and Codex consider \"Common Knowledge\" for a given discipline, and intersect them into a single LCD mirror.\n\n```bash\n# Ensure that model setup is configured (instructions are in the top level readme)\nnode .agents/skills/project-discipline-guides/scripts/generate_mirrors.ts <discipline_name>\n```\n\nThis will create files inside the `.agents/skills/project-discipline-guides/mirrors/` directory:\n- `mirrors/<discipline>/gemini_mirror.md` (via Gemini - temporary)\n- `mirrors/<discipline>/claude_mirror.md` (via Claude - temporary)\n- `mirrors/<discipline>/codex_mirror.md` (via Codex - temporary)\n- `mirrors/<discipline>/mirror.md` (Unified Redundancy Mirror intersection)\n\n> [!IMPORTANT]\n> Ensure that the unified **Redundancy Mirror** (`.agents/skills/project-discipline-guides/mirrors/<discipline>/mirror.md`) has been successfully generated. This mirror represents the exact mathematical intersection of all three source models, preventing pruning errors and reducing context window overhead.\n\n### 2. Perform the Inverse Filter (Agent Task)\nAs the agent, read the **Target** guide and the unified **Redundancy Mirror** (`.agents/skills/project-discipline-guides/mirrors/<discipline>/mirror.md`).\n\n- **Strict A - B Comparison**: Compare rules in the Target guide strictly against the unified **Redundancy Mirror**. You should ONLY remove a rule or pattern from the Target guide if it is fully and clearly covered in the Redundancy Mirror.\n- **No Subjective Self-Attestation**: Rely exclusively on the literal content present in the Redundancy Mirror. Do not prune rules based on your own subjective self-attestation of what you \"know\" or would do by default. If a concept is not in the Redundancy Mirror, it remains in the Target guide.\n- **Avoid Blind Bullet-Point Deletions**: If a single bullet point or rule in the Target contains multiple guidelines or APIs, do **not** delete the entire bullet point just because some parts of it are common knowledge. Carefully split or dissect the rule, pruning only the redundant parts and explicitly retaining any differential knowledge.\n- **Preserve Differential Knowledge**: Keep only what is unique to this project or necessary to guide the AI effectively. This generally includes:\n    - Rules that counter common AI biases.\n    - Conventions chosen among valid alternatives.\n    - Advanced performance patterns, security constraints, or heuristics that models know but often omit in default outputs.\n\n> [!WARNING]\n> **Keep the Refactor Scoped**: The primary and sole goal of this skill is reduction of redundant common knowledge. Do **not** add new rules, modify logic, or introduce unrelated guidelines in this refactoring pass. Keep the changes highly focused and easy to review.\n\n### 3. Apply Surgical Edits\nPerform the cleanup on the Target file. Aim for surgical edits that preserve the file's structure while removing unnecessary content.\n\nIn your response, provide an explanation of the changes made and the rationale for what was removed or kept.\n\n### 4. Verification Step\nAfter applying edits, perform a self-verification:\n- **Contrast Check**: Verify that none of the rules in the new guide are present in the Redundancy Mirror.\n- **Preservation Check**: Ensure that critical project-specific rules, behavioral steering, and any specific advanced APIs (such as `Object.groupBy()`) were not accidentally removed.\n\n## Core Principles\n\n- **Delete Redundancies**: If a model natively \"knows\" a rule, it does not belong in the skill.\n- **Preserve Signal**: Keep instructions that force the model into \"Senior Engineer\" mode or align with specific project architecture.\n- **Context Efficiency**: A lean skill is a fast and cheap skill.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".agents/skills/project-evals/SKILL.md",
+      "blob_sha": "14a39a9f28746a4008a270f23ebb7015f2f9f98e",
+      "source_url": "https://github.com/GoogleChrome/modern-web-guidance-src/blob/3bb177a6de62b7fd8cd0432c33756e6f3c9ece9d/.agents/skills/project-evals/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "project-evals",
+        "description": "Best practices for creating and reviewing `expectations.md`, `targets/<app>/task.md`, and `targets/<app>/grader.ts` files to evaluate guidance quality. Use this skill any time you're writing or reviewing an `expectations.md`, `task.md`, or `grader.ts` file."
+      },
+      "excerpt": "---\nname: project-evals\ndescription: Best practices for creating and reviewing `expectations.md`, `targets/<app>/task.md`, and `targets/<app>/grader.ts` files to evaluate guidance quality. Use this skill any time you're writing or reviewing an `expectations.md`, `task.md`, or `grader.ts` file.\n---\n\n# Stage 3: Evaluating guidance for a use case (Needs evals)\n\nThis is the third of three stages in creating guidance:\n\n1. Stage 1: Identifying use cases for a feature\n2. Stage 2: Authoring guidance for a use case\n3. Stage 3: Evaluating guidance for a use case (you are here)\n\n## What the eval agent sees vs real-world agents\n\n**Real-world coding agents see only `guide.md`** — retrieved via the Skills CLI when a developer asks for help. Every other file in a guide directory is eval infrastructure.\n\n**The eval harness** runs a coding agent in an isolated workspace initialized with a target base application (`daily-grind` or `devtools-times`). The agent receives the prompt from `targets/<base_app>/task.md` (or legacy Gen1 `tasks/task.md`) and (in guided mode) access to `guide.md` via the Skills CLI. The harness then runs `targets/<base_app>/grader.ts` (or Gen1 `grader.ts`) against the agent's modified application.\n\nNone of the following are ever seen by real-world coding agents:\n\n| File | Role in eval pipeline |\n|---|---|\n| `expectations.md` | Natural-language spec of assertions that must hold when `guide.md` is followed |\n| `demo.html` | Standalone reference implementation authored by the SME |\n| `targets/<base_app>/task.md` | A concrete, single-bullet user prompt tailored to `<base_app>`, formatted as a single `- ` line with no YAML frontmatter |\n| `targets/<base_app>/patches/*-solution.patch` | Multi-agent golden solution diffs (`antigravity`/`jetski`, `claude`, `codex`) that must score **100%** on `grader.ts` |\n| `targets/<base_app>/patches/zero-passrate.patch` | Baseline diff (empty on almost every guide, i.e., the untouched starting app) that must score **0%** on non-exempt checks in `grader.ts` |\n| `targets/<base_app>/grader.ts` | Playwright + static AST test suite run against the eval agent's output |\n\n## Eval Review Bar: The 8 Red Lines\n\nWhen authoring or reviewing an eval, hold it to these 8 red lines. An eval is wrong if any of the following is true:\n\n1. **A check gives the wrong verdict.** It fails a solution that follows the guide, or passes a broken or missing one. Common causes: vacuous or tautological assertions; checks that only find elements via classes or IDs the task never establishes or that only the golden solutions use; reading a single file when a solution can span several; using source regex or AST for behavior the browser should check; fixed `waitForTimeout` waits instead of polling; mocked browser APIs that don't match the real API (a credential mock without `toJSON()` breaks correct code); or a required expectation with no test.\n   * *Guard:* Only treat an over-strict check as wrong when the rejected pattern is one the guide allows, or when a failure is reproduced on a real run or valid solution. Never loosen a check speculatively for hypothetical code no agent would write.\n2. **The task hands the unguided run the answer.** It names the target API, CSS property, HTML attribute, fallback mechanism, or expectation checklist, names the guide, or copies `guide.md`'s frontmatter `description` verbatim.\n   * *Guard:* Naming the user-visible component being built (\"a modal dialog\", \"custom elements\") and neutral `id`/`data-*` hooks is fine.\n3. **An expectation grades something the guide doesn't require, or contradicts it.** It invents an untaught rule, turns an \"(Optional)\" or one-of-several pattern into a mandatory requirement, hardcodes snippet identifiers or magic numbers, requires a fallback for a Baseline Widely Available feature the guide says needs none, or contradicts the guide's own code or prose.\n4. **An expectation can't be tested objectively on the target app.** It requires subjective judgment, grades the guide, the browser, or code comments instead of the app, or assumes something the starting app and task never include (such as live HTTP response headers on a static client-only app, or media/iframes/forms that aren't there).\n5. **The guide teaches broken code or wrong spec/browser behavior.** A code snippet throws or fails in a real browser (including code in the fallback section), or the prose misstates web specs or browser support.\n6. **The task and grader disagree on what to build.** The task contradicts an expectation, or the grader checks a feature, selector, or endpoint that the task never asks for *and* the guide doesn't require. This often happens after `task.md` is edited to remove a leak while `grader.ts` keeps the old check: whenever you edit a task, re-check the grader.\n7. **Two guides an agent retrieves together contradict each other on the task**, so following one causes the other's grader to fail.\n8. **Calibration breaks.** A golden solution fails a check, the untouched starting app (or Gen1 `negative-demo.html`) passes a non-exempt check, or a patch commits build or dependency artifacts (`node_modules`, `dist`).\n\n**When reviewing**, flag only these 8 and skip style nits. For each finding, give the file and line, the red line it breaks, the evidence, and the fix. New lessons go in as an example under an existing red line, not as a new rule.\n\n**Ownership & fixes:**\n- **Never change a guide to fit its grader.** If a grader needs the guide to say something new, fix the grader (or raise the gap with the guide's owner).\n- **Preserve SME wording in `expectations.md`.** SMEs own `guide.md`, `demo.html`, and `expectations.md`. Keep existing `expectations.md` wording; edit a bullet only when its meaning must change (the guide doesn't teach it, the task doesn't ask for it, or it rejects an alternative the guide allows), and state the reason. Never reword existing expectations just to line up with test titles.\n\n## Writing `expectations.md`\n\nAll `expectations.md` authoring rules live in [project-guides](../project-guides/SKILL.md#writing-expectationsmd) (cover every required outcome with no bullet cap, omit optional/\"prefer\" items, never drop hard-to-test requirements, preserve SME wording, and scope discipline bullets to the element/feature they govern). For Stage 3 (`grader.ts` authoring and review):\n\n* **1:1 with grader tests** — Each bullet becomes one `test()` block in `grader.ts` (for use-case guides). Write one bullet per assertion; do not combine multiple checks into a single bullet. `src/core/grader-coverage.ts` verifies semantic coverage on non-discipline guides, and test titles do not have to match expectation bullets verbatim.\n* **Separate native and fallback expectations** — Write core expectations assuming all features in `guide.md` are natively supported. When `guide.md` includes `## Fallback strategies`, write each fallback requirement as a separate plain-English bullet that names the unsupported feature (e.g., *\"When `<feature>` is unsupported, ...\"*) rather than combining native and fallback checks in the same bullet, so `gd dev` can scope fallback tests with `skipUnless({ unsupported: '<feature>' })` automatically.\n\n---\n\n## Writing & Reviewing `targets/<base_app>/task.md`\n\n`targets/<base_app>/task.md` contains a single realistic developer prompt formatted as a single `- ` line with no YAML frontmatter:\n\n```md\n- Add a passkey management section to the account settings where signed-in readers can view their registered passkeys, rename them, or remove keys they no longer use, keeping their authenticator in sync.\n```\n\n### Rules for `task.md`\n1. **Grounded in the Application**: Assume the developer is working on the existing app and reference its real pages, components, and content where relevant. If the feature modifies or enhances an existing layout, component, or behavior already in the app, ask the assistant to upgrade, refactor, or modify those existing parts rather than building an isolated demo from sc",
+      "card": null
+    },
+    {
+      "skill_path": ".agents/skills/project-features/SKILL.md",
+      "blob_sha": "ed77ca2c06e92fb2c5177d3f8a74676243509145",
+      "source_url": "https://github.com/GoogleChrome/modern-web-guidance-src/blob/3bb177a6de62b7fd8cd0432c33756e6f3c9ece9d/.agents/skills/project-features/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "project-features",
+        "description": "Criteria and best practices for filing and triaging `new-feature` issues. Use this skill any time you file a new-feature issue, triage one, fix its web-feature ID, or decide whether a browser launch needs guidance at all."
+      },
+      "excerpt": "---\nname: project-features\ndescription: Criteria and best practices for filing and triaging `new-feature` issues. Use this skill any time you file a new-feature issue, triage one, fix its web-feature ID, or decide whether a browser launch needs guidance at all.\n---\n\n# Filing and triaging new-feature issues\n\nA `new-feature` issue says \"this web platform feature needs guidance.\" It comes before use cases (see the `project-use-cases` skill), and automation depends on it:\n\n* **ATL routing:** `src/ci/atl-triage.ts` assigns an ATL based on the issue's labels and its web-feature ID.\n* **Use case tracking:** `src/ci/sync-use-cases.ts` (called \"the sync\" below, run by the guide-sync workflow) matches use-case issues to the feature issue by ID. It also writes the use case checklist into the issue body, sets the project status, and closes the issue when every linked use case has complete guidance and expectations.\n* **Priority:** the feature issue's priority label and milestone are copied to its use-case issues.\n* **Coverage:** guidance coverage is measured by whether a feature's web-feature ID appears in a published guide.\n\nMost triage problems come from one of five mistakes: using the template for a general request, filing a launch that isn't developer-facing, filing an incremental change as a new feature, filing a duplicate, or giving the issue the wrong ID. This skill covers each one.\n\nAlways confirm with the user before you post a comment, edit an issue body, change labels, set a status, or close an issue.\n\n## Step 1: Decide whether it qualifies\n\nWork through these questions in order. Stop at the first one that settles it.\n\n### Is it about a specific web platform feature?\n\nThe new-feature template is for one web platform feature that has shipped, or is about to ship, in a browser. People sometimes use it as a general request for guidance instead. Relabel these rather than closing them:\n\n* **A request for guidance on a topic or problem,** such as \"PWA guidance\" or submitting a chat message with Enter without breaking IME input: remove `new-feature` and add `content`, and the ATL decides whether it becomes a use case. Only use `new-use-case` when the issue is formatted with the [new-use-case template](../../../.github/ISSUE_TEMPLATE/new-use-case.yml) fields (`### Category`, `### Use case slug`, `### web-feature-id`) and title (`Create guide for the <slug> use case`); otherwise the sync treats an unlinked `new-use-case` issue as an orphan and closes it as not planned.\n* **A problem with existing guidance,** such as an incorrect code example: remove `new-feature`, set the issue type to `Bug` (which is what the bug report template sets), and add `content` or the guide's category label so `src/ci/atl-triage.ts` routes it to the ATL.\n\n### Is it developer-facing?\n\nAlways read the linked explainer, specification, or browser feature-tracker entry first rather than judging from the issue title alone. Guidance only helps if a general web developer has to write or change code. Close the issue as **not planned** and remove the `new-feature` label when the launch is any of the following:\n\n* **Described by the browser as having no developer-visible change.**\n* **A bug fix or spec-alignment fix** that doesn't add an API or change a pattern we recommend. For example, correcting the `dropEffect` values in drag events.\n* **Automatic browser behavior,** such as rendering, font shaping, UA stylesheet or initial-value changes, or a new storage backend. Examples: avar2 font rendering and a new IndexedDB storage backend.\n* **An existing API arriving on another platform** of the same browser, such as the Web Serial API on Android.\n* **Internal security hardening or niche environment-only behavior** (such as VDI-only or enterprise-policy-only changes) with nothing for general web developers to change.\n* **A removal of an API.** Browsers only remove an API once its usage is low enough that removing it won't cause significant breakage.\n* **An experiment or trial that ended** without shipping.\n\nClose with a one-line reason, for example: \"Spec-alignment fix to event timing; no new API or pattern to recommend.\"\n\nDeprecations are different from removals: guides may need to start discouraging the deprecated API. Don't close them. Remove `new-feature` and handle them like an incremental change (Step 4), so the ATL can decide whether guides need to change.\n\n### Is it a new feature or an incremental change?\n\nThe test: **does the launch have, or deserve, its own web-features entry?**\n\n* **New feature:** web-features has an entry for it, or should have one. Examples: `margin-trim`, `url-integrity`, `polygon()` rounding. Keep the `new-feature` label.\n* **Incremental change:** a later launch that extends a feature that already has an entry, and wouldn't get its own. Examples: `appearance: base-select` in listbox mode (a change to `customizable-select`) and prerendering cross-origin iframes (a change to `speculation-rules`). These don't get the `new-feature` label. Handle them as described in Step 4.\n\nWeb-features sometimes folds a launch into an older feature when it deserves its own entry, for example `polygon()` rounding in `shapes`. In that case, request an entry upstream (see Step 2) and treat it as a new feature.\n\n### Is it already tracked?\n\nSearch before you file. Duplicates are common: automation files the same launch twice, or files one that someone already filed by hand. Search open **and** closed issues, with and without the `new-feature` label, for:\n\n* the web-feature ID and any `tmp-` ID for it\n* the feature's name and its main API or property name\n* the URL of any browser feature-tracker entry linked from the issue\n\nAlso check whether a guide already lists the ID: `git grep -n \"<id>\" -- 'guides/**/guide.md'` (checking both `<id>` and `tmp-<id>`), plus open PRs. Before concluding that a match means the launch is already covered or only an incremental change, verify in Step 2 that the issue isn't borrowing a related shipped feature's ID—for example, filing the `AccentColor` and `AccentColorText` system color keywords under the shipped `accent-color` CSS property ID instead of the upcoming `accentcolor` ID. Reusing a shipped feature's ID causes the sync to attach existing guides for that older feature to the new issue and close it prematurely.\n\n## Step 2: Choose exactly one web-feature ID\n\nEach new-feature issue carries **exactly one** ID, and the ID must match what guides will list in their `web-feature-ids` (without the `tmp-` prefix; the sync and triage scripts strip `tmp-` automatically when matching guides to issues). Coverage is counted by that match, so keep IDs correct even on closed issues.\n\n* **Find it** on [webstatus.dev](https://webstatus.dev/) or in the `web-features` package.\n* **Don't trust IDs copied from browser feature trackers.** They are often wrong: `accent-color` for the `AccentColor` and `AccentColorText` system color keywords (`accentcolor`), `usermedia` for a `getDisplayMedia()` option, `shape-function` for `polygon()` rounding, or `html` for processing instructions. If a browser feature tracker like ChromeStatus has the wrong or conflated ID, nudge the issue author to update the tracker field too.\n* **Verify with the feature's BCD keys, not its one-line description.** An entry covers what its `compat_features` list covers. Never reuse an existing shipped feature's ID just because its BCD keys sit nearby or share a spec—if guides already list that shipped ID, the sync will link those guides to the new issue and may close it as already covered. Only use an existing entry's ID when the launch genuinely belongs to that entry's scope.\n* **If web-features has no entry yet,** check `features/draft/` and open issues and PRs in the [web-features repo](https://github.com/web-platform-dx/web-features) for an upcoming ID (for example, `accentcolor` for the `AccentColor` and `AccentColorText` system colors). If no request exists upstream, open one. On the GitHub `new-feat",
+      "card": {
+        "title_zh": "新特性议题归档与分诊",
+        "purpose_zh": "指导如何提交与分诊 new-feature 议题：判断是否符合条件、选定唯一 web-feature ID、修正模板字段与标签，避免常见分诊错误。",
+        "does": [
+          "按顺序判断议题是否针对具体已发布或即将发布的 Web 平台特性",
+          "判断是否面向开发者，非开发者可见变更建议关闭为 not planned",
+          "区分新特性与增量变更，决定是否保留 new-feature 标签",
+          "搜索开放与已关闭议题及指南，排查重复",
+          "为议题选定并校验唯一的 web-feature ID，处理待发布 tmp- 候选 ID",
+          "修正标题、ID、描述、发布日期与标签等模板字段"
+        ],
+        "inputs": [
+          "待提交或待分诊的 new-feature 议题",
+          "浏览器特性跟踪器、规范或解释器链接",
+          "webstatus.dev 或 web-features 包中的特性 ID",
+          "现有议题与指南中的 ID 搜索结果"
+        ],
+        "outputs": [
+          "符合模板的 new-feature 议题",
+          "修正后的 web-feature-id 与标签",
+          "关闭为 not planned 的结论及一行理由",
+          "上游 web-features 条目请求与 tmp- 候选 ID 登记"
+        ],
+        "scenarios": [
+          "提交新的 Web 平台特性指南需求议题",
+          "分诊自动化或人工提交的 new-feature 议题",
+          "修正议题中错误的 web-feature ID",
+          "判断某次浏览器发布是否需要指南",
+          "排查重复的特性议题"
+        ],
+        "prerequisites": [
+          "可访问 webstatus.dev 或 web-features 包以查找 ID",
+          "了解议题模板字段与标签体系",
+          "分诊时需先阅读链接的解释器、规范或特性跟踪器条目"
+        ],
+        "limits": [
+          "发布评论、编辑议题正文、改标签、设状态或关闭议题前必须与用户确认",
+          "每个 new-feature 议题只能携带一个 web-feature ID",
+          "解析器只读取 web-feature-id 下第一行，格式错误会静默失败",
+          "占位符与裸 URL 会被误解析为 ID",
+          "移除 API 或已结束的实验应关闭为 not planned"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "产品规划",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Criteria and best practices for filing and triaging `new-feature` issues."
+          },
+          {
+            "field": "does",
+            "quote": "Work through these questions in order. Stop at the first one that settles it."
+          },
+          {
+            "field": "does",
+            "quote": "Always read the linked explainer, specification, or browser feature-tracker entry first rather than judging from the issue title alone."
+          },
+          {
+            "field": "does",
+            "quote": "Search before you file."
+          },
+          {
+            "field": "does",
+            "quote": "Each new-feature issue carries **exactly one** ID, and the ID must match what guides will list in their `web-feature-ids`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Always read the linked explainer, specification, or browser feature-tracker entry first rather than judging from the issue title alone."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Find it** on [webstatus.dev](https://webstatus.dev/) or in the `web-features` package."
+          },
+          {
+            "field": "limits",
+            "quote": "Always confirm with the user before you post a comment, edit an issue body, change labels, set a status, or close an issue."
+          },
+          {
+            "field": "limits",
+            "quote": "**A removal of an API.** Browsers only remove an API once its usage is low enough that removing it won't cause significant breakage."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".agents/skills/project-guide-validation/SKILL.md",
+      "blob_sha": "93c5200f8f7c22a764721e06d2dc168ec6c57fc3",
+      "source_url": "https://github.com/GoogleChrome/modern-web-guidance-src/blob/3bb177a6de62b7fd8cd0432c33756e6f3c9ece9d/.agents/skills/project-guide-validation/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "project-guide-validation",
+        "description": "Protocol for validating the technical accuracy, framework nuances, and evaluation readiness of web guidance. Use this skill when authoring new guides to self-validate your work before opening a PR, or when assigned to review and validate a guide, demo, or expectations file."
+      },
+      "excerpt": "---\nname: project-guide-validation\ndescription: Protocol for validating the technical accuracy, framework nuances, and evaluation readiness of web guidance. Use this skill when authoring new guides to self-validate your work before opening a PR, or when assigned to review and validate a guide, demo, or expectations file.\n---\n\n# Guide Validation\n\nThis protocol defines the process for an AI agent to validate the technical accuracy, framework nuances, and evaluation readiness of web guidance. In **Stage 2** (after authoring `guide.md`, `demo.html`, and `expectations.md`), authors are strongly encouraged to run their draft guides through this protocol to catch edge cases, verify demo behaviors, and ensure expectation alignment prior to opening a PR.\n\n> **Human SME Sign-Off**: Automated agent validation complements, but does not replace, human SME review required by [`GOVERNANCE.md`](../../../GOVERNANCE.md) and [`docs/ATLS.md`](../../../docs/ATLS.md).\n\n## Validation Checklist\n\nWhen assigned to validate a guide, create a task list artifact based on this checklist and complete each phase:\n\n- [ ] 1. Familiarization\n- [ ] 2. Best Practices & Accessibility Review\n- [ ] 3. Expectation Alignment\n- [ ] 4. Testing and Verification with DevTools MCP (Includes starting server)\n- [ ] 5. Manual Verification (Only if automated tests pass)\n- [ ] 6. Feedback Report\n\n---\n\n## 1. Familiarization & Automated Validation\n\nBefore performing qualitative or browser verification, read the `guide.md` file in its entirety and run the automated guide validation suite:\n*   **Understand the Problem & Solution**: Identify the core developer problem the guide addresses and the recommended API, property, or architectural approach.\n*   **Run Automated Validation**: Run `node --test src/authoring/guides-integrity.test.ts` to validate frontmatter, `web-feature-ids`, markdown soundness, transclusion macros, and grader expectation coverage (and inspect the macro-expanded output in `out/build/skills-cli/guides/<category>/<slug>.md` after `pnpm build` when using macros).\n*   **When Reviewing a PR (Splits, Merges, & Reorgs)**: Inspect existing review threads first to avoid duplicating open feedback or rehashing settled discussions. Compare full `BASE` and `HEAD` files (`git show <base_sha>:<path>`) bullet-by-bullet and code-block-by-code-block to catch silently dropped guidance or duplicate bullets, and check for stale `GUIDE_REF` or `INCLUDE` targets across `guides/` and `features/`.\n\n## 2. Qualitative & Best Practices Review\n\nCritically evaluate the guide's content against the authoring standards in [project-use-cases](../project-use-cases/SKILL.md) and [project-guides](../project-guides/SKILL.md):\n*   **Discipline Guides**: Check if there is a discipline guide for the relevant category or domain registered in `DISCIPLINE_GUIDES` in `src/core/guide-validation.ts` (which includes category root guides like `guides/css/css/guide.md` as well as named orientation guides; see [`project-discipline-guides`](../project-discipline-guides/SKILL.md)). If one exists, ensure the guide complies with it (and ensure any new orientation guide is added to `DISCIPLINE_GUIDES`).\n*   **Accessibility (A11y)**: Accessibility is a distinct concern that MUST **always** be evaluated. The canonical reference is `guides/accessibility/accessibility/guide.md`. Read it first, then apply it as follows:\n    *   **`guide.md` under review**: MUST adhere to every applicable best practice across all sections of the canonical guide (landmarks/headings, ARIA roles, names/descriptions, focus management, keyboard navigation, alt text and SVG treatment, hints and validation, live regions, non-color state indicators, reduced motion, dialog/overlay semantics, and visibility hiding decisions). Recommendations and code samples must not contradict the canonical guide. Pay particular attention to copy-paste safety (code examples must embed the rules they mention, e.g. `prefers-reduced-motion`, `:focus-visible`, `aria-hidden`), multi-indicator state communication, AT-tree synchronization with visibility changes, and post-transition focus management.\n    *   **`demo.html` under review**: NOT held to general a11y best practices — only required to faithfully demonstrate the patterns the `guide.md` prescribes. If the guide mandates a specific a11y pattern (e.g., `aria-live=\"polite\"` on toasts, `aria-pressed` on a toggle, `prefers-reduced-motion` in CSS), the demo MUST show it. Do not flag demos for missing a11y features that the guide does not call out.\n    *   **`expectations.md` under review**: SHOULD encode the a11y patterns that the guide prescribes as testable expectations, but MUST NOT include prose-only or manual-verification-only requirements that the grader cannot assert.\n*   **Avoid Gating Critical Content**: Verify that the guide does not recommend interactive reveal patterns (e.g., following the cursor) that are inaccessible to non-pointer users. Ensure accessible alternatives are provided if such patterns are discussed.\n*   **Internal Consistency & Spec Rigor**: Verify API/CSS claims against primary specs and [project-guides](../project-guides/SKILL.md) (token economy, `{# ... #}` maintainer comments vs. inline rationale, `BASELINE_STATUS` vs. `FEATURE_FALLBACKS`, upfront `GUIDE_REF` disambiguation, and no hard-coded browser support claims).\n*   **Copy-Paste Safety**: Ensure that code examples are complete, run without throwing in a real browser, and are safe to copy (including code in the fallback section). If the text recommends a fallback or a constraint (like reduced motion), the code example **MUST** implement it.\n\n## 3. Expectation Alignment\n\nReview `expectations.md` against `guide.md`, `demo.html`, and primary specs/MDN/BCD to prevent both **false failures** (rejecting valid code) and **false passes** (passing broken code). Follow the authoring rules in [project-guides](../project-guides/SKILL.md#writing-expectationsmd) and the 8 red lines in [project-evals](../project-evals/SKILL.md#eval-review-bar-the-8-red-lines) (preserve SME wording in `expectations.md`: edit an existing bullet only when its meaning must change, and state why); sibling `expectations.md` files are useful for calibrating scope and length.\n*   **Accuracy & Contradictions**:\n    *   **Traceability & Strength**: Map each expectation to the `guide.md` section it comes from. Flag expectations absent from the guide, expectations that strengthen or narrow guide wording (e.g., turning a *\"Prefer\"* or snippet detail into a required rule, or *\"preceding\"* into *\"immediately before\"*), and rules that the guide's own code examples, decision trees, or `demo.html` would fail.\n    *   **Actionability**: The guide must provide clear instructions on *how* to meet each expectation. An agent should not have to guess the implementation to satisfy an expectation.\n    *   **Spec & BCD Verification (`guide.md` is not infallible)**: Verify technical claims against specs (W3C, WHATWG, CSSWG), MDN, and BCD. Flag valid alternatives the expectation would reject, deprecated or renamed syntax (`masonry` vs. `grid-lanes`, `interesttarget` vs. `interestfor`), unit and property edge cases, and flawed feature-detection strings. Report `guide.md` errors separately from expectation issues (never change `guide.md` just to fit a grader).\n    *   **Internal & Cross-Guide Consistency**: Flag direct contradictions or redundant overlaps between bullets in `expectations.md`, as well as rules that conflict with companion guides an agent retrieves alongside this one on the same task.\n*   **Coverage (Missing & Unnecessary)**:\n    *   **Missing**: Identify core guide rules (`DO` / `DO NOT` / decision-tree branches, accessibility, overflow, focus order, fallbacks) and `demo.html` behaviors with no corresponding expectation (there is no bullet cap, unprompted guide requirements are fair to grade, and never drop a requirement just because it is hard to test).\n    *   **Unnecessary**: Cut items that are ab",
+      "card": {
+        "title_zh": "指南验证协议",
+        "purpose_zh": "定义 AI 代理验证 Web 指南技术准确性、框架细节与评测就绪度的流程，用于作者提交 PR 前自检或受派评审指南、演示与期望文件。",
+        "does": [
+          "按清单分阶段验证指南：熟悉、最佳实践与无障碍审查、期望对齐、DevTools MCP 测试、人工验证、反馈报告",
+          "运行自动化校验套件检查 frontmatter、web-feature-ids、Markdown 与评分期望覆盖",
+          "对照规范、MDN、BCD 核查 API/CSS 声明与期望文件，识别误判与遗漏",
+          "用 DevTools MCP 启动本地服务器并交互测试 demo，核对基线与回退演示",
+          "在自动化测试通过后引导用户进行人工验证并给出反馈报告"
+        ],
+        "inputs": [
+          "guide.md 指南文件",
+          "demo.html 演示文件",
+          "expectations.md 期望文件",
+          "PR 的 BASE 与 HEAD 版本文件",
+          "相关规范、MDN、BCD 资料"
+        ],
+        "outputs": [
+          "验证任务清单",
+          "反馈报告",
+          "期望文件问题与指南错误的分项报告"
+        ],
+        "scenarios": [
+          "作者在提交 PR 前自检新写的指南",
+          "被指派评审指南、演示或期望文件",
+          "评审涉及拆分、合并、重组的 PR"
+        ],
+        "prerequisites": [
+          "已编写 guide.md、demo.html、expectations.md",
+          "可运行 node --test 与 pnpm 构建",
+          "可启动本地 HTTP 服务器",
+          "可使用 DevTools MCP 服务器"
+        ],
+        "limits": [
+          "自动化代理验证不能替代人工 SME 签署",
+          "demo.html 不按通用无障碍最佳实践审查，只要求忠实演示指南规定的模式",
+          "期望文件不得包含仅靠人工验证的纯文字要求",
+          "自动化测试失败时须停止，不进入人工验证"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network"
+        ],
+        "tags": [
+          "文档",
+          "测试",
+          "代码审查",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This protocol defines the process for an AI agent to validate the technical accuracy, framework nuances, and evaluation readiness of web guidance."
+          },
+          {
+            "field": "does",
+            "quote": "When assigned to validate a guide, create a task list artifact based on this checklist and complete each phase:"
+          },
+          {
+            "field": "does",
+            "quote": "Run `node --test src/authoring/guides-integrity.test.ts` to validate frontmatter, `web-feature-ids`, markdown soundness, transclusion macros, and grader expectation coverage"
+          },
+          {
+            "field": "does",
+            "quote": "Verify technical claims against specs (W3C, WHATWG, CSSWG), MDN, and BCD."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "In **Stage 2** (after authoring `guide.md`, `demo.html`, and `expectations.md`), authors are strongly encouraged to run their draft guides through this protocol"
+          },
+          {
+            "field": "limits",
+            "quote": "Automated agent validation complements, but does not replace, human SME review"
+          },
+          {
+            "field": "limits",
+            "quote": "**`demo.html` under review**: NOT held to general a11y best practices — only required to faithfully demonstrate the patterns the `guide.md` prescribes."
+          },
+          {
+            "field": "limits",
+            "quote": "MUST NOT include prose-only or manual-verification-only requirements that the grader cannot assert."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run `node --test src/authoring/guides-integrity.test.ts`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".agents/skills/project-guides/SKILL.md",
+      "blob_sha": "6e989af9ecf0694725d204950194883318ecc93a",
+      "source_url": "https://github.com/GoogleChrome/modern-web-guidance-src/blob/3bb177a6de62b7fd8cd0432c33756e6f3c9ece9d/.agents/skills/project-guides/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "project-guides",
+        "description": "Best practices for authoring and reviewing guidance. Use this skill any time you're writing or reviewing `guide.md`, `expectations.md`, or `demo.html` files."
+      },
+      "excerpt": "---\nname: project-guides\ndescription: Best practices for authoring and reviewing guidance. Use this skill any time you're writing or reviewing `guide.md`, `expectations.md`, or `demo.html` files.\n---\n\n# Stage 2: Authoring guidance for a use case (Needs guidance)\n\nThis is the second of three stages in creating guidance:\n\n1. Stage 1: Identifying use cases for a feature\n2. Stage 2: Authoring guidance for a use case (you are here)\n3. Stage 3: Evaluating guidance for a use case\n\n> **Governance & Review**: See [`GOVERNANCE.md`](../../../GOVERNANCE.md) and [`docs/ATLS.md`](../../../docs/ATLS.md) for authoring permissions (Peers fast-track to Stage 2; every guide requires Peer/ATL authorship and category Content ATL approval before merging).\n\n## What a real-world coding agent sees\n\nWhen a developer asks an AI coding assistant to implement something, the assistant retrieves the relevant `guide.md` via a RAG (vector search) system. **`guide.md` is the only project file a real-world coding agent ever sees.** Everything else in a use case directory is reference or eval infrastructure:\n\n| File/Directory | Purpose | Seen by real-world agents? |\n|---|---|---|\n| `guide.md` | Guidance for implementing the use case | ✅ Yes — this is the only file |\n| `demo.html` | Canonical standalone reference implementation used for Stage 2 validation and review | ❌ No |\n| `expectations.md` | Verification criteria used to generate target evaluation suites | ❌ No |\n| `targets/<base_app>/patches/*-solution.patch` | Multi-agent golden diffs against clean base apps used to calibrate the grader | ❌ No |\n| `targets/<base_app>/patches/zero-passrate.patch` | Calibration baseline diff (empty on almost every guide, i.e., the untouched starting app) used to verify grader assertions fail when requirements are not implemented | ❌ No |\n| `targets/<base_app>/grader.ts` | Playwright test suite run against the eval agent's output | ❌ No |\n| `targets/<base_app>/task.md` | Simulated developer prompt fed to the eval agent by the harness | ❌ No |\n\n**Implication for Stage 2 authoring (`guide.md`, `demo.html`, & `expectations.md`):** Stage 2 ends at `guide.md`, `demo.html`, and `expectations.md` (self-validated with the [`project-guide-validation`](../project-guide-validation/SKILL.md) skill). `task.md`, the solution patches, and `grader.ts` are generated downstream in Stage 3 by `gd dev` (see [`src/harness/README.md`](../../../src/harness/README.md)); people can hand-edit them, and agents only when a person asks. Never change `guide.md` just to fit a grader; if a grader needs something the guide doesn't require, fix the grader (see [project-evals](../project-evals/SKILL.md)).\n\n**Implication for `guide.md`:** Because `guide.md` is the agent's only source of truth, it must be entirely self-contained. Do not rely on agents reading `expectations.md`, any target patch, or any external link to understand how to implement the use case.\n\n**MANDATORY RULES FOR WRITING `guide.md`:**\n\n### 1. YAML Frontmatter Schema\n\n`guide.md` must start with this YAML frontmatter structure (added in **Stage 1**):\n\n```yaml\n---\nname: slugified-use-case-name\ndescription: <do thing> <with feature> (e.g., \"Create dynamic color systems using modern color syntax\")\nweb-feature-ids:\n  - webstatus-feature-id\n---\n```\n* **web-features**: Must be a list of accurate IDs found via webstatus.dev. Include ALL features referenced in the guide body, not just the primary one. If an ID is missing, inform the USER.\n  * **Pending Features (`tmp-` prefix)**: If a feature ID is pending upstream in `@web-platform-dx/web-features` (e.g. an open issue), use `tmp-<candidate-slug>` (e.g. `tmp-scroll-axis-lock`) in `guide.md` AND register it in `features/pending-web-features.json` along with its upstream issue link. Optionally add `group` (a web-features group ID like `scrolling`, or an array of them) so ATL triage routes it to that group's owner in `.github/atls.json` (then run `node src/ci/generate-feature-to-groups.ts`), and `compat_features` (a `@mdn/browser-compat-data` key or array of keys, e.g. `[\"css.properties.scroll-axis-lock\"]`) so CI can detect when the feature graduates upstream even if `web-features` chooses a different final ID than `<candidate-slug>`. On the GitHub `new-feature` issue itself, annotate the predicted final ID **without** the `tmp-` prefix (`<candidate-slug>`); the sync and triage scripts automatically strip `tmp-` when matching guides to issues. When the feature ID is officially released upstream in `web-features`, validator checks will automatically fail in CI to prompt updating the frontmatter to the official ID.\n* **draft** (optional): Withholds the guide from all distribution without deleting it. Omit to publish. Must be one of:\n  * `stub`: placeholder with outline/author notes; skips the H1 and Baseline checks.\n  * `wip`: being written.\n  * `blocked`: held back by the platform/spec situation. Requires `draft-reason` (one line, link the deciding issue/PR).\n\n### 2. Tone and Formatting\n\n* **Formatting Directives:** Use strict imperative directives (`MANDATORY:`, `DO`, `DO NOT`) only when emphasis is strictly needed (e.g., for critical constraints, security, or common pitfalls). Do not overuse them for every single instruction (`MANDATORY` is emphasis, not a required tag on every graded step). Coding agents respond best to rigid constraints when they are selectively applied.\n* **Focus & Token Economy (Teach Only the Course-Correction Delta):** Keep the guidance focused on the specific use case and short. No fluff or conversational text. Cut reference-style syntax enumeration and textbook explanations of Baseline Widely Available features that coding agents already know (e.g., how `<label>` or `addEventListener` works). Include a brief overview of the use case and explanation of why the solution outlined in the guide is the recommended approach.\n* **Maintainer Notes vs. Agent Rationale (`{# ... #}` vs. Prose/Comments):**\n  * **Internal notes for human maintainers:** Use `{# ... #}` comments inside `guide.md` (which [`stripComments()`](../../../src/core/macro-parsing.ts) strips out of the built guide served to agents) for upstream bug links, review history, or why an alternative/polyfill was rejected. Never commit separate `reasoning.md` or `notes.md` files in a guide directory.\n  * **Actionable rationale for coding agents:** Put concise \"why\" explanations directly in `guide.md` prose or inline code comments whenever an agent might otherwise doubt or misapply a non-obvious pattern.\n* **Self-Contained:** DO NOT include any external links in the markdown body (`[link text](url)`), and DO NOT rely on internal `{{ GUIDE_REF(\"...\") }}` cross-references to supply required implementation details. All required knowledge to use the feature MUST be fully synthesized into the markdown body (or transcluded at build time via `INCLUDE`/`FEATURE`). Agents must not be slowed down or require additional retrievals to implement the guidance.\n* **American English:** Always author guidance in American English (`behavior`, `color`, `synchronize`, `center`, `optimize`, etc.) for consistency across documentation, RAG tokens, and search embeddings.\n* **Callouts:** Use GitHub alert syntax (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`), with the body on the following `>` lines. Validation rejects bold-label callouts (`> **Note:** …`) and other alert types; the devsite build converts alerts to DevSite notices.\n\n### 3. Code Snippets\n\n* **No Full-Implementation Code Dumps:** Include short, heavily commented code snippets where every snippet illustrates something the agent cannot infer from the prose above. Replace 50+ line boilerplate blocks with minimal, focused snippets and strip orthogonal details (such as inline SVG icons or arbitrary visual styling).\n* Put directives directly in code comments so they are impossible to miss (e.g., `<!-- Always use the required attribute -->`).\n* Code comments MUST explain why a value or approa",
+      "card": {
+        "title_zh": "项目指南编写规范",
+        "purpose_zh": "为编写和评审 guide.md、expectations.md、demo.html 提供规范，说明 guide.md 是编码代理唯一可见文件，并规定其结构、语气、代码片段与回退策略。",
+        "does": [
+          "规定 guide.md 的 YAML frontmatter 结构，包括 name、description、web-feature-ids 及 draft 状态",
+          "说明用例目录中各文件用途及真实编码代理只能看到 guide.md",
+          "要求 guide.md 自包含，不依赖外部链接或其他文件",
+          "规定语气与格式：慎用强制指令、使用 GitHub 告警语法、使用美式英语",
+          "规定代码片段写法：短小带注释、使用 ES 模块、标明示例值",
+          "规定实现步骤与回退策略的编写要求，包括 Baseline 目标与特性检测"
+        ],
+        "inputs": [
+          "guide.md 草稿",
+          "expectations.md 草稿",
+          "demo.html 草稿",
+          "webstatus.dev 上的 web-features ID"
+        ],
+        "outputs": [
+          "符合规范的 guide.md",
+          "符合规范的 expectations.md",
+          "符合规范的 demo.html"
+        ],
+        "scenarios": [
+          "为某个 Web 功能用例编写实现指南",
+          "评审已有的 guide.md 是否符合规范",
+          "为指南补充回退策略说明",
+          "确定 guide.md 的 frontmatter 与草稿状态"
+        ],
+        "prerequisites": [
+          "需通过 webstatus.dev 查证 web-features ID",
+          "待发布功能需在 features/pending-web-features.json 注册",
+          "需遵循 GOVERNANCE.md 与 docs/ATLS.md 的编写权限与审批流程"
+        ],
+        "limits": [
+          "guide.md 正文不得包含外部链接",
+          "不得引用 demo.html 或其他文件作为实现依据",
+          "实现部分不得包含跨浏览器回退，回退只能写在回退章节",
+          "不得为迁就评分器而修改 guide.md",
+          "不得在指南目录提交 reasoning.md 或 notes.md"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "写作",
+          "前端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Best practices for authoring and reviewing guidance. Use this skill any time you're writing or reviewing `guide.md`, `expectations.md`, or `demo.html` files."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "**`guide.md` is the only project file a real-world coding agent ever sees.**"
+          },
+          {
+            "field": "does",
+            "quote": "`guide.md` must start with this YAML frontmatter structure (added in **Stage 1**):"
+          },
+          {
+            "field": "does",
+            "quote": "**Self-Contained:** DO NOT include any external links in the markdown body (`[link text](url)`)"
+          },
+          {
+            "field": "does",
+            "quote": "Use GitHub alert syntax (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**web-features**: Must be a list of accurate IDs found via webstatus.dev."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "register it in `features/pending-web-features.json` along with its upstream issue link"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "See [`GOVERNANCE.md`](../../../GOVERNANCE.md) and [`docs/ATLS.md`](../../../docs/ATLS.md) for authoring permissions"
+          },
+          {
+            "field": "limits",
+            "quote": "Never change `guide.md` just to fit a grader"
+          },
+          {
+            "field": "limits",
+            "quote": "Never commit separate `reasoning.md` or `notes.md` files in a guide directory."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".agents/skills/project-maintenance/SKILL.md",
+      "blob_sha": "163268bb0ab062bf4727f15968acef03fd9d272b",
+      "source_url": "https://github.com/GoogleChrome/modern-web-guidance-src/blob/3bb177a6de62b7fd8cd0432c33756e6f3c9ece9d/.agents/skills/project-maintenance/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "project-maintenance",
+        "description": "Routine maintenance notes: checking vendored deps, web-features/compat dataset updates, and doc coherence."
+      },
+      "excerpt": "---\nname: project-maintenance\ndescription: \"Routine maintenance notes: checking vendored deps, web-features/compat dataset updates, and doc coherence.\"\n---\n\n# Repository Maintenance\n\nThings that should happen with some regularity across the repository:\n\n### Vendored Dependencies\nCheck if upstream packages have newer releases than what we vendored:\n```bash\necho \"Upstream: $(npm info @vercel/detect-agent version)\" && echo \"Vendored: $(grep -o 'detect-agent@[0-9.]*' src/cli/telemetry/detect-agent.ts)\"\n```\nIf updated, sync changes to `src/cli/telemetry/detect-agent.ts`, bump the version comment, and run `node --test src/cli/telemetry/detect-agent.test.ts src/cli/telemetry/clearcut-logger.test.ts`.\n\n### Web Standards & Compatibility Datasets\n- **`web-features`**: Automated via `.github/workflows/update-web-features.yml` (Mon/Thu). Can also be run manually with `pnpm update web-features`, followed by `src/ci/generate-feature-to-groups.ts` and `src/ci/validate-after-web-feature-update.ts`.\n- **Compat & WebRef**: Periodically bump `@mdn/browser-compat-data`, `@webref/css`, `@webref/elements`, `@webref/idl`, `caniuse-lite`, and `mdn-data`.\n\n### Document Coherence & Link Integrity\n```bash\nnode .agents/skills/coherence-auditor/scripts/coherence-audit.ts\n```\n",
+      "card": {
+        "title_zh": "仓库例行维护",
+        "purpose_zh": "提供仓库例行维护笔记：检查 vendored 依赖是否有上游新版本、更新 web-features 与兼容性数据集、检查文档一致性与链接完整性。",
+        "does": [
+          "对比上游 npm 包版本与仓库内 vendored 版本",
+          "同步 vendored 依赖变更并运行相关测试",
+          "手动或按计划更新 web-features 数据集并运行生成与校验脚本",
+          "定期升级浏览器兼容数据与 webref、caniuse-lite、mdn-data 等依赖",
+          "运行一致性审计脚本检查文档与链接完整性"
+        ],
+        "inputs": [
+          "仓库源码（如 src/cli/telemetry/detect-agent.ts）",
+          "npm 与 pnpm 包管理环境",
+          "GitHub Actions 工作流配置"
+        ],
+        "outputs": [
+          "更新后的 vendored 依赖文件与版本注释",
+          "更新后的 web-features 及兼容性数据集依赖",
+          "一致性审计脚本的运行结果"
+        ],
+        "scenarios": [
+          "定期检查仓库 vendored 依赖是否落后于上游",
+          "更新 web-features 数据集",
+          "升级浏览器兼容性相关依赖",
+          "审计文档一致性与链接完整性"
+        ],
+        "prerequisites": [
+          "具备 npm 与 pnpm 环境",
+          "仓库中存在对应脚本与工作流文件",
+          "可访问 npm 上游包信息"
+        ],
+        "limits": [
+          "原文仅为维护笔记，未说明具体执行频率细节",
+          "部分更新依赖 GitHub Actions 定时工作流",
+          "未说明审计脚本的具体判定标准"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "运维部署",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Routine maintenance notes: checking vendored deps, web-features/compat dataset updates, and doc coherence."
+          },
+          {
+            "field": "does",
+            "quote": "Check if upstream packages have newer releases than what we vendored:"
+          },
+          {
+            "field": "does",
+            "quote": "If updated, sync changes to `src/cli/telemetry/detect-agent.ts`, bump the version comment, and run `node --test src/cli/telemetry/detect-agent.test.ts src/cli/telemetry/clearcut-logger.test.ts`."
+          },
+          {
+            "field": "does",
+            "quote": "Can also be run manually with `pnpm update web-features`, followed by `src/ci/generate-feature-to-groups.ts` and `src/ci/validate-after-web-feature-update.ts`."
+          },
+          {
+            "field": "does",
+            "quote": "Periodically bump `@mdn/browser-compat-data`, `@webref/css`, `@webref/elements`, `@webref/idl`, `caniuse-lite`, and `mdn-data`."
+          },
+          {
+            "field": "does",
+            "quote": "node .agents/skills/coherence-auditor/scripts/coherence-audit.ts"
+          },
+          {
+            "field": "inputs",
+            "quote": "echo \"Upstream: $(npm info @vercel/detect-agent version)\" && echo \"Vendored: $(grep -o 'detect-agent@[0-9.]*' src/cli/telemetry/detect-agent.ts)\""
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Automated via `.github/workflows/update-web-features.yml` (Mon/Thu)."
+          },
+          {
+            "field": "limits",
+            "quote": "Things that should happen with some regularity across the repository:"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm info @vercel/detect-agent version"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "sync changes to `src/cli/telemetry/detect-agent.ts`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".agents/skills/project-use-cases/SKILL.md",
+      "blob_sha": "07bcddfbefca19812dd0c186bca05009b0d8c1f7",
+      "source_url": "https://github.com/GoogleChrome/modern-web-guidance-src/blob/3bb177a6de62b7fd8cd0432c33756e6f3c9ece9d/.agents/skills/project-use-cases/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "project-use-cases",
+        "description": "Best practices for creating use cases for a given feature. This is the first step in creating a new guide. Use this skill any time you're writing or reviewing a use case under the guides/ directory."
+      },
+      "excerpt": "---\nname: project-use-cases\ndescription: Best practices for creating use cases for a given feature. This is the first step in creating a new guide. Use this skill any time you're writing or reviewing a use case under the guides/ directory.\n---\n\n# Stage 1: Identifying use cases for a feature (Needs use cases)\n\nThe primary goal of this stage is to translate a technical web platform feature into a carefully selected set of its most common and important use cases. This is the first of three stages in creating guidance:\n\n1. Stage 1: Identifying use cases for a feature (you are here)\n2. Stage 2: Authoring guidance for a use case\n3. Stage 3: Evaluating guidance for a use case\n\n> **Governance & Fast-Track**: See [`GOVERNANCE.md`](../../../GOVERNANCE.md#peers) for authoring rights—community contributors align on Stage 1 use cases with [Content ATLs](../../../docs/ATLS.md) first, while onboarded Peers may fast-track directly to Stage 2 ([`project-guides`](../project-guides/SKILL.md)).\n\n## Identifying action-oriented tasks\n\nA \"use case\" in this project is not a description of a feature; it's a task that the user is trying to implement, or a problem they're trying to solve. The feature is only relevant in the sense that it's part of the recommended solution for the use case.\n\n* **Action-oriented thinking**: Frame every use case as a task, and make sure it starts with a verb. Instead of \"Scroll-driven animations support horizontal scrolling,\" use something like \"Synchronize an animation's progress with the horizontal scroll distance of a container.\"\n* **Bridge the knowledge gap**: Assume the developer knows *what* they want to build (e.g., \"I need a sticky header that shrinks on scroll\") but might not know *which* modern web feature is the best solution (e.g., scroll-driven animations). Your use cases should facilitate this discovery by focusing on the desired outcome.\n* **Balance Generality and Distinctness**: The use case **description** should be general enough to capture the overall intent and match a wide range of user prompts. However, to leverage the vector search effectively, ensure the guide uses **clear, descriptive headings**. The RAG system chunks content by heading, making specific parts of your guide discoverable for specific prompts. The implementation details within those chunks must remain **distinct and specific** to ensure the agent receives an unambiguous solution. For example, instead of saying \"Fade an image in/out...\" in the description, say \"Smoothly hide/show a component...\".\n* **Focus on the WHAT not the HOW**: Do not mention the solution in the use case description. Default to omitting specific API methods, properties, or the target feature name in the description unless retrieval genuinely needs it (and note that `gd dev` task generation strips feature and API names when building `task.md`). For example, avoid phrases like \"...by doing...\" or \"...through the use of...\". Ideally, the use case description should remain constant, even if the recommended features or best practices for implementing it change over time.\n* **Scope**: Aim for 2-5 distinct use cases per feature. Each use case should represent a distinct implementation pattern or a significant variation in how the feature is applied. IMPORTANT: Not every sub-feature or feature variation needs a use case.\n* **MANDATORY: Drop niche use cases**: Every guide must solve a tangible, high-priority developer need. Do not document niche features or visual tricks with negligible practical impact. Omit use cases unlikely to match real developer prompts.\n* **Merge rather than split**: If two proposed use cases would result in guides that are 99% identical, combine them into one, more general use case. Duplicate guides bloat context windows and create confusing contradictions.\n* **Break down complex features**: Conversely, do not cram multi-step, intricate features (like passkeys) into a single generic guide. Split them into logical, detailed use cases.\n* **UX-Driven, Not Feature-Driven**: Do not simply list every method, property, or option of an API as a separate use case. A use case must represent a distinct user experience goal or a distinct developer problem, not just a variation in API usage or an isolated prerequisite step. If a feature only addresses one facet or prerequisite of a broader workflow, fold it into the guide for that broader goal; if the implementation across proposed use cases is 90% identical, consolidate them.\n* **Avoid Forcing Use Cases on Low-Level Utilities**: If a feature is a low-level utility (like a new Promise method or a general object cloning function) that primarily acts as a drop-in replacement for legacy patterns, avoid forcing it into multiple outcome-oriented use cases. Instead, consider recommending a single 'Fundamental Guide' (e.g., \"Deep cloning complex objects\") or placing it in a top-level discipline guide.\n* **Avoid Standalone Guides for Single-Line Progressive Enhancements**: If a feature amounts to a single declaration or one-line progressive enhancement, do not create a 1:1 micro-guide whose entire solution is that single line. Instead, fold the feature and its guidance into a broader existing discipline or topic guide where it applies.\n* **Granular Guide Decomposition (Avoid Monoliths)**: Break discipline-level guidance into focused subguides rather than monolithic guides, with a conceptual hub routing to subguides via `{{ GUIDE_REF(\"guide-slug\") }}` (see [`project-discipline-guides`](../project-discipline-guides/SKILL.md)).\n\n\n\n\n## Minimizing overlap\n\nThis guidance is ultimately served through a RAG (Retrieval-Augmented Generation) search system. If multiple guides have significant overlap, coding agents may struggle to select the most relevant one, leading to confusing or contradictory advice.\n\n* **Check existing guides**: Before creating a new use case, review existing guides in the same discipline.\n* **Search by web-feature-id**: Each guide lists the web features it relies on in the `web-feature-ids` metadata field. Search for the ID of the feature you're writing about in existing guides and open PRs to see how it's being used.\n* **Merge or differentiate**: If your proposed use case is substantially similar to an existing one, do not create a duplicate. Instead, consider how the existing guide should be updated to include your new scenario as a variation or a specific directive.\n* **Distinct value proposition**: Every new guide must offer a distinct solution to a distinct problem.\n\n## Implementation and scaffolding\n\nThe following steps are REQUIRED for creating a new use case:\n\n* **Step 1: Describe the use case**\n\n  You MUST choose a short (max 1024 characters), action-oriented `description` of the problem the feature solves. The description must be a single sentence, start with an imperative verb, and answer the question: \"What is the user trying to DO?\"\n  \n  For example, a use case of the `fetch-priority` feature is \"Deprioritize background data fetches made with the Fetch API to prevent network contention with user-initiated requests.\"\n\n  **Match the scope of the guide ID and description.** Ensure `name` and `description` cover the exact same scope; do not pair a narrow guide ID with a broad description or vice versa.\n\n* **Step 2: Choose a category**\n\n  Use cases MUST live under the [`guides/`](/guides) directory, organized into a single, high-level category such as [`motion`](/guides/motion) or [`performance`](/guides/performance). List the current subdirectories under `guides/` and choose the most appropriate one.\n\n  **Categorize by the use case, not the implementation.** This is the \"WHAT not HOW\" principle applied to taxonomy: a category should name the user's goal (`motion`, `overlays`, `datetime`, `typography`), not the technology used to achieve it. Quick test: *could someone who understands the use case but can't write the code file it correctly?* If the only way to know where a guide belongs is to know which API it uses, the ",
       "card": null
     }
   ]

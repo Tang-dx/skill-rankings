@@ -1,0 +1,1019 @@
+{
+  "schema": 1,
+  "repo": "Jakeschincariol/day-trader-skill",
+  "tree_sha": "100eb4c32bd61365a822c40a77861a121ec8aa74",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "trader-alerts/SKILL.md",
+      "blob_sha": "051743789685531bbbebb87e44ab88776d5fd3d8",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-alerts/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-alerts",
+        "description": "Price Alerts. Rings when a price, a stop or the opening bell hits. Turns the trade plan into three alerts in one go (the stop, the target and \"flat by close\" at your flat-by time), plus above / below / stop / target levels, percent moves from the previous close, any time of day, and the NYSE opening bell, each ringing once so you are not spammed. Knows NYSE hours with the 2026 and 2027 holidays and 1:00 p.m. early closes, works out New York time itself, fetches free delayed quotes (Yahoo chart J"
+      },
+      "excerpt": "---\nname: trader-alerts\ndescription: >-\n  Price Alerts. Rings when a price, a stop or the opening bell hits. Turns\n  the trade plan into three alerts in one go (the stop, the target and \"flat\n  by close\" at your flat-by time), plus above / below / stop / target levels,\n  percent moves from the previous close, any time of day, and the NYSE\n  opening bell, each ringing once so you are not spammed. Knows NYSE hours\n  with the 2026 and 2027 holidays and 1:00 p.m. early closes, works out New\n  York time itself, fetches free delayed quotes (Yahoo chart JSON, Stooq\n  CSV) one ticker at a time, and writes trader/prices.json for sizing and the\n  risk check. Use when the user says \"alert me when\", \"tell me if TSLA hits\",\n  \"watch my stop\", \"watch my trade\", \"remind me to close by 3:55\", \"is the\n  market open\", \"when does the market open\", \"get me a price\", or right\n  after /trader-exit writes a plan.\nargument-hint: \"[ticker] [price]\"\n---\n\n# trader-alerts\n\nPrice Alerts watches the numbers so the user does not have to stare at a\nchart. An alert is information, never an order: when a stop alert rings,\nnothing is sold by this skill. With a bracket order the stop-loss and the\ntake-profit already sit at the broker and do the work; the alerts tell the\nuser what happened and when it is time to be flat.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" clock                          # NYSE open or closed, next open\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" add --from-plan                # stop, target, flat by close from trader/plan.json\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" add --opening-bell\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" add --symbol TSLA --stop 358.32\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" add --symbol TSLA --target 370.04\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" add --at 15:55 --label \"flat by close\" --before-close\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" add --symbol KO --pct 3\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" check                          # exit 0 = something rang\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" quote TSLA --write             # -> trader/prices.json\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" quote --holdings --write       # portfolio + plan tickers\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" list\npython3 \"${CLAUDE_SKILL_DIR}/alerts.py\" reset tsla-plan-stop\n```\n\n`--now \"2026-10-19 15:55\"` pins the clock (New York time); `--offline DIR`\nreads saved quote files instead of the network.\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/plan.json` | the trade from trader-exit, for `add --from-plan` |\n| `trader/alerts.json` | the rules (`alerts.example.json` in this folder) |\n| `trader/state/alerts.json` | which rules rang and when, so each rings once |\n| `trader/prices.json` | the latest quotes, merged in, for trader-budget and trader-risk |\n| `trader/portfolio.json` | the tickers held, for `quote --holdings` |\n\n## Rule types\n\n| type | rings when | rings again |\n| --- | --- | --- |\n| `above` / `target` | price at or above `price` | after `reset`, or on its own if `\"rearm\": true` and the price fell back |\n| `below` / `stop` | price at or below `price` | same |\n| `pct_move` | moved `pct` percent from the previous close (or `ref`), optional `direction` up or down | once per day at most |\n| `time` | the New York clock passed `at` (\"15:55\") on a trading day | once per trading day |\n| `opening_bell` | the NYSE is open | once per trading day |\n\nA rule with `\"date\"` is watched on that New York date only; `--from-plan`\nrules carry the plan's date, so yesterday's stop never rings today. A `time`\nrule with `\"before_close\": true` moves 3 hours earlier on a 1:00 p.m. early\nclose, so \"flat by close\" at 15:55 rings at 12:55 on those days.\n\n## Quotes\n\n- `yahoo` (default): `query2.finance.yahoo.com/v8/finance/chart/<TICKER>`, an\n  unofficial free JSON endpoint, one request per ticker, half a second apart.\n  On a 429 it waits and tries once more; on a 429 or a 5xx after that it\n  tries `query1`. It identifies itself as `day-trader-skill/2.0`.\n- `stooq`: `stooq.com/q/l/?s=tsla.us&f=sd2t2ohlcv&h&e=csv`, Stooq's free CSV.\n  It answered 404 on 2026-10-13; the parser stays for when it is back.\n- Free quotes are unofficial, delayed and can lag. They are fine for alerts\n  and for checking a size, not for timing an order. The broker's price is the\n  one that fills. Each price in `trader/prices.json` keeps its quote time, and\n  trader-risk only uses one under 15 minutes old.\n- If both are down, read the price from the broker connector (Alpaca\n  `get_stock_snapshot`, IBKR `get_price_snapshot`) and write it into\n  `trader/prices.json` as `{\"as_of\": \"...Z\", \"prices\": {\"TSLA\": 366.48}}`.\n\n## The NYSE clock\n\nRegular session 9:30 a.m. to 4:00 p.m. New York time, closed on weekends and\non these holidays, from nyse.com/markets/hours-calendars (read 2026-10-13):\n\n- 2026: Jan 1, Jan 19, Feb 16, Apr 3 (Good Friday), May 25, Jun 19, Jul 3\n  (Independence Day observed), Sep 7, Nov 26, Dec 25. Early close 1:00 p.m. on\n  Nov 27 and Dec 24.\n- 2027: Jan 1, Jan 18, Feb 15, Mar 26 (Good Friday), May 31, Jun 18\n  (Juneteenth observed), Jul 5 (Independence Day observed), Sep 6, Nov 25,\n  Dec 24 (Christmas observed). Early close 1:00 p.m. on Nov 26.\n\nDaylight saving time is worked out in the tool, so it needs no time zone\nfiles and ignores the computer's own zone. For any other year it says the\nholiday list is unknown.\n\n## Steps\n\n1. Right after trader-exit writes the plan, run `add --from-plan`. Confirm\n   the three alerts back to the user: the stop, the target and the flat-by time.\n2. Run `check` while the trade is open: every few minutes from a Claude\n   scheduled task or `/loop`. Each run fetches only the tickers in today's\n   rules and rings each alert once. A check reads the latest delayed quote;\n   it is not a live feed, and a price can pass a level between two checks.\n3. Tell the user what rang in one line each. A stop or target alert means the\n   bracket order has probably filled: check `get_open_position` and record the\n   fill with trader-broker. \"Flat by close\" means close anything still open:\n   trader-broker `flatten`, then trader-risk, then the user's yes. Never act\n   for them.\n\n## Example: the reel\n\nTSLA on Monday 2026-10-19: entry 364.18 at 10:15 AM, stop 358.32, target\n370.04, flat by 15:55. `add --from-plan` writes `tsla-plan-stop`,\n`tsla-plan-target` and `tsla-flat-by` for that day. A `check` at 10:53 reads\nthe real 10:52 quote, 366.48, between the stop and the target:\n\n```\nNYSE OPEN (2026-10-19 10:53 New York, regular session).\nNothing hit. 3 rule(s) watched today, TSLA $366.48.\n```\n\nAt 3:55 PM:\n\n```\nALERT Flat by close: it is 15:55 New York (set for 15:55), the market closes at 16:00. If TSLA is still\nopen, close it: trader-broker flatten --symbol TSLA builds the sell ticket, then trader-risk and your yes.\n```\n\nIt rings once. The next morning the plan's three alerts are no longer\nwatched; with `add --opening-bell`, the bell rings at 9:30.\n\n## Rules\n\n- An alert is a fact about a price or the clock. Say it as a fact.\n- Never present a quote as live. Free quotes are delayed and unofficial.\n- Confirm every new rule back to the user: ticker, type, level, day.\n\n## What it never does\n\nIt never places, cancels or changes an order, never claims a quote is\nlive, and never predicts where a price is going.\n\n## Safety\n\n- Education and tooling, not financial advice. A PASS is a rules check, not a recommendation.\n- Paper trading by default (`\"paper\": true`). Going live is the user's own decision, in their own config.\n- Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk\n  passed that exact order today, the user typed an explicit yes for that one order in the chat, and the\n  user clicked Allow once on Claude's own card because the order tool is set to \"Needs approval\"\n  (Customize > Connectors > tool permissions). Never set an order tool to \"Alw",
+      "card": {
+        "title_zh": "价格提醒",
+        "purpose_zh": "把交易计划转成止损、目标价、收盘前平仓等提醒，按价格、涨跌幅、时间或纽交所开盘铃触发，每次只响一次，并抓取免费延迟报价写入 trader/prices.json。",
+        "does": [
+          "从 trader/plan.json 一次性生成止损、目标价、收盘前平仓三条提醒",
+          "支持 above/below/stop/target、涨跌幅、指定时间、开盘铃等规则类型",
+          "用内置纽交所时钟判断开闭市，含 2026、2027 假日与 13:00 提前收盘",
+          "抓取 Yahoo 图表 JSON 或 Stooq CSV 的免费延迟报价，逐个代码请求",
+          "把最新报价合并写入 trader/prices.json 供仓位与风险检查使用",
+          "记录已触发规则，使每条提醒只响一次，可 reset 重新布防"
+        ],
+        "inputs": [
+          "命令行参数：ticker、价格、百分比、时间、标签等",
+          "trader/plan.json 交易计划",
+          "trader/alerts.json 提醒规则",
+          "trader/portfolio.json 持仓代码",
+          "可选 --now 固定纽约时间、--offline DIR 读取本地报价文件"
+        ],
+        "outputs": [
+          "trader/alerts.json 规则文件",
+          "trader/state/alerts.json 触发状态",
+          "trader/prices.json 最新报价",
+          "命令行输出的提醒文本与开闭市状态"
+        ],
+        "scenarios": [
+          "用户说 alert me when 或 tell me if TSLA hits 时设置价格提醒",
+          "trader-exit 写出计划后立即生成三条提醒",
+          "盘中定时运行 check 查看是否触发",
+          "询问市场是否开盘或何时开盘",
+          "获取某个代码的报价并写入 prices.json"
+        ],
+        "prerequisites": [
+          "需要 python3 运行 alerts.py",
+          "需要 trader/plan.json 才能使用 add --from-plan",
+          "网络可访问 Yahoo 或 Stooq 免费接口（或用 --offline 本地报价）"
+        ],
+        "limits": [
+          "提醒只是信息，从不下单、撤单或改单",
+          "免费报价为非官方、延迟数据，不能当作实时行情",
+          "两次 check 之间价格可能已越过触发位",
+          "仅内置 2026、2027 年纽交所假日，其他年份提示假日未知",
+          "Stooq 接口在 2026-10-13 返回 404，解析器仅保留备用",
+          "trader-risk 只采用 15 分钟内的报价"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "数据分析",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Price Alerts. Rings when a price, a stop or the opening bell hits. Turns the trade plan into three alerts in one go (the stop, the target and \"flat by close\" at your flat-by time)"
+          },
+          {
+            "field": "does",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/alerts.py\" add --from-plan                # stop, target, flat by close from trader/plan.json"
+          },
+          {
+            "field": "does",
+            "quote": "Knows NYSE hours with the 2026 and 2027 holidays and 1:00 p.m. early closes, works out New York time itself"
+          },
+          {
+            "field": "does",
+            "quote": "fetches free delayed quotes (Yahoo chart JSON, Stooq CSV) one ticker at a time, and writes trader/prices.json for sizing and the risk check"
+          },
+          {
+            "field": "does",
+            "quote": "`trader/state/alerts.json` | which rules rang and when, so each rings once"
+          },
+          {
+            "field": "does",
+            "quote": "| `pct_move` | moved `pct` percent from the previous close (or `ref`), optional `direction` up or down | once per day at most |"
+          },
+          {
+            "field": "inputs",
+            "quote": "`--now \"2026-10-19 15:55\"` pins the clock (New York time); `--offline DIR` reads saved quote files instead of the network."
+          },
+          {
+            "field": "inputs",
+            "quote": "| `trader/portfolio.json` | the tickers held, for `quote --holdings` |"
+          },
+          {
+            "field": "outputs",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/alerts.py\" quote TSLA --write             # -> trader/prices.json"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/alerts.py\" clock                          # NYSE open or closed, next open"
+          },
+          {
+            "field": "limits",
+            "quote": "An alert is information, never an order: when a stop alert rings, nothing is sold by this skill."
+          },
+          {
+            "field": "limits",
+            "quote": "Free quotes are unofficial, delayed and can lag. They are fine for alerts and for checking a size, not for timing an order."
+          },
+          {
+            "field": "limits",
+            "quote": "A check reads the latest delayed quote; it is not a live feed, and a price can pass a level between two checks."
+          },
+          {
+            "field": "limits",
+            "quote": "For any other year it says the holiday list is unknown."
+          },
+          {
+            "field": "limits",
+            "quote": "It answered 404 on 2026-10-13; the parser stays for when it is back."
+          },
+          {
+            "field": "limits",
+            "quote": "trader-risk only uses one under 15 minutes old."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/alerts.py\" check                          # exit 0 = something rang"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "trader-analyst/SKILL.md",
+      "blob_sha": "9d9b95a4a722a348e50de6a7ae69956fe128b64f",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-analyst/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-analyst",
+        "description": "The Earnings Analyst. Reads a company's reported numbers straight from SEC EDGAR (XBRL company facts from its 10-Qs and 10-Ks, plus the latest earnings 8-K and its press release) and sums up what changed: revenue, gross, operating and net margins, net income and diluted EPS, quarter by quarter, each against the same quarter a year earlier, with the trailing twelve months. Reads an earnings call transcript when you paste one. Use when the user says \"how did Tesla's earnings look\", \"analyze the ea"
+      },
+      "excerpt": "---\nname: trader-analyst\ndescription: >-\n  The Earnings Analyst. Reads a company's reported numbers straight from SEC\n  EDGAR (XBRL company facts from its 10-Qs and 10-Ks, plus the latest earnings\n  8-K and its press release) and sums up what changed: revenue, gross,\n  operating and net margins, net income and diluted EPS, quarter by quarter,\n  each against the same quarter a year earlier, with the trailing twelve\n  months. Reads an earnings call transcript when you paste one. Use when the\n  user says \"how did Tesla's earnings look\", \"analyze the earnings\", \"what\n  changed this quarter\", \"is revenue growing\", \"check the 10-Q\", \"compare\n  margins\", \"sum up the call\", \"does it report this week\", or before trading\n  a stock around its earnings.\nargument-hint: \"[tickers]\"\n---\n\n# trader-analyst\n\nEarnings move stocks more than anything else on the calendar, and the press\nrelease is written to put the best number first. This skill reads the numbers\nthe company actually filed with the SEC, lines them up quarter by quarter, and\nsays plainly what changed. For a day trader it answers two questions before a\ntrade: what did the last report say, and is the next one inside this trade?\n\nTool in this folder (standard library Python, no keys):\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/facts.py\" --help\n```\n\nIt needs the SEC User-Agent (`sec_user_agent` in `trader/config.json`, or\n`SEC_USER_AGENT`): \"Your Name you@example.com\" with the user's real name and\nemail. It refuses to call SEC without one.\n\n## What it reads and writes\n\n- Reads `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json` (every\n  number the company has tagged in its filings), the company's submissions\n  list (for the newest 10-Q or 10-K and the newest 8-K with item 2.02,\n  \"Results of Operations\") and that 8-K's folder to find the press release\n  (the EX-99.1 exhibit).\n- Writes `trader/metrics.json` with `--metrics`: one row per company (TTM\n  revenue, net income and diluted EPS, the latest margins and growth), for\n  your notes or a spreadsheet. `metrics.example.json` in this folder is a\n  real run for AAPL, AXP, GOOGL, KO and BAC on 2026-10-13.\n- Earnings calls: the tool does not fetch transcripts. If the user pastes one\n  (or the company's IR page has it), read it and sum up what management said\n  changed: guidance, margins, demand, anything they declined to answer.\n- The next report date is not in SEC data. Look for it in `/trader-news`\n  headlines or on the company's investor relations page, and say where it\n  came from.\n\n## The rules\n\n- **Filed numbers first.** The table comes from XBRL facts the company filed.\n  Use the press release for context (guidance, segment colour), and say which\n  numbers came from where.\n- **Compare like with like.** Growth is against the same quarter a year\n  earlier. Quarter-on-quarter changes are shown but many businesses are\n  seasonal (Apple's December quarter is always its biggest).\n- **Say what is derived.** Companies do not file a Q4 10-Q. The fourth\n  quarter is the 10-K year minus the three quarters inside it and is marked\n  \"derived\"; derived EPS is approximate.\n- **Say when the data lags.** SEC's facts API can trail a filing. When the\n  newest 10-Q is later than the newest quarter in the facts, the tool prints a\n  NOTE with the link: read the 10-Q itself before summarising.\n- **Flag one-offs.** When net income is above operating income, gains outside\n  the business (investment marks, tax items) are inside it. The tool says so.\n  Banks and insurers have no gross margin: blank, not zero.\n\n## Steps\n\n1. Run it for the companies in question (or the tickers on\n   `trader/watchlist.json`):\n\n   ```bash\n   python3 \"${CLAUDE_SKILL_DIR}/facts.py\" TSLA\n   python3 \"${CLAUDE_SKILL_DIR}/facts.py\" TSLA NVDA AMD --metrics trader/metrics.json\n   ```\n\n   `--quarters 8` shows two years, `--json` everything machine-readable,\n   `--cik` a company without a ticker.\n2. Open the latest earnings press release (the EX-99 link) and the 10-Q when\n   the numbers need context, and read them.\n3. Write the summary: one line on the quarter (revenue, EPS, growth), one on\n   margins, one on anything unusual (a one-off, a derived quarter, data that\n   lags), and the links. Plain words, real numbers, no adjectives the numbers\n   do not support.\n4. If the next report falls inside the planned trade (an overnight hold, or a\n   report before the open), say it before `/trader-exit` sets the stop: a stop\n   does not protect against a gap, the stock can open past it.\n\n## Example: the reel's stock\n\n`facts.py TSLA` (run 2026-10-20): quarter ending 2026-06-30 (Q2 2026),\nrevenue $28.24B, +25.5% against a year earlier, net income $1.11B (-4.9%),\ndiluted EPS $0.32 (-3.0%); gross margin 16.8% (-4.3 points on the quarter\nbefore), operating margin 1.4%; last four quarters $103.6B revenue and $1.08\nEPS. The tool flags that net income is above operating income, so gains\noutside the business are inside it. Latest 10-Q filed 2026-07-23. Monday's\nheadlines said Tesla reports this week, so the summary ends: \"The next report\nis days away. A day trade that closes before the bell is not exposed to it;\nanything held overnight is.\"\n\n`facts.py AAPL` (2026-10-13): revenue $109.42B, +16.4% against a year\nearlier, diluted EPS $2.02 (+28.7%). For Coca-Cola the tool noted that SEC's\nfacts stopped at 2026-04-03 while the 10-Q for 2026-07-03 was already filed,\nso the summary read that 10-Q directly.\n\n## What it never does\n\n- Never says a stock is cheap, expensive, a buy or a sell. It reports what\n  the company filed.\n- Never invents a number the filings do not have, or estimates a quarter it\n  cannot derive.\n- Never calls SEC without the User-Agent, and stays well under 10 requests a\n  second.\n\n## Safety\n\nEducation and tooling, not financial advice. This skill only reads filings.\nNothing places an order except `/trader-broker`, after `/trader-risk` passes\nand the user types an explicit yes for that order.\n",
+      "card": null
+    },
+    {
+      "skill_path": "trader-broker/SKILL.md",
+      "blob_sha": "da8522a13c4d58ea7f76902d8547cde3f00a45d3",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-broker/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-broker",
+        "description": "Order Executor. Sends approved orders to your broker, paper trading by default, never without your yes. Shows each order as a plain ticket (a bracket shows its stop-loss, take-profit and the max loss at the stop) plus the exact JSON for Alpaca's place_stock_order, records your yes word for word, then Claude's own Allow once / Deny card asks again. Builds the sell ticket that closes a day trade by your flat-by time, records fills, and logs each trade's max loss so trader-risk can hold the daily l"
+      },
+      "excerpt": "---\nname: trader-broker\ndescription: >-\n  Order Executor. Sends approved orders to your broker, paper trading by\n  default, never without your yes. Shows each order as a plain ticket (a\n  bracket shows its stop-loss, take-profit and the max loss at the stop)\n  plus the exact JSON for Alpaca's place_stock_order, records your yes word\n  for word, then Claude's own Allow once / Deny card asks again. Builds the\n  sell ticket that closes a day trade by your flat-by time, records fills,\n  and logs each trade's max loss so trader-risk can hold the daily limit.\n  Covers setting up Alpaca's official MCP server in Claude Desktop (paper by\n  default, keys in env vars, never in chat), the Interactive Brokers\n  connector, and setting order tools to \"Needs approval\". Use when the user\n  says \"place the order\", \"buy it\", \"execute\", \"send it to my broker\",\n  \"close my position\", \"flatten\", \"get me out\", \"connect Alpaca\", \"set up\n  paper trading\", or after /trader-risk passes.\nargument-hint: \"[order number]\"\n---\n\n# trader-broker\n\nThe Order Executor is the only skill in this pack that can lead to a real\norder, so it is the strictest. An order reaches the market only after three\nseparate gates, every time, for every order:\n\n1. **trader-risk passed this exact order today** (matched by fingerprint).\n2. **The user typed an explicit yes for this one order** in the chat.\n3. **The user clicked Allow once** on Claude's own permission card, which\n   appears because the order tool is set to \"Needs approval\".\n\nTwo yeses from the user, one PASS from the rules. No yes, no order.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ticket.py\" show                     # every ticket, READY or not\npython3 \"${CLAUDE_SKILL_DIR}/ticket.py\" approve --index 1 --reply \"yes\"\npython3 \"${CLAUDE_SKILL_DIR}/ticket.py\" result --index 1 --status placed --broker-id ID --filled-qty 8 --filled-price 364.20\npython3 \"${CLAUDE_SKILL_DIR}/ticket.py\" fill --symbol TSLA --side sell --qty 8 --price 370.04\npython3 \"${CLAUDE_SKILL_DIR}/ticket.py\" flatten --symbol TSLA --qty 8\npython3 \"${CLAUDE_SKILL_DIR}/ticket.py\" log\n```\n\n`ticket.py` never talks to a broker. It renders tickets, checks that a reply\nis a real yes for that order, builds the flatten ticket, and keeps the log in\n`trader/state/broker.json`. `--now \"2026-10-19 10:15\"` pins the clock (New York time).\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/orders.json` | the proposed orders (trader-budget writes it; `flatten` replaces it) |\n| `trader/state/risk.json` | trader-risk's verdicts; only a PASS from today is READY |\n| `trader/state/broker.json` | every yes, no, placed, failed and filled, with each entry's max loss |\n| `trader/portfolio.json` | cash and shares, updated by `fill` and by `result --filled-qty` |\n| `trader/plan.json` | the flat-by time for `flatten` |\n\n## Setup A: Alpaca (official MCP server, Claude Desktop)\n\nAlpaca's own server is github.com/alpacahq/alpaca-mcp-server (MIT). It runs on\nthe user's computer inside Claude Desktop. It is not in Claude's connector\ndirectory. It trades on a **paper** account unless told otherwise. Checked\nagainst its source on 2026-10-20 (version 2.4.0).\n\n1. The user makes an Alpaca account and creates **paper trading** API keys in\n   the Alpaca dashboard. Paper keys are separate from live keys.\n2. The user installs `uv` (it provides `uvx`), from docs.astral.sh/uv.\n3. In Claude Desktop: Settings > Developer > Edit Config. That opens\n   `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/`,\n   Windows: `%APPDATA%\\Claude\\`). The user adds this block (also in\n   `claude_desktop_config.example.json` here) and types their own keys into the file:\n\n```json\n{\n  \"mcpServers\": {\n    \"alpaca\": {\n      \"command\": \"uvx\",\n      \"args\": [\"alpaca-mcp-server\"],\n      \"env\": {\n        \"ALPACA_API_KEY\": \"paste your paper key here, in this file only\",\n        \"ALPACA_SECRET_KEY\": \"paste your paper secret here, in this file only\",\n        \"ALPACA_PAPER_TRADE\": \"true\",\n        \"ALPACA_TOOLSETS\": \"account,trading,stock-data\"\n      }\n    }\n  }\n}\n```\n\n   The `env` block hands the keys to the server as environment variables.\n   **Keys never go in the chat.** Never ask for them, never read this file\n   back into the conversation, and if the user pastes a key anyway, tell them\n   to delete that message and make new keys in the Alpaca dashboard.\n   `ALPACA_PAPER_TRADE` is already true by default; writing it makes it\n   visible. `ALPACA_TOOLSETS` is optional and hides the tools they do not need.\n4. Restart Claude Desktop.\n5. **Set the tool permissions.** Customize > Connectors (Settings > Connectors\n   in older versions), open alpaca, and for each tool pick Always allow, Needs\n   approval or Blocked:\n   - `place_stock_order`: **Needs approval**. Never Always allow.\n   - every other tool that places, changes, cancels or closes anything\n     (`cancel_order_by_id`, `replace_order_by_id`, `close_position`,\n     `update_account_config`): Needs approval.\n   - `place_option_order`, `place_crypto_order`, `close_all_positions`,\n     `cancel_all_orders`, `exercise_options_position`,\n     `do_not_exercise_options_position`: **Blocked** unless the user has a\n     reason and says so.\n   - read-only tools (`get_account_info`, `get_all_positions`, `get_open_position`,\n     `get_orders`, `get_clock`, `get_stock_snapshot`, `get_stock_latest_quote`):\n     Always allow is fine.\n6. Check it: ask Claude for the Alpaca account info (read only) and confirm\n   in the Alpaca dashboard that it is the paper account.\n\nIn Claude Code instead of Claude Desktop, keep the order tool on ask in\n`.claude/settings.json`: `\"permissions\": {\"ask\": [\"mcp__alpaca__place_stock_order\"]}`,\nand never put an order tool in `allow`.\n\n**Bracket orders on Alpaca.** `place_stock_order` takes\n`take_profit_limit_price` and `stop_loss_stop_price` (and an optional\n`stop_loss_limit_price`). When either is there, the server sets\n`order_class` to \"bracket\" by itself; trader-budget writes it anyway so the\nticket shows it. A bracket is whole shares only, with `time_in_force` day or\ngtc. After the entry fills, the stop-loss and the take-profit wait at the\nbroker as two orders that cancel each other. They are day orders too, so they\nend at the close: one more reason to be flat by then.\n\n## Setup B: Interactive Brokers (connector in Claude's directory)\n\nInteractive Brokers publishes a verified connector: claude.ai/directory/interactive-brokers\n(connector URL `https://api.ibkr.com/v1/api/mcp`). Add it from Customize >\nConnectors > Browse connectors and sign in to IBKR there, not in the chat.\nIts listing says Claude can draft trade instructions that are sent to the\nuser's IBKR account for their review and approval, and that Claude never\nsubmits orders directly to the market. So with IBKR the final yes happens in\nIBKR as well. Set `\"broker\": \"ibkr\"` in `trader/config.json`. Set its tools\nthat draft orders to Needs approval too.\n\n## Steps: the entry\n\n1. `ticket.py show`. Only READY tickets go to the user. A ticket that is NOT\n   READY or BLOCKED goes back to `/trader-risk`.\n2. Show ONE ticket and ask: \"Place this order? Reply yes or no.\" One order\n   per question. Never offer \"yes to all\".\n3. Run `ticket.py approve --index N --reply \"<the user's reply, word for word>\"`.\n   If it prints \"Not recorded\", the reply was not an explicit yes for this\n   order (for example \"sure\", \"yes to all\", or a yes that names a different\n   stock or amount). Ask again. Never turn a reply into a yes yourself.\n4. Only after \"Recorded your yes\", call `place_stock_order` with exactly the\n   JSON the ticket printed. Claude's card appears: Allow once or Deny.\n5. Record what happened: `ticket.py result --index N --status placed\n   --broker-id <id> --filled-qty Q --filled-price P` (the fill from the\n   response or `get_open_position`), or `--status denied`, or `--status failed`\n   with `--note`. A failed order is not ",
+      "card": {
+        "title_zh": "交易下单执行器",
+        "purpose_zh": "把已通过风控的订单以票据形式展示，经用户逐单明确同意与权限卡确认后，通过券商 MCP 工具提交下单，并记录成交、平仓与每笔最大亏损。",
+        "does": [
+          "展示订单票据，含止损、止盈、止损处最大亏损及将提交的精确 JSON",
+          "逐单校验用户回复是否为该订单的明确 yes 并记录",
+          "在用户点击 Allow once 后调用 place_stock_order 提交订单",
+          "记录下单结果、成交与失败，并更新组合现金与持股",
+          "按 flat_by 时间生成平仓卖单票据并走同样审批流程",
+          "记录每笔交易最大亏损供 trader-risk 校验每日限额"
+        ],
+        "inputs": [
+          "trader/orders.json 中的待下单订单",
+          "trader/state/risk.json 中风控当日 PASS 结论",
+          "用户在聊天中对单个订单的明确 yes 回复",
+          "Claude 权限卡上的 Allow once 点击",
+          "Alpaca 或 IBKR 券商连接与账户信息"
+        ],
+        "outputs": [
+          "订单票据文本与 place_stock_order 的精确 JSON",
+          "trader/state/broker.json 中的同意、下单、失败、成交日志",
+          "更新后的 trader/portfolio.json 现金与持股",
+          "flatten 生成的平仓卖单写入 trader/orders.json"
+        ],
+        "scenarios": [
+          "用户说 place the order、buy it、execute 时提交已批准订单",
+          "用户说 close my position、flatten、get me out 时生成平仓单",
+          "临近 flat_by 时间平掉当日未平仓位",
+          "配置 Alpaca 官方 MCP 服务器与纸面交易",
+          "配置 Interactive Brokers 连接器并设置工具审批"
+        ],
+        "prerequisites": [
+          "已安装 uv（提供 uvx）并配置 Alpaca 纸面交易 API 密钥到环境变量",
+          "在 Claude Desktop 配置文件中添加 alpaca MCP 服务器并重启",
+          "将下单类工具权限设为 Needs approval，危险工具设为 Blocked",
+          "trader-risk 已对同一订单当日给出 PASS",
+          "trader/plan.json 中已设定 flat_by 时间"
+        ],
+        "limits": [
+          "ticket.py 本身不连接券商，只渲染票据与记录日志",
+          "没有用户明确 yes 与权限卡 Allow once 就不下单",
+          "一次 yes 只对应一个订单，不提供 yes to all",
+          "不在定时或后台任务中下单",
+          "不索取、读取、存储或复述 API 密钥与密码",
+          "不自行切换为实盘，不调用全平、全撤、期权或加密下单工具",
+          "不承诺成交价格"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Order Executor. Sends approved orders to your broker, paper trading by default, never without your yes."
+          },
+          {
+            "field": "does",
+            "quote": "Shows each order as a plain ticket (a bracket shows its stop-loss, take-profit and the max loss at the stop) plus the exact JSON for Alpaca's place_stock_order"
+          },
+          {
+            "field": "does",
+            "quote": "records your yes word for word, then Claude's own Allow once / Deny card asks again."
+          },
+          {
+            "field": "does",
+            "quote": "Builds the sell ticket that closes a day trade by your flat-by time, records fills, and logs each trade's max loss so trader-risk can hold the daily limit."
+          },
+          {
+            "field": "does",
+            "quote": "`ticket.py` never talks to a broker. It renders tickets, checks that a reply is a real yes for that order, builds the flatten ticket, and keeps the log in `trader/state/broker.json`."
+          },
+          {
+            "field": "inputs",
+            "quote": "`trader/state/risk.json` | trader-risk's verdicts; only a PASS from today is READY"
+          },
+          {
+            "field": "inputs",
+            "quote": "`trader/orders.json` | the proposed orders (trader-budget writes it; `flatten` replaces it)"
+          },
+          {
+            "field": "outputs",
+            "quote": "`trader/portfolio.json` | cash and shares, updated by `fill` and by `result --filled-qty`"
+          },
+          {
+            "field": "outputs",
+            "quote": "`trader/state/broker.json` | every yes, no, placed, failed and filled, with each entry's max loss"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The user installs `uv` (it provides `uvx`), from docs.astral.sh/uv."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The user makes an Alpaca account and creates **paper trading** API keys in the Alpaca dashboard."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`place_stock_order`: **Needs approval**. Never Always allow."
+          },
+          {
+            "field": "hosts",
+            "quote": "In Claude Code instead of Claude Desktop, keep the order tool on ask in `.claude/settings.json`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "trader-budget/SKILL.md",
+      "blob_sha": "e28ec39018f84187104a6130e2f393165f8b6705",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-budget/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-budget",
+        "description": "Budget Manager. Sizes every position to your budget and your max loss per trade. Reads the trade plan from trader-exit (entry, stop, target), finds the whole shares that fit inside four limits (max loss per trade, position cap, max order, cash after your buffer), says which limit decided it, and writes ONE bracket order (entry, stop-loss, take-profit) to trader/orders.json in the exact shape of Alpaca's place_stock_order. A stop too far away for your max loss is a plain refusal, not a smaller or"
+      },
+      "excerpt": "---\nname: trader-budget\ndescription: >-\n  Budget Manager. Sizes every position to your budget and your max loss per\n  trade. Reads the trade plan from trader-exit (entry, stop, target), finds\n  the whole shares that fit inside four limits (max loss per trade, position\n  cap, max order, cash after your buffer), says which limit decided it, and\n  writes ONE bracket order (entry, stop-loss, take-profit) to\n  trader/orders.json in the exact shape of Alpaca's place_stock_order. A stop\n  too far away for your max loss is a plain refusal, not a smaller order.\n  Nothing is placed. Use when the user says \"how many shares\", \"size this\n  trade\", \"how much should I buy\", \"I have $5,000\", \"I only want to risk $50\n  a trade\", \"set my rules\", \"keep 10% in cash\", or after /trader-exit writes\n  a plan.\nargument-hint: \"[budget in dollars]\"\n---\n\n# trader-budget\n\nThe Budget Manager turns a plan (\"buy TSLA at 364.18, stop 358.32\") into an\nexact order (\"buy 8 shares\"), inside rules the user sets once. The stop\ndecides the size: the further away the stop, the fewer shares. It writes a\nproposal only. trader-risk checks it and trader-broker asks the user yes or\nno. Day trading loses most people money. Sizing to a max loss keeps each\nloss small; it does not make a trade win.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/size.py\"                        # trader/plan.json + trader/config.json\npython3 \"${CLAUDE_SKILL_DIR}/size.py\" --write                # write trader/orders.json\npython3 \"${CLAUDE_SKILL_DIR}/size.py\" --limit --write        # a limit order at the plan's entry\npython3 \"${CLAUDE_SKILL_DIR}/size.py\" --limit 364.00 --json  # a limit order at 364.00\npython3 \"${CLAUDE_SKILL_DIR}/size.py\" --weights AAPL=40,KO=60 --config split.json   # weights mode, below\n```\n\n`--now \"2026-10-19 10:15\"` pins the clock (New York time). A plan for\nanother day is refused: make a new one with trader-exit.\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/config.json` | the rules (start from `config.example.json` in this folder) |\n| `trader/plan.json` | the trade: entry, stop, target, setup, flat-by time (trader-exit writes it) |\n| `trader/prices.json` | optional: a fresh price above the plan's entry means a bigger risk (trader-alerts writes it) |\n| `trader/portfolio.json` | optional: its cash caps the size (trader-broker keeps it) |\n| `trader/orders.json` | the one proposed bracket order it writes with `--write` |\n\n## Step 1: set the rules once\n\nIf `trader/config.json` does not exist, copy `config.example.json` into\n`trader/config.json` and ask the user for each value in plain words:\n\n- **budget**: how much money this is for. Only money they can afford to lose.\n- **cash_buffer_pct**: how much always stays in cash (default 10).\n- **max_loss_per_trade_usd**: the most one trade may lose if the stop fills at the stop (default 50).\n- **max_position_pct**, **max_order_usd**, **min_order_usd**: the biggest position (75% of the\n  budget), the biggest order ($4,000) and the smallest order ($5).\n- The day limits trader-risk enforces: **max_daily_loss_usd** (150), **max_trades_per_day** (3),\n  **min_reward_risk** (1.0), **require_stop** (true), **no_entries_before** / **no_entries_after**\n  (\"09:45\" / \"15:30\") and **flat_by** (\"15:55\"), all New York time.\n- **blocked**: tickers they never want to trade.\n- Keep **paper** true until they have watched it work on a paper account.\n\n## Step 2: size the trade\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/size.py\" --write\n```\n\nWhole shares only: Alpaca takes no fractions in a bracket order. The size is\nthe smallest of four limits:\n\n| limit | shares |\n| --- | --- |\n| max loss | `max_loss_per_trade_usd` / risk a share (entry minus stop) |\n| position cap | budget x `max_position_pct` / entry |\n| max order | `max_order_usd` / entry |\n| cash | (budget minus the cash buffer) / entry, never more than the cash in `trader/portfolio.json` |\n\nThe entry it sizes at: the limit price with `--limit`. For a market order, the\nplan's entry, or the price in `trader/prices.json` if it is fresh (under 15\nminutes old) and higher. A price that ran up since the plan means a bigger\nloss at the same stop, so fewer shares. A lower price never shrinks the risk.\n\nIt refuses, and writes no order, when: the size is zero shares, the order is\nunder the minimum, reward:risk is under `min_reward_risk`, the stop is not\nbelow the entry, the target is not above it (the move already happened), the\nplan is for another day, the ticker is blocked, or the plan is a short. Say\nthe reason to the user in one line.\n\n## Step 3: show the user\n\nShow the four limits, which one decided the size, the shares, the dollars\nand the max loss at the stop. Say plainly that a stop is an order, not a\npromise: in a fast market it can fill below the stop. Then hand over to\n`/trader-risk`.\n\n## Example: the reel\n\nTSLA on Monday 2026-10-19. Opening-range breakout: entry 364.18 at 10:15 AM,\nstop 358.32 (the opening-range midpoint), target 370.04 (1R). Risk 5.86 a\nshare. The example config: $5,000 budget, 10% cash buffer, $50 max loss.\n\n| limit | the math | shares |\n| --- | --- | --- |\n| max loss | $50 / 5.86 | **8 (decides it)** |\n| position cap | 75% of $5,000 = $3,750 / 364.18 | 10 |\n| max order | $4,000 / 364.18 | 10 |\n| cash | $5,000 minus $500 = $4,500 / 364.18 | 12 |\n\n8 shares = $2,913.44. Max loss at the stop: 8 x 5.86 = $46.88. It writes:\n\n```json\n{\"symbol\": \"TSLA\", \"side\": \"buy\", \"qty\": \"8\", \"type\": \"market\", \"time_in_force\": \"day\",\n \"order_class\": \"bracket\", \"take_profit_limit_price\": \"370.04\", \"stop_loss_stop_price\": \"358.32\",\n \"why\": \"opening-range breakout on TSLA: 8 shares, bound by your $50 max loss per trade (8 x 5.86 = $46.88 at the stop)\",\n \"plan\": {\"entry\": 364.18, \"stop\": 358.32, \"target\": 370.04, \"risk_per_share\": 5.86, \"max_loss\": 46.88,\n          \"setup\": \"orb\", \"entry_time\": \"10:15 AM\", \"flat_by\": \"15:55\"}}\n```\n\n`why` and `plan` are notes for trader-risk and trader-broker. They are never\nsent to Alpaca. With the stop at 300.00 instead, one share would risk 64.18,\nmore than the $50 max loss: no order. At 10:52 the real quote was 366.48, so\nthe same plan sizes to 6 shares at 8.16 a share, and reward:risk falls to\n0.44: refused, because the move it was waiting for has mostly happened.\n\n## Weights mode (kept from v1)\n\n`--weights AAPL=22.04,KO=10.86` or `--targets FILE` (`targets.example.json`\nhere) splits a budget across a list by weight: the cash buffer comes off the\ntop, weights are renormalised to 100, any stock over `max_position_pct` is\npinned at the cap and its excess shared out, slices under the minimum order\nare dropped, and amounts round to whole dollars so nothing is left idle by\naccident. With `\"max_position_pct\": 25` and `\"fractional\": true`, the example\nfile gives AAPL $1,250 (capped), AXP $1,119, GOOGL $823, KO $708, BAC $600.\nWith `\"fractional\": false` (the example config) it buys whole shares and\nneeds prices (`--prices trader/prices.json`). These are plain buys with no stop: trader-risk blocks them while\n`require_stop` is true and counts each one against `max_trades_per_day`. Use\na separate config (`--config`) for a long-term split.\n\n## Rules\n\n- Proposals only. This skill never calls a broker tool.\n- Never size money the user has not said is for this. Ask for the budget and the max loss.\n- Every number comes from the config, the plan or the prices. Nothing is guessed.\n- No projections: never say what a trade will make. A target is a plan, not a forecast.\n- Free Yahoo prices are unofficial and can lag. The broker's price is the one that fills.\n\n## What it never does\n\nIt never places, approves or schedules an order, never raises a limit on its\nown, never shrinks a stop to fit more shares, and never sizes options,\nmargin or short positions.\n\n## Safety\n\n- Education and tooling, not financial advice. A PASS is a rules check, not a recommendation.\n- Paper trading by default (`\"paper\": true`). Going live is the",
+      "card": {
+        "title_zh": "交易预算仓位计算",
+        "purpose_zh": "按用户设定的预算与单笔最大亏损，把交易计划换算成整数股仓位，写出一个括号订单提案供后续风控与下单环节使用。",
+        "does": [
+          "读取交易计划与规则配置，按单笔最大亏损、仓位上限、单笔订单上限、现金缓冲四项限制取最小股数",
+          "说明是哪一项限制决定了最终股数，并给出金额与止损处最大亏损",
+          "用 --write 把一条括号订单（入场、止损、止盈）写入 trader/orders.json",
+          "止损过远超出最大亏损时直接拒绝，不缩小订单",
+          "支持按权重把预算拆分到多只股票的权重模式",
+          "拒绝零股、低于最小订单、盈亏比不足、跨日计划、被屏蔽标的及做空计划"
+        ],
+        "inputs": [
+          "trader/config.json 规则配置（预算、现金缓冲、单笔最大亏损、仓位与订单上限等）",
+          "trader/plan.json 交易计划（入场、止损、目标、形态、平仓时间）",
+          "可选 trader/prices.json 新鲜报价",
+          "可选 trader/portfolio.json 现金",
+          "命令行参数：--write、--limit、--json、--now、--weights、--targets、--config、--prices"
+        ],
+        "outputs": [
+          "trader/orders.json 中的一条括号订单提案",
+          "四项限制对比、决定股数的限制、股数、金额与止损处最大亏损的说明",
+          "拒绝时的一行原因说明"
+        ],
+        "scenarios": [
+          "用户问该买多少股、如何为这笔交易定仓位",
+          "用户设定预算与单笔可承受亏损规则",
+          "trader-exit 写出交易计划后需要确定股数",
+          "用户要求保留一定比例现金",
+          "按权重把预算拆分到多只股票"
+        ],
+        "prerequisites": [
+          "存在 trader/config.json，否则从 config.example.json 复制并逐项询问用户",
+          "需要 trader/plan.json 交易计划，通常由 trader-exit 生成",
+          "运行环境需有 python3",
+          "权重模式整股购买时需要价格文件"
+        ],
+        "limits": [
+          "只产出提案，从不调用券商工具、不下单、不审批、不排程",
+          "不会自行放宽限制，也不会为多买而缩小止损",
+          "不计算期权、保证金或做空仓位",
+          "免费 Yahoo 价格非官方且可能滞后",
+          "默认纸面交易，转实盘由用户自行在配置中决定",
+          "不提供收益预测，目标只是计划不是预测"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "产品规划",
+          "数据分析",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "The Budget Manager turns a plan (\"buy TSLA at 364.18, stop 358.32\") into an exact order (\"buy 8 shares\"), inside rules the user sets once."
+          },
+          {
+            "field": "does",
+            "quote": "The size is the smallest of four limits"
+          },
+          {
+            "field": "does",
+            "quote": "It writes a proposal only."
+          },
+          {
+            "field": "does",
+            "quote": "A stop too far away for your max loss is a plain refusal, not a smaller order."
+          },
+          {
+            "field": "does",
+            "quote": "`--weights AAPL=22.04,KO=10.86` or `--targets FILE` (`targets.example.json` here) splits a budget across a list by weight"
+          },
+          {
+            "field": "inputs",
+            "quote": "| `trader/config.json` | the rules (start from `config.example.json` in this folder) |"
+          },
+          {
+            "field": "inputs",
+            "quote": "| `trader/plan.json` | the trade: entry, stop, target, setup, flat-by time (trader-exit writes it) |"
+          },
+          {
+            "field": "outputs",
+            "quote": "| `trader/orders.json` | the one proposed bracket order it writes with `--write` |"
+          },
+          {
+            "field": "outputs",
+            "quote": "Show the four limits, which one decided the size, the shares, the dollars and the max loss at the stop."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If `trader/config.json` does not exist, copy `config.example.json` into `trader/config.json` and ask the user for each value in plain words:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/size.py\"                        # trader/plan.json + trader/config.json"
+          },
+          {
+            "field": "limits",
+            "quote": "It never places, approves or schedules an order, never raises a limit on its own, never shrinks a stop to fit more shares, and never sizes options, margin or short positions."
+          },
+          {
+            "field": "limits",
+            "quote": "Free Yahoo prices are unofficial and can lag."
+          },
+          {
+            "field": "limits",
+            "quote": "Paper trading by default (`\"paper\": true`)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/size.py\" --write                # write trader/orders.json"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "trader-entry/SKILL.md",
+      "blob_sha": "8eb646220bb13a2732838faaa829db514a0440fa",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-entry/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-entry",
+        "description": "Entry Timer. Watches a setup bar by bar and tells you the moment to get in. Reads free Yahoo 1-minute or 5-minute bars, builds the opening range (the first 15 minutes by default) and calls the entry on the first completed bar that CLOSES above the range high, or above a level you give it (like a 20-day high from the scanner), with an optional volume check. Says waiting and how far, triggered with the time and the price, expired, or not open yet, and writes trader/entry.json for /trader-exit. Lon"
+      },
+      "excerpt": "---\nname: trader-entry\ndescription: >-\n  Entry Timer. Watches a setup bar by bar and tells you the moment to get in.\n  Reads free Yahoo 1-minute or 5-minute bars, builds the opening range (the\n  first 15 minutes by default) and calls the entry on the first completed bar\n  that CLOSES above the range high, or above a level you give it (like a\n  20-day high from the scanner), with an optional volume check. Says waiting\n  and how far, triggered with the time and the price, expired, or not open\n  yet, and writes trader/entry.json for /trader-exit. Long side only. It never\n  places an order. Use when the user says \"tell me when to get in\", \"watch\n  TSLA\", \"has it broken out\", \"did it break the opening range\", \"entry\n  signal\", \"time my entry\", \"check my watchlist\", or after /trader-scanner\n  and /trader-news, before /trader-exit.\nargument-hint: \"[TICKER] [--setup orb|level] [--interval 5m|1m]\"\n---\n\n# trader-entry\n\nThe Entry Timer turns a setup into one moment: the bar that confirms it. It\nreads bars, 1-minute or 5-minute, and waits for each one to finish. A price\nthat pokes above the high in the middle of a bar is not an entry. A bar that\nCLOSES above it is. Then it says the time and the price, writes them down for\nthe Exit Planner, and stops. It never buys anything. Day trading loses most\npeople money, and a clean signal does not change that.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA                  # 15-minute opening range, 5-minute bars\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA --write          # also save trader/entry.json\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA --setup level --level 371.20\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" check TSLA --interval 1m --min-volume-x 1.5\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" watch TSLA --until 15:30    # one line per closed bar, stops on the trigger\npython3 \"${CLAUDE_SKILL_DIR}/entry.py\" watchlist                   # every hit in trader/watchlist.json\n```\n\nOther flags: `--or-minutes N` (default 15), `--json`, `--offline FILE` (a\nsaved Yahoo chart JSON, `.json` or `.json.gz`, or a folder of\n`<TICKER>.json`), `--now \"2026-10-19 10:15\"` (New York time) to replay a day.\n`watch` with `--now` or `--offline` runs on a simulated clock and replays the\nday bar by bar without waiting.\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/watchlist.json` | the scanner's hits (`hits[].symbol`), for `watchlist` |\n| `trader/config.json` | `no_entries_before` (09:45) and `no_entries_after` (15:30), New York time. Optional |\n| Yahoo chart API | today's bars, `range=1d&interval=5m` (or `1m`): free, unofficial, can lag |\n| `trader/entry.json` | with `check --write`, or when `watch` triggers: symbol, setup, status, time, bar, price, level, opening range |\n\n## The rule\n\n- **Opening range (orb).** The high and low of the first 15 minutes: the\n  9:30, 9:35 and 9:40 five-minute bars, or fifteen 1-minute bars. The level\n  to beat is the range high.\n- **Level.** A price you give, like a 20-day high from `/trader-scanner`.\n- **The trigger** is the first completed bar after the range that CLOSES\n  above the level. A wick above is not a trigger. A close exactly at the\n  level is not above it.\n- **The time** is that bar's close time (the 10:10 bar closes at 10:15 AM).\n  The price is its close, to the cent.\n- **Only closed bars count.** A bar is closed when the clock passes its start\n  plus 5 (or 1) minutes and Yahoo has caught up to that moment (it waits a\n  minute at most). Yahoo's live tick, like 10:49:45, is never a bar.\n- **Volume, if you want it.** `--min-volume-x 1.5` also needs the trigger\n  bar's volume at 1.5 times the range bars' average. The 9:30 bar holds the\n  opening auction, so 1.0 is already strict.\n- **Time limits.** No entries before 9:45 or after 15:30 (config). On a 1:00\n  p.m. early close the cutoff moves up with the close, to 12:30.\n- **What it says.** Waiting (and how far the last close is from the level),\n  triggered, expired, or no data. Before 9:30: not open yet. Before 9:45: the\n  range is still forming. Weekends and NYSE holidays: the market is closed.\n\n## Steps\n\n1. Get the symbol from the user, or run `entry.py watchlist` after\n   `/trader-scanner`. Check `/trader-news` for it first.\n2. Run `entry.py check SYMBOL`. Tell the user the status in one line:\n   waiting and how far, triggered at what time and price, or expired.\n3. To wait for it, Claude can run `entry.py watch SYMBOL --until 15:30` in\n   the background, or `entry.py check SYMBOL --write` on a `/loop` every 5\n   minutes. `watch` wakes just after each bar closes, prints one line per\n   bar, and exits 0 on the trigger (it writes `trader/entry.json`) or 1 when\n   the setup expires. Keep the computer awake while it watches: a sleeping\n   laptop pauses it, and it catches up, late, when it wakes.\n4. When it triggers, say the time and the price, and that nothing was placed.\n   If the trigger is more than a bar old, say that too: a late entry is a\n   different trade.\n5. Hand off to `/trader-exit` to set the stop and the target BEFORE anything\n   is bought.\n\n## Example: the reel\n\nTSLA, Monday 2026-10-19, 5-minute bars. The opening range is 354.47 to\n362.18. At 10:12 the 10:10 bar is still open, so it waits:\n\n```\nWAITING  last close $361.68 (10:05 bar), $0.50 under the range high $362.18 (-0.14%).\nThe 10:10 bar is still forming ($364.18 so far, closes 10:15 AM); it does not count until it closes.\n```\n\nAt 10:15 the bar has closed:\n\n```\nTSLA  Mon 2026-10-19 10:15 ET  opening-range breakout (15-minute range) on 5-minute bars (Yahoo, free, can lag)\nOpening range 9:30-9:45: high $362.18, low $354.47 (3 of 3 bars).\nTRIGGERED 10:15 AM at $364.18: the 10:10 bar (bar 8) closed above the range high $362.18 (+0.55%).\nThis is the moment to get in, if you take the trade. Nothing was placed.\nNext: set the stop and target BEFORE you buy: /trader-exit (exit.py plan --from trader/entry.json).\n```\n\nWith `--min-volume-x 1` the 10:10 bar is too thin (0.60x the range's volume)\nand the trigger moves to 10:35 AM at 365.75 (the 10:30 bar, 7.98x).\n\n## Rules\n\n- Bar by bar, on free Yahoo 1-minute or 5-minute bars. They are unofficial\n  and can lag. Say so when a minute matters.\n- A signal is information, not an order, and not a promise. Nothing here\n  promises winning trades or money.\n- Long side only. v2 plans longs only. If the user wants a short, say that.\n- One trigger per setup per day: the first close above. Later closes do not\n  reset it.\n- Never call an entry early because a bar looks like it will close above.\n\n## What it never does\n\nIt never places an order, never sizes a position, never sets the stop (that\nis `/trader-exit`), never moves the level after the fact, and never counts a\nbar that has not closed. It never runs `/trader-broker` from a background\nwatch: nobody is there to say yes.\n\n## Safety\n\n- Education and tooling, not financial advice. A PASS is a rules check, not a recommendation.\n- Paper trading by default (`\"paper\": true`). Going live is the user's own decision, in their own config.\n- Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk\n  passed that exact order today, the user typed an explicit yes for that one order in the chat, and the\n  user clicked Allow once on Claude's own card because the order tool is set to \"Needs approval\"\n  (Customize > Connectors > tool permissions). Never set an order tool to \"Always allow\".\n- No options, margin, short selling or leverage unless the config allows it and the user confirms.\n- Broker keys live in environment variables or the Claude Desktop config, never in the chat.\n",
+      "card": null
+    },
+    {
+      "skill_path": "trader-exit/SKILL.md",
+      "blob_sha": "3ba6e92a2511d9c422eb9db5261512e8e3d28377",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-exit/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-exit",
+        "description": "Exit Planner. Sets your stop and your target before you enter, so you know when to get out. Reads the entry from trader-entry (or a price you give), puts the stop at the opening-range midpoint by default (or the range low, your price, a percent, or a multiple of the ATR), rounds it down to the cent, and sets the target at 2R (or 1R, or your price). Refuses a stop at or above the entry, a target at or below it, or a stop too tight to survive the spread, and says why. Writes trader/plan.json for t"
+      },
+      "excerpt": "---\nname: trader-exit\ndescription: >-\n  Exit Planner. Sets your stop and your target before you enter, so you know\n  when to get out. Reads the entry from trader-entry (or a price you give),\n  puts the stop at the opening-range midpoint by default (or the range low,\n  your price, a percent, or a multiple of the ATR), rounds it down to the\n  cent, and sets the target at 2R (or 1R, or your price). Refuses a stop at or\n  above the entry, a target at or below it, or a stop too tight to survive the\n  spread, and says why. Writes trader/plan.json for the Time Machine, the\n  Budget Manager and Price Alerts. Long side only. Use when the user says\n  \"where's my stop\", \"set my stop and target\", \"plan the exit\", \"when do I get\n  out\", \"stop loss\", \"what's my R\", \"risk reward\", or right after\n  /trader-entry triggers, before /trader-timemachine.\nargument-hint: \"[--stop or-mid|or-low|price:X|pct:X|atr:K] [--target 2R|1R|price:X]\"\n---\n\n# trader-exit\n\nThe Exit Planner decides how a trade ends before it starts. The stop is where\nthe setup has failed. The target is where you take what you came for. Both\nare set BEFORE the entry, written down and handed on, so nobody has to decide\nanything in the middle of a fast move. A stop is a plan, not a guarantee: a\ngap or a fast market can fill past it. Day trading loses most people money,\nand a neat plan does not change that.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/exit.py\" plan                          # trader/entry.json: midpoint stop, 2R target\npython3 \"${CLAUDE_SKILL_DIR}/exit.py\" plan --stop or-mid --target 1R --write\npython3 \"${CLAUDE_SKILL_DIR}/exit.py\" plan --stop atr:1.5           # needs the session's bars (Yahoo or --offline)\npython3 \"${CLAUDE_SKILL_DIR}/exit.py\" plan --symbol TSLA --entry 364.18 --or-high 362.18 --or-low 354.47\npython3 \"${CLAUDE_SKILL_DIR}/exit.py\" show                          # the current trader/plan.json\n```\n\nOther flags: `--flat-by 15:55`, `--json`, `--now \"2026-10-19 10:15\"` (New\nYork time), `--entry PRICE` with a waiting entry.json to plan ahead, `--setup\nlevel`, `--offline FILE` (a saved Yahoo chart JSON for an ATR stop).\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/entry.json` | the trigger from trader-entry: symbol, entry price, time, bar, opening range |\n| `trader/config.json` | `flat_by` (15:55) and `min_reward_risk` (1.0: a note here, trader-risk enforces it) |\n| Yahoo chart API | only for an `atr:K` stop: the session's bars up to the entry bar, free and unofficial |\n| `trader/plan.json` | with `--write`: entry, stop and its rule, target and its R, risk a share, reward:risk, flat by. trader-timemachine, trader-budget and trader-alerts read it |\n\n## Stops and targets\n\n| stop | where it goes |\n| --- | --- |\n| `or-mid` | the opening-range midpoint (the default for an opening-range breakout) |\n| `or-low` | the opening-range low: wider, so fewer shares for the same max loss |\n| `price:X` | your price |\n| `pct:X` | X percent under the entry |\n| `atr:K` | K times the 14-bar ATR under the entry, on the session's bars up to the entry bar. With fewer than 14 bars by then it averages all of them and says so |\n\nA level setup has no opening range to lean on, so it needs a stop you name.\n\n- **Rounding.** The stop rounds AWAY from the entry to the cent (down, for a\n  long). Risk = entry minus stop. Target = entry + R x risk, rounded half up\n  to the cent. `2R` by default; `1R`, `1.5R` or `price:X` also work.\n- **Refused, with the reason.** A stop at or above the entry. A target at or\n  below it. A risk under 0.05% of the price: too tight to survive the\n  spread, normal wiggle would stop you out. An entry.json that has not\n  triggered (unless you give `--entry`). A short: v2 plans longs only.\n- **Flat by.** 15:55 by default (or `flat_by` in the config). Out by then,\n  win or lose, no overnight hold. On a 1:00 p.m. early close it moves up to\n  12:55. An entry at or after the flat-by time is refused.\n\n## Steps\n\n1. Run it right after `/trader-entry` triggers. Before that, `--entry PRICE`\n   plans ahead at the level you expect.\n2. Use the default stop for an opening-range breakout unless the user names\n   another. A level setup needs one: ask.\n3. Run `exit.py plan --write`. Read back the entry, the stop and its rule,\n   the target and its rule, the risk a share, reward:risk and flat by.\n4. If it refuses, say the reason and the fix (a wider stop, a farther\n   target). Never loosen anything on your own.\n5. Say once that the stop is a plan, not a guarantee.\n6. Hand off to `/trader-timemachine` to replay the plan, then `/trader-budget`\n   to size it to the max loss per trade. Offer `/trader-alerts` for the stop,\n   the target and the flat-by time. Claude can keep `entry.py watch` running\n   in the background or on a `/loop` until a setup triggers, then come here.\n\n## Example: the reel\n\nTSLA, Monday 2026-10-19. The entry is 364.18 at 10:15 AM (the 10:10 bar,\nbar 8) and the opening range is 354.47 to 362.18. `exit.py plan --stop\nor-mid --target 1R --write`:\n\n```\nExit plan: TSLA long, Mon 2026-10-19, opening-range breakout on 5-minute bars\n  Entry         $364.18 at 10:15 AM (bar 8)\n  Stop          $358.32  opening-range midpoint: ($362.18 + $354.47) / 2 = $358.325, rounded down\n  Target        $370.04  1R (one times the risk)\n  Risk a share  $5.86 (1.61% of the entry)\n  Reward:risk   1.0\n  Flat by       15:55 ET, win or lose: no overnight hold\n```\n\nThe default 2R target would be 364.18 + 2 x 5.86 = 375.90. trader-budget then\nsizes it: a $50 max loss per trade buys floor(50 / 5.86) = 8 shares.\n\n## Rules\n\n- The stop and the target are set before the entry, never after.\n- Never move a stop further from the entry once the trade is on.\n- Plain numbers only: entry, stop, target, risk a share, reward:risk. It\n  never prints a P&L or a return.\n- Nothing here promises winning trades or money. A 1R target is not a\n  prediction that the price gets there.\n- Long side only. v2 plans longs only.\n\n## What it never does\n\nIt never places an order, never sizes a position, never widens a stop to\nmake a plan pass, and never calls a stop a guarantee.\n\n## Safety\n\n- Education and tooling, not financial advice. A PASS is a rules check, not a recommendation.\n- Paper trading by default (`\"paper\": true`). Going live is the user's own decision, in their own config.\n- Nothing in this pack places an order except trader-broker, and only when all three hold: trader-risk\n  passed that exact order today, the user typed an explicit yes for that one order in the chat, and the\n  user clicked Allow once on Claude's own card because the order tool is set to \"Needs approval\"\n  (Customize > Connectors > tool permissions). Never set an order tool to \"Always allow\".\n- No options, margin, short selling or leverage unless the config allows it and the user confirms.\n- Broker keys live in environment variables or the Claude Desktop config, never in the chat.\n",
+      "card": {
+        "title_zh": "交易离场计划器",
+        "purpose_zh": "在入场前设定止损与目标价，计算每股风险与盈亏比，并写入交易计划文件供后续工具使用。",
+        "does": [
+          "读取 trader-entry 的入场信息或用户给定价格，按 or-mid、or-low、price、pct、atr 等规则设定止损",
+          "按 2R、1R、1.5R 或指定价格设定目标价，并四舍五入到分",
+          "拒绝止损不低于入场、目标不高于入场、风险过窄、未触发入场或做空等情形并说明原因",
+          "默认设定 15:55 前平仓，早收盘日提前至 12:55",
+          "用 --write 写出 trader/plan.json，含入场、止损、目标、每股风险、盈亏比与平仓时间",
+          "用 show 显示当前 trader/plan.json 内容"
+        ],
+        "inputs": [
+          "trader/entry.json 中的标的、入场价、时间、K 线与开盘区间",
+          "trader/config.json 中的 flat_by 与 min_reward_risk",
+          "命令行参数 --stop、--target、--symbol、--entry、--or-high、--or-low、--flat-by、--json、--now、--setup、--offline",
+          "atr 止损时读取 Yahoo chart API 或本地保存的图表 JSON"
+        ],
+        "outputs": [
+          "trader/plan.json：入场、止损及其规则、目标及其 R、每股风险、盈亏比、平仓时间",
+          "终端或 JSON 格式的离场计划文本"
+        ],
+        "scenarios": [
+          "用户询问止损设在哪里、如何设定止损与目标",
+          "刚触发 trader-entry 后、进入 trader-timemachine 前规划离场",
+          "用户询问风险回报比或 R 值",
+          "按 ATR 或开盘区间设定止损"
+        ],
+        "prerequisites": [
+          "已存在 trader-entry 生成的 trader/entry.json，或通过 --entry 提供入场价",
+          "使用 atr 止损时需要会话 K 线，来自 Yahoo chart API 或 --offline 文件",
+          "运行环境需有 python3"
+        ],
+        "limits": [
+          "仅支持做多，v2 只规划多头",
+          "不保证成交，跳空或快速行情可能越过止损",
+          "不打印盈亏或收益率，不预测价格",
+          "不自动放宽止损以让计划通过",
+          "不负责下单、仓位 sizing 或资金管理"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "其他",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "The Exit Planner decides how a trade ends before it starts. The stop is where the setup has failed. The target is where you take what you came for."
+          },
+          {
+            "field": "does",
+            "quote": "puts the stop at the opening-range midpoint by default (or the range low, your price, a percent, or a multiple of the ATR), rounds it down to the cent, and sets the target at 2R (or 1R, or your price)"
+          },
+          {
+            "field": "does",
+            "quote": "Refuses a stop at or above the entry, a target at or below it, or a stop too tight to survive the spread, and says why."
+          },
+          {
+            "field": "does",
+            "quote": "Writes trader/plan.json for the Time Machine, the Budget Manager and Price Alerts."
+          },
+          {
+            "field": "does",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/exit.py\" show                          # the current trader/plan.json"
+          },
+          {
+            "field": "inputs",
+            "quote": "`trader/entry.json` | the trigger from trader-entry: symbol, entry price, time, bar, opening range"
+          },
+          {
+            "field": "inputs",
+            "quote": "Yahoo chart API | only for an `atr:K` stop: the session's bars up to the entry bar, free and unofficial"
+          },
+          {
+            "field": "outputs",
+            "quote": "`trader/plan.json` | with `--write`: entry, stop and its rule, target and its R, risk a share, reward:risk, flat by."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "An entry.json that has not triggered (unless you give `--entry`)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/exit.py\" plan --stop atr:1.5           # needs the session's bars (Yahoo or --offline)"
+          },
+          {
+            "field": "limits",
+            "quote": "Long side only. v2 plans longs only."
+          },
+          {
+            "field": "limits",
+            "quote": "A stop is a plan, not a guarantee: a gap or a fast market can fill past it."
+          },
+          {
+            "field": "limits",
+            "quote": "It never places an order, never sizes a position, never widens a stop to make a plan pass, and never calls a stop a guarantee."
+          },
+          {
+            "field": "limits",
+            "quote": "Plain numbers only: entry, stop, target, risk a share, reward:risk. It never prints a P&L or a return."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/exit.py\" plan --stop or-mid --target 1R --write"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Yahoo chart API | only for an `atr:K` stop: the session's bars up to the entry bar, free and unofficial"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "trader-news/SKILL.md",
+      "blob_sha": "45c4d616f6651f47edbb15f9d2f9319957e67a96",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-news/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-news",
+        "description": "News Monitor. Tracks breaking news on every stock you watch and flags what moves it: Yahoo Finance headlines per ticker, each company's 8-K filings on SEC EDGAR (earnings, CEO changes, deals, restatements, bankruptcy) and how far each stock is from yesterday's close. Shows only what is new since the last check, newest first, in New York time, tags each item (earnings, analyst, deal, halt, regulatory, macro...) and never repeats one. Use when the user says \"any news on TSLA\", \"why is this moving\""
+      },
+      "excerpt": "---\nname: trader-news\ndescription: >-\n  News Monitor. Tracks breaking news on every stock you watch and flags what\n  moves it: Yahoo Finance headlines per ticker, each company's 8-K filings on\n  SEC EDGAR (earnings, CEO changes, deals, restatements, bankruptcy) and how\n  far each stock is from yesterday's close. Shows only what is new since the\n  last check, newest first, in New York time, tags each item (earnings,\n  analyst, deal, halt, regulatory, macro...) and never repeats one. Use when\n  the user says \"any news on TSLA\", \"why is this moving\", \"what's the news on\n  my watchlist\", \"morning briefing\", \"pre-market news\", \"monitor the news\",\n  \"did anything break\", \"check the 8-Ks\", or after /trader-scanner finds setups.\nargument-hint: \"[tickers]\"\n---\n\n# trader-news\n\nA chart can look perfect and still be about to gap on an earnings date, a\nhalt or a lawsuit. Before a setup becomes a trade, this skill reads the two\nfeeds that carry those first, for every stock on the watchlist, and tells you\nonly what is new. It also prints how far each stock has moved today, so a\nheadline and a move sit side by side.\n\nTool in this folder (standard library Python, no keys):\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/news.py\"                         # watchlist + plan + portfolio\npython3 \"${CLAUDE_SKILL_DIR}/news.py\" --tickers TSLA NVDA --hours 12\npython3 \"${CLAUDE_SKILL_DIR}/news.py\" --no-sec --json\n```\n\n## What it reads and writes\n\n| file / feed | what |\n| --- | --- |\n| `--tickers`, else `trader/watchlist.json` | the scanner's hits (trader-scanner) |\n| `trader/plan.json` | the trade you are planning (trader-exit) |\n| `trader/portfolio.json` | what you hold (trader-broker records fills there) |\n| Yahoo Finance headline RSS | `https://feeds.finance.yahoo.com/rss/2.0/headline?s=TSLA&region=US&lang=en-US` |\n| Yahoo Finance chart endpoint | the last price against yesterday's close (unofficial, can lag) |\n| SEC EDGAR company Atom feed | 8-K by default (`--forms 8-K,10-Q` for more); needs `sec_user_agent` in `trader/config.json` or `SEC_USER_AGENT`, else filings are skipped with a note |\n| `trader/state/news.json` | what has been shown (kept 30 days) and each ticker's CIK |\n\n## The rules\n\n- **Headlines are leads, not facts.** Before telling the user something\n  happened, open the story or the filing and read it. Quote the source and\n  link it. Never summarise a paywalled story you could not read: say so.\n- **Filings beat headlines.** If an 8-K and a headline disagree, the 8-K is\n  what the company told the SEC.\n- **Say what it touches.** Every item lists the tickers it touches and its\n  tags: earnings, analyst, legal, deal, capital, people, risk, halt,\n  regulatory, macro. Filings marked `!` carry an important 8-K item: earnings\n  results (2.02), an officer change (5.02), an impairment (2.06), a delisting\n  notice (3.01), past financials no longer reliable (4.02), bankruptcy (1.03)\n  or a cyber incident (1.05).\n- **MOVING** marks a stock 3 % or more from yesterday's close (`--move-pct`).\n  A move with no headline is worth saying out loud too.\n- **No predictions.** Report what was published and how far the price is from\n  yesterday's close. Never say what the stock will do next.\n\n## Steps\n\n1. Run the check: `python3 \"${CLAUDE_SKILL_DIR}/news.py\"`. Exit code 1 means\n   nothing new. `--all` shows items already seen, `--json` gives everything\n   machine readable, `--dry-run` leaves the state alone.\n2. Read the items that matter: every `!` filing, anything tagged earnings,\n   halt, legal, regulatory or risk, and every MOVING ticker first.\n3. Write a short brief, per ticker: what happened, the source and link, the\n   move, and one line on why it matters to the setup (for example \"earnings\n   are this week: an overnight gap can jump past any stop\").\n4. If a story changes the picture, say so before `/trader-entry` and\n   `/trader-exit`: an earnings date inside the trade, a halt, an offering.\n   Never act on a headline alone.\n\nDuring the session: `/loop 15m /trader-news`, or a scheduled task each\nmorning before the open.\n\n## Example: the reel\n\nMonday 2026-10-19, TSLA broke its opening range at 10:15 AM ET. The check at\n10:15 (Yahoo Finance's TSLA feed, 16 headlines since 8:00) leads with the\nmorning's real stories: \"Meta and Musk earnings and September pending home\nsales: What to Watch\" (8:00, earnings), \"Tesla-SpaceX Merger Mania Strikes\nWall Street Ahead of Earnings\" (8:04, earnings, deal), \"Tech Stock Rebound\nNudges US Equity Futures Mostly Higher Pre-Bell\" (8:02, macro). The brief:\n\"Tesla reports this week, so the stock can gap overnight; today's trade is\nin and out before the close. No new 8-K.\" At 10:52 the price line reads\n`TSLA 366.48 +3.31% vs yesterday's close 354.72 at 10:52 ET  MOVING`. When a\nticker has no news, say so rather than padding the brief.\n\n## What it never does\n\n- Never invents or embellishes a story, a quote or a number.\n- Never trades on news, and never tells the user to buy or sell because of a\n  headline.\n- Never hammers a server: one request per feed per ticker, a pause between\n  calls, and SEC's 10 requests a second limit stays far away.\n\n## Safety\n\nEducation and tooling, not financial advice. This skill only reads and\nreports. Nothing places an order except `/trader-broker`, after\n`/trader-risk` passes and the user types an explicit yes for that order.\n",
+      "card": {
+        "title_zh": "交易新闻监控",
+        "purpose_zh": "为自选股抓取雅虎财经头条与SEC EDGAR的8-K等公告，只显示自上次检查以来的新条目，并附上相对昨收的涨跌幅，供交易前参考。",
+        "does": [
+          "运行news.py抓取自选股或指定代码的雅虎财经头条RSS",
+          "抓取SEC EDGAR公司Atom订阅的8-K等公告，需配置user agent",
+          "对比昨收计算涨跌幅，达3%标记MOVING",
+          "只显示上次检查后新增条目，按纽约时间倒序并打标签",
+          "输出每只股票的简短简报，含来源链接与对交易计划的影响",
+          "支持--json机器可读输出与--dry-run不改状态"
+        ],
+        "inputs": [
+          "--tickers参数指定的股票代码",
+          "trader/watchlist.json自选股",
+          "trader/plan.json交易计划",
+          "trader/portfolio.json持仓",
+          "trader/config.json中的sec_user_agent或环境变量SEC_USER_AGENT",
+          "--hours、--forms、--move-pct等命令行参数"
+        ],
+        "outputs": [
+          "按股票分组的新闻简报文本",
+          "--json格式的机器可读结果",
+          "trader/state/news.json记录已展示条目与各股票CIK，保留30天"
+        ],
+        "scenarios": [
+          "用户询问某只股票有什么新闻",
+          "用户问股价为何异动",
+          "盘前或早间简报",
+          "监控自选股新闻",
+          "trader-scanner发现交易机会后核查消息面"
+        ],
+        "prerequisites": [
+          "需Python3标准库环境",
+          "SEC公告需在trader/config.json配置sec_user_agent或设置SEC_USER_AGENT环境变量，否则跳过并提示",
+          "需能访问雅虎财经RSS与图表接口及SEC EDGAR"
+        ],
+        "limits": [
+          "仅读取和报告，不预测股价、不给出买卖建议",
+          "头条只是线索，需打开原文核实，付费墙文章不可读时须说明",
+          "公告优先于头条，二者冲突以8-K为准",
+          "雅虎图表接口为非官方，可能延迟",
+          "未配置SEC user agent时跳过公告",
+          "每次每源每股票仅一次请求，遵守SEC每秒10次限制"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "调研",
+          "数据分析",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "News Monitor. Tracks breaking news on every stock you watch and flags what moves it: Yahoo Finance headlines per ticker, each company's 8-K filings on SEC EDGAR"
+          },
+          {
+            "field": "does",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/news.py\" --tickers TSLA NVDA --hours 12"
+          },
+          {
+            "field": "does",
+            "quote": "Shows only what is new since the last check, newest first, in New York time, tags each item"
+          },
+          {
+            "field": "does",
+            "quote": "**MOVING** marks a stock 3 % or more from yesterday's close (`--move-pct`)."
+          },
+          {
+            "field": "does",
+            "quote": "`--all` shows items already seen, `--json` gives everything machine readable, `--dry-run` leaves the state alone."
+          },
+          {
+            "field": "inputs",
+            "quote": "`--tickers`, else `trader/watchlist.json`"
+          },
+          {
+            "field": "inputs",
+            "quote": "needs `sec_user_agent` in `trader/config.json` or `SEC_USER_AGENT`, else filings are skipped with a note"
+          },
+          {
+            "field": "outputs",
+            "quote": "`trader/state/news.json` | what has been shown (kept 30 days) and each ticker's CIK"
+          },
+          {
+            "field": "outputs",
+            "quote": "Write a short brief, per ticker: what happened, the source and link, the move, and one line on why it matters to the setup"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user says \"any news on TSLA\", \"why is this moving\", \"what's the news on my watchlist\", \"morning briefing\", \"pre-market news\""
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Tool in this folder (standard library Python, no keys)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Yahoo Finance chart endpoint | the last price against yesterday's close (unofficial, can lag)"
+          },
+          {
+            "field": "limits",
+            "quote": "Never trades on news, and never tells the user to buy or sell because of a headline."
+          },
+          {
+            "field": "limits",
+            "quote": "Never summarise a paywalled story you could not read: say so."
+          },
+          {
+            "field": "limits",
+            "quote": "Never hammers a server: one request per feed per ticker, a pause between calls, and SEC's 10 requests a second limit stays far away."
+          },
+          {
+            "field": "hosts",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/news.py\""
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/news.py\" --no-sec --json"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "trader-pelosi/SKILL.md",
+      "blob_sha": "f09348d540816d25620e339f00ee13169a0733a1",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-pelosi/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-pelosi",
+        "description": "The Pelosi Tracker. Watches the stock trades members of Congress must disclose under the STOCK Act: reads the House Clerk's public Periodic Transaction Reports (PTRs) as soon as they are posted, alerts once per new filing, and turns each PDF into clean rows (who, owner, stock, ticker, buy or sell, options strike and expiry, trade date, amount range, how many days it took to disclose). Flags trades in stocks you hold. Senate reports are covered by a documented manual route. Use when the user says"
+      },
+      "excerpt": "---\nname: trader-pelosi\ndescription: >-\n  The Pelosi Tracker. Watches the stock trades members of Congress must\n  disclose under the STOCK Act: reads the House Clerk's public Periodic\n  Transaction Reports (PTRs) as soon as they are posted, alerts once per new\n  filing, and turns each PDF into clean rows (who, owner, stock, ticker,\n  buy or sell, options strike and expiry, trade date, amount range, how many\n  days it took to disclose). Flags trades in stocks you hold. Senate reports\n  are covered by a documented manual route. Use when the user says \"what is\n  Pelosi buying\", \"track Nancy Pelosi\", \"Congress trades\", \"politician stock\n  trades\", \"did any congressman buy X\", \"alert me when Pelosi files\", or\n  \"run the Pelosi skill\".\nargument-hint: \"[member name] [--read]\"\n---\n\n# trader-pelosi\n\nMembers of Congress have to report their trades, their spouse's and their\ndependent children's. The House Clerk posts every report as a PDF and lists\nthem all in one index file per year. This skill reads that index, notices the\nmoment a new report appears, and reads the report for you.\n\nIt is fast. It is not early. A PTR is due within 30 days of the member\nlearning of the trade and never more than 45 days after it, so by the time\nanyone can read it the trade is days or weeks old. There is no inside\ninformation here: only public filings, read quickly. Say that every time.\n\nTool in this folder (standard library Python; `pdftotext` from poppler is\noptional, to read the PDFs locally):\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" --help\n```\n\n## What it reads and writes\n\n- Reads `https://disclosures-clerk.house.gov/public_disc/financial-pdfs/<YEAR>FD.zip`\n  (one `<Member>` per filing: name, district, FilingType, FilingDate, DocID)\n  and each PTR at `.../public_disc/ptr-pdfs/<YEAR>/<DocID>.pdf`.\n- Writes `trader/state/pelosi.json` (the DocIDs already shown, so each PTR\n  alerts once) and keeps downloaded PDFs in `trader/state/ptr-pdfs/`.\n- Reads `trader/portfolio.json` (if it exists) to flag trades in what you hold.\n\n## The rules\n\n- **Quote the filing, not a tracker.** Every row comes from the PTR PDF on the\n  Clerk's site, with its DocID and link. Third-party trackers are fine for\n  browsing but can be off (Capitol Trades showed Pelosi's trade dates one day\n  earlier than her PTRs). The PTR wins.\n- **Amounts are ranges.** \"$1,000,001 - $5,000,000\", never \"$3 million\".\n- **Owner matters.** SP is the spouse, JT joint, DC a dependent child, blank\n  the member. Pelosi's 2026 trades are all SP: Paul Pelosi.\n- **Say the delay.** Each row shows how many days passed between the trade\n  and the filing; over 45 is flagged as late.\n- **Options are options.** A call bought with a strike and an expiry is not\n  a share purchase. The tool reads contracts, strike and expiry from the\n  description and marks exercises.\n\n## Step 1: what has been filed\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" index --member pelosi\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" index --since 2026-10-01        # every member\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" index --member \"Josh Gottheimer\" --year 2025\n```\n\n`--member` takes a last name, \"First Last\" or \"Last, First\", and repeats.\n`--type ''` lists every filing type (annual reports are type O).\n\n## Step 2: watch for new ones\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" new --member pelosi --read\n```\n\nShows only PTRs not seen at the last check (the first run shows the last 45\ndays), downloads and reads them with `--read`, and records them in the state\nfile. Exit code 1 means nothing new. In January it also checks last year's\nindex. The Clerk rebuilds the index file about once a day (the copy read on\n2026-10-13 was stamped 09:00 that morning), so checking every hour on weekdays\nis plenty: run it with `/loop 1h` or a scheduled task.\n\n## Step 3: read a report\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" fetch 20035143\npython3 \"${CLAUDE_SKILL_DIR}/ptr.py\" parse ptr.txt --filed 2026-08-21 --json\n```\n\n`fetch` saves the PDF and, if `pdftotext` is installed, prints the rows. If it\nis not installed, open the saved PDF and read it directly: you can read PDFs.\n`parse` turns `pdftotext -layout` text into rows. Check the row count against\nthe PDF when a report runs over several pages.\n\n## Example: a real alert\n\n```\nNEW Periodic Transaction Report: Hon. Nancy Pelosi (CA11) filed 2026-08-21, doc 20035143\n  - spouse purchase, Bloom Energy Corporation Class A Common Stock (BE): 100 call\n    options, $100 strike, expires 2027-06-17, $1,000,001 - $5,000,000, traded\n    2026-07-24, disclosed 28 days later\n```\n\nThe same PTR also shows 10,000 and 5,000 BE shares, a second block of 100 BE\ncalls on 07/28, Intel shares and 50 Intel calls ($50 strike, 6/17/27), and a\nprivate real estate LLC with no ticker. Her other 2026 PTRs: 20033725\n(01/23), 20034836 (06/23, Intel and Uber calls) and 20035553 (10/02, a real\nestate LLC). Then: \"This is a public disclosure filed 28 days after the trade.\nIt says what Paul Pelosi bought in July, not what anyone will buy next.\"\n\nIf the user wants to act on it, it goes the long way: a disclosure is weeks\nold, so it is a reason to look at a chart, not a setup. `/trader-scanner`\nand `/trader-entry` decide if there is a trade today; then shares only (the\nconfig has `allow_options: false`), sized by `/trader-budget`, checked by\n`/trader-risk`, placed by `/trader-broker` only after their yes.\n\n## The Senate: the manual route\n\nSenate reports live at `https://efdsearch.senate.gov`. Before searching, the\nsite asks you to tick a box agreeing to the legal limits on how the reports\nmay be used. That is an agreement for the person to accept, so this skill\ndoes not click it or automate it. The route:\n\n1. The user opens `https://efdsearch.senate.gov/search/` in their browser and\n   accepts the agreement themselves.\n2. They pick the report type \"Periodic Transactions\", type the senator's last\n   name, set the date range and search.\n3. They open the report: electronic filings show a table of transactions,\n   paper filings are scanned images.\n4. They paste the table (or a screenshot, or the saved page) into the chat,\n   and you write it up in the same shape as the House rows, with the report\n   link, and the same 45-day caveat.\n\n## What it never does\n\n- Never says or implies a member has inside information, or that copying a\n  politician beats the market. No return claims.\n- Never presents a range as an exact dollar figure or a tracker's date as the\n  trade date.\n- Never places an order, and never copies options trades.\n- Never automates the Senate agreement or any login.\n\n## Safety\n\n- Education and tooling, not financial advice. Nothing in this pack is a\n  recommendation to buy or sell anything.\n- Paper trading by default (`\"paper\": true` in `trader/config.json`).\n- Nothing places an order except `/trader-broker`, and only after\n  `/trader-risk` passes AND the user types an explicit yes for that order in\n  the chat, AND the brokerage tool is set to \"Needs approval\" in Claude\n  (Customize > Connectors > tool permissions) so Claude's own \"Allow once /\n  Deny\" card appears too. Never \"Always allow\" an order tool.\n- No options, margin, shorting or leverage unless the config allows it and\n  the user confirms.\n- Congressional trades are PUBLIC disclosures filed up to 45 days after the\n  trade (STOCK Act). This skill reads them fast; it has no inside\n  information, and it says so.\n",
+      "card": null
+    },
+    {
+      "skill_path": "trader-risk/SKILL.md",
+      "blob_sha": "8628b2f24842ee32e3632a7b72d2f3e3f8c581ab",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-risk/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-risk",
+        "description": "Risk Manager. Checks every trade against your limits and stops anything over them, before it can reach the broker. For a day trade: a stop is required, the loss at the stop must fit your max loss per trade (measured from the higher of the plan's entry and a fresh price), reward:risk must meet your minimum, the day's total risk must fit your daily loss limit, no more than your trades per day, and no new entries outside your entry window or when the market is closed. It also keeps the basics: bloc"
+      },
+      "excerpt": "---\nname: trader-risk\ndescription: >-\n  Risk Manager. Checks every trade against your limits and stops anything\n  over them, before it can reach the broker. For a day trade: a stop is\n  required, the loss at the stop must fit your max loss per trade (measured\n  from the higher of the plan's entry and a fresh price), reward:risk must\n  meet your minimum, the day's total risk must fit your daily loss limit, no\n  more than your trades per day, and no new entries outside your entry\n  window or when the market is closed. It also keeps the basics: blocked\n  tickers, order size, position cap, cash buffer, margin, short sales,\n  options and crypto, malformed or bad bracket orders, duplicates and a daily\n  order limit. Getting out is never blocked by a day limit. Prints PASS or\n  BLOCK with the reason and records the verdicts so trader-broker only shows\n  an order that passed. Use when the user says \"check my order\", \"is this\n  safe\", \"risk check\", \"does this break my rules\", \"can I take this trade\",\n  \"how much have I risked today\", or before /trader-broker, always.\nargument-hint: \"[path to orders.json]\"\n---\n\n# trader-risk\n\nThe Risk Manager is the gate between a proposal and the broker. Every order\nwritten by trader-budget or trader-broker's flatten passes through it. A\nBLOCK is final for that order: it does not go to the user for a yes, and it\ndoes not go to the broker. Most people who day trade lose money. These limits\nkeep each loss and each day's losses small. They do not make a trade win.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/check.py\"                           # trader/ files; writes trader/state/risk.json\npython3 \"${CLAUDE_SKILL_DIR}/check.py\" --json\npython3 \"${CLAUDE_SKILL_DIR}/check.py\" --no-write                # look without recording\npython3 \"${CLAUDE_SKILL_DIR}/check.py\" --now \"2026-10-19 10:15\"  # pin the clock (New York time)\n```\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/orders.json` | the proposed orders (trader-budget, or trader-broker's flatten) |\n| `trader/config.json` | the limits (trader-budget ships `config.example.json`) |\n| `trader/portfolio.json` | cash and holdings; if missing, a fresh account funded with the budget |\n| `trader/prices.json` | a fresh price raises the entry it measures risk from; also values holdings |\n| `trader/state/broker.json` | what was placed today: duplicates, trades per day, daily loss, day trades |\n| `trader/state/risk.json` | the verdicts it writes, with a fingerprint of each exact order |\n\n## Entries and exits\n\nAn **entry** opens or adds to a position: a buy, or a sell that would go\nshort. An **exit** only reduces what you already hold. Getting out must\nalways be possible, so an exit is checked for format, asset and short sales\nonly. Every other rule (day limits, entry window, loss, reward:risk, blocked\nlist, size, duplicates) turns into a warning for an exit, never a BLOCK.\n\n## The checks\n\nOrders are checked in file order, as if each passed order had filled, so a\nbatch that is fine order by order but breaks a limit together is caught.\n\n| check | blocks when |\n| --- | --- |\n| format | no symbol, side not buy or sell, both or neither of qty and notional, a notional order that is not market + day (Alpaca's rule), a limit order with no limit price; a bracket that is not whole shares, not `day` or `gtc`, or misses its stop-loss or take-profit |\n| asset | an option symbol while `allow_options` is false; crypto or anything that is not a US stock or ETF ticker |\n| short | a sell of more than you hold (`allow_short` false) |\n| blocked | (entries) the ticker is on the `blocked` list |\n| size | (entries) under `min_order_usd` or over `max_order_usd` |\n| position | (entries) the stock would be over `max_position_pct` of the account |\n| cash | (entries) the buy would leave less than the cash buffer, or need margin |\n| stop | (entries) no stop while `require_stop` is true (a bracket `stop_loss_stop_price`, or the order's plan stop); a stop on the wrong side of the entry |\n| loss | (entries) qty x (entry minus stop) over `max_loss_per_trade_usd` |\n| reward:risk | (entries) (target minus entry) / (entry minus stop) under `min_reward_risk` |\n| daily loss | (entries) the max losses at the stops of today's entries, plus this one, over `max_daily_loss_usd` |\n| trades | (entries) `max_trades_per_day` entries already placed today |\n| window | (entries) before `no_entries_before` or after `no_entries_after`, or the market is closed |\n| pdt | (entries, only with `pdt_guard` true) 3 day trades already in the last 5 business days |\n| duplicate | (entries) the same symbol and side twice in one batch, or already placed today |\n| daily limit | (entries) `max_orders_per_day` orders already placed today |\n\nHow the numbers work:\n\n- **The entry it measures from**: the limit price for a limit order. For a\n  market order, the HIGHER of the plan's entry and a fresh price from\n  `trader/prices.json` (under 15 minutes old). A plan written at 10:15 cannot\n  understate the risk at 10:55 after the price ran up. An older price is not\n  used, and it says so.\n- **Daily loss** counts the full max loss of every entry placed today, win or\n  lose, as trader-broker logged it. Three full-size trades use up a $150 day.\n- **The window** is New York time, worked out in the tool (daylight saving\n  included), never from the computer's clock zone. Weekends and NYSE holidays\n  are closed. On a 1:00 p.m. early close the window ends 3 hours earlier too.\n  Set both `no_entries_*` to null to switch the window off.\n- **pdt_guard** (off by default) counts a day trade as a symbol bought and\n  sold on the same day in the log, plus any entry placed today (it is meant\n  to be flat by the close). FINRA removed the $25,000 pattern-day-trader\n  minimum (Regulatory Notice 26-10, effective June 4, 2026; firms may phase\n  in until October 20, 2027), so some brokers still apply the old rule: turn\n  `pdt_guard` on if yours does.\n\nWarnings do not block, but say them to the user: a LIVE account, a number\nsent as a number instead of a string, a stop that lives only in the plan and\nnot at the broker, a price too old to use, an early close today.\n\n## Steps\n\n1. If the price may have moved since the plan, refresh it first\n   (trader-alerts: `alerts.py quote TSLA --write`).\n2. Run `check.py`. Exit code 0 means every order passed, 1 means at least one\n   was blocked.\n3. Tell the user the result in plain words, order by order: the max loss at\n   the stop, reward:risk, and how much of today's limits it uses. For a\n   BLOCK, give the reason and the fix (fewer shares, a closer stop from\n   trader-exit, wait for the window, or skip the trade). Never change a\n   limit yourself.\n4. If the order changes in any way, run the check again. trader-broker matches\n   each order to its verdict by fingerprint, so an edited order is not ready\n   until it passes again, and a verdict from yesterday does not count today.\n\n## Example: the reel\n\nThe TSLA bracket from trader-budget at 10:15 AM on Monday 2026-10-19, on a\nfresh $5,000 paper account with the example config:\n\n```\nPASS  #1 buy TSLA 8 shares, entry\n          entry 364.18 (the plan's entry), stop 358.32, target 370.04: risk 5.86 a share\n          max loss $46.88 (limit $50), reward:risk 1.00 (min 1)\n          today before this: 0 of 3 trades, $0 of $150 daily loss\n\n1 passed, 0 blocked at 2026-10-19 10:15 New York. Cash after the passed orders: $2,086.56 (paper account).\n```\n\nOne more share and it is blocked:\n\n```\nBLOCK #1 buy TSLA 9 shares, entry\n          entry 364.18 (the plan's entry), stop 358.32, target 370.04: risk 5.86 a share\n          max loss $52.74 (limit $50), reward:risk 1.00 (min 1)\n          today before this: 0 of 3 trades, $0 of $150 daily loss\n        - loss: 9 shares x 5.86 risk a share = $52.74 at the stop, over your $50 max loss per trade\n```\n\nThe same 8 shares checked at 10:55 with the real 10:52 quote (366.48) in\n`trade",
+      "card": {
+        "title_zh": "交易风控检查器",
+        "purpose_zh": "在下单前按用户配置的限额逐笔检查交易订单，超限即拦截，并记录判定结果供下单环节使用。",
+        "does": [
+          "按配置检查订单格式、资产类型、卖空、黑名单、下单规模与仓位上限",
+          "校验止损、单笔最大亏损、盈亏比、当日累计亏损与每日交易次数",
+          "检查入场时间窗、市场是否休市、重复订单与每日订单上限",
+          "按文件顺序模拟成交，逐笔累计风险以发现批量合计超限",
+          "输出 PASS 或 BLOCK 及原因，并写入带订单指纹的判定记录",
+          "对仅用于平仓的退出单只做格式、资产与卖空检查，不因日内限额拦截"
+        ],
+        "inputs": [
+          "trader/orders.json 待检查的订单",
+          "trader/config.json 风控限额配置",
+          "trader/portfolio.json 现金与持仓",
+          "trader/prices.json 最新价格",
+          "trader/state/broker.json 当日已下单记录",
+          "可选参数 --json、--no-write、--now 指定时间"
+        ],
+        "outputs": [
+          "PASS 或 BLOCK 判定及逐条原因",
+          "trader/state/risk.json 判定记录与订单指纹",
+          "退出码 0 表示全部通过，1 表示至少一单被拦截",
+          "终端中每单的最大亏损、盈亏比与当日限额占用说明"
+        ],
+        "scenarios": [
+          "用户说 check my order 或 is this safe 时检查订单",
+          "下单前作为 trader-broker 的前置风控关卡",
+          "查询今天已用掉多少风险额度",
+          "判断某笔交易是否违反自设规则",
+          "批量订单逐笔累计风险的合规检查"
+        ],
+        "prerequisites": [
+          "已安装 Python 3 并可运行 check.py",
+          "存在 trader/ 目录下的订单与配置文件",
+          "配置中的限额由用户自行设定，技能不会修改"
+        ],
+        "limits": [
+          "PASS 仅表示订单可展示给用户，不构成交易建议或用户同意",
+          "不代下单、不改单使其通过、不放宽限额",
+          "免费 Yahoo 价格非官方且可能滞后，止损在快市中可能成交更差",
+          "期权、保证金、卖空、杠杆需配置允许且用户确认",
+          "pdt_guard 默认关闭，需按券商规则自行开启"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "安全",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Risk Manager. Checks every trade against your limits and stops anything over them, before it can reach the broker."
+          },
+          {
+            "field": "does",
+            "quote": "Prints PASS or BLOCK with the reason and records the verdicts so trader-broker only shows an order that passed."
+          },
+          {
+            "field": "does",
+            "quote": "Orders are checked in file order, as if each passed order had filled, so a batch that is fine order by order but breaks a limit together is caught."
+          },
+          {
+            "field": "does",
+            "quote": "Getting out must always be possible, so an exit is checked for format, asset and short sales only."
+          },
+          {
+            "field": "inputs",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/check.py\" --now \"2026-10-19 10:15\"  # pin the clock (New York time)"
+          },
+          {
+            "field": "outputs",
+            "quote": "Run `check.py`. Exit code 0 means every order passed, 1 means at least one was blocked."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/check.py\"                           # trader/ files; writes trader/state/risk.json"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/check.py\" --no-write                # look without recording"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "trader-scanner/SKILL.md",
+      "blob_sha": "96bc6a8906cdc4c29053430b123002f7be024eac",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-scanner/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": "2026-11-13T10:59:35.565Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-scanner",
+        "description": "Chart Scanner. Scans thousands of charts for setups: opening-range breakouts, flags, oversold bounces. Builds the list of US-listed common stocks, ordinary shares and ADRs from Nasdaq Trader's symbol directories, runs a pre-market scan of daily closes (20-day closing-high breakout, bull flag, reclaimed the 20-day average, oversold, oversold bounce) and an intraday opening-range breakout scan on 5-minute bars, then writes trader/watchlist.json for trader-news and trader-entry. Free Yahoo data, ba"
+      },
+      "excerpt": "---\nname: trader-scanner\ndescription: >-\n  Chart Scanner. Scans thousands of charts for setups: opening-range\n  breakouts, flags, oversold bounces. Builds the list of US-listed common\n  stocks, ordinary shares and ADRs from Nasdaq Trader's symbol directories,\n  runs a pre-market scan of daily closes (20-day closing-high breakout, bull\n  flag, reclaimed the 20-day average, oversold, oversold bounce) and an\n  intraday opening-range breakout scan on 5-minute bars, then writes\n  trader/watchlist.json for trader-news and trader-entry. Free Yahoo data,\n  bar by bar. Use when the user says \"scan the market\", \"find me setups\",\n  \"what is breaking out\", \"opening range breakouts\", \"scan for bull flags\",\n  \"oversold stocks\", \"pre-market scan\", \"build my watchlist\", \"what should I\n  look at today\", or at the start of a trading day before /trader-news.\nargument-hint: \"[universe | daily | orb] [--at HH:MM]\"\n---\n\n# trader-scanner\n\nThe Chart Scanner is the first step of a day trade. It reads thousands of\nfree charts and lists the ones that match a rule. That is all it does. A scan\nis a list of charts that match a rule, not a list of stocks to buy, and a\nsetup on a chart is not a prediction. Most people who day trade lose money;\nthe scanner does not change that. It only saves you from flipping through\n5,000 charts by hand.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/scan.py\" universe                       # -> trader/universe.txt\npython3 \"${CLAUDE_SKILL_DIR}/scan.py\" daily                          # before the open -> trader/watchlist.json\npython3 \"${CLAUDE_SKILL_DIR}/scan.py\" daily --symbols TSLA,NVDA,AMD  # or --watchlist FILE, --limit 200\npython3 \"${CLAUDE_SKILL_DIR}/scan.py\" orb                            # after 9:50 AM ET -> trader/watchlist.json\npython3 \"${CLAUDE_SKILL_DIR}/scan.py\" orb --at 10:15                 # cut the clock at 10:15 AM ET\npython3 \"${CLAUDE_SKILL_DIR}/scan.py\" orb --watchlist trader/watchlist.json --json\n```\n\nFlags: `--min-price 5` and `--min-volume` (daily 1,000,000, orb 0),\n`--or-minutes 15`, `--max-confirm 200` (orb stage 2),\n`--now \"2026-10-19 10:15\"` (New York time) to pin the clock, `--offline PATH`\nto read saved Yahoo files, `--no-write`, `--show N`, `--json`. Exit code 0\nwhen the scan found something, 1 when it found nothing or could not run (the\nreason is one plain line).\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/universe.txt` | written by `universe`: one `SYMBOL\\|Name` a line, read by `daily` and `orb` |\n| `trader/watchlist.json` | written by `daily` and `orb`: `mode`, `as_of`, `universe`, `scanned`, `failed`, `hits[]`. trader-news and trader-entry read `hits[].symbol` |\n| `trader/config.json` | read by `orb`: `no_entries_after` (default 15:30) |\n\n## The universe\n\n`universe` downloads `nasdaqlisted.txt` and `otherlisted.txt` from\nnasdaqtrader.com/dynamic/SymDir and keeps a row when, in this order:\n\n1. It is not a test issue, not an ETF, not NextShares.\n2. It is a plain ticker: 1 to 5 letters, or 1 to 4 letters plus one class\n   letter after a dot (BRK.B). A `$` preferred (ABR$D) is out, and so is a\n   `.U`, `.W` or `.R` suffix (units, warrants, rights).\n3. Out, whatever else the name says: warrants; SPAC units and rights (\"Units,\n   each consisting of\", \"Rights to receive\"); notes, ETNs, debentures; a %\n   coupon; \"Depositary Shares\" that are not American or Global (those carry a\n   preferred).\n4. In: the name calls it common stock, common shares or units, ordinary\n   shares, shares of beneficial interest, ADS / ADR / American or Global\n   depositary shares, or partnership or trust units.\n5. Out: the name still says unit, right, bond, preferred or preference.\n6. In: everything else (plain names like \"AMETEK, Inc.\").\n\nOn the Oct 19 2026 files this keeps 5,943. The reel said 5,259: that count\ncame from an ad hoc filter (names that say common or ordinary, no ADRs). All\n5,259 of those are in this list; the 684 extra are mostly ADRs, closed-end\nfunds and partnership units. The Oct 20 files gave 5,942.\n\n## The daily scan (before the open)\n\nYahoo's spark endpoint returns closes for 20 symbols a request, so 5,942\nsymbols take 298 requests. On Oct 20 2026 that took 145 seconds with the\npolite pause (0.3 s). Liquidity comes from the spark meta: last price at\nleast `--min-price` and last session's volume at least `--min-volume`. Run it\nbefore the open or after the close: during the session the volume is the\nday's so far, and today's daily bar is left out until 4:00 PM.\n\nThe setups are computed from daily closes only (spark has no highs or lows),\nso they are close cousins of the reel's `refs/scan.py`, which used highs and\nlows:\n\n| setup | the rule on closes |\n| --- | --- |\n| `breakout_20d` | the last close is above every close of the 20 sessions before it |\n| `bull_flag` | up more than 10 % over the 10 sessions before the last 5, then the last 5 closes inside a 5 % range |\n| `reclaim_ma20` | the close before was under its 20-day average, the last close is above it |\n| `oversold` | RSI 14 (Wilder) under 30 |\n| `oversold_bounce` | RSI 14 was under 30 yesterday and today closed up |\n\nA closing-high breakout fires more often than an intraday-high one (KO on\nOct 16 broke its 20-day closing high, not its 20-day intraday high). Hits are\nlisted most traded first (price times volume).\n\n## The opening-range breakout scan (during the session)\n\nThe opening range is the first `--or-minutes` (15) of the session: the 9:30,\n9:35 and 9:40 five-minute bars. A hit is the first completed 5-minute bar\nto CLOSE above the range high, at that bar's close time.\n\n1. Stage 1, every symbol: spark closes of today's 5-minute bars, 20 a\n   request. A chart goes on only if a completed bar after the range closed at\n   or above the highest close of the range. That is a necessary condition\n   (the range high is at least every range close), so no breakout is lost.\n2. Stage 2, each candidate: the v8 chart with real highs and lows, one\n   request each. Range high = the highest high of the range bars, range low =\n   the lowest low. On a strong morning most charts are candidates, so stage 2\n   checks at most `--max-confirm` (200) of them, the most traded first (price\n   times volume so far), and prints PARTIAL with the count it skipped.\n   `--max-confirm 0` checks them all.\n\nTiming, live on Tue Oct 20 2026 (a strong morning): 100 liquid names at\n10:01 AM took 35 seconds (5 spark requests, 70 v8 charts, 51 of 91 usable\ncharts broke out). The whole universe at 10:03 AM took about 4 minutes (298\nspark requests, then 200 v8 charts): 2,448 usable charts, 1,782 candidates,\nthe 200 most traded checked, 119 of those broke out. For a fast answer, scan\nthe daily watchlist or a list of names you trade (`--watchlist`, `--symbols`).\n\nA chart is usable only when every 5-minute bar from 9:30 to the cutoff is\nthere; a missing bar means a halt or a thin stock. Null closes are dropped,\na bar off the 5-minute grid (the live tick, like 10:58:07) is dropped, and a\nbar counts only once it is complete (start + 5 minutes). Before 9:50 AM, on a\nweekend or holiday, after the close, or after `no_entries_after` (an expired\nsetup) it prints one plain line and writes nothing. The 1:00 PM early closes\nare in the calendar.\n\n## Data and limits\n\n- Yahoo's chart and spark endpoints are free, unofficial and can lag. Bars are\n  5-minute bars, bar by bar, never tick by tick. query2 first, query1 on a 429\n  or 5xx, one retry after a 5-second wait on a 429.\n- Partial results are said as partial: \"Fetched 4,980 of 5,259 charts (279\n  failed or had no data)\". Never round a partial scan up to \"the whole market\".\n- NYSE holidays and early closes for 2026 and 2027 (nyse.com, read 2026-10-13).\n\n## Steps\n\n1. Once a week or so: `scan.py universe`.\n2. Before the open: `scan.py daily`. Tell the user the counts (fetched,\n   liquid, scanned, hits) and the top few by setup.\n3. After 9:50 AM ET (10:15 is the classic): `scan.py orb",
+      "card": {
+        "title_zh": "图表形态扫描器",
+        "purpose_zh": "从纳斯达克交易商目录构建美股普通股与ADR清单，用免费雅虎数据按规则扫描日线形态和盘中开盘区间突破，输出观察名单JSON供后续技能使用。",
+        "does": [
+          "下载纳斯达克交易商符号目录，按规则筛选出普通股、普通股单位与ADR，生成股票池文件",
+          "对日线收盘价扫描20日收盘新高突破、牛旗、收复20日均线、超卖、超卖反弹五种形态",
+          "盘中用5分钟K线扫描开盘区间突破，先粗筛候选再用真实高低点确认",
+          "按成交额排序命中结果，写出观察名单JSON供trader-news和trader-entry读取",
+          "支持指定符号、观察名单文件、离线数据文件、固定时钟和JSON输出",
+          "报告抓取数、可用图表数、命中数，并明确标注部分结果"
+        ],
+        "inputs": [
+          "子命令universe、daily或orb",
+          "可选参数--symbols、--watchlist、--limit、--at、--now、--offline、--no-write、--show、--json",
+          "价格与成交量下限、开盘区间分钟数、确认上限等标志",
+          "trader/config.json中的no_entries_after",
+          "纳斯达克交易商符号目录文件与雅虎图表数据"
+        ],
+        "outputs": [
+          "trader/universe.txt，每行SYMBOL|Name",
+          "trader/watchlist.json，含mode、as_of、universe、scanned、failed、hits[]",
+          "终端打印的命中清单与统计行",
+          "退出码0表示有命中，1表示无命中或无法运行"
+        ],
+        "scenarios": [
+          "开盘前扫描全市场日线形态，生成当日观察名单",
+          "盘中9:50后扫描开盘区间突破",
+          "用户说扫描市场、找形态、什么在突破、超卖股票时",
+          "为trader-news和trader-entry准备候选标的",
+          "用离线保存的雅虎数据复现某次扫描"
+        ],
+        "prerequisites": [
+          "需要python3运行scan.py",
+          "需要能访问nasdaqtrader.com与雅虎图表接口的网络",
+          "需先运行universe生成股票池，daily和orb依赖它",
+          "盘中扫描需在美东9:50后、收盘前且未过no_entries_after"
+        ],
+        "limits": [
+          "雅虎数据免费非官方且可能延迟，只有5分钟K线，无逐笔数据",
+          "日线形态仅用收盘价计算，无最高最低价",
+          "盘中确认阶段默认最多检查200个候选，超出会标记PARTIAL",
+          "数据缺失或停牌导致图表不可用，结果可能不完整",
+          "不判断买卖、不下单、不承诺形态有效，不提供盈亏数字",
+          "命中会随价格变动而过时，需重新运行"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "数据分析",
+          "调研",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Scans thousands of charts for setups: opening-range breakouts, flags, oversold bounces."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "then writes trader/watchlist.json for trader-news and trader-entry"
+          },
+          {
+            "field": "does",
+            "quote": "`universe` downloads `nasdaqlisted.txt` and `otherlisted.txt` from nasdaqtrader.com/dynamic/SymDir"
+          },
+          {
+            "field": "does",
+            "quote": "The setups are computed from daily closes only"
+          },
+          {
+            "field": "does",
+            "quote": "A hit is the first completed 5-minute bar to CLOSE above the range high, at that bar's close time."
+          },
+          {
+            "field": "does",
+            "quote": "Hits are listed most traded first (price times volume)."
+          },
+          {
+            "field": "does",
+            "quote": "Partial results are said as partial"
+          },
+          {
+            "field": "inputs",
+            "quote": "Flags: `--min-price 5` and `--min-volume` (daily 1,000,000, orb 0), `--or-minutes 15`, `--max-confirm 200`"
+          },
+          {
+            "field": "inputs",
+            "quote": "`trader/config.json` | read by `orb`: `no_entries_after` (default 15:30)"
+          },
+          {
+            "field": "outputs",
+            "quote": "`trader/watchlist.json` | written by `daily` and `orb`: `mode`, `as_of`, `universe`, `scanned`, `failed`, `hits[]`"
+          },
+          {
+            "field": "outputs",
+            "quote": "Exit code 0 when the scan found something, 1 when it found nothing or could not run"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user says \"scan the market\", \"find me setups\", \"what is breaking out\""
+          },
+          {
+            "field": "scenarios",
+            "quote": "After 9:50 AM ET (10:15 is the classic): `scan.py orb"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/scan.py\" universe"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Yahoo's chart and spark endpoints are free, unofficial and can lag."
+          },
+          {
+            "field": "limits",
+            "quote": "Bars are 5-minute bars, bar by bar, never tick by tick."
+          },
+          {
+            "field": "limits",
+            "quote": "stage 2 checks at most `--max-confirm` (200) of them"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "trader-timemachine/SKILL.md",
+      "blob_sha": "ecef8b13f13ac43e4bb8d79886faef05ea0fdf04",
+      "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-timemachine/SKILL.md",
+      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "trader-timemachine",
+        "description": "Time Machine. Replays every possible outcome of a trade before you risk a dollar: 10,000 simulated sessions plus every past time the setup fired. Takes the plan from trader-exit (entry, stop, target), rebuilds the rest of the day 10,000 times from the stock's own 5-minute bars over the last 60 days, and re-runs the same rule on every past session. Prints the odds of target first, stop first, or neither by the close, where the price sits at the close, the average R, the history, and one honest ve"
+      },
+      "excerpt": "---\nname: trader-timemachine\ndescription: >-\n  Time Machine. Replays every possible outcome of a trade before you risk a\n  dollar: 10,000 simulated sessions plus every past time the setup fired.\n  Takes the plan from trader-exit (entry, stop, target), rebuilds the rest of\n  the day 10,000 times from the stock's own 5-minute bars over the last 60\n  days, and re-runs the same rule on every past session. Prints the odds of\n  target first, stop first, or neither by the close, where the price sits at\n  the close, the average R, the history, and one honest verdict, then hands\n  off to /trader-budget. Use when the user says \"run the time machine\",\n  \"replay this trade\", \"what are the odds\", \"simulate this trade\", \"monte\n  carlo\", \"backtest this setup\", \"how often does this hit the target\", \"is\n  this a coin flip\", or after /trader-exit writes a plan, before\n  /trader-budget.\nargument-hint: \"[path to plan.json, or TICKER]\"\n---\n\n# trader-timemachine\n\nThe Time Machine sits between the plan and the money. trader-exit has set\nthe entry, the stop and the target. Before anything is sized or sent, this\nskill asks one question: if today plays out like the stock's own last 60\ndays, how often does this plan hit the target first, the stop first, or\nneither? It answers with 10,000 replays and with the real record of the same\nrule on every past session. It is a simulation built from the stock's own\nrecent bars, not a prediction. Day trading loses most people money, and a\ngood-looking replay does not change that.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run                    # trader/plan.json, 10,000 replays, seed 19\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --write            # also save trader/timemachine.json\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --until 15:55      # end each replay at your flat-by time\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --json\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --symbol TSLA --date 2026-10-19 \\\n    --entry 364.18 --stop 358.32 --target 370.04 --entry-time \"10:15 AM\"\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" chart --from           # ASCII fan chart of the saved run\n```\n\nOther flags: `--replays N`, `--seed N` (default 19), `--window N` (default 2\nbars), `--offline FILE` (a saved Yahoo chart JSON, `.json` or `.json.gz`),\n`--now \"2026-10-19 10:15\"` (New York time) to pin the clock.\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/plan.json` | the plan from trader-exit: symbol, date, entry, entry_time / entry_bar, stop, stop_rule, target, target_r, opening range |\n| Yahoo chart API | one request: 60 days of 5-minute bars (`range=60d&interval=5m`), free and unofficial, can lag |\n| `trader/timemachine.json` | with `--write`: `{plan, mc, history}` plus the verdict. `mc` holds the odds, percentiles, the fan-chart bands, 160 sample paths and a 24-bin histogram of the close |\n\n## How it works\n\n1. **The pool.** It keeps only FULL sessions before the plan's date: all 78\n   five-minute bars, 9:30 to 4:00 New York time. Half days, gaps and today\n   are left out. Every bar becomes four ratios to the bar before it:\n   open, high, low and close over the previous close.\n2. **One replay.** Start at the entry price. For each bar left in the day,\n   pick a past bar from the same time of day (plus or minus 2 bars) at\n   random, and scale it to the current price. Bar by bar, it checks the stop\n   first, then the target. A bar that touches both counts as the stop.\n3. **10,000 replays** give four odds. Target first. Stop first. Neither,\n   which means the trade was still open at `--until` (default 4:00 PM, the\n   close, or 1:00 PM on an NYSE early-close day). Green, which means target\n   first or above the entry at `--until`.\n   R is +1 at a 1R target, -1 at the stop, and otherwise the distance from\n   the entry at `--until` divided by the risk. A gap through the stop still\n   counts as -1R here. A real fill can be worse.\n4. **The history.** The plan's own rule (the same opening range, stop rule\n   and target R) runs again on every one of those past sessions. That is\n   what really happened, not a simulation.\n5. **The verdict** is one line from the numbers. It looks only at the\n   replays that hit one side, and asks how often the target came first. A\n   bigger target needs to win less often to break even: 1 in (1 + R). That\n   is 50 % at 1R, 33 % at 2R, 25 % at 3R. Less than 5 points from break-even:\n   \"Close to a coin flip\" at 1R, \"Close to break-even\" at any other R. 5 to\n   15 points: \"Leans toward the target\" or \"Leans toward the stop\". 15 or\n   more: \"Strongly toward\" one of them. So a 2R plan with target first\n   24.1 % and stop first 50.5 % is close to break-even (it needs 33 % of\n   the 74.6 % that hit a side, and got 32 %), not a loser.\n6. **Below the verdict**, when it applies: a line when more than 40 % of the\n   replays hit neither (the price at `--until` decides those), and the\n   average R when its sign goes against the lean. Those can only point the\n   other way because of the replays that hit neither.\n\n**The seed.** The draws come from Python's `random.Random(seed)`, seed 19 by\ndefault. Same plan, same data, same seed: the same numbers, on any machine.\nSay the seed with every result so the user can repeat it.\n\n**5-minute bars only.** Yahoo keeps 60 days of 5-min bars but only about 7\ndays of 1-min bars, too few sessions for a fair pool. It refuses, in one\nplain line, when there are fewer than 20 full sessions, when the entry bar is\nnot in the data (wrong date, not closed yet, a future day), or when the plan\ndoes not make sense (a stop above a buy's entry, an entry off the 5-minute\ngrid). A live in-progress bar is never used.\n\n## Steps\n\n1. Make sure `trader/plan.json` is today's plan from `/trader-exit`. If there\n   is none, run that first, or pass the plan as flags.\n2. Run `timemachine.py run --write`. Add `--until 15:55` when the plan has a\n   flat-by time, so \"neither\" means still open at the time you would get out.\n3. Tell the user, in this order: the four odds, the median and the 5 to 95\n   range of the price at the close, the average R, the history line, then the\n   verdict line and any line under it exactly as printed. Say the seed.\n4. If the verdict is a coin flip or close to break-even, say so plainly. Do\n   not dress it up. If the history and the replays disagree, say that too.\n5. Say once that this is built from the last 60 days and is not a prediction.\n   Earnings, news and halts can do things those 60 days never did. Check\n   `/trader-news` for the stock before going on.\n6. If the user still wants the trade, hand off to `/trader-budget` to size it.\n\n## Example: the reel\n\nTSLA, Monday 2026-10-19. The 15-minute opening range is 354.47 to 362.18.\nThe 10:10 bar closes above it: entry 364.18 at 10:15 AM (bar 8), stop 358.32\n(the range midpoint, rounded down), target 370.04 (1R, risk 5.86 a share).\n\n```\n10,000 replays of the rest of the session, 10:15 AM to 4:00 PM (69 five-minute bars), seed 19.\n  target first   29.4 %\n  stop first     25.5 %\n  neither        45.1 %   still open at 4:00 PM\n  green          51.7 %   target first, or above the entry at 4:00 PM\n  Price at 4:00 PM: median 364.36, 90 % of replays between 355.54 and 373.54.\n  Average R: +0.034\nHistory: the same rule on each of those 59 real sessions fired 33 times:\n13 target, 15 stop, 5 neither. Average R -0.062.\nClose to a coin flip: target first 29.4 % vs stop first 25.5 %.\n45.1 % of the replays hit neither by 4:00 PM; the price at 4:00 PM decides those.\n```\n\nAt 1R the target has to come first in half of the replays that hit one\nside. It did in 53.6 %. The replays came out close to a coin flip, and the\nreal history was slightly worse than even. That is the honest answer for this setup, and it is what\nthe user should hear before `/trader-budget` sizes 8 shares.\n\n## Rules\n\n- Every number comes from the run. Never round a coin f",
+      "card": null
+    }
+  ]
+}
