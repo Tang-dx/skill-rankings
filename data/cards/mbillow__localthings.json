@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "repo": "mbillow/localthings",
+  "tree_sha": "242d1da1a015b812f38e2ee5c849ee1f5a7f2f6e",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": ".claude/skills/adding-device-support/SKILL.md",
+      "blob_sha": "db560a9c47217ba5fc778f706894df945b2b7529",
+      "source_url": "https://github.com/mbillow/localthings/blob/663e4b39732bffb29cea4ed13d71b60a4d52d08d/.claude/skills/adding-device-support/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "adding-device-support",
+        "description": "Add or extend support for a Samsung OCF appliance in localthings from a /device/0 diagnostics dump. Use when a device-support issue lands, a device raises the \"incomplete capability coverage\" repair, a diagnostics JSON needs triaging, or you're mapping OCF resources to HA entities. Covers reading dumps, routing a device to a registry from its `/oic/d` device type first and an unrecognized board family second (modelNum board tokens, resource signatures), OCF-standard vs vendor hrefs, the diagnost"
+      },
+      "excerpt": "---\nname: adding-device-support\ndescription: >-\n  Add or extend support for a Samsung OCF appliance in localthings from a\n  /device/0 diagnostics dump. Use when a device-support issue lands, a device\n  raises the \"incomplete capability coverage\" repair, a diagnostics JSON needs\n  triaging, or you're mapping OCF resources to HA entities. Covers reading dumps,\n  routing a device to a registry from its `/oic/d` device type first and an\n  unrecognized board family second (modelNum board tokens, resource\n  signatures),\n  OCF-standard vs vendor hrefs, the diagnostic/config/normal entity taxonomy,\n  preferring dynamic (device-reported) select options over hardcoded lists,\n  ensuring every href is bound or ignored, and locking it in with a fixture +\n  golden + test. Also covers multi-subdevice (\"composite\") appliances that\n  expose several logical indoor subdevices over one IP — triaging a missing\n  second subdevice, and why registry hrefs stay canonical rather than indexed.\n---\n\n# Adding device support\n\nlocalthings maps a Samsung appliance's OCF resources (`/device/0` dump) to Home\nAssistant entities. Each resource `href` is handled by a `Capability` that\ndeclares the entities it produces. This skill is the workflow for turning a new\ndump into coverage.\n\n## 1. Get the dump and see the gaps\n\nA user's diagnostics download (`config_entry-localthings-*.json`) has, under\n`data`:\n- `resources`: `{href: rep}` — the parsed `/device/0` snapshot. **This is the\n  source of truth**, not code comments. On a multi-subdevice appliance this is\n  the subdevice the config entry connects to and *only* that subdevice;\n  siblings report their own (see below).\n- `unbound_hrefs`: resources that bound to no capability. The\n  \"incomplete capability coverage\" repair fires whenever this is **non-empty or\n  the device type is unrecognized** (`coordinator._update_coverage_gap_issue`).\n\nMulti-subdevice appliances (one IP, one DTLS session, several logical indoor\nsubdevices — issue #177) add four more, all absent/empty on an ordinary device:\n- `subdevices`: one entry per materialized sibling — `kind`/`key`/`seed_path`,\n  its own `model`, its bound hrefs, and its own `resources`.\n- `subdevices_skipped`: candidates whose seed answered but that produced no\n  live primary state, with the reps the gate actually judged. An unused\n  SmartThings slot lands here, not in `subdevices`.\n- `subdevice_probes`: `{seed_href: found}` for every seed attempted — tells\n  \"checked, nothing there\" apart from \"never checked\".\n- `multidevice`: `/multidevice/vs/0`'s rep if the board answers it. Its\n  `numofsubdevice` is a corroborating count, not a gate.\n\nGoal: make `unbound_hrefs` empty by **binding** the useful resources and\n**ignoring** the noise — and surface every genuinely useful sensor/select/switch\nalong the way.\n\n## 2. Compute coverage without Home Assistant\n\nThe `registry/` package is HA-free, so you can drive discovery directly (HA\nisn't importable standalone because `localthings/__init__.py` pulls it in — stub\nthe package to skip that):\n\n```python\nimport sys, types, json, importlib\ncc = types.ModuleType('custom_components'); cc.__path__=['custom_components']; sys.modules['custom_components']=cc\nlt = types.ModuleType('custom_components.localthings'); lt.__path__=['custom_components/localthings']; sys.modules['custom_components.localthings']=lt\nby_type   = importlib.import_module('custom_components.localthings.registry.by_type')\ndiscovery = importlib.import_module('custom_components.localthings.registry.discovery')\nadapter   = importlib.import_module('custom_components.localthings.registry.adapter')\n\ndata = json.load(open('dump.json'))['data']\nresources = data['resources']\n# identity.device_types is /oic/d's `rt` -- resolve()'s primary signal (see\n# §3). Absent on dumps predating that field; () falls through to model-based\n# detection exactly like a device that reports nothing there.\ndevice_types = tuple((data.get('identity') or {}).get('device_types') or ())\nreg = by_type.resolve(resources, device_types=device_types)   # the same entry point the coordinator uses\nunbound = []\nbound = discovery.discover(resources, reg.capabilities, reg.pattern_capabilities, log=unbound.append)\nstate = adapter.flatten(bound, resources)   # {entity_key: value}\nprint('registry:', reg.name, 'unbound:', sorted(unbound))\nprint('state_keys:', sorted(state))\n```\n\n`discover()` binds caps (applies `rt_filter`/`match_fn`); `flatten()` applies\n`exists_fn` and produces the final entity values. Use the same routine to\nregenerate a golden.\n\n**A sibling subdevice's block runs through this unchanged.** `subdevices[i].resources`\n(and `subdevices_skipped[i].resources`) are keyed by *canonical* hrefs —\n`/mode/vs/0`, never the `/mode/vs/1` or `/<uuid>/mode/vs/0` that subdevice\nactually answers on — precisely so you can paste one into `resources` above and\nread the result exactly like the master's. No de-indexing by hand.\n\n## 3. Route the device to a registry — add a row, never a branch\n\nIf detection returns `None`, the device falls back to common capabilities and\nloses roughly **half** its entities (measured across the fixture corpus: 843 of\n1510 bound entities survive). So routing is the first thing to fix, and\n`registry/by_type/__init__.py` is deliberately kept boring.\n\n`resolve(resources, device_types=())` is the only entry point — the\ncoordinator, the config flow's probe and the golden-regression harness all\ncall it, so the order can't drift between what ships and what the tests\nassert. Four stages, most-specific evidence first:\n\n1. **`for_device_by_oic_type(device_types)`** — the primary path whenever a\n   dump has it. `device_types` is `/oic/d`'s `rt`, looked up against\n   `_OIC_TYPE_TO_KEY`. The device naming its own type beats parsing board\n   part numbers, so this always wins when it hits. **Always check this first\n   when triaging a new dump** — see \"Adding an /oic/d device type\" below.\n2. **`for_device_by_subtype(deviceSubType)`** — the 8888 bridge's\n   equivalent, since it serves no `/oic/d`. Each record names its own type in\n   `Information.deviceSubType` (`Washer`, `Dryer`, `WallOven`, ...), which\n   lands in `/information/vs/0` and is looked up against\n   `_DEVICE_SUBTYPE_TO_KEY`. A new 8888 appliance needs a row here, not a\n   board token.\n3. **`for_device_by_model(model_num, description)`** — the fallback for\n   everything `/oic/d` doesn't resolve. Both fields come from\n   `/information/vs/0`. Board-family tokens are matched against `modelNum`\n   first, then `description`, then the fuzzy two-letter consumer-model prefix.\n4. **`for_device_by_resources(resources)`** — for boards that report no\n   `/information/vs/0` at all. Needs a *distinctive* signature.\n\n**`oneUiVersion` is not consulted.** It looks like the obvious signal — the\ndevice naming its own type, `'7.0 Dishwasher'` — and it used to be stage one.\nBut only a minority of hardware reports it, every device that does is already\ntyped by its modelNum board token (`TestOneUiVersionIsNotConsulted` checks that\nagainst the whole corpus), and no device-support issue was ever fixed by adding\na mapping for it. Don't reintroduce it as a detection stage; it stays in\ndiagnostics as a firmware-generation marker (`'7.0 Air conditioner'` means\nTizen Lite), which is useful when triaging.\n\n### Adding a board family\n\nAlmost always a one-line addition to `_BOARD_TOKEN_TO_KEY`:\n\n```python\n'VSKR': 'vacuum_station',   # issue #131 -- stick-vacuum clean station\n```\n\nMatching is on **whole tokens** of the model string, split on any run of\nnon-alphanumerics and upper-cased. That is what keeps this a table, and it\ncarries rules:\n\n- **Never add a delimiter spelling.** `'_RAC_'` and `'-RAC-'` are the same\n  entry, `RAC`. If you find yourself adding a second row for punctuation, the\n  tokenizer already handled it.\n- **Name the specific type, never the board family.** `DA-AC-` prefixes\n  RAC/WAC/DHM/AIR alike — a bare `'AC'` row would swallow the dehumidifier\n  and the air purifier. Same for `DA",
+      "card": {
+        "title_zh": "设备支持扩展流程",
+        "purpose_zh": "依据 /device/0 诊断转储，为 Samsung OCF 家电在 localthings 中新增或扩展设备支持，把 OCF 资源映射为 Home Assistant 实体并消除未绑定 href。",
+        "does": [
+          "读取诊断 JSON 中的 resources 与 unbound_hrefs，定位能力覆盖缺口",
+          "在无 Home Assistant 环境下用 registry 包计算绑定与实体状态",
+          "按 /oic/d 设备类型、deviceSubType、modelNum 板级 token、资源签名四级顺序路由到注册表",
+          "新增板级 token 或 /oic/d 类型映射行，而非写分支逻辑",
+          "处理多子设备（复合）家电的子设备枚举与缺失子设备排查",
+          "用 fixture、golden 与测试锁定新增覆盖"
+        ],
+        "inputs": [
+          "用户诊断下载 config_entry-localthings-*.json",
+          "/device/0 的 resources 快照",
+          "identity 块中的 device_types、manufacturer、model",
+          "/oic/d、/oic/p、/oic/res 端点数据"
+        ],
+        "outputs": [
+          "绑定与忽略后的 unbound_hrefs 清单",
+          "flatten 得到的 entity_key 到值映射",
+          "注册表路由结果与新增映射表行",
+          "fixture、golden 与测试用例"
+        ],
+        "scenarios": [
+          "设备支持 issue 出现时新增支持",
+          "设备触发 incomplete capability coverage 修复提示",
+          "诊断 JSON 需要分诊",
+          "把 OCF 资源映射为 HA 实体",
+          "多子设备家电缺失第二个子设备"
+        ],
+        "prerequisites": [
+          "可获取设备诊断转储 JSON",
+          "可导入 localthings 的 registry 包（需 stub custom_components 包以绕过 HA 依赖）",
+          "了解注册表 by_type 中的映射表结构"
+        ],
+        "limits": [
+          "oneUiVersion 不作为检测阶段",
+          "板级 token 不得添加分隔符拼写、板族名或可共现的 token",
+          "两字母 token 仅作最后手段",
+          "资源签名需两个独立特征",
+          "无对应注册表键的类型保持不映射"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "后端",
+          "文档",
+          "调研",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "localthings maps a Samsung appliance's OCF resources (`/device/0` dump) to Home Assistant entities."
+          },
+          {
+            "field": "does",
+            "quote": "Goal: make `unbound_hrefs` empty by **binding** the useful resources and **ignoring** the noise"
+          },
+          {
+            "field": "does",
+            "quote": "The `registry/` package is HA-free, so you can drive discovery directly"
+          },
+          {
+            "field": "does",
+            "quote": "`resolve(resources, device_types=())` is the only entry point"
+          },
+          {
+            "field": "does",
+            "quote": "Almost always a one-line addition to `_BOARD_TOKEN_TO_KEY`"
+          },
+          {
+            "field": "does",
+            "quote": "Also covers multi-subdevice (\"composite\") appliances that expose several logical indoor subdevices over one IP"
+          },
+          {
+            "field": "does",
+            "quote": "ensuring every href is bound or ignored, and locking it in with a fixture + golden + test"
+          },
+          {
+            "field": "inputs",
+            "quote": "A user's diagnostics download (`config_entry-localthings-*.json`) has, under `data`:"
+          },
+          {
+            "field": "outputs",
+            "quote": "`discover()` binds caps (applies `rt_filter`/`match_fn`); `flatten()` applies `exists_fn` and produces the final entity values."
+          },
+          {
+            "field": "outputs",
+            "quote": "Use the same routine to regenerate a golden."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when a device-support issue lands, a device raises the \"incomplete capability coverage\" repair, a diagnostics JSON needs triaging, or you're mapping OCF resources to HA entities."
+          },
+          {
+            "field": "scenarios",
+            "quote": "triaging a missing second subdevice"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "HA isn't importable standalone because `localthings/__init__.py` pulls it in — stub the package to skip that"
+          },
+          {
+            "field": "limits",
+            "quote": "**`oneUiVersion` is not consulted.**"
+          },
+          {
+            "field": "limits",
+            "quote": "**Never add a delimiter spelling.**"
+          }
+        ]
+      }
+    }
+  ]
+}

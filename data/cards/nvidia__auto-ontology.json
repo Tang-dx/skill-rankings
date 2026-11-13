@@ -1,0 +1,404 @@
+{
+  "schema": 1,
+  "repo": "NVIDIA/auto-ontology",
+  "tree_sha": "69a4abfc5b14032f3ddb63148ef2b38d974bd35a",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/nvidia-ontology-management/SKILL.md",
+      "blob_sha": "c03bf84dacd9d33f02eccb02af1f539a0b93b15c",
+      "source_url": "https://github.com/NVIDIA/auto-ontology/blob/fc43a82600e18b19d159c52023f54f5572f537ac/skills/nvidia-ontology-management/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "nvidia-ontology-management",
+        "description": "Model and publish semantic definitions in Auto Ontology. Use for terms, relationships, measures, imports, and governed results—not deployment or querying."
+      },
+      "excerpt": "---\nname: nvidia-ontology-management\ndescription: >-\n  Model and publish semantic definitions in Auto Ontology. Use for terms, relationships,\n  measures, imports, and governed results—not deployment or querying.\nlicense: Apache-2.0\nmetadata:\n  version: \"0.2.1\"\n  author: \"NVIDIA <opensource@nvidia.com>\"\n  tags:\n    - nvidia-ontology\n    - ontology\n    - glossary\n    - sql-attributes\n    - catalog\n---\n\n<!--\nSPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.\nAll rights reserved.\nSPDX-License-Identifier: Apache-2.0\n-->\n\n# Auto Ontology management and modeling\n\n## Purpose\n\nInspect and change Auto Ontology's semantic layer without confusing a successful API call\nwith correct business meaning or durable publication. The machine-readable\ninputs, outputs, statuses, gates, and handoffs are in\n[runtime-contract.yaml](assets/runtime-contract.yaml).\n\nChoose the focused workflow before acting:\n\n- routine inspection or metadata edits: continue below and use\n  [write-api.md](references/write-api.md);\n- concepts, relationships, measures, units, grain, or policies: use\n  [modeling.md](references/modeling.md);\n- model promotion or reusable analytical results: use\n  [publication.md](references/publication.md).\n\nMCP tools only **read**. Create, patch, import, and compile-reset go through\nthe Next.js `/api/...` gateway. Governed result rows require an approved source\nwriter; Auto Ontology has no generic result-row writeback endpoint. Request bodies and\nfield types live in `docs/openapi/auto-ontology-api.json`; this skill names operations and\npermissions only.\n\n## Prerequisites\n\nUse a running, authenticated Auto Ontology deployment. Use `nvidia-ontology-setup` when\nthe deployment or semantic layer is not ready.\n\n## Limitations\n\nMCP is read-only, Auto Ontology has no generic result-row writeback endpoint, and current\nmodel import and certification APIs do not prove atomic promotion. Follow the\npublication gates below and fail closed when exact readback is unavailable.\n\n## Auth\n\nScripts use an API token (`x-api-key` or `Authorization: Bearer`). Mint it in\nthe UI (user menu → API Tokens). A token **acts as its owner** — a viewer's\ntoken cannot do admin things. Creating and revoking tokens requires a signed-in\nsession; a token cannot mint another token.\n\nWrites below need `catalog:edit` unless noted. `403` means the owner's role\nlacks that permission, not that the path is wrong.\n\n## Instructions\n\n1. **Discover current meaning** via MCP (`search_terms`, `get_term`,\n   `get_term_columns`, `get_term_sql_attributes`, `describe_table`) or REST\n   if MCP is absent (`GET /api/terms`, `GET /api/terms/{term_id}`,\n   `GET /api/exploration/tables/{table_id}/details`).\n2. **Resolve the semantic contract** when meaning changes. Record source\n   binding, identity, population, relationship cardinality, measure expression,\n   unit, grain, denominator, time, validity, and counterexamples; see\n   [modeling.md](references/modeling.md).\n3. **State the proposed change** to the user (term rename, new SQL attribute,\n   import, and so on). Do not silently rewrite the glossary.\n4. **Validate SQL** before create/update: `POST /api/sql-attributes/validate`.\n   A parse failure is **HTTP 422**, not `valid: false`.\n5. **Apply** the smallest write that matches the request (see\n   [write-api.md](references/write-api.md)).\n6. **Compilation is not a hidden side effect.** Check\n   `GET /api/semantic-compilation/status`. Do **not** call\n   `POST /api/semantic-compilation/reset` as cleanup — it is an asynchronous,\n   destructive rebuild of every database's compiled layer, returns 202, and\n   requires `semanticCompilation:manage`.\n7. **Verify the persisted change**, not merely request success. Model imports\n   require a scoped backup and exact re-export comparison; see\n   [publication.md](references/publication.md). Then use MCP\n   `check_answerable` / `ask_question` (or REST\n   `POST /api/question-entity-coverage` and `POST /api/chat/completions`) for\n   positive and negative behavior checks.\n\n## Semantic relationships and \"what does this dataset mean\"\n\nStay on the semantic layer. Do not browse raw schemas to answer meaning.\n\n- Term → columns: MCP `get_term_columns` or\n  `GET /api/terms/{term_id}/column-attributes`\n- Term → derived SQL: MCP `get_term_sql_attributes`\n- Table → terms and SQL attributes: MCP `describe_table` or\n  `GET /api/exploration/tables/{table_id}/details`\n- Semantic hop chain between two terms:\n  `GET /api/exploration/terms/{term_id}/path/{other_term_id}`\n- Semantic graphs: `GET /api/exploration/graph`,\n  `GET /api/exploration/semantic-graph`\n\nThese are semantic relationship paths, not generation provenance, source\nrevision, certification history, or version lineage.\n\n## Bulk import / export\n\n- `POST /api/model/export` — YAML of catalog + semantic layer.\n  Permission `modelInterchange:export`. Body may set catalog database **IDs**\n  in `databases` (empty = all) and `format` (`auto_ontology` or `ossie`).\n- `POST /api/model/import` — multipart YAML; native Auto Ontology\n  (`data_layer` / `semantic_layer`) or Apache Ossie (`version`, `name`,\n  `datasets` at the root).\n  Query `replace` (default true) and `embed` (default true). Permission\n  `modelInterchange:import`. Can replace existing data — confirm with the\n  user before `replace=true`, apply first in isolation, and use the exact\n  readback workflow in [publication.md](references/publication.md).\n\n## Examples\n\n- To define a run-grain measure, follow the evidence and counterexample workflow\n  in [modeling.md](references/modeling.md).\n- To revise and promote a model, back up the exact scope and follow the staged\n  readback workflow in [publication.md](references/publication.md).\n\n## Troubleshooting\n\nFor write failures, verify the authenticated owner's permission, distinguish\nHTTP 422 parse failures from validation results, and inspect compilation status\nbefore changing the model or resetting compilation.\n\n## See also\n\n- [write-api.md](references/write-api.md)\n- [modeling.md](references/modeling.md)\n- [publication.md](references/publication.md)\n- `nvidia-ontology-query` — how to call Auto Ontology and validate query results\n- `nvidia-ontology-setup` — deployment not ready\n- `mcp/auto_ontology_mcp/tools.py` — live read-tool allow-list\n",
+      "card": {
+        "title_zh": "Auto Ontology 语义建模",
+        "purpose_zh": "在 Auto Ontology 中查看与修改语义层，包括术语、关系、度量、导入与受治理结果；强调区分 API 调用成功与业务含义正确，不涉及部署或查询。",
+        "does": [
+          "通过 MCP 只读工具或 REST 接口发现术语、列属性、SQL 属性与表语义",
+          "在含义变更时梳理源绑定、身份、粒度、单位、时间、有效性等语义契约",
+          "在创建或更新前用 /api/sql-attributes/validate 校验 SQL",
+          "按最小写入原则执行创建、补丁、导入等变更，并先向用户说明",
+          "检查语义编译状态，避免把编译重置当作清理手段",
+          "通过导出导入 YAML 进行模型批量交换，并做回读验证"
+        ],
+        "inputs": [
+          "运行中且已认证的 Auto Ontology 部署",
+          "API 令牌（x-api-key 或 Authorization: Bearer）",
+          "术语、关系、度量、单位、粒度、策略等语义定义",
+          "待校验的 SQL 语句",
+          "YAML 模型文件（Auto Ontology 或 Apache Ossie 格式）"
+        ],
+        "outputs": [
+          "术语、列属性、SQL 属性、语义图与路径等查询结果",
+          "语义模型变更（创建、补丁、导入）",
+          "SQL 校验结果或 HTTP 422 解析失败",
+          "语义编译状态",
+          "模型导出 YAML 与回读比对结果"
+        ],
+        "scenarios": [
+          "例行查看或编辑术语元数据",
+          "定义概念、关系、度量、单位、粒度或策略",
+          "模型晋升或复用分析结果的发布",
+          "批量导入导出语义模型",
+          "排查写入失败与编译状态问题"
+        ],
+        "prerequisites": [
+          "使用运行中且已认证的 Auto Ontology 部署",
+          "部署或语义层未就绪时改用 nvidia-ontology-setup",
+          "写入需 catalog:edit 权限，令牌权限等同其所有者",
+          "令牌需在 UI 用户菜单的 API Tokens 中创建"
+        ],
+        "limits": [
+          "MCP 工具只读，写入须走 Next.js /api 网关",
+          "Auto Ontology 没有通用的结果行回写端点",
+          "当前模型导入与认证 API 不能证明原子晋升",
+          "编译重置是异步破坏性重建，返回 202，需 semanticCompilation:manage",
+          "导入 replace=true 可能替换现有数据，须先确认"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "数据分析",
+          "文档",
+          "后端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Inspect and change Auto Ontology's semantic layer without confusing a successful API call with correct business meaning or durable publication."
+          },
+          {
+            "field": "does",
+            "quote": "MCP tools only **read**. Create, patch, import, and compile-reset go through the Next.js `/api/...` gateway."
+          },
+          {
+            "field": "does",
+            "quote": "**Validate SQL** before create/update: `POST /api/sql-attributes/validate`."
+          },
+          {
+            "field": "does",
+            "quote": "**Verify the persisted change**, not merely request success."
+          },
+          {
+            "field": "does",
+            "quote": "`POST /api/model/export` — YAML of catalog + semantic layer."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use a running, authenticated Auto Ontology deployment. Use `nvidia-ontology-setup` when the deployment or semantic layer is not ready."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Scripts use an API token (`x-api-key` or `Authorization: Bearer`). Mint it in the UI (user menu → API Tokens)."
+          },
+          {
+            "field": "limits",
+            "quote": "MCP is read-only, Auto Ontology has no generic result-row writeback endpoint, and current model import and certification APIs do not prove atomic promotion."
+          },
+          {
+            "field": "limits",
+            "quote": "Can replace existing data — confirm with the user before `replace=true`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Writes below need `catalog:edit` unless noted."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/nvidia-ontology-query/SKILL.md",
+      "blob_sha": "56ccfb32bd23ffb1ad2aa4c1d0fcd31aaf21323c",
+      "source_url": "https://github.com/NVIDIA/auto-ontology/blob/fc43a82600e18b19d159c52023f54f5572f537ac/skills/nvidia-ontology-query/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "nvidia-ontology-query",
+        "description": "Query Auto Ontology and validate generated SQL, rows, and answers. Use for MCP or REST access, readiness, authentication, conversations, and grounded questions."
+      },
+      "excerpt": "---\nname: nvidia-ontology-query\ndescription: >-\n  Query Auto Ontology and validate generated SQL, rows, and\n  answers. Use for MCP or REST access, readiness, authentication, conversations,\n  and grounded questions.\nlicense: Apache-2.0\nmetadata:\n  version: \"0.2.1\"\n  author: \"NVIDIA <opensource@nvidia.com>\"\n  tags:\n    - nvidia-ontology\n    - mcp\n    - api\n    - agents\n    - aiq\n---\n\n<!--\nSPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.\nAll rights reserved.\nSPDX-License-Identifier: Apache-2.0\n-->\n\n# Auto Ontology grounded queries\n\n## Purpose\n\nQuery the current Auto Ontology implementation from an agent without prescribing a\nharness, SDK, or LangGraph template. Typed workflow artifacts, statuses, gates,\nand handoffs are in [runtime-contract.yaml](assets/runtime-contract.yaml).\n\n## Prerequisites\n\nUse a running Auto Ontology deployment and an authenticated MCP or REST client. If Auto Ontology is\nnot running, use `nvidia-ontology-setup` first.\n\n## Limitations\n\nThis skill reads and validates answers. It does not expose FastAPI directly,\nwrite semantic definitions, publish governed results, or provide a raw-schema\nbrowser. Hand mutations and publication to `nvidia-ontology-management`.\n\n## Instructions\n\n1. Call readiness before asking a question.\n2. Discover terms and confirm answerability through the semantic layer.\n3. Ask through MCP, or use the authenticated Next.js REST gateway as fallback.\n4. Validate material intent, SQL, rows, truncation, and prose before presenting\n   a claim-bearing answer.\n\n## Prefer MCP for reads\n\nWhen the harness speaks MCP, use it. The **handshake tool list** is the live\nsource of truth (`mcp/auto_ontology_mcp/tools.py`). Do not copy a tool table into the\nsession; if the handshake and this skill disagree, trust the handshake.\n\nSequence (the server also advertises this so models do not jump straight to\n`ask_question`):\n\n1. `check_readiness` — compiled semantic layer **and** a live DB connection.\n2. `search_terms` — what the nouns mean here.\n3. `check_answerable` — cheap coverage check.\n4. `ask_question` — full text-to-SQL; tens of seconds; answer + SQL + rows\n   (capped at 100 rows, with `row_count` / `truncated`).\n5. For a claim-bearing answer, validate material intent, generated SQL, returned\n   rows, truncation, and prose using\n   [query-validation.md](references/query-validation.md).\n\nEverything on MCP **reads**. There is no MCP tool for raw databases, schemas,\nor columns on purpose. `describe_table` is the legitimate table view: terms\nand SQL attributes the table participates in.\n\nConnect: `AUTO_ONTOLOGY_API_URL` is the **web app**. Run `auto-ontology-mcp`, point the client at\n`…/mcp`, user signs in. No token on the MCP server. Details:\nrepository `mcp/README.md` and `docs/mcp.md`.\n\n## REST fallback and write handoff\n\nWhen MCP is unavailable, public clients call the authenticated **Next.js\ngateway**, not FastAPI\n`:3001`. FastAPI trusts `x-auto-ontology-user-id` and must not be exposed. A direct\nFastAPI request without `conversation_id` is stateless; with\n`conversation_id` it requires that internal header.\n\nAuth (any of these; resolved in one place):\n\n- Browser session cookie\n- API token: `x-api-key: $AUTO_ONTOLOGY_API_TOKEN` (`Authorization: Bearer` works for\n  `auto_ontology_…` tokens too). Token acts as its owner.\n- OAuth bearer issued by Auto Ontology (MCP sign-in)\n- SSO id token (`Authorization: Bearer <jwt>`), e.g. AI-Q — see\n  [stack.md](references/stack.md)\n\nShapes: `docs/openapi/auto-ontology-api.json`. Do not scrape all ~87 operations. A write\nrequest hands off to `nvidia-ontology-management`; this skill does not turn a read-only\nquestion into a mutation.\n\n### Chat\n\n`POST /api/chat/completions` — SSE `step` / `result` / `error` / `charts`,\nthen `[DONE]`. Permission `chat:use`; a request with `conversation_id` also\nneeds `conversation:write`, or it gets 403.\n\n- Omit `conversation_id` for a one-shot (no history, no chart step).\n- Supply a client-generated UUID to create or continue a thread (needs\n  `chat:use` and `conversation:write`).\n- Wait for `[DONE]` before the next turn; overlapping requests return\n  **`409 Conversation in progress`**.\n- A 404 on a conversation id means it belongs to another user.\n\nPython (from the Auto Ontology README; no extra SDK):\n\n```python\nimport os\nimport requests\n\nsession = requests.Session()\nsession.headers[\"x-api-key\"] = os.environ[\"AUTO_ONTOLOGY_API_TOKEN\"]\n\nterms = session.get(\"https://ontology.example.com/api/terms\").json()\n\nanswer = session.post(\n    \"https://ontology.example.com/api/chat/completions\",\n    json={\"question\": \"How many orders shipped last week?\"},\n)\n# response is SSE, not a single JSON object\n```\n\nOpen an API-created thread in the UI at `/chat?focus=<conversation_id>` when\nit belongs to the signed-in user.\n\n### Discovery (semantic layer, not a catalog browser)\n\nMCP first. REST fallback:\n\n- `GET /api/terms` (`query`, `skip`, `limit`)\n- `GET /api/terms/{term_id}`\n- `GET /api/exploration/tables/{table_id}/details`\n- `GET /api/exploration/graph`\n\nWrites and compile reset: `nvidia-ontology-management`.\n\n## Validate claim-bearing answers\n\nDo not treat successful execution as sufficient evidence. Before presenting a\ndecision-facing result, apply\n[query-validation.md](references/query-validation.md) to check population,\nmeasure, unit, grain, joins, lineage, status, validity, rows, truncation, and\nanswer prose. If a material constraint cannot be verified, return the gap rather\nthan a stronger claim.\n\n## Empty or failed answers\n\n`ask_question` / chat returned nothing useful → `check_readiness` (or\n`GET /api/semantic-compilation/status`) before rewriting the question. A\nnamed database is not proof SQL can execute. See `nvidia-ontology-setup`\ntroubleshooting.\n\n## Examples\n\n- For a grounded count, run `check_readiness`, `search_terms`,\n  `check_answerable`, and then `ask_question`.\n- If a response is truncated or violates measure grain, refuse the complete\n  claim and follow [query-validation.md](references/query-validation.md).\n\n## Troubleshooting\n\nFor empty or failed answers, check readiness and compilation status before\nrephrasing. For REST errors, verify the public web origin, authentication, and\nconversation ownership before retrying.\n\n## See also\n\n- [stack.md](references/stack.md) — AI-Q, Nemotron, cuOpt (what exists vs\n  what partners wire)\n- [query-validation.md](references/query-validation.md) — material intent, SQL,\n  rows, and answer checks\n- `nvidia-ontology-management` — model, modify, and publish through the layer\n- `nvidia-ontology-setup` — bring-up and MCP OAuth discovery\n",
+      "card": {
+        "title_zh": "本体查询与答案校验",
+        "purpose_zh": "从智能体侧查询运行中的 Auto Ontology，通过 MCP 或 REST 获取语义层术语与问答结果，并在给出结论前校验 SQL、行、截断与文字表述。",
+        "does": [
+          "先调用 check_readiness 检查语义层编译与数据库连接就绪",
+          "用 search_terms 与 check_answerable 发现术语并确认可回答性",
+          "通过 ask_question 执行文本转 SQL，返回答案、SQL 与最多100行结果",
+          "按 query-validation.md 校验意图、度量、粒度、连接、血缘、截断与答案文字",
+          "MCP 不可用时改用已认证的 Next.js REST 网关，包括 SSE 聊天接口",
+          "空结果或失败时先查就绪与编译状态，再考虑改写问题"
+        ],
+        "inputs": [
+          "运行中的 Auto Ontology 部署",
+          "已认证的 MCP 客户端或 REST 客户端",
+          "自然语言问题",
+          "AUTO_ONTOLOGY_API_URL 与可选 AUTO_ONTOLOGY_API_TOKEN",
+          "可选 conversation_id（客户端生成的 UUID）"
+        ],
+        "outputs": [
+          "就绪状态与语义层编译状态",
+          "术语搜索结果与可回答性判断",
+          "答案文本、生成的 SQL、返回行（含 row_count 与 truncated）",
+          "SSE 事件 step/result/error/charts 与 [DONE]",
+          "校验后保留的结论或未验证的缺口说明"
+        ],
+        "scenarios": [
+          "向本体提问并取得有依据的计数类答案",
+          "在展示决策相关结论前校验 SQL 与行是否支撑该结论",
+          "发现语义层术语含义并判断问题是否可回答",
+          "通过 REST 网关以 API token 或会话发起一次性问答",
+          "排查空答案或失败答案的就绪与编译问题"
+        ],
+        "prerequisites": [
+          "需要运行中的 Auto Ontology 部署；若未运行先用 nvidia-ontology-setup",
+          "需要已认证的 MCP 或 REST 客户端",
+          "REST 回退需通过已认证的 Next.js 网关，不得直接暴露 FastAPI :3001"
+        ],
+        "limits": [
+          "只读取与校验答案，不直接暴露 FastAPI",
+          "不写语义定义、不发布受治理结果、不提供原始 schema 浏览器",
+          "MCP 侧全部为读操作，无原始数据库、schema 或列工具",
+          "ask_question 返回行数上限100行，可能被截断",
+          "写操作与发布需转交 nvidia-ontology-management",
+          "同一会话重叠请求返回 409 Conversation in progress",
+          "材料约束无法验证时应返回缺口而非更强结论"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "network",
+          "needs_secret"
+        ],
+        "tags": [
+          "数据分析",
+          "调研",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Query the current Auto Ontology implementation from an agent without prescribing a harness, SDK, or LangGraph template."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Validate material intent, SQL, rows, truncation, and prose before presenting a claim-bearing answer."
+          },
+          {
+            "field": "does",
+            "quote": "1. Call readiness before asking a question."
+          },
+          {
+            "field": "does",
+            "quote": "2. Discover terms and confirm answerability through the semantic layer."
+          },
+          {
+            "field": "does",
+            "quote": "`ask_question` — full text-to-SQL; tens of seconds; answer + SQL + rows (capped at 100 rows, with `row_count` / `truncated`)."
+          },
+          {
+            "field": "does",
+            "quote": "When MCP is unavailable, public clients call the authenticated **Next.js gateway**, not FastAPI `:3001`."
+          },
+          {
+            "field": "does",
+            "quote": "`ask_question` / chat returned nothing useful → `check_readiness` (or `GET /api/semantic-compilation/status`) before rewriting the question."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use a running Auto Ontology deployment and an authenticated MCP or REST client. If Auto Ontology is not running, use `nvidia-ontology-setup` first."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "FastAPI trusts `x-auto-ontology-user-id` and must not be exposed."
+          },
+          {
+            "field": "limits",
+            "quote": "This skill reads and validates answers. It does not expose FastAPI directly, write semantic definitions, publish governed results, or provide a raw-schema browser."
+          },
+          {
+            "field": "limits",
+            "quote": "Everything on MCP **reads**. There is no MCP tool for raw databases, schemas, or columns on purpose."
+          },
+          {
+            "field": "limits",
+            "quote": "A write request hands off to `nvidia-ontology-management`; this skill does not turn a read-only question into a mutation."
+          },
+          {
+            "field": "limits",
+            "quote": "Wait for `[DONE]` before the next turn; overlapping requests return **`409 Conversation in progress`**."
+          },
+          {
+            "field": "limits",
+            "quote": "If a material constraint cannot be verified, return the gap rather than a stronger claim."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "API token: `x-api-key: $AUTO_ONTOLOGY_API_TOKEN` (`Authorization: Bearer` works for `auto_ontology_…` tokens too)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`POST /api/chat/completions` — SSE `step` / `result` / `error` / `charts`, then `[DONE]`."
+          },
+          {
+            "field": "hosts",
+            "quote": "Query the current Auto Ontology implementation from an agent without prescribing a harness, SDK, or LangGraph template."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/nvidia-ontology-setup/SKILL.md",
+      "blob_sha": "6a2adaae618f1bc4189bdf30cbaf4c3416d8588b",
+      "source_url": "https://github.com/NVIDIA/auto-ontology/blob/fc43a82600e18b19d159c52023f54f5572f537ac/skills/nvidia-ontology-setup/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "nvidia-ontology-setup",
+        "description": "Set up or troubleshoot the Auto Ontology runtime. Use for Helm (the official install), Docker Compose, developer setup, and MCP connection to an existing deployment."
+      },
+      "excerpt": "---\nname: nvidia-ontology-setup\ndescription: >-\n  Set up or troubleshoot the Auto Ontology runtime. Use for Helm (the official\n  install), Docker Compose, developer setup, and MCP connection to an existing\n  deployment.\nlicense: Apache-2.0\nmetadata:\n  version: \"0.3.1\"\n  author: \"NVIDIA <opensource@nvidia.com>\"\n  tags:\n    - nvidia-ontology\n    - install\n    - docker\n    - helm\n    - mcp\n    - troubleshooting\n---\n\n<!--\nSPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.\nAll rights reserved.\nSPDX-License-Identifier: Apache-2.0\n-->\n\n# Auto Ontology setup\n\n## Purpose\n\nBring up the current Auto Ontology implementation, troubleshoot it, or connect an agent\nto an instance that is already running. Do not invent a second installer:\nthe official installation is the Helm chart in repository-root `DEPLOYMENT.md`;\nDocker Compose runs the same stack on one machine. `dev_tools/setup_env.sh` is a\ndeveloper tool, not an installer. Typed setup, connection, ingestion,\ncompilation, and readiness artifacts are in\n[runtime-contract.yaml](assets/runtime-contract.yaml).\n\nOn failure, read [troubleshooting.md](references/troubleshooting.md) instead of\nsearching the web.\n\n## Instructions\n\n### Required questions\n\nAsk these if not already clear. Do not guess a default and emit a command.\n\n1. **Target** — Helm on Kubernetes (the official install, and the default\n   recommendation), Docker Compose on one machine, a developer workflow\n   (`--dev` / `--ds`, only when changing Auto Ontology itself), or \"Auto\n   Ontology is already up, I only need MCP\"?\n2. **NVIDIA NIM key** — is `DEFAULT_MODELS_API_KEY` (Helm:\n   `defaultModelsApiKey`) available? Chat and ingest need it.\n3. **Admin account** — the email and password for the bootstrap admin.\n   Self-service sign-up is disabled, so this is the only way to sign in.\n4. **Source database** — a connection string (`CONNECTION_STRINGS` /\n   `connectionStrings`), or will connections be added in the UI?\n5. **Helm only** — which chart version, and the URL users will browse to\n   (`appUrl`).\n6. **Compose only** — is host `5432` free? `POSTGRES_PORT` only remaps the\n   host side; containers still use 5432 internally.\n\nNever ask the user to paste secrets into the conversation, and never put them\nin command arguments. Have the user write them into a values file or `.env`.\n\n## Install with Helm (official)\n\nReleases are published to the public NGC `nvidia` org (chart and images). Follow\n`DEPLOYMENT.md` with the version the user named:\n\nThe user creates a values file in an editor (not on the command line, so\nvalues stay out of shell history and process arguments), readable only by\nthem, and out of git:\n\n```yaml\n# auto-ontology-values.yaml\ndefaultModelsApiKey: <API-KEY>\npostgresPassword: <POSTGRES-PASSWORD>\nadminEmail: <ADMIN-EMAIL>\nadminPassword: <ADMIN-PASSWORD>\nconnectionStrings: <CONNECTION-STRINGS>   # optional; or add connections in the UI\n```\n\n```bash\nhelm fetch https://helm.ngc.nvidia.com/nvidia/charts/auto-ontology-<VERSION>.tgz\nhelm install auto-ontology auto-ontology-<VERSION>.tgz -f auto-ontology-values.yaml\nkubectl port-forward svc/frontend 3000:3000\n```\n\n- `adminEmail` and `adminPassword` are required; the install fails without them.\n- `appUrl` must be the exact origin users browse to. The default\n  (`http://localhost:3000`) only fits the port-forward above; set it for a\n  NodePort, ingress, or HTTPS origin.\n- `authSecret` is generated on first install and kept across upgrades; set it\n  only to share one value across environments.\n- If the chart fetch returns 404, that version is not published yet. Ask the\n  user; do not fall back to the internal staging registry.\n\nThis skill does not cover Astra GitOps.\n\n## Local: Docker Compose\n\nFor running the whole stack on one machine. In the repository root, the user\ncopies `.env.example` to `.env` and fills in `AUTH_SECRET`, `APP_URL`,\n`AUTO_ONTOLOGY_ADMIN_EMAIL`, and `AUTO_ONTOLOGY_ADMIN_PASSWORD` (all required).\nThen:\n\n```bash\ndocker compose up -d --build\n```\n\n`AUTH_SECRET` and `APP_URL` are required. Without them every page fails with a\nBetter Auth \"default secret\" error. Fill `DEFAULT_MODELS_API_KEY` and a\n`CONNECTION_STRINGS` value (or plan to add connections in the UI). The full\nvariable list is `.env.example`.\n\nThis builds `auto-ontology` and `auto-ontology-frontend`, starts Postgres,\npgAdmin, and the ingestion service, runs two one-shot migrate jobs, and starts\nthe app:\n\n- `auto-ontology-migrate` applies Alembic migrations to the backend's `public`\n  schema (catalog and semantic tier). The backend waits for it.\n- `frontend-migrate` syncs the Prisma `frontend` schema: users, sessions, API\n  keys, and the OAuth tables MCP sign-in uses. The frontend waits for it.\n\nIf sign-in or MCP login fails, check both with `docker compose ps -a` and\n`docker compose logs frontend-migrate`. Read the `frontend-migrate` log even\nwhen it exited 0: it has finished without an error before while leaving MCP\nlogin broken.\n\n| Service | URL |\n| --- | --- |\n| UI | http://localhost:3000 |\n| FastAPI (internal) | http://localhost:3001 |\n| Ingestion | http://localhost:3002 |\n| pgAdmin | http://localhost:5050 |\n| Postgres | localhost:`$POSTGRES_PORT` (from `.env`, default 5432) |\n\n## Developer workflows (`--dev`, `--ds`)\n\nOnly for people changing Auto Ontology itself; these are not installations.\n`dev_tools/setup_env.sh` starts part of the stack in Docker and leaves the rest\nto run from the checkout. Both need the `.env` above plus:\n\n```bash\ncd frontend && pnpm install   # Next.js\n# from repo root:\nuv sync\n```\n\n`--dev` runs infra only (Postgres, pgAdmin, ingestion); you run Next.js and FastAPI:\n\n```bash\n./dev_tools/setup_env.sh --dev\ncd frontend && pnpm dev\n# repo root:\nuv run uvicorn auto_ontology.server.__main__:create_app --factory --reload --host 127.0.0.1 --port 3001\n```\n\nThe app factory is `create_app()` in `auto_ontology/server/__main__.py`. There is no\n`auto_ontology/server/main.py`. `uv run python -m auto_ontology.server` is the same app without\nreload (what the container runs).\n\n`--ds` runs the frontend in Docker and FastAPI on the host:\n\n```bash\n./dev_tools/setup_env.sh --ds\nuv run python -m auto_ontology.server\n```\n\nThe frontend image bakes `PYTHON_API_URL=http://host.docker.internal:3001`, so\nthe API must accept connections from the container, not just loopback.\n`python -m auto_ontology.server` binds `0.0.0.0:3001` (what `setup_env.sh --ds`\nprints); a `--host 127.0.0.1` uvicorn is unreachable from the container on\nLinux. Because FastAPI trusts `x-auto-ontology-user-id`, keep port 3001\nfirewalled from other machines. On native Linux Docker you may need\n`--add-host=host.docker.internal:host-gateway`.\n\n## Limitations\n\nThis skill uses the repository's existing Helm chart and Compose file and does\nnot cover Astra GitOps, change semantic definitions, or treat partial Vault\nconfiguration as secret storage. Ask before destructive volume deletion.\n\n## Auto Ontology is already up — MCP only\n\nDo not reinstall. Point `AUTO_ONTOLOGY_API_URL` at the **web app** (Compose UI is\n`:3000`, not FastAPI `:3001`):\n\n```bash\nAUTO_ONTOLOGY_API_URL=http://localhost:3000 uvx --from \"git+https://github.com/NVIDIA/auto-ontology.git#subdirectory=mcp\" auto-ontology-mcp\n```\n\nUntil the package is on PyPI this needs GitHub credentials that can read\n`NVIDIA/auto-ontology`. Client config uses the MCP server URL with a `/mcp` suffix.\nPeople sign in through Auto Ontology; do not put a token on the MCP server.\n\nConfirm the deployment is new enough to be an authorization server:\n\n```bash\ncurl -s -o /dev/null -w '%{http_code}\\n' \"$AUTO_ONTOLOGY_API_URL/.well-known/oauth-authorization-server\"\n```\n\n`200` is required. Anything else: run the frontend from the checkout\n(`pnpm dev`) and point `AUTO_ONTOLOGY_API_URL` at that port.\n\n## Examples\n\n- Kubernetes: install the published Helm chart from `DEPLOYMENT.md` with the\n  admin account and `appUrl` set.\n- One machine: `docker compose up -d --build` after filling `.env`.\n- Existing",
+      "card": {
+        "title_zh": "Auto Ontology 部署与排障",
+        "purpose_zh": "启动或排查 Auto Ontology 运行时，包括 Helm 官方安装、Docker Compose 单机部署、开发者工作流，以及把 MCP 客户端连接到已运行的实例。",
+        "does": [
+          "按 DEPLOYMENT.md 用 Helm chart 在 Kubernetes 上安装 Auto Ontology",
+          "用 docker compose up -d --build 在单机启动整套服务栈",
+          "用 dev_tools/setup_env.sh 的 --dev / --ds 模式搭建开发者环境",
+          "把 MCP 客户端指向已部署实例，并校验 OAuth 发现端点返回 200",
+          "通过 API 测试并新增数据源连接，再核对目录与语义编译状态",
+          "提供停止与卸载命令，并提示会销毁数据"
+        ],
+        "inputs": [
+          "目标部署方式：Helm、Docker Compose、开发者工作流或仅 MCP",
+          "NVIDIA NIM 密钥 DEFAULT_MODELS_API_KEY / defaultModelsApiKey",
+          "引导管理员的邮箱与密码",
+          "源数据库连接串 CONNECTION_STRINGS，或在 UI 中添加连接",
+          "Helm 场景下的 chart 版本与 appUrl",
+          "Compose 场景下宿主机 5432 端口是否空闲"
+        ],
+        "outputs": [
+          "运行中的 Auto Ontology 实例及 UI、FastAPI、Ingestion、pgAdmin、Postgres 服务",
+          "Helm values 文件与安装命令",
+          "已配置的 MCP 客户端连接",
+          "数据源连接与语义编译状态",
+          "排障结论与停止/卸载操作"
+        ],
+        "scenarios": [
+          "在 Kubernetes 上用 Helm 安装 Auto Ontology",
+          "在一台机器上用 Docker Compose 跑起整套栈",
+          "修改 Auto Ontology 本身时搭建开发环境",
+          "已有部署，只需接入 MCP 客户端",
+          "安装或登录失败时排查问题"
+        ],
+        "prerequisites": [
+          "Helm 场景需可访问 NGC 公共 nvidia 组织的 chart 与镜像",
+          "Compose 场景需从 .env.example 复制并填写 AUTH_SECRET、APP_URL、管理员邮箱与密码",
+          "开发者工作流需 pnpm install 与 uv sync",
+          "MCP 场景需 GitHub 凭据以读取 NVIDIA/auto-ontology 仓库，且部署需支持 OAuth 授权服务器"
+        ],
+        "limits": [
+          "不覆盖 Astra GitOps",
+          "不修改语义定义",
+          "不把部分 Vault 配置当作密钥存储",
+          "表级范围保证尚未端到端可强制，见 issue #255",
+          "删除卷等破坏性操作需先询问",
+          "不得让用户在对话或命令行参数中粘贴密钥"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "运维部署",
+          "后端",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Bring up the current Auto Ontology implementation, troubleshoot it, or connect an agent to an instance that is already running."
+          },
+          {
+            "field": "does",
+            "quote": "helm fetch https://helm.ngc.nvidia.com/nvidia/charts/auto-ontology-<VERSION>.tgz"
+          },
+          {
+            "field": "does",
+            "quote": "docker compose up -d --build"
+          },
+          {
+            "field": "does",
+            "quote": "./dev_tools/setup_env.sh --dev"
+          },
+          {
+            "field": "does",
+            "quote": "AUTO_ONTOLOGY_API_URL=http://localhost:3000 uvx --from \"git+https://github.com/NVIDIA/auto-ontology.git#subdirectory=mcp\" auto-ontology-mcp"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "the official installation is the Helm chart in repository-root `DEPLOYMENT.md`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "the user copies `.env.example` to `.env` and fills in `AUTH_SECRET`, `APP_URL`, `AUTO_ONTOLOGY_ADMIN_EMAIL`, and `AUTO_ONTOLOGY_ADMIN_PASSWORD` (all required)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Until the package is on PyPI this needs GitHub credentials that can read `NVIDIA/auto-ontology`."
+          },
+          {
+            "field": "limits",
+            "quote": "This skill uses the repository's existing Helm chart and Compose file and does not cover Astra GitOps, change semantic definitions, or treat partial Vault configuration as secret storage."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Never ask the user to paste secrets into the conversation, and never put them in command arguments."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "curl -s -o /dev/null -w '%{http_code}\\n' \"$AUTO_ONTOLOGY_API_URL/.well-known/oauth-authorization-server\""
+          },
+          {
+            "field": "risk_flags",
+            "quote": "cd frontend && pnpm install   # Next.js"
+          },
+          {
+            "field": "hosts",
+            "quote": "Ask these if not already clear. Do not guess a default and emit a command."
+          }
+        ]
+      }
+    }
+  ]
+}

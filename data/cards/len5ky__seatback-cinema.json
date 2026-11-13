@@ -1,0 +1,395 @@
+{
+  "schema": 1,
+  "repo": "len5ky/seatback-cinema",
+  "tree_sha": "e6978c7617acb633bec2e70a90316d066c5c4840",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": ".claude/skills/inflight-movie-picker/SKILL.md",
+      "blob_sha": "9f43d284b9ee33bebf745ab0c65b861d3f1f7c2e",
+      "source_url": "https://github.com/len5ky/seatback-cinema/blob/a0e0f9289a148c1a73351eaba27655d15ac02867/.claude/skills/inflight-movie-picker/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "inflight-movie-picker",
+        "description": "Recommend what to watch on a flight from the airline's in-flight catalogue, ranked by IMDb rating and the user's taste. Use when the user asks what to watch on their flight or plane, what movies are on Emirates / ice, United, KLM, British Airways, Singapore Airlines, Lufthansa, JAL, Cathay Pacific, Qantas, ANA or American Airlines this month, for plane movie picks, or whether a specific film is available on a given airline. Also triggers on \"inflight movie picker\", \"seatback cinema\", \"what's on "
+      },
+      "excerpt": "---\nname: inflight-movie-picker\ndescription: Recommend what to watch on a flight from the airline's in-flight catalogue, ranked by IMDb rating and the user's taste. Use when the user asks what to watch on their flight or plane, what movies are on Emirates / ice, United, KLM, British Airways, Singapore Airlines, Lufthansa, JAL, Cathay Pacific, Qantas, ANA or American Airlines this month, for plane movie picks, or whether a specific film is available on a given airline. Also triggers on \"inflight movie picker\", \"seatback cinema\", \"what's on the plane\" and \"in-flight entertainment\" questions.\n---\n\n# Inflight movie picker\n\nLocal monthly catalogues for Emirates, United, KLM, British Airways (`ba`), Singapore Airlines (`singapore`),\nLufthansa, Japan Airlines (`jal`), Cathay Pacific (`cathay`), Qantas, ANA and American (`american`),\nmatched to IMDb and ranked by a blend of IMDb, Letterboxd, RT and Metacritic plus the user's Letterboxd taste and `taste.json`. Run everything from the project root `/home/lensky/Dev/plane_movie`\nwith bun (`~/.bun/bin` on PATH). `bun run cli` with no arguments lists the registered airline ids.\n\n## Answering \"what should I watch on my flight?\"\n\n1. Find out the airline and, if it matters, the flight month (catalogues change monthly).\n2. Make sure data is fresh, then rank:\n   ```bash\n   bun run cli stats --airline united                  # snapshot for this month? match rate?\n   bun run cli fetch united [--month YYYY-MM]          # only if the month is missing (cached per month)\n   bun run cli match --airline united                  # after any fetch or imdb sync\n   bun run cli picks --airline united --top 15 [--genre Thriller] [--min-rating 7] [--language English] [--min-year N] [--max-year N] [--year N]\n   ```\n   `picks` defaults to Emirates when `--airline` is omitted.\n3. Present 5-10 picks with one line each: why it fits (genre, rating), runtime (fits the flight?), IMDb link.\n4. For \"is X on the plane?\": `bun run cli search \"<title>\"` searches every fetched airline (or `--airline X`).\n\n`bun run cli imdb sync` reloads IMDb (downloads ~1.2 GB if files are older than 7 days, ~3 min load). Only run it\nwhen `stats` shows 0 IMDb titles or the user asks for fresher ratings.\n\n## Taste and ratings\n\nThe simplest taste input is the user's IMDb export: imdb.com > Your Ratings (and Watchlist) > three-dot menu > Export, CSVs dropped into `data/imdb-ratings/`, then `bun run cli taste import` (joined on tconst, no title matching).\nA Letterboxd export works too. If `picks` prints \"taste: taste.json only\", offer this:\n\n1. Letterboxd > Settings > Data > Export your data; drop the zip into `data/letterboxd/`.\n2. `bun run cli taste import` (re-run after each new export; it replaces the previous import and lists unmatched\n   films). Watched and rated films are then excluded, watchlist films are boosted, and genre/director affinities\n   learned from the ratings show up as \"you rate X +0.7 (3 films)\" reasons.\n\nExtra rating sources (optional, slow the first time): `bun run cli ids sync`, then\n`bun run cli ratings sync [--source letterboxd|rt|mc|tmdb] [--airline X]`. Scraped sites go at 1 request/s with a\n30-day cache, so a first full run is about an hour per source; scope it with `--airline` or `--limit N`. TMDB needs\n`TMDB_API_KEY` in `.env` (free key from themoviedb.org > Settings > API) and is skipped otherwise. Picks then blend\nIMDb, Letterboxd, RT audience and Metacritic; each pick shows its LB, RT and MC scores on its first line.\n\n`taste.json` stays as manual overrides: `liked_genres`, `disliked_genres` (IMDb names such as Sci-Fi, Thriller,\nHorror), `min_rating`, `min_votes`, `seen` (titles or tt ids, excluded from picks), `favourites` (titles; their\ndirectors get a small boost). When the user says they have seen a film, add it to `seen`.\n\n## Caveats to tell the user when relevant\n\n- All sources are undocumented airline endpoints: personal, low-volume use. Never fetch the same airline-month more\n  than once a day (raw responses are cached under `data/raw/`; `--refresh` forces a refetch). Never loop retries,\n  especially against BA (Akamai).\n- BA, Singapore and Qantas only publish the current cycle, so next month cannot be fetched for them until it starts.\n  The others accept a future `--month`. Lufthansa, JAL and ANA make one detail call per film (~130-410 requests,\n  cached), so do not refetch them casually.\n- Qantas is the large international seatback catalogue; domestic and smaller aircraft differ.\n- Matches are graded high/medium/low/none from title, year, director and runtime. Picks use only high and medium.\n  Emirates has no year field, so its regional-language films and concert specials match least often.\n- A catalogue can differ by route, aircraft or country; only the airline's public web catalogue is fetched.\n",
+      "card": {
+        "title_zh": "机上电影推荐",
+        "purpose_zh": "根据航空公司机上片单，结合 IMDb、Letterboxd、RT、Metacritic 评分与用户口味，推荐航班上可看的电影，并回答某部影片是否在某航司片单中。",
+        "does": [
+          "查询指定航司当月片单快照与匹配率",
+          "抓取并匹配航司片单到 IMDb 条目",
+          "按评分、类型、语言、年份等条件生成推荐榜单",
+          "跨航司搜索某部影片是否在片单中",
+          "导入 IMDb 或 Letterboxd 导出数据以学习用户口味",
+          "同步 IMDb 数据及可选的多来源评分"
+        ],
+        "inputs": [
+          "航空公司标识（如 united、emirates）",
+          "可选航班月份 YYYY-MM",
+          "筛选条件：类型、最低评分、语言、年份区间",
+          "IMDb 或 Letterboxd 导出 CSV 文件",
+          "taste.json 手动偏好配置",
+          "可选 TMDB_API_KEY 环境变量"
+        ],
+        "outputs": [
+          "片单统计快照与匹配率",
+          "按条件排序的电影推荐列表（含评分、片长、IMDb 链接）",
+          "跨航司影片搜索结果",
+          "口味导入结果与未匹配影片列表"
+        ],
+        "scenarios": [
+          "用户询问航班上该看什么电影",
+          "用户想知道某航司本月片单有哪些影片",
+          "用户询问某部具体影片是否在某航司机上可看",
+          "用户希望按类型或评分筛选机上电影"
+        ],
+        "prerequisites": [
+          "在项目根目录 /home/lensky/Dev/plane_movie 下运行",
+          "使用 bun 执行命令（~/.bun/bin 在 PATH 中）",
+          "使用 TMDB 评分来源时需在 .env 配置 TMDB_API_KEY"
+        ],
+        "limits": [
+          "数据源为未公开的航司接口，仅适合个人低频率使用",
+          "同一航司同一月份每天最多抓取一次，禁止循环重试",
+          "BA、Singapore、Qantas 仅发布当前周期片单，无法提前抓取下月",
+          "Lufthansa、JAL、ANA 每部影片需一次详情请求，不宜随意重抓",
+          "匹配分高/中/低/无，推荐仅采用高和中",
+          "Emirates 无年份字段，地区语言影片与演唱会特辑匹配率最低",
+          "片单可能因航线、机型或国家而异，仅抓取航司公开网页片单",
+          "首次全量抓取多来源评分约每来源一小时"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Recommend what to watch on a flight from the airline's in-flight catalogue, ranked by IMDb rating and the user's taste."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "For \"is X on the plane?\": `bun run cli search \"<title>\"` searches every fetched airline (or `--airline X`)."
+          },
+          {
+            "field": "does",
+            "quote": "bun run cli picks --airline united --top 15 [--genre Thriller] [--min-rating 7] [--language English] [--min-year N] [--max-year N] [--year N]"
+          },
+          {
+            "field": "does",
+            "quote": "bun run cli stats --airline united                  # snapshot for this month? match rate?"
+          },
+          {
+            "field": "does",
+            "quote": "bun run cli fetch united [--month YYYY-MM]          # only if the month is missing (cached per month)"
+          },
+          {
+            "field": "does",
+            "quote": "bun run cli match --airline united                  # after any fetch or imdb sync"
+          },
+          {
+            "field": "does",
+            "quote": "then `bun run cli taste import` (joined on tconst, no title matching)."
+          },
+          {
+            "field": "does",
+            "quote": "`bun run cli imdb sync` reloads IMDb (downloads ~1.2 GB if files are older than 7 days, ~3 min load)."
+          },
+          {
+            "field": "inputs",
+            "quote": "TMDB needs `TMDB_API_KEY` in `.env` (free key from themoviedb.org > Settings > API) and is skipped otherwise."
+          },
+          {
+            "field": "outputs",
+            "quote": "Present 5-10 picks with one line each: why it fits (genre, rating), runtime (fits the flight?), IMDb link."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run everything from the project root `/home/lensky/Dev/plane_movie` with bun (`~/.bun/bin` on PATH)."
+          },
+          {
+            "field": "limits",
+            "quote": "BA, Singapore and Qantas only publish the current cycle, so next month cannot be fetched for them until it starts."
+          },
+          {
+            "field": "limits",
+            "quote": "Lufthansa, JAL and ANA make one detail call per film (~130-410 requests, cached), so do not refetch them casually."
+          },
+          {
+            "field": "limits",
+            "quote": "Matches are graded high/medium/low/none from title, year, director and runtime. Picks use only high and medium."
+          },
+          {
+            "field": "limits",
+            "quote": "A catalogue can differ by route, aircraft or country; only the airline's public web catalogue is fetched."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Scraped sites go at 1 request/s with a 30-day cache, so a first full run is about an hour per source; scope it with `--airline` or `--limit N`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "plugins/seatback-cinema/skills/inflight-movie-picker-web/SKILL.md",
+      "blob_sha": "65d1317f3d621defcc6f2e69ecf6946872ed4a6e",
+      "source_url": "https://github.com/len5ky/seatback-cinema/blob/a0e0f9289a148c1a73351eaba27655d15ac02867/plugins/seatback-cinema/skills/inflight-movie-picker-web/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "inflight-movie-picker-web",
+        "description": "Recommend what to watch on a flight from the airline's actual in-flight film catalogue for that month, ranked against the person's taste, using the Seatback Cinema connector. Use when someone asks what to watch on their flight or plane, what movies are on Emirates (ice), United, KLM, British Airways, Singapore Airlines, Lufthansa, JAL, Cathay Pacific, Qantas, ANA or American Airlines this month, wants plane movie picks for themselves or their kids, shares an IMDb or Letterboxd profile for flight"
+      },
+      "excerpt": "---\nname: inflight-movie-picker-web\ndescription: Recommend what to watch on a flight from the airline's actual in-flight film catalogue for that month, ranked against the person's taste, using the Seatback Cinema connector. Use when someone asks what to watch on their flight or plane, what movies are on Emirates (ice), United, KLM, British Airways, Singapore Airlines, Lufthansa, JAL, Cathay Pacific, Qantas, ANA or American Airlines this month, wants plane movie picks for themselves or their kids, shares an IMDb or Letterboxd profile for flight picks, or asks whether a specific film is on a given airline. Also triggers on \"inflight movie picker\", \"seatback cinema\", \"what's on the plane\" and \"in-flight entertainment\" questions.\n---\n\n# Inflight movie picker (Claude app)\n\nSeatback Cinema holds every film in eleven airlines' seatback catalogues for the current month, with IMDb ids,\nratings and a short synopsis. You reach it one of two ways, and they answer the same: the `seatback` connector's\ntools when they're available (`list_airlines`, `catalogue`, `picks`, `profile_from_imdb_url`,\n`profile_from_letterboxd`, `profile_from_text`, `save_profile`, `get_profile`), otherwise the GET API at\n`https://seatback.len5ky.com/api/` through your web fetch tool (the last section maps each tool to a URL). Check\nfor the tools first; most people have only the skill, so the API is the usual route. You recommend from what comes\nback and from nothing else. If a film isn't in a result, it isn't on the plane as far as you know, however well it\nwould fit. Never fall back to recommending from memory.\n\n## 1. The flight\n\nYou need the airline, the flight length and whether children are watching. Take what the person already said and\nask for the rest in one short message. If they just want picks, assume (long-haul, adults) and say what you\nassumed.\n\nCall `list_airlines` once to get the airline ids and the month each catalogue covers. Covered: Emirates, United,\nKLM, British Airways, Singapore, Lufthansa, JAL, Cathay Pacific, Qantas, ANA, American. Delta, Turkish, Air France\nand Qatar aren't covered because they don't publish a usable catalogue. Say that plainly; don't guess their\nline-up. If the flight is next month and the airline hasn't published it yet, use the current month and say the\nline-up may change around the 1st.\n\nFlight length becomes `flight_minutes` (7 hours is 420). `picks` drops anything longer than the flight minus 30\nminutes, which covers taxi, climb and descent. Children watching means `filters: { family: true }`, and you still\ncheck each pick's `cert` against the child's age yourself.\n\n## 2. Their taste\n\nPeople see this part, so a word on naming: the saved profile is their **taste code**. Never call it a token in\nanything you write to them, even though the tool field is `token`.\n\nUse the first of these the person can give you, in this order: an IMDb profile link, a Letterboxd username, a\ntaste code from last time. If they already sent one, use it and don't ask. Otherwise, when taste matters (they want\npicks, not a yes or no on one title), ask in one line, in your own words:\n\n> Want these ranked for you? Paste your IMDb profile link or your Letterboxd username, or your taste code if you\n> have one from last time.\n\nIf they have none of those, or would rather not share, go to the seen check below. Bring up exports and file\nuploads only if they ask, or if everything else has failed.\n\n### A taste code\n\nIt's 20 lowercase letters and digits, usually pasted as \"My Seatback Cinema taste code is abcd...\". Older ones say\n\"profile token\" instead; treat them the same. Pass `profile: { token: \"...\" }` straight to `picks` and skip the\nother routes, even if they also pasted a profile link. Call `get_profile` only when you need to show them what's in\nit. If the code comes back unknown or expired, say so in plain words and ask for the link or the username.\n\n### An IMDb profile link\n\nIt looks like `https://www.imdb.com/user/p.xxxxxxxx/ratings/` (older ones use `ur1234567` in place of `p.xxx`), and\nthe ratings must be public. Call `profile_from_imdb_url` with the link straight away. Don't fetch the IMDb pages\nyourself first: the connector reads the profile on its own server, scores and watchlist included, in up to half a\nminute for a big one. It answers with counts, the genres and directors it learned, `notes` and an `imdb_user` id.\nPass `profile: { imdb_user: \"ur...\" }` to `picks` and mention anything in `notes`. Call it once per link: the\nimport stays on the server for 24 hours, so later picks in the same chat reuse `imdb_user`.\n\nWhen it fails, the error says why. Don't call it again with the same link.\n\n- **Private ratings.** Tell them how to fix it in one line: on imdb.com, Settings, then Privacy, and set ratings to\n  public; then send the link again. Meanwhile offer Letterboxd or the seen check.\n- **IMDb said no, or the daily limit is reached.** Say the IMDb import isn't working right now, in a few words,\n  and move on to their Letterboxd username or the seen check.\n\n### A Letterboxd username\n\nAny `https://letterboxd.com/<username>/` link will do as well. Call `profile_from_letterboxd` with it and pass the\n`profile` it returns to `picks` unchanged. It reads their public diary, which only goes back 50 entries, so tell\nthem in your reply that you went by their latest 50 logged films. Older films they've seen can still turn up, so\nfollow with one round of the seen check on the picks.\n\n### The seen check\n\nMost of what a long rating history buys is knowing what they've already watched. Without one, ask:\n\n1. Call `picks` with whatever profile you have (none is fine) and `limit: 20`.\n2. Show the top ten as one short list, title and year only, and ask which they've seen. A reply like \"seen 2, 5\n   and Wicked\" is enough.\n3. Add the ones they name to the profile's `seen` as their `imdbId`s, call `picks` again, and ask once more about\n   the next ten they haven't been shown.\n4. Then pick from the third call. Two rounds at most, even if they've seen a lot.\n\nIf they mention films they loved or hated along the way, add those to `seen` too, and put any genres they want or\nwant to avoid in `liked_genres` and `disliked_genres`. Keep each round to two lines.\n\n### Files, if they ask\n\nAn IMDb ratings export (CSV), a Letterboxd export (zip) or its CSVs, attached to the chat, still work. Send each\nfile's text to `profile_from_text`, unchanged, and chain the files with `add_to`:\n\n- IMDb ratings export (`Const` and `Your Rating` columns): `kind: \"imdb_csv\"`. A watchlist or list export (`Const`\n  without `Your Rating`, or one that starts with `Position`) is detected; add `list: \"watchlist\"` to be sure.\n- Letterboxd `ratings.csv` and `watched.csv`: `kind: \"letterboxd_csv\"`. `watchlist.csv`: the same with\n  `list: \"watchlist\"`.\n\nUnpack a Letterboxd zip with your file tool or code sandbox and send those three files; skip `profile.csv`, which\nholds their email and no films. A file over about 200 KB goes in parts of about 200 KB cut at line ends, each part\nstarting with the file's header line, each call after the first passing the previous result as `add_to`.\n\nThe IMDb export is at https://www.imdb.com/list/ratings/export on a computer (it appears under Your exports a\nminute later); Letterboxd's is under Settings, Data, Export your data. For a big export, or a phone where attaching\na file is awkward, https://seatback.len5ky.com/taste turns the same files into a taste code in their browser.\n\n## 3. Offer a taste code (once)\n\nAfter the first import that worked (an IMDb link or a file), offer it once, in one line: \"Want a taste code so\nnext time you can skip this? It holds your film ids and scores, nothing else, for a year.\" If they say yes, call\n`save_profile` with `profile: { imdb_user: \"ur...\" }` after an IMDb import, or with the profile itself after a file,\nand give them the code on its own line with the sentence to paste next time: \"My Seatback Cinema taste code is\n<code>.\" Anyone with the code can load",
+      "card": {
+        "title_zh": "机上电影推荐",
+        "purpose_zh": "根据航空公司当月真实机上片单，结合用户口味（IMDb、Letterboxd 或口味码）与航班时长，推荐机上可看的电影，并回答某片是否在某航司。",
+        "does": [
+          "按航司当月机上片单推荐电影，并按用户口味排序",
+          "支持 IMDb 链接、Letterboxd 用户名、口味码或导出文件建立口味档案",
+          "按航班时长过滤片长，按长途、短途、儿童给出不同推荐结构",
+          "用已看检查（seen check）两轮排除看过的影片",
+          "回答某部影片是否在某航司片单上，或概览某航司片单",
+          "无连接器时通过 GET API 获取相同数据"
+        ],
+        "inputs": [
+          "航空公司",
+          "航班时长（分钟）",
+          "是否有儿童观看",
+          "IMDb 个人主页链接或 Letterboxd 用户名",
+          "口味码（taste code）",
+          "IMDb/Letterboxd 导出文件（CSV/zip）",
+          "想查的片名、类型、语言等筛选条件"
+        ],
+        "outputs": [
+          "每部影片一张卡片：片名、年份、类型、片长、评分、简介、推荐理由、IMDb 链接",
+          "备选影片标注",
+          "已看跳过数量说明",
+          "片单查询的是/否回答",
+          "可选的个人口味码"
+        ],
+        "scenarios": [
+          "问某航班上看什么电影",
+          "问某航司本月有哪些电影",
+          "为孩子挑选机上电影",
+          "查某部影片是否在某航司片单上",
+          "按个人 IMDb/Letterboxd 口味获取机上推荐"
+        ],
+        "prerequisites": [
+          "需要航空公司、航班时长、是否有儿童等信息",
+          "口味排序需 IMDb 公开评分、Letterboxd 用户名或口味码",
+          "使用连接器工具或通过网页抓取工具访问 GET API"
+        ],
+        "limits": [
+          "仅覆盖 11 家航司：Emirates、United、KLM、British Airways、Singapore、Lufthansa、JAL、Cathay Pacific、Qantas、ANA、American",
+          "Delta、Turkish、Air France、Qatar 无可用片单，不覆盖",
+          "只能推荐工具返回结果中的影片，不得凭记忆推荐",
+          "Letterboxd 只读取最近 50 条公开记录",
+          "IMDb 导入结果在服务器保留 24 小时",
+          "已看检查最多两轮",
+          "片单可能因航线、机型、舱位及月中调整而变化"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "其他",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Recommend what to watch on a flight from the airline's actual in-flight film catalogue for that month, ranked against the person's taste, using the Seatback Cinema connector."
+          },
+          {
+            "field": "does",
+            "quote": "Use the first of these the person can give you, in this order: an IMDb profile link, a Letterboxd username, a taste code from last time."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "You need the airline, the flight length and whether children are watching."
+          },
+          {
+            "field": "limits",
+            "quote": "Never fall back to recommending from memory."
+          },
+          {
+            "field": "limits",
+            "quote": "It reads their public diary, which only goes back 50 entries"
+          },
+          {
+            "field": "limits",
+            "quote": "the import stays on the server for 24 hours"
+          },
+          {
+            "field": "limits",
+            "quote": "Two rounds at most, even if they've seen a lot."
+          },
+          {
+            "field": "hosts",
+            "quote": "# Inflight movie picker (Claude app)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skill/inflight-movie-picker/SKILL.md",
+      "blob_sha": "db1d5a4199a9f7b698f3900fa7fad2ff963435fd",
+      "source_url": "https://github.com/len5ky/seatback-cinema/blob/a0e0f9289a148c1a73351eaba27655d15ac02867/skill/inflight-movie-picker/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "inflight-movie-picker",
+        "description": "Recommend what to watch on a flight from the airline's actual in-flight film catalogue for that month, ranked against the person's taste. Use when someone asks what to watch on their flight or plane, what movies are on Emirates (ice), United, KLM, British Airways, Singapore Airlines, Lufthansa, JAL, Cathay Pacific, Qantas, ANA or American Airlines this month, wants plane movie picks for themselves or their kids, or asks whether a specific film is on a given airline. Also triggers on \"inflight mo"
+      },
+      "excerpt": "---\nname: inflight-movie-picker\ndescription: Recommend what to watch on a flight from the airline's actual in-flight film catalogue for that month, ranked against the person's taste. Use when someone asks what to watch on their flight or plane, what movies are on Emirates (ice), United, KLM, British Airways, Singapore Airlines, Lufthansa, JAL, Cathay Pacific, Qantas, ANA or American Airlines this month, wants plane movie picks for themselves or their kids, or asks whether a specific film is on a given airline. Also triggers on \"inflight movie picker\", \"seatback cinema\", \"what's on the plane\" and \"in-flight entertainment\" questions.\n---\n\n# Inflight movie picker\n\nSeatback Cinema publishes every film in eleven airlines' seatback catalogues, month by month, and matches about\n94% of them to an IMDb id. `scripts/catalogue.ts` in this skill's folder downloads one airline-month, caches it\nand prints it as a table. You pick from that table and nothing else: if a film isn't in it, it isn't on the plane\nas far as you know.\n\nUse it when someone asks what to watch on a flight, whether a film is on an airline, or what an airline is showing\nthis month. Don't use it for streaming or cinema recommendations.\n\n## 1. Get the facts about the flight\n\nYou need four things. Take whatever the person already said and ask for the rest in one short message; if they\njust want picks, guess sensibly and say what you assumed.\n\n- **Airline**, and the month if the flight is in a later month than today (catalogues change around the 1st).\n- **Flight length.** Long-haul is 6 hours or more, short-haul under 3.\n- **Who is watching.** Alone, with a partner, or with children (ages matter).\n- **Mood.** Something easy, something to cry at, a film they've been meaning to see.\n\nAirline ids: `emirates`, `united`, `klm`, `ba`, `singapore`, `lufthansa`, `jal`, `cathay`, `qantas`, `ana`,\n`american`. Delta, Turkish, Air France and Qatar aren't covered (they don't publish a full catalogue, or hide it\nbehind bot protection). Say so plainly and offer general picks they can check against the seatback screen.\n\n## 2. Read the catalogue\n\nRun the script by its full path from the person's working directory, so relative paths to their exports work.\nAny of Bun, Node 22.6+ or Deno will run it:\n\n```bash\nS=<this skill's folder>/scripts/catalogue.ts\nbun $S --list                                     # airline ids and published months\nbun $S emirates                                   # latest month\nbun $S united 2026-11 --max-runtime 110           # a given month, films up to 110 minutes\nbun $S united --family --max-runtime 100         # kids: family, kids and animation genres\nbun $S ba --search \"wicked\"                       # \"is X on the plane?\"\nnode --experimental-strip-types $S klm            # Node; deno run -A $S klm for Deno\n```\n\nThe table is `title | year | min | genres | cert | imdb`. `cert` is the airline's own age rating (PG13, 12, M,\nTV-G and so on; formats vary by airline). `imdb` is the matched IMDb id; `(medium)` after it means the match rests\non one signal, such as runtime alone, so treat it as probably right. `-` means no confident match: the film is on\nthe plane, but you can't vouch for which film it is.\n\nOther options: `--matched` (only films with an IMDb id), `--tmdb` (adds TMDB score and vote count; needs\n`TMDB_API_KEY`), `--taste <path>`, `--imdb-url <url>` and `--letterboxd-url <url>` (below), `--profile-token <token>`,\n`--save-profile`, `--json`, `--refresh`. Emirates lists about 2,000 films and Cathay\nabout 1,500, so filter by genre or runtime, or read the full list once and shortlist from it.\n\nIf the flight month isn't published yet, use the latest month and tell the person the line-up may change.\n\n## 3. Learn their taste\n\nLook in the working directory first, without asking: an IMDb export (`data/imdb-ratings/*.csv`, or any CSV with a\n`Const` column) or an unzipped Letterboxd export (`ratings.csv`, `watched.csv`, `watchlist.csv`) beats anything\nelse. Pass the file or folder to the script with `--taste data/imdb-ratings` (or the export folder).\n\nOtherwise ask for the first of these they can give, in this order: an IMDb profile link, a Letterboxd username, a\ntaste code from last time. With none of them, do the seen check below. Mention exports only if they ask or\neverything else failed.\n\n**IMDb link.** Pass it to the script. It reads the profile from this machine through IMDb's API (the calls\nimdb.com makes in a browser; a 941-rating profile with scores and watchlist is 7 requests), falls back to the\nprofile pages, and caches it for 24 hours. The ratings must be public: if the script or the connector says they're\nprivate, tell them in one line to set ratings to public under Settings, Privacy on imdb.com and send the link\nagain. IMDb refuses scripted requests from some networks (an empty HTTP 202 or a 429). Then, if the Seatback Cinema\nconnector is in this session (tools `list_airlines`, `picks`, `profile_from_imdb_url` and so on), call\n`profile_from_imdb_url` with the link once; it reads the profile from its own server and usually gets through. Pass\n`profile: { imdb_user }` from its answer to `picks`. Without the connector, the same server answers\n`curl 'https://seatback.len5ky.com/api/profile?imdb=<link>'` with a taste code, and\n`/api/picks?airline=<id>&flight_minutes=<n>&code=<taste code>` with ranked cards.\n\n**Letterboxd username.** `--letterboxd-url https://letterboxd.com/<username>/` reads their films pages, 72 a page,\nthen the watchlist, up to 50 pages. If Letterboxd answers 403, the connector's `profile_from_letterboxd` reads their\ndiary feed instead, which covers only the latest 50 entries; say so, and follow with the seen check.\n\n```bash\nbun $S emirates --imdb-url https://www.imdb.com/user/ur12345678/ratings/\nbun $S ba --letterboxd-url https://letterboxd.com/<username>/\nbun $S emirates --profile-token <code>\n```\n\n**Taste code.** \"My Seatback Cinema taste code is ...\" (or the older \"my profile token is ...\") goes in as\n`--profile-token <code>`, in place of the other options. To carry a profile into the Claude app, add\n`--save-profile` to an `--imdb-url`, `--letterboxd-url` or `--taste` run: it stores the profile on the Seatback\nserver and ends with the sentence to paste there.\n\nWith any of these the script hides every film they've rated or logged, adds a `you` column that says `watchlist`\nfor films on their watchlist, and prints their 9-10/10 films and their 1-4/10 films above the table. IMDb rows\nmatch on the IMDb id, exactly. Letterboxd rows have no IMDb id, so they match through the dataset's Letterboxd\nlinks where it has them, else on title (lowercased, accents, punctuation and a leading \"The\" dropped) with the year\nwithin one. Letterboxd half-stars are doubled to the 10-point scale.\n\n**The seen check.** Most of what a long rating history buys is knowing what they've already watched. With nothing\nelse, shortlist the 20 strongest films for the flight from the table, show the first ten as title and year, and\nask which they've seen; then ask once more about the next ten. Two rounds at most. Drop every film they name, and\nnote any they say they loved or hated, plus anything to avoid (horror, subtitles, sad endings).\n\nWhen everything else has failed, the export is the fallback: imdb.com, Your ratings, the three-dot menu, Export,\nor Letterboxd's Settings, Data, Export your data; then `--taste`.\n\n## 4. Rank\n\nThe dataset carries no review scores. Rank with what you know about each film: its reception, who it suits, how\nclose it sits to the films they loved and how far from the ones they hated. If `TMDB_API_KEY` is set, run with\n`--tmdb` and use the score and vote count as a check on your memory; a 7.8 from 40 votes means little. Never\ninvent a score.\n\nWatchlist films go near the top unless they clash with the flight (a three-hour epic on a 90-minute hop). Prefer\nthis year's and last year's releases when they're good: those are the films people can't easily watch at home.\nLeave out anyt",
+      "card": {
+        "title_zh": "机上电影推荐",
+        "purpose_zh": "根据十一家航空公司当月真实机上片单，结合用户口味推荐航班上可看的电影，并回答某部片是否在某航司片单中。",
+        "does": [
+          "下载并缓存指定航司某月的机上片单，以表格输出片名、年份、时长、类型、分级和 IMDb id",
+          "按类型、时长、家庭向、关键词搜索等条件筛选片单",
+          "读取 IMDb 导出、Letterboxd 导出、IMDb 主页链接、Letterboxd 用户名或口味码来了解用户口味",
+          "隐藏用户已评分或已看过的影片，标注想看清单，并列出高分与低分片",
+          "按长途、短途、儿童、心情等场景排序并生成推荐卡片",
+          "可选接入 TMDB 评分作为参考"
+        ],
+        "inputs": [
+          "航空公司 id（如 emirates、united、klm 等十一家）",
+          "航班月份（可选，默认最新月）",
+          "航班时长与同行人（独自、伴侣、儿童及年龄）",
+          "心情偏好",
+          "IMDb 导出 CSV、Letterboxd 导出文件或目录",
+          "IMDb 主页链接、Letterboxd 用户名或口味码",
+          "可选 TMDB_API_KEY"
+        ],
+        "outputs": [
+          "片单表格：title | year | min | genres | cert | imdb",
+          "推荐卡片：片名年份、类型时长、评分、简介、推荐理由、IMDb 链接",
+          "已看/想看标注与高分低分片列表",
+          "口味码与可粘贴到 Claude 应用的句子（使用 --save-profile 时）"
+        ],
+        "scenarios": [
+          "登机前问这趟航班看什么电影",
+          "查询某部电影是否在某航司本月片单上",
+          "为带孩子的家庭挑选机上适龄影片",
+          "按短途或长途航班时长筛选合适片长",
+          "结合个人观影历史获得个性化机上推荐"
+        ],
+        "prerequisites": [
+          "运行环境需 Bun、Node 22.6+ 或 Deno 之一",
+          "脚本位于本 skill 的 scripts/catalogue.ts",
+          "需能访问 seatback.len5ky.com 数据集",
+          "使用 IMDb 口味需其评分设为公开",
+          "使用 --tmdb 需设置 TMDB_API_KEY"
+        ],
+        "limits": [
+          "仅覆盖十一家航司：emirates、united、klm、ba、singapore、lufthansa、jal、cathay、qantas、ana、american",
+          "Delta、Turkish、Air France、Qatar 不覆盖",
+          "数据集不含影评分数，排名依赖模型记忆，禁止编造评分",
+          "IMDb 匹配约 94%，(medium) 表示中等置信，- 表示无法确认具体影片",
+          "片单随航线、机型、舱位变化，月中可能换片",
+          "Letterboxd 403 时只能读最近 50 条日记",
+          "未发布月份只能用最新月并提示可能变动"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Seatback Cinema publishes every film in eleven airlines' seatback catalogues, month by month, and matches about 94% of them to an IMDb id."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Use it when someone asks what to watch on a flight, whether a film is on an airline, or what an airline is showing this month."
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/catalogue.ts` in this skill's folder downloads one airline-month, caches it and prints it as a table."
+          },
+          {
+            "field": "does",
+            "quote": "The table is `title | year | min | genres | cert | imdb`."
+          },
+          {
+            "field": "does",
+            "quote": "bun $S united --family --max-runtime 100         # kids: family, kids and animation genres"
+          },
+          {
+            "field": "does",
+            "quote": "bun $S ba --search \"wicked\"                       # \"is X on the plane?\""
+          },
+          {
+            "field": "does",
+            "quote": "If `TMDB_API_KEY` is set, run with `--tmdb` and use the score and vote count as a check on your memory"
+          },
+          {
+            "field": "inputs",
+            "quote": "**Airline**, and the month if the flight is in a later month than today (catalogues change around the 1st)."
+          },
+          {
+            "field": "inputs",
+            "quote": "an IMDb export (`data/imdb-ratings/*.csv`, or any CSV with a `Const` column) or an unzipped Letterboxd export (`ratings.csv`, `watched.csv`, `watchlist.csv`) beats anything else."
+          },
+          {
+            "field": "inputs",
+            "quote": "**Taste code.** \"My Seatback Cinema taste code is ...\" (or the older \"my profile token is ...\") goes in as `--profile-token <code>`"
+          },
+          {
+            "field": "outputs",
+            "quote": "it stores the profile on the Seatback server and ends with the sentence to paste there."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Any of Bun, Node 22.6+ or Deno will run it:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The ratings must be public: if the script or the connector says they're private, tell them in one line to set ratings to public under Settings, Privacy on imdb.com and send the link again."
+          },
+          {
+            "field": "limits",
+            "quote": "Delta, Turkish, Air France and Qatar aren't covered (they don't publish a full catalogue, or hide it behind bot protection)."
+          }
+        ]
+      }
+    }
+  ]
+}

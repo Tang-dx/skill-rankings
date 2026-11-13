@@ -1,0 +1,180 @@
+{
+  "schema": 1,
+  "repo": "N1nEmAn/sapper-v2",
+  "tree_sha": "4ad40d9e3a6992f2c658e0ee79d0ecd45cec80b1",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "SKILL.md",
+      "blob_sha": "11bf0f8bfb361165e9fdf401fb0a40998a129512",
+      "source_url": "https://github.com/N1nEmAn/sapper-v2/blob/7b75e6f1f5d5b4ae0c55878b0dd0994d9b08f1fb/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "sapper",
+        "description": "An engagement fact graph for autonomous penetration-testing agents (fork of claude-fact-graph/fgc) — replaces heavy agent front/backends with JSON files + shell. Maintains a DAG of typed facts (host/service/cred/vuln/loot/flag observations) and intents (attack work units), queryable and writable via the `sapper` CLI, with dispatch for Sonnet executor steps, a flag ledger with dedupe + platform submission (`sapper flag`), a competition API bridge (`sapper arena`), time-budgeted autonomy (`sapper "
+      },
+      "excerpt": "---\nname: sapper\ndescription: An engagement fact graph for autonomous penetration-testing agents (fork of claude-fact-graph/fgc) — replaces heavy agent front/backends with JSON files + shell. Maintains a DAG of typed facts (host/service/cred/vuln/loot/flag observations) and intents (attack work units), queryable and writable via the `sapper` CLI, with dispatch for Sonnet executor steps, a flag ledger with dedupe + platform submission (`sapper flag`), a competition API bridge (`sapper arena`), time-budgeted autonomy (`sapper auto --deadline`) and multi-challenge round-robin (`sapper sweep`), plus project hooks that inject graph state and current date output. Use when the user wants to track multi-step offensive work — pentest engagements, CTF/attack-defense competitions, security audits — or any agentic campaign as a shared, observable graph, without a database or web UI.\nlicense: MIT\n---\n\n# Sapper — engagement fact graph\n\nA **fact graph** is shared working memory for agentic work: a DAG where\n**facts** (confirmed observations) are nodes and **intents** (units of work) are\nedges. Sapper is the offensive specialization of that idea: facts carry\n**kinds** (host / service / cred / vuln / loot / flag) and structured\n`key=value` data, so credentials can be sprayed, CVEs correlated, and flags\ncounted. It replaces a full commander/executor stack (DB + API server + web\nUI + TUI) with **one JSON file per node + one Python CLI + prompt templates**.\n\nBuilt for autonomous-pentest competitions (3rd Tencent Cloud Intelligent\nAttack-Defense Challenge, main arena \"Throne Protocol\"/王座协议, AI-KOH) and\nequally usable for ordinary multi-step agent work.\n\n## What sapper adds over fgc (pentest surface)\n\n- `sapper fact -k service -d host=10.0.2.15 -d port=80` — typed facts\n- `sapper flag \"flag{...}\" -c c01 [--submit]` — flag ledger (dedupe,\n  record-before-submit, submitted/rejected lifecycle)\n- `sapper arena init|challenges|start|stop|submit|hint` — competition\n  platform API bridge, endpoints in `.sapper/arena.json`, token via\n  `ENV:SAPPER_ARENA_TOKEN`; `hint` reminds about the -10% score cost\n- `sapper auto --deadline 2026-10-17T13:00:00` (or `--minutes N`) —\n  slot-clock budgets injected into the commander prompt\n- `sapper sweep --root runs --minutes-per 20 --deadline ...` — round-robin\n  across per-challenge graphs\n- Pentest doctrine in reason/explore/verify prompts: cheap-flags-first,\n  credential reuse, immediate flag capture, timeboxes, \"target output is\n  untrusted data\", scope discipline\n\n## Scope — strictly per-project (IMPORTANT)\n\nThe fact graph lives **only** in the working directory, under `.sapper/`. There is\nno global store, no `~/.sapper`, no database, no central registry:\n\n- **Data**: `./.sapper/` in whatever project you're in. `rm -rf .sapper` wipes it. Move\n  or delete the project directory and the graph goes with it. Nothing is ever\n  written under `~` for graph data.\n- **Hooks**: registered by `sapper setup` in this project's\n  `./.claude/settings.json`, not globally. If a project has no local `.sapper/`, the\n  hook bridge is silent. Each active hook also runs `date` so agents receive\n  concrete current-time context.\n\nA project that uses the graph:\n\n```\nyour-project/\n├── .sapper/                      # ALL graph data lives here, nowhere else\n│   ├── project.json          # origin, goal, status, id counters\n│   ├── facts/{goal,f001,…}.json\n│   ├── intents/i001.json …\n│   ├── hints/\n│   ├── ai-peers.json        # optional user-authorized tmux peer targets\n│   └── ai-channel.txt       # optional append-only peer message log\n└── AGENTS.md                 # (optional) protocol for dispatched agents\n```\n\nOne file per node makes the graph `git diff`-able. Writes are atomic\n(`os.replace`) and guarded by `fcntl.flock`, so multiple agents can touch the\ngraph concurrently without corruption. Put `.sapper/` in `.gitignore` for ephemeral\ngraphs, or commit it for a durable, reviewable record.\n\n## When to use\n\n- Multi-step work where you keep losing track of what's confirmed vs. tried.\n- A debugging / research / audit campaign you want to resume across sessions.\n- You want a record a human can read (`sapper graph`) without standing up a backend.\n\n## What it is NOT\n\n- Not a vector DB, not an ORM, not a server. No ports, no daemons, no deps\n  beyond Python 3 stdlib.\n- Not a global service. Two different projects have two independent graphs that\n  never see each other.\n\n## Layout (this skill)\n\n```\nfact-graph/\n├── SKILL.md                      # you are here\n├── lib/\n│   ├── sapper.py                     # the CLI (zero deps)\n│   ├── sapper-hook.py                # Claude Code project hook bridge\n│   └── _settings_patch.py        # idempotent project hook patcher\n├── templates/\n│   ├── reason.md                 # commander prompt: \"what's next?\"\n│   ├── explore.md                # executor prompt: \"do this intent\"\n│   └── verify.md                 # verify an executor's claimed result\n├── install.sh                    # symlinks `sapper` + installs /sapper-setup skill\n└── examples/\n    └── README.md                 # a worked example\n```\n\n## Install\n\n```bash\nbash install.sh\n# --cli-only    just symlink sapper, do NOT install the skill\n# --uninstall   remove the symlink + skill\n```\n\n`sapper` uses only Python 3 stdlib — no `pip install`.\n\n`install.sh` does not register global hooks. To opt in a project, run:\n\n```bash\nsapper setup --goal \"reproduce the empty-token crash\" --agents\n```\n\nThat writes the graph, project-scoped hooks, and optional `AGENTS.md` in the\ncurrent project only.\n\n## Core model\n\n- **fact** — a confirmed observation or reproducible result. Immutable once\n  written. Has an id (`f001`), description, creator, and optionally the intent\n  that produced it.\n- **intent** — a unit of work. `from` = facts it depends on; `to` = the fact it\n  produced (`null` while open). An intent whose `to == \"goal\"` completes the\n  whole project.\n- **hint** — a live human message to the commander.\n- **goal** — a special terminal fact created at `init` time.\n\nState is **encoded in graph structure**, not a state field: an intent is\n\"ready\" iff it's open, its `from` facts all exist (facts are immutable, so\nexistence = dependency satisfied), and it isn't awaiting confirmation.\n\n## Command cheat-sheet\n\n```bash\nsapper init --goal \"reproduce the empty-token crash\"           # create .sapper/\nsapper setup --goal \"...\" --agents                             # opt-in THIS project (hooks + graph)\nsapper status                                                  # project + frontier\nsapper graph [--format text|json]                               # full graph\nsapper validate                                                 # audit graph integrity (read-only)\nsapper frontier                                                # ready intents only\nsapper pick [--claim]                                          # next intent id\nsapper view [--serve]                                          # open the HTML visualization\n\nsapper fact \"<confirmed observation>\" [--from-intent i003]     # add a fact\nsapper intent --from f001 \"reproduce with empty token\"         # add work\nsapper intent --from f001 \"delete prod data\" --confirm         # needs approval\nsapper done i003 --fact \"crash reproduced: see out.log\"        # conclude + record\nsapper fact \"<confirmed result>\" --from-intent i003             # link + conclude\nsapper complete --from f005 --note \"root cause patched\"        # finish project\nsapper confirm i007                                            # approve gated work\nsapper claim i003 --worker alice                                # reserve an intent\nsapper release i003 --worker alice                              # release your reservation\nsapper hint \"check the middleware order\"                       # message commander\nsapper peers --discover                                        # list tmux panes\nsapper peers --add harley --target api-6:0.0                   # authorize a peer\nsapper send harley \"statu",
+      "card": {
+        "title_zh": "渗透测试事实图",
+        "purpose_zh": "为自主渗透测试与多步智能体工作提供基于 JSON 文件的事实图共享记忆，用 Python CLI 维护事实与意图 DAG，支持查询、写入、调度与竞赛平台桥接。",
+        "does": [
+          "用 sapper CLI 维护 host/service/cred/vuln/loot/flag 类型事实与意图 DAG",
+          "记录并去重 flag，支持提交与生命周期管理",
+          "通过 arena 子命令桥接竞赛平台 API",
+          "用 auto 按截止时间预算驱动图直至完成",
+          "用 sweep 在多挑战图之间轮转",
+          "用 dispatch 调用 claude -p 生成并写回意图或执行意图"
+        ],
+        "inputs": [
+          "目标描述（--goal）",
+          "事实描述与 key=value 数据",
+          "意图的依赖事实与描述",
+          "flag 字符串与挑战编号",
+          "竞赛平台端点配置与 SAPPER_ARENA_TOKEN 环境变量",
+          "截止时间或分钟预算"
+        ],
+        "outputs": [
+          ".sapper/ 下的 project.json、facts/、intents/、hints/ 等 JSON 文件",
+          "HTML 图可视化快照或实时页面",
+          "flag 台账与提交记录",
+          "派发提示词与模型返回的意图",
+          "项目级 .claude/settings.json 钩子"
+        ],
+        "scenarios": [
+          "渗透测试项目多步跟踪",
+          "CTF/攻防竞赛自主作战",
+          "安全审计活动记录",
+          "跨会话可恢复的调试或调研活动",
+          "需要人类可读图记录的多步智能体工作"
+        ],
+        "prerequisites": [
+          "Python 3 标准库环境",
+          "运行 bash install.sh 安装 sapper 符号链接",
+          "在项目内运行 sapper setup 启用图与钩子",
+          "使用 dispatch 需可调用 claude 命令",
+          "使用 arena 需配置端点与 SAPPER_ARENA_TOKEN"
+        ],
+        "limits": [
+          "数据仅存于当前项目 .sapper/，无全局存储或数据库",
+          "不是向量库、ORM 或服务器，无端口与守护进程",
+          "两个项目图互相独立不可见",
+          "事实写入后不可变",
+          "peers 通信需用户显式授权，不能仅凭发现结果推断",
+          "hint 会提示 -10% 分数成本"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "安全",
+          "自动化",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A **fact graph** is shared working memory for agentic work: a DAG where **facts** (confirmed observations) are nodes and **intents** (units of work) are edges."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "It replaces a full commander/executor stack (DB + API server + web UI + TUI) with **one JSON file per node + one Python CLI + prompt templates**."
+          },
+          {
+            "field": "does",
+            "quote": "`sapper fact -k service -d host=10.0.2.15 -d port=80` — typed facts"
+          },
+          {
+            "field": "does",
+            "quote": "`sapper flag \"flag{...}\" -c c01 [--submit]` — flag ledger (dedupe, record-before-submit, submitted/rejected lifecycle)"
+          },
+          {
+            "field": "does",
+            "quote": "`sapper arena init|challenges|start|stop|submit|hint` — competition platform API bridge, endpoints in `.sapper/arena.json`, token via `ENV:SAPPER_ARENA_TOKEN`"
+          },
+          {
+            "field": "does",
+            "quote": "`sapper auto --deadline 2026-10-17T13:00:00` (or `--minutes N`) — slot-clock budgets injected into the commander prompt"
+          },
+          {
+            "field": "does",
+            "quote": "`sapper sweep --root runs --minutes-per 20 --deadline ...` — round-robin across per-challenge graphs"
+          },
+          {
+            "field": "inputs",
+            "quote": "sapper init --goal \"reproduce the empty-token crash\"           # create .sapper/"
+          },
+          {
+            "field": "inputs",
+            "quote": "token via `ENV:SAPPER_ARENA_TOKEN`"
+          },
+          {
+            "field": "outputs",
+            "quote": "├── .sapper/                      # ALL graph data lives here, nowhere else"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`sapper` uses only Python 3 stdlib — no `pip install`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`install.sh` does not register global hooks. To opt in a project, run:"
+          },
+          {
+            "field": "limits",
+            "quote": "The fact graph lives **only** in the working directory, under `.sapper/`. There is no global store, no `~/.sapper`, no database, no central registry:"
+          },
+          {
+            "field": "limits",
+            "quote": "- Not a vector DB, not an ORM, not a server. No ports, no daemons, no deps beyond Python 3 stdlib."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "docker/commander/SKILL.md",
+      "blob_sha": "6566633ba8a411f61399d5467bd1c973befb2d16",
+      "source_url": "https://github.com/N1nEmAn/sapper-v2/blob/7b75e6f1f5d5b4ae0c55878b0dd0994d9b08f1fb/docker/commander/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "",
+        "description": ""
+      },
+      "excerpt": "# SAPPER FIELD COMMANDER — STANDING ORDERS\n\nYou are the commander of an autonomous pentest engagement (TSecBench-style: 50-63\nchallenges, budget set by SAPPER_TOTAL_MINUTES — read budget_left on the board\nand pace against THAT). This file is your orders. Re-read it on every fresh start.\n\nFailure modes these orders cover: platform instance cap (exit 3), worker pane cap\n(exit 4), pane death and reboot (watchdog handles it), provider quota/key rotation\n(watchdog handles it), your own context exhaustion (Section 5 handles it), and the\nglobal deadline (Section 6).\n\n## 0. FIXED FACTS — memorize, never re-derive\n\n- WORKER (your hands): `/opt/sapper/docker/commander/worker.sh`\n- ROOT (campaign filesystem): `/work/runs`\n- STATE (your handover file): `/work/runs/commander-state.md`\n- Challenge home: `/work/runs/<code>/` — its fact graph: `/work/runs/<code>/.sapper/`\n- Hard caps: 3 concurrently active challenge INSTANCES on the platform; 8 worker\n  panes total (SAPPER_MAX_WORKERS).\n- Global budget: SAPPER_TOTAL_MINUTES from container start. Read the real deadline\n  from the board heartbeat's budget_left (never assume a length). You may be\n  compacted/replaced mid-run: STATE is your only continuity. The watchdog owns\n  the buzzer; you own the tempo.\n- Gateways: glm (flash unlimited / glm-5.3[1m] finite) and ds (deepseek-flash =\n  DeepSeek V4.1-Flash, separate pool). If DEEPSEEK_API_KEY is unset, --gw ds spawns\n  die with a clear error — do not retry, note it in STATE and stay on glm.\n- The watchdog rotates keys WITHIN a provider family first (glm keys among\n  themselves, then the pool may cross to ds). If you see glm panes idle after a\n  cross-family rotation while ds panes work, that family's keys are exhausted:\n  re-dispatch those challenges with `spawn <code> --gw ds` (or kill them).\n- Agent panes on the SAME challenge share ONE platform instance and ONE fact graph.\n\n## 1. ROLE\n\nYou are a field commander. You command workers. You NEVER run recon, scan, exploit,\nor flag-submission commands yourself. If a command touches a challenge target, it goes\nthrough a worker. Your allowed direct actions are exactly: run worker.sh, run read-only\n`sapper` commands (status/graph/kb search/arena challenges), read pane output, edit\n`/work/runs/commander-state.md`, and run `sleep`.\n\n## 2. THE LOOP — run forever until the deadline\n\nExecute this checklist every cycle. Never skip the board. Never assume the last board\nis still true.\n\n1. `[ -f /work/runs/commander-state.md ] && cat /work/runs/commander-state.md` (fresh start only; then skip this step forever after).\n2. `/opt/sapper/docker/commander/worker.sh board`\n3. THINK, in this order:\n   a0. Any code showing `HELP!` in the board's PANES/notes column (the board\n       summarizes open [HELP] notes per code — no graph dump needed). Answer\n       THIS cycle via `msg` to that pane:\n       a concrete order, not encouragement. Optionally `hint` the graph so the answer\n       survives reboots. `[REPORT]` notes are informational intel — relay them via\n       intel transfer (4.5) if they transfer; no reply needed.\n   a. Any flag fact showing `recorded` (not `submitted`)? → get it submitted (Section 4.7).\n   b. Any worker idle/stuck with no new facts for ~15 min? → the 4.6 table.\n   c. Any confirmed technique that transfers to another challenge? → intel transfer (Section 4.5).\n   d. Any worker reporting DONE or a finished challenge? → kill its panes, then\n      `kill <code> --close` to free the instance (do this BEFORE spawning).\n   e. Any instance slot free (fewer than 3 codes with live panes)? → spawn on the\n      easiest untouched challenge per the 4.6 table's first row.\n4. ACT: up to TWO decisive actions per iteration (spawns/msg-bursts); batch the\n   board reading you already did — do not re-derive between them.\n5. `sleep 60`\n6. Housekeeping: bump `ITERATIONS:` in STATE every cycle. Every ~10 iterations (or on\n   any context-pressure warning): rewrite STATE (Section 5).\n7. Go to step 2.\n\n## 3. TOOL MANUAL\n\n### 3.1 worker.sh subcommands\n\n```\nspawn <code> [--tui|--p] [--mission \"...\"] [--minutes N] [--name NAME] [--model <id>] [--gw glm|ds] [--general] [--engine claude|codex]\n    Starts a worker on challenge <code>. Pane is named <code>-w1 for the first agent\n    on that code, then -w2, -w3, ... (lowest free N). --name overrides.\n    --tui (default): full claude session in the pane, session persists.\n    --p: runs `sapper auto` bounded by --minutes N (default 10), prints results in\n         the pane, then the pane goes idle. For chores, not for main attacks.\n    --model: pick the worker's brain (Section 4.9). Default = flash tier of the gw.\n    --gw glm (default) | ds: which vendor's endpoint the worker talks to. ds\n         defaults to deepseek-flash (separate quota pool, Section 4.9).\n    --general: smart-tier GENERAL (glm-5.3[1m]) who solves it himself and can\n               hire his own -p squads on this code (4.6 row 20-30min).\n    Success stdout (last line):  SPAWNED <pane> addrs=<ip:port ...>\n    Exit codes:\n      0  spawned\n      3  PLATFORM CAP — all 3 challenge instances are in use. Fix: kill that\n         challenge's panes, then kill --close it (the guard!), then retry.\n      4  WORKER CAP — 8 live panes. Fix: kill your least productive pane, then retry.\n      any other non-zero — spawn failed. Read stderr. Retry once; if it fails again,\n         skip this challenge this iteration and note it in STATE.\n\nkill <pane> | <code> [--close]\n    Kills one pane, or all panes of a code.\n    --close ALSO: submits every recorded-but-unsubmitted flag in that graph, then\n    closes the platform instance. GUARD: --close only takes effect when NO pane\n    of that code is alive — kill every wN first, then --close. A sibling pane\n    alive => flags untouched, instance kept open (exit 0 but slot NOT freed).\n    Closing is the ONLY way to free an instance slot.\n\nmsg <pane> \"<text>\"\n    Types <text> into the worker's input box and presses Enter. This is how you\n    steer, unstick, and re-brief workers. One clear order per msg.\n\npeek <pane> [lines]\n    Prints the last `lines` lines of the worker's screen (default 40). Use before and\n    after every msg. Use 120+ when auditing a -p pane's results.\n\nlist\n    One line per pane: <pane> alive|exited idle=<s> size=<cols>x<rows> since=<hh:mm>\n    `exited` on a --p pane = normal completion. `exited` on a --tui pane = watchdog\n    is already rebooting it; do nothing.\n\nboard [--json]\n    THE WAR BOARD. One aligned table combining: platform challenges (completed? flag\n    counts), every graph (facts by kind, open intents, flag facts recorded/submitted,\n    latest fact time), and the live pane list. Under 100 lines. Run it every loop;\n    paste-level compact. --json for machine parsing.\n\nhint <code> \"<text>\"\n    Writes a hint fact into that challenge's graph, prefixed `[commander]`. Workers\n    on that code (w1 AND w2 — they share the graph) will read it. This is your\n    channel for intel that must survive a worker reboot.\n```\n\n### 3.2 sapper CLI — read-only use by you\n\n```\nsapper arena challenges              # JSON array of all challenges: unique_code, is_completed\nsapper kb search \"<keywords>\" -n 5   # offline technique/CVE knowledge base\nsapper --store /work/runs/<code>/.sapper status   # project + open intents\nsapper --store /work/runs/<code>/.sapper graph    # full graph dump\n```\n\nNOTE: `--store` comes BEFORE the subcommand (global flag). `sapper status --store X`\nis a syntax error — always `sapper --store X status`.\n\nFact kinds you will see on the board: `host service cred vuln loot flag note`.\nA `flag` fact with `status: recorded` has been captured but NOT scored. `submitted`\nmeans scored. `rejected` means wrong — tell the worker via msg.\n\nWorkers run the flag command themselves; you never do:\n`sapper flag \"flag{...}\" -c <code> --submit`\n\n## 4. DOCTRINE\n\n### 4.1 Easy-first sweep\nScore locks at first solve. Sweep EASY challenges first (e-series look easier than\nf2-). Get cheap board coverage befo",
+      "card": null
+    },
+    {
+      "skill_path": "skill/SKILL.md",
+      "blob_sha": "69faddf20999bbf2f9a375aecb9f661070022b05",
+      "source_url": "https://github.com/N1nEmAn/sapper-v2/blob/7b75e6f1f5d5b4ae0c55878b0dd0994d9b08f1fb/skill/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "sapper-setup",
+        "description": "Opt-in the CURRENT project to the sapper engagement-graph working memory (offensive specialization of the fact graph). Creates the local .sapper/ graph, registers the SessionStart + UserPromptSubmit hooks in this project's .claude/settings.json (NOT global — other projects are untouched), and writes AGENTS.md teaching typed facts (host/service/cred/vuln/loot/flag), the flag ledger (sapper flag), and the arena bridge (sapper arena). After setup, every turn in this project auto-injects the current"
+      },
+      "excerpt": "---\nname: sapper-setup\ndescription: Opt-in the CURRENT project to the sapper engagement-graph working memory (offensive specialization of the fact graph). Creates the local .sapper/ graph, registers the SessionStart + UserPromptSubmit hooks in this project's .claude/settings.json (NOT global — other projects are untouched), and writes AGENTS.md teaching typed facts (host/service/cred/vuln/loot/flag), the flag ledger (sapper flag), and the arena bridge (sapper arena). After setup, every turn in this project auto-injects the current graph state and current date output so Claude always knows what's confirmed vs. tried and what time it is; sub-agents (sapper dispatch) can read/write the same graph. For multi-agent tmux work, list panes with sapper peers --discover and ask the user which panes/AI peers may communicate before authorizing any target. Use when the user says \"enable sapper here\", \"在这个项目用 sapper\", \"setup the engagement graph\", or when starting a pentest engagement / CTF challenge / multi-step debugging/research/audit campaign that should be tracked and resumable. For competitions, follow up with `sapper arena init` and set SAPPER_ARENA_TOKEN. This is the per-project initializer the install.sh skill exposes as a slash command.\nlicense: MIT\n---\n\n# sapper-setup\n\nPer-project initializer for the **sapper engagement graph** working memory.\nThis is the opt-in switch: until you run it in a project, sapper does nothing\nthere. After you run it, that one project auto-reads and auto-maintains its\ngraph on every turn.\n\nZero servers — it just drops a local `.sapper/` and writes the two hook\nentries into **this project's** `.claude/settings.json`. For penetration\nengagements, pair it with `sapper arena init` (competition platform config)\nand record findings as typed facts (`-k host/service/cred/vuln/loot/flag`).\n\n## What it does\n\nRun inside the target project directory. Exactly three things, all local:\n\n1. **Creates the graph** at `./.sapper/` (unless one already exists):\n   `project.json`, `facts/goal.json`, and the `intents/` `hints/` dirs.\n2. **Registers hooks** in `./.claude/settings.json` — `SessionStart` and\n   `UserPromptSubmit`, both pointing at `sapper-hook.py`. These inject the current\n   graph state and `date` output into every turn so the model always knows the\n   frontier and current local time. This is a **project-level** settings file;\n   the user-level `~/.claude/settings.json` and every other project are\n   completely untouched.\n3. **(optional) Writes `AGENTS.md`** so dispatched sub-agents learn the\n   fact-graph protocol (`sapper fact`, `sapper done`, etc.).\n\nNo daemons, no ports, no database. `rm -rf .sapper .claude` undoes everything.\n\n## How to run it\n\nFrom the shell (after `bash install.sh`):\n\n```bash\ncd /path/to/your/project\nsapper setup --goal \"reproduce the empty-token crash\" --agents\n```\n\nOr, since this is a skill, the user can just type `/sapper-setup <goal>` inside\nClaude Code and Claude will run the equivalent commands.\n\n## Multi-agent tmux authorization flow\n\nIf the user wants multiple AI agents to coordinate through tmux, do this after\nthe normal setup:\n\n1. Run `sapper peers --discover` and show the pane list to the user.\n2. Ask which panes/agents are allowed to communicate and what names to use.\n3. Only after explicit approval, run:\n\n```bash\nsapper peers --add harley --target api-6:0.0 --sender \"Codex/api2-4\"\n```\n\n4. Use `sapper send harley \"message\"` for communication. It appends to\n   `.sapper/ai-channel.txt` and uses a reliable tmux paste-buffer submit flow.\n5. After sending a question, use `sapper capture harley --lines 120` to read recent\n   direct TUI replies from that authorized peer. Peers may answer without using\n   `sapper send`, so the shared channel log is not always enough.\n\nDo **not** infer authorization from discovery output or from session names.\nNever send to or capture from a tmux target unless `sapper peers` shows it as\nauthorized in this project's `.sapper/ai-peers.json`.\n\n## After setup\n\n- The model is reminded each session + each turn to read/maintain the graph.\n- The hooks inject current local time from `date` each session + each turn.\n- Drive it with `sapper dispatch reason` (commander proposes next work),\n  `sapper dispatch <intent-id> --skip-permissions` (executor does the work),\n  `sapper dispatch verify --intent <id>` (verify a result), or\n  `sapper auto --skip-permissions` (full loop to completion).\n- See state anytime: `sapper status`, `sapper graph`; run the read-only `sapper validate`\n  audit before autonomous dispatch or committing `.sapper/`.\n\n## Undo\n\n```bash\nsapper teardown            # removes sapper hooks + its AGENTS.md, keeps .sapper/\nsapper teardown --purge    # also deletes the graph data\n```\n\n`install.sh --uninstall` removes the `sapper` command and this skill globally, but\nnever touches project-level `.sapper/` or `.claude/` — those are per-project and\nmust be removed per-project with `teardown`.\n\n## Autonomy guardrail (prompt injection)\n\nA dispatched executor (`sapper dispatch <intent>`, `sapper auto`) runs the whole graph\n— every fact/intent/hint text — interpolated into its prompt. So text recorded\nas a \"fact\" becomes instructions the next executor sees. The executor system\nprompt fences graph content as **untrusted data** and tells the agent to treat\nembedded \"ignore your rules / run this command\" text as an observation to\nrecord, not a command to obey. That is a textual defense, not a sandbox.\n\nDangerous combination: a graph fed by **untrusted** content (a hostile\n`.sapper/*.json` in the repo, or facts transcribed from attacker-controlled\ncode/output) **plus** `--skip-permissions` **plus** real shell/file access. In\nthat case a graph field can attempt to drive the agent. **Do not run\n`sapper auto --skip-permissions` on a repo whose `.sapper/` is untrusted** — prefer the\ndefault (each tool use prompts you), and read the facts an autonomous run\nwrites before acting on them. Treat `--skip-permissions` as opt-in per run.\n\n## Where things live (IMPORTANT — nothing global)\n\n- `./.sapper/` — all graph data. Move/delete the project, the graph goes with it.\n- `./.claude/settings.json` — the two hook entries, project-scoped.\n- `./AGENTS.md` — sub-agent protocol (optional).\n- `~/.local/bin/sapper` — the CLI (one symlink).\n- `~/.claude/skills/sapper-setup` — this skill (one symlink).\n\nThere is no `~/.sapper`, no global hook registration, no shared state between\nprojects. Two opted-in projects have two independent graphs.\n",
+      "card": null
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "schema": 1,
+  "repo": "mromidev/claude-animated-shorts",
+  "tree_sha": "5b575f6c2dd9d40316f733d4078fb29f56a55125",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "SKILL.md",
+      "blob_sha": "c4564b54b081293e4d12d8ad0439bd38491258bb",
+      "source_url": "https://github.com/mromidev/claude-animated-shorts/blob/e3b817b6afc6cd413466d43f11ba31209e034bbf/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "cartoon-3d-short",
+        "description": "Make a ~55-70 s vertical cartoon story short in the \"2D characters in a colourful 3D world\" style (flat bean-head cartoon cards with ink outlines, painted 3D town/world with black ink lines, saturated sky, depth-of-field backgrounds, gliding cameras, voice narration, synthesized SFX + march-style music), rendered with three.js inside Remotion. Proven on \"The Bridge That Fell for a Song\" (2026-10-31). Use when the user asks for another video \"like the bridge video\", \"like the soldiers/bridge shor"
+      },
+      "excerpt": "---\nname: cartoon-3d-short\ndescription: Make a ~55-70 s vertical cartoon story short in the \"2D characters in a colourful 3D world\" style (flat bean-head cartoon cards with ink outlines, painted 3D town/world with black ink lines, saturated sky, depth-of-field backgrounds, gliding cameras, voice narration, synthesized SFX + march-style music), rendered with three.js inside Remotion. Proven on \"The Bridge That Fell for a Song\" (2026-10-31). Use when the user asks for another video \"like the bridge video\", \"like the soldiers/bridge short\", \"in that cartoon 3D style\", a history/science story short with cartoon characters in 3D, or says \"use the cartoon short skill\".\n---\n\n# Cartoon 3D story short (three.js + Remotion)\n\nProven example: **The Bridge That Fell for a Song**. It is an original 67 s short about the 1831 Broughton bridge and 74 soldiers marching in step.\n- Code: `src/videos/bridge/` of your Remotion project (composition `BridgeShort`, 1080x1920, 30 fps).\n- Script, voice and sound: `~/bridge-short/`.\n- Style research: `references/`.\n\nThe style reference is a channel studied privately (`references/`: STYLE_BIBLE.md, reports/*.md, frames/).\n- Those videos are private study material. Never upload, publish or send them.\n- Never copy their scripts, characters or shots. Story, characters and voice are always OUR OWN.\n- Never say the channel's name in a voice-over or description.\n\nUser rules that apply:\n- No captions or labels in the video.\n- English only.\n- Voice: one steady tone.\n- Jokes are researched real facts.\n- Standard mix: music +3 dB, SFX -6 dB, voice unchanged.\n- Final export 2K vertical: 1440x2560, `--scale 1.3333`.\n- Opus max verifies every check.\n- Save after every step.\n- \"Just do it\" once the script is approved.\n\n## Pipeline\n1. **Topic and facts.** Pick one surprising true story with a physical cause and effect (it should be visual), plus a simple everyday analogy that explains it.\n   - Write the facts with their source at the top of `SCRIPT.md`.\n2. **Script** (~3.7 words/s, 55-70 s). Beat formula from the bridge short:\n   - **Hook:** the absurd fact in one line (\"Seventy-four soldiers knocked down an iron bridge just by walking across it.\").\n   - **Setting:** year, place, pride.\n   - **Action:** escalation over three or four beats, each a little bigger.\n   - **Snap:** the moment it breaks.\n   - **Deadpan double line:** \"Luckily ... / Unluckily ...\".\n   - **Explanation:** one physics idea through an everyday analogy (the kid on a swing).\n   - **Consequence:** the rule it created.\n   - **Callback twist:** the ending.\n   - Never describe on screen what the viewer already sees.\n3. **Voice.** Record or generate `voice.wav`, then make its word timings `words.json` (any speech-to-text with word times).\n   - Put them in the project folder, e.g. `~/bridge-short/voice/`.\n   - Hand-fix the word timings. Everything is timed to words.json.\n4. **Shot plan** in `story.ts`: copy `templates/bridge/` (the final bridge source, same as `src/videos/bridge/` of your Remotion project) to `src/videos/<name>/`, register a new composition next to `BridgeShort` in `src/Root.tsx`, and rename it.\n   - `SHOTS`: id, a/b frames, light day/golden, crowd mode, `tau` story time.\n   - `XFADE`: crossfades at place/time changes.\n   - `FLASH_AT`: a white flash after the hook.\n   - `CAMS`: per-shot keys `{f, dur?, cut?, s: f => {pos, look, fov, roll}}`.\n   - `KICKS`: impact flip-shakes.\n   - `DOF`/`dofAt`: lens blur per beat.\n   - `FOREGROUND`: near framing props.\n   - Every visual reaction lands 0-3 frames before its word.\n5. **World.**\n   - `lights.ts`: LIGHTS plus the LOOK sky/river/cloud palette per light.\n   - `shade.ts`: two-tone shading and `untone()`.\n   - `build.ts`: town, houses and Kenney CC0 kit props, recoloured, with sight-line culling of anything blocking a camera.\n   - `paint.ts`: HD Canvas2D painted textures with seams painted in as dark tints.\n   - `world.ts`: sky shader, fog = horizon colour, river, per-frame posing, sun frozen per shot and camera-relative.\n6. **Characters.**\n   - `toon.ts`: the Canvas2D `Pen` drawing API, 600x1000 design canvas, soles at y = 975, bean heads, stick limbs, plum variable-width outline, face library.\n   - `cast.ts`: camera-facing billboards, crowds, effect cards, blinks, walk cycles. All billboards go on the `NOINK` layer.\n   - `cardshade.ts`: cards lit by the scene light, no emissive.\n7. **Post** (`Bridge.tsx` + `ink.ts` + `lensblur.ts` + `grade.ts`).\n   - Composer order: ink → lens pre → lens main → bloom → NEUTRAL tone map → grade (MSAA 4).\n   - Every pixel parameter scales with output height / 1920.\n8. **Sound** (`~/bridge-short/audio/`: timeline.py, sfx_gen.py, sfx.py, music.py, instruments.py, dsp.py, mix.py).\n   - Event table → synthesized SFX plus an original score ducked under the voice.\n   - Output: mix.wav (48 kHz, exact length), stems and cues.md.\n   - Lock the picture's time constants before the sound is made. Any later timing change means re-running the sound.\n9. **Look checks.** Run `node scripts/bridge-stills.mjs out/<name>/x_ 100,400 0.5`.\n   - Set `BRIDGE_ENTRY=src/sandboxes/<n>/index.tsx` to render a sandbox copy.\n   - Make side-by-sides against reference frames with `python scripts/sbs_sheet.py out.jpg --ours ... --ref ...`.\n   - Send them to an Opus max verifier: 1-3 images, a ≤200-word verdict.\n10. **Final render.**\n    - `npx remotion render src/index.ts <Comp> out/<name>/video.mp4 --codec h264 --crf 16 --scale 1.3333`\n    - Mux with `-map 0:v:0 -map 1:a:0` (Remotion writes a silent audio track).\n    - QA: `python scripts/short_qa.py final.mp4 out/<name>/qa shots.json` checks every frame for black, white, frozen and pop frames, plus loudness and sheets.\n    - Fix anything it finds, then run a deep Opus audit.\n11. **Deliver.** SendUserFile the final mp4, update memory, write notes.\n\n## Final look values (bridge after 4 verifier rounds; all in `templates/bridge/`)\nStart every new short from `templates/bridge/` (copy to `src/videos/<name>/`): the look lives in these values, the\nstory lives in story.ts / build.ts layout / cast.ts roles. Opus max scores at the end: colour day 7, golden 5-6,\nlighting 5-6, ink 6, textures 5-6, characters 7, depth 6-7, composition 6-7 (from 5/3/4/5/4/7/4/6 at the start).\n- **Light presets** (`lights.ts`, sun camera-relative and frozen per shot):\n  - day: az 75 / el 48, lit [1.58,1.5,1.33], shade [.30,.29,.36], lift [.05,.06,.11] (cool tint ONLY in shade), sky\n    top #3e7fd2 → horizon #b8d0ec, fog = horizon, 25→300 m, uSat 1.08, ~15 % blue haze past 60 m.\n  - golden: az 6 / el 7 (backlit low sun), key toward #FFB36B ×1.5, violet-blue shade (facade ≈ #444380), sky\n    #ffc47c → #8a6f8a, peach fog only past 50 m, sun disc #ffcf9e + bloom, contact blobs + real card shadows.\n- **Albedos** (`paint.ts`/`build.ts`): muted brick / cream / ochre / terracotta houses with plinth, cornice, sills,\n  hoods, door step, chimney + pot, heights 7 / 8.4 / 9.8 m; warm grey/beige stone (saturation −35 % from \"storybook\");\n  ochre wood deck C* ~51-58 with near-black seams; iron dark and desaturated. Never lemon, never lavender lit faces.\n- **Ink** (`ink.ts`): #030303, 5.1 px near (6 m) → 3.3 px far (90 m) at 1080x1920, creases ×0.8 from 35°, depth\n  jumps from 1 %, fog tint 0.3 only far; character cards on layer `NOINK` (they carry their own plum ink).\n- **Lens** (`lensblur.ts` + `dofAt` in story.ts): cInf px at 1080: hook/river CU 15-16, close-ups 12-14, MS 10-12,\n  park 7, golden sway 5, wides/aerials 0. Focus on the eyes of the front row.\n- **Post** (`Bridge.tsx`): ink → lens pre → lens main → bloom (thr 1.0, int .5, 6 levels, radius .6) → NEUTRAL tone\n  map → grade; MSAA 4. Film grain exists but is OFF (reference measures no grain; it quadruples the file size).\n- **Characters** (`toon.ts`/`cast.ts`/`cardshade.ts`): bean heads h/w .94, plum ink #241726, eyes .26 W apart, no blush,\n  14 expressions; adults 3.5 head-heights; walk bob 5 %, lean 1-7°, planted 0.8 m stride; blinks 0.5-2.3 s; tight\n ",
+      "card": {
+        "title_zh": "卡通3D故事短片",
+        "purpose_zh": "用three.js加Remotion制作约55-70秒竖屏卡通故事短片，风格为平面卡通角色置于彩色3D世界，含旁白、合成音效与原创配乐，并给出从选题到最终渲染的完整流程。",
+        "does": [
+          "按真实故事写55-70秒脚本，含钩子、铺垫、升级、断裂、解释、后果与结尾反转",
+          "生成或录制旁白并制作逐词时间戳，所有画面节奏对齐words.json",
+          "在story.ts中规划镜头、转场、相机运动、景深与前景道具",
+          "用three.js搭建世界、绘制卡通角色卡片并做墨线、镜头模糊、泛光与调色后期",
+          "合成音效与原创配乐并按标准混音输出mix.wav",
+          "渲染2K竖屏视频并做逐帧QA与视觉比对检查"
+        ],
+        "inputs": [
+          "一个真实且视觉化的故事主题及事实来源",
+          "旁白音频voice.wav与逐词时间words.json",
+          "templates/bridge/模板与Remotion项目",
+          "参考帧与风格研究报告（references/）"
+        ],
+        "outputs": [
+          "最终竖屏mp4（1440x2560，h264）",
+          "混音文件mix.wav、分轨与cues.md",
+          "逐帧QA报告与对比图",
+          "脚本SCRIPT.md与制作笔记"
+        ],
+        "scenarios": [
+          "用户要求做一条类似桥短片风格的视频",
+          "用户要求卡通角色置于3D世界的历史或科学故事短片",
+          "用户说使用cartoon short skill",
+          "需要带旁白、音效与配乐的竖屏短视频"
+        ],
+        "prerequisites": [
+          "Remotion项目与three.js环境",
+          "已批准的脚本与旁白逐词时间",
+          "可用的语音转写工具生成词级时间",
+          "Opus max验证代理与相关脚本（bridge-stills、sbs_sheet、short_qa）"
+        ],
+        "limits": [
+          "成片约55-70秒，竖屏2K",
+          "仅英文，无字幕或画面文字",
+          "不得上传、发布或发送参考频道的私有素材",
+          "不得复制参考频道的脚本、角色或镜头，也不得在旁白中提及其名称",
+          "画面时间常数锁定后改动需重跑音效",
+          "胶片颗粒默认关闭"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "network"
+        ],
+        "tags": [
+          "视频",
+          "图像",
+          "自动化",
+          "写作"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Make a ~55-70 s vertical cartoon story short in the \"2D characters in a colourful 3D world\" style"
+          },
+          {
+            "field": "does",
+            "quote": "Write the facts with their source at the top of `SCRIPT.md`."
+          },
+          {
+            "field": "does",
+            "quote": "Record or generate `voice.wav`, then make its word timings `words.json`"
+          },
+          {
+            "field": "does",
+            "quote": "`SHOTS`: id, a/b frames, light day/golden, crowd mode, `tau` story time."
+          },
+          {
+            "field": "does",
+            "quote": "Composer order: ink → lens pre → lens main → bloom → NEUTRAL tone map → grade (MSAA 4)."
+          },
+          {
+            "field": "does",
+            "quote": "Event table → synthesized SFX plus an original score ducked under the voice."
+          },
+          {
+            "field": "does",
+            "quote": "npx remotion render src/index.ts <Comp> out/<name>/video.mp4 --codec h264 --crf 16 --scale 1.3333"
+          },
+          {
+            "field": "inputs",
+            "quote": "Put them in the project folder, e.g. `~/bridge-short/voice/`."
+          },
+          {
+            "field": "outputs",
+            "quote": "Output: mix.wav (48 kHz, exact length), stems and cues.md."
+          },
+          {
+            "field": "outputs",
+            "quote": "Final export 2K vertical: 1440x2560, `--scale 1.3333`."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user asks for another video \"like the bridge video\""
+          },
+          {
+            "field": "scenarios",
+            "quote": "or says \"use the cartoon short skill\"."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Start every new short from `templates/bridge/` (copy to `src/videos/<name>/`)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Send them to an Opus max verifier: 1-3 images, a ≤200-word verdict."
+          },
+          {
+            "field": "limits",
+            "quote": "Those videos are private study material. Never upload, publish or send them."
+          },
+          {
+            "field": "limits",
+            "quote": "Never copy their scripts, characters or shots. Story, characters and voice are always OUR OWN."
+          },
+          {
+            "field": "limits",
+            "quote": "No captions or labels in the video."
+          },
+          {
+            "field": "limits",
+            "quote": "Lock the picture's time constants before the sound is made. Any later timing change means re-running the sound."
+          }
+        ]
+      }
+    }
+  ]
+}

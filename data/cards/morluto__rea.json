@@ -1,0 +1,708 @@
+{
+  "schema": 1,
+  "repo": "morluto/rea",
+  "tree_sha": "a9e52c779cee35f5c950293eb196d145a8b1984d",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": ".agents/skills/rea-analysis-optimization/SKILL.md",
+      "blob_sha": "3e22a0c055e2050e03a8c9f5165fc5ae12f0bf38",
+      "source_url": "https://github.com/morluto/rea/blob/bbe2bcc979be747698d9ad9ce87af017b92e0f10/.agents/skills/rea-analysis-optimization/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "rea-analysis-optimization",
+        "description": "Optimize REA providers and shared analysis workflows for agent context, latency, CPU, and memory while preserving correctness and Evidence. Use for analysis bottlenecks and cache or query design; CI/test-suite optimization belongs to rea-ci-tests-audit."
+      },
+      "excerpt": "---\nname: rea-analysis-optimization\ndescription: Optimize REA providers and shared analysis workflows for agent context, latency, CPU, and memory while preserving correctness and Evidence. Use for analysis bottlenecks and cache or query design; CI/test-suite optimization belongs to rea-ci-tests-audit.\n---\n\n# REA analysis optimization\n\nFind a concrete source of unnecessary work, change it at its owner, and verify\nequivalent completed investigations. A useful outcome can also be a measured\ndecision to leave an implementation alone.\n\nFollow the checkout's [performance priorities](../../../AGENTS.md#performance),\n[tool design](../../../docs/development/tool-design.md), and\n[testing guide](../../../docs/development/testing.md). This skill supplies an optimization\nworkflow, not additional permission to execute targets, publish, or merge.\nUse the current contracts, provider prerequisites, and user authorization.\n\nReserve performance measurements for changes that target performance or have a\nconcrete regression concern. Routine cleanup uses correctness checks and does\nnot require this optimization workflow or synthetic benchmarks merely because\nhelper calls, imports, or representations change.\n\nRead [the Kuna case study](references/kuna-case-study.md) when selecting a\nreuse strategy or interpreting a benchmark. Its pinned observations illustrate\ntradeoffs; they are not current-provider guarantees or universal speedups.\n\n## Pin the question and the correctness oracle\n\nDescribe the analyst's completed task, including the facts and relationships\nneeded to answer it, requested detail, source access, and meaningful unknowns.\nChoose a representative real artifact and a small or empty case. Record the\nbaseline revision, target digest, engine identity, options, host, and entrypoint.\nUse a separate checkout for changes without disturbing other work.\n\nEstablish an oracle independent of the changed implementation: source-built\nfixture expectations, independently mapped file bytes, or a native producer\npaired with checks of its interpretation. Comparing two wrappers around the\nsame faulty decoder does not establish correctness. Preserve address widths,\nsame-address alternatives, unresolved endpoints, coverage, and source linkage.\nAn empty result proves absence only within the actually examined scope.\n\n## Locate the earliest unnecessary work\n\nTrace one public CLI or MCP task through shared application code to its producer.\nMeasure relevant phases: admission and identity checks, native analysis,\ndecoding, lookup, projection, serialization, Evidence retention, and cleanup.\nInclude catalog discovery and extra calls when they affect the completed task.\n\nUse the evidence to choose the smallest structural correction:\n\n| Observed cost                     | Candidate correction                                       | Condition to establish                                                               |\n| --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------ |\n| Repeated scans of validated facts | Reuse existing order or lookup structure                   | The owner establishes ordering and identity; every matching alternative survives     |\n| Repeated equivalent engine work   | Share a validated result or in-flight producer             | Inputs, freshness, lifetime, and per-caller outcomes remain explicit                 |\n| Full reports for selected facts   | Push selection or projection to the earliest capable owner | Required facts and evidence remain reachable; examined coverage is reported          |\n| Large temporary transport buffers | Decode incrementally or use bounded source reads           | Validate the whole admitted document; retained facts and copies still consume memory |\n| Many repeated homogeneous reads   | Share admission, decoding, or batch work                   | Preserve item identity, order where required, and individual failures                |\n\nDo not introduce an index, generic cache, batch endpoint, or orchestration layer\nwithout identifying the work it removes and its maintenance/resource cost.\nProjection after materializing a full report may reduce output while leaving\nanalysis time and peak memory unchanged. Fix missing or incorrect facts before\nbenchmarking an alternative composition against a better-covered workflow.\n\n## Keep one interpretation and a defined reuse lifetime\n\nLet the producer boundary validate and normalize facts once. Consumers query\nthat representation through the shared CLI/MCP implementation; adapters should\nnot rebuild relationships or independently reinterpret raw reports. Keep lookup\nidentity separate from display formatting. Reuse contracts when their intent\nmatches, honoring requested detail and complete Evidence access.\n\nFor every cache or shared producer, state its key, owner, invalidation, retained\nsize, and lifetime. Account for result-affecting target bytes, engine contents,\nanalysis options, architecture/load mapping, and parser/schema versions where\nthey affect reuse. Validate live state before calling a cached observation\ncurrent. Cache a refusal only when it is deterministic for that validated key;\nmalformed, partial, transient, or cancelled attempts need explicit retry policy.\n\nOne cancelled waiter must not invalidate a successful peer. Preserve producer\nfailure context and each caller's cancellation reason. Retain ownership and\ncapacity charges until shared work and cleanup settle; preserve completed\nobservations when cleanup fails. Exercise invalidation, concurrent consumers,\nlast-waiter cancellation, close, and cleanup retry when those paths change.\n\nBound the process family and retained state, not just a parent heap or worker\ncount. Account for decoding and serialization expansion before allocation.\nChoose CPU, memory, concurrency, and disk limits from the host and workload;\nstop before OOM and verify owned cleanup. A guard-stopped task is incomplete.\nDo not replace a transport buffer cap with an unbounded retained inventory or\nhide partial results behind a success status.\n\n## Compare completed tasks and limit the claim\n\nRun the affected real public workflow before and after with equivalent inputs,\nresults, coverage, and Evidence semantics. Include small inputs so setup costs\nand regressions are visible. Distinguish fresh sessions, warm runtime caches,\nand OS file caches. Alternate or repeat runs when variance affects the decision.\nChoose meaningful boundary regressions for cases the actual engine cannot\nreliably reproduce; a fake engine does not qualify a real provider.\n\nReport task outcome, relevant phase timings, total elapsed and CPU time, peak\nprocess-family memory and its accounting method, resource stops, and cleanup.\nCheck the payload exit status as well as the profiler's. Keep failed attempts\nand identify unmeasured costs; a passing retry does not explain a failure.\n\nFor token claims, count schemas/discovery, arguments, replies, retries, and\ncontinuations needed to finish the task. Label tokenizer estimates separately\nfrom actual model usage and record the client/catalog behavior. Smaller JSON\nalone establishes neither fewer model tokens nor better investigation quality.\nDo not claim a complex-software advantage without completed representative\ninvestigations and comparable correctness/coverage.\n\nFinish with the bottleneck, owning change, preserved semantics, executed\nchecks, before/after measurements, and remaining limits. Keep any integration\nrecord current with its tested revision and distinguish merged production work\nfrom experiment-only code. Stop when the demonstrated bottleneck is resolved\nor further benefit remains speculative.\n",
+      "card": {
+        "title_zh": "REA分析性能优化",
+        "purpose_zh": "为REA provider与共享分析流程定位并消除不必要的重复工作，在保持正确性与Evidence语义的前提下优化上下文、延迟、CPU与内存，并用完成任务的实测对比限定结论。",
+        "does": [
+          "先固定分析任务与独立于改动实现的正确性判据，记录基线版本、目标摘要、引擎身份、选项、宿主与入口",
+          "沿一条公开CLI或MCP任务追踪到生产者，测量准入、原生分析、解码、查找、投影、序列化、Evidence保留与清理各阶段",
+          "按观测成本选择最小结构性修正：复用既有顺序或查找结构、共享已验证结果、把选择或投影前移、增量解码、合并同质读取",
+          "为每个缓存或共享生产者明确键、所有者、失效、保留大小与生命周期，并处理并发消费者、取消与清理重试",
+          "在改动前后用等价输入运行真实公开工作流，对比结果、覆盖与Evidence语义，并区分冷启动、热缓存与OS文件缓存",
+          "报告瓶颈、所属改动、保留语义、已执行检查、前后测量与剩余限制，瓶颈解决或收益仅存推测时停止"
+        ],
+        "inputs": [
+          "分析者要完成的任务描述，含所需事实与关系、细节要求、源访问与未知项",
+          "代表性真实工件以及一个小规模或空输入用例",
+          "基线修订、目标摘要、引擎身份、选项、宿主与入口信息",
+          "改动前后真实公开工作流的运行测量数据"
+        ],
+        "outputs": [
+          "定位到的最早不必要工作及其所属改动",
+          "改动前后完成任务的阶段耗时、总耗时、CPU时间、峰值进程族内存与清理情况",
+          "保留语义与已执行检查的说明",
+          "缓存或共享生产者的键、所有者、失效、保留大小与生命周期定义",
+          "关于是否值得继续优化的实测结论"
+        ],
+        "scenarios": [
+          "分析流程出现延迟、CPU或内存瓶颈需要定位",
+          "设计或评估分析结果的缓存与查询复用策略",
+          "判断某处投影或选择前移能否减少输出而不改变分析成本",
+          "验证共享生产者或缓存改动在并发、取消与清理路径上的行为"
+        ],
+        "prerequisites": [
+          "遵循检出仓库的性能优先级、工具设计与测试指南",
+          "使用当前契约、provider前置条件与用户授权",
+          "选择独立于被改实现的正确性判据，如源构建夹具期望、独立映射的文件字节或原生生产者加解释校验",
+          "为改动使用单独检出以免干扰其他工作"
+        ],
+        "limits": [
+          "本技能只提供优化工作流，不额外授予执行目标、发布或合并的权限",
+          "常规清理只需正确性检查，不因辅助调用、导入或表示变化而要求本工作流或合成基准",
+          "Kuna案例研究中的固定观测只说明权衡，不构成当前provider保证或通用加速",
+          "比较同一有缺陷解码器的两个包装不能确立正确性",
+          "空结果只能证明实际检查范围内的缺失",
+          "仅JSON更小既不能证明模型token更少，也不能证明调查质量更好",
+          "没有完成的代表性调查与可比正确性/覆盖，不得声称复杂软件优势",
+          "被保护机制中止的任务视为未完成"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "后端",
+          "数据分析",
+          "运维部署",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Optimize REA providers and shared analysis workflows for agent context, latency, CPU, and memory while preserving correctness and Evidence."
+          },
+          {
+            "field": "does",
+            "quote": "Trace one public CLI or MCP task through shared application code to its producer."
+          },
+          {
+            "field": "does",
+            "quote": "Measure relevant phases: admission and identity checks, native analysis, decoding, lookup, projection, serialization, Evidence retention, and cleanup."
+          },
+          {
+            "field": "does",
+            "quote": "For every cache or shared producer, state its key, owner, invalidation, retained size, and lifetime."
+          },
+          {
+            "field": "does",
+            "quote": "Run the affected real public workflow before and after with equivalent inputs, results, coverage, and Evidence semantics."
+          },
+          {
+            "field": "does",
+            "quote": "Finish with the bottleneck, owning change, preserved semantics, executed checks, before/after measurements, and remaining limits."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Follow the checkout's [performance priorities](../../../AGENTS.md#performance), [tool design](../../../docs/development/tool-design.md), and [testing guide](../../../docs/development/testing.md)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Establish an oracle independent of the changed implementation: source-built fixture expectations, independently mapped file bytes, or a native producer paired with checks of its interpretation."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use a separate checkout for changes without disturbing other work."
+          },
+          {
+            "field": "limits",
+            "quote": "This skill supplies an optimization workflow, not additional permission to execute targets, publish, or merge."
+          },
+          {
+            "field": "limits",
+            "quote": "Routine cleanup uses correctness checks and does not require this optimization workflow or synthetic benchmarks merely because helper calls, imports, or representations change."
+          },
+          {
+            "field": "limits",
+            "quote": "Its pinned observations illustrate tradeoffs; they are not current-provider guarantees or universal speedups."
+          },
+          {
+            "field": "limits",
+            "quote": "Comparing two wrappers around the same faulty decoder does not establish correctness."
+          },
+          {
+            "field": "limits",
+            "quote": "An empty result proves absence only within the actually examined scope."
+          },
+          {
+            "field": "limits",
+            "quote": "Smaller JSON alone establishes neither fewer model tokens nor better investigation quality."
+          },
+          {
+            "field": "limits",
+            "quote": "A guard-stopped task is incomplete."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".agents/skills/rea-changelog-update/SKILL.md",
+      "blob_sha": "c4e2ced5307a11bf76ceba50856e0ee5bef1a956",
+      "source_url": "https://github.com/morluto/rea/blob/bbe2bcc979be747698d9ad9ce87af017b92e0f10/.agents/skills/rea-changelog-update/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "rea-changelog-update",
+        "description": "Prepare or rewrite REA release changelogs and GitHub release notes from pinned Git history, with verified contributor thanks and Release Please synchronization."
+      },
+      "excerpt": "---\nname: rea-changelog-update\ndescription: Prepare or rewrite REA release changelogs and GitHub release notes from pinned Git history, with verified contributor thanks and Release Please synchronization.\n---\n\n# REA changelog update\n\nUse this for release-note preparation and contributor attribution. Read\n[docs/development/releasing.md](../../../docs/development/releasing.md) from the repository root for\npublication authority and the existing checkpoint checks. This skill prepares\nnotes; it does not authorize merging, tagging, or publishing.\n\n## Inventory before prose\n\nFetch complete history and tags. Select the published baseline tag from\n`.release-please-manifest.json` on the release PR's **base branch**, and pin that\nbranch's exact SHA as the editorial target. REA tags are `rea-agents-VERSION`.\nUse the proposed version, including its prerelease suffix; do not change the\n`always-bump-minor` strategy to imitate OpenClaw's calendar versions.\n\n```bash\nnode scripts/release-notes.mjs inventory \\\n  --repository morluto/rea --base rea-agents-PREVIOUS \\\n  --target FULL_BASE_BRANCH_SHA --version VERSION \\\n  --manifest /tmp/rea-VERSION.contributions.json\nnode scripts/release-notes.mjs record \\\n  --manifest /tmp/rea-VERSION.contributions.json \\\n  --summary \\\n  --output /tmp/rea-VERSION.record.md\n```\n\nRead the inventory, not just the existing bot draft. It includes side-branch\ncommits, GitHub-associated PRs whose merge commits are in the range, commit\nauthors/co-authors, and confirmed closing issues with their reporters. GitHub\nconnections are paginated. Network errors stop generation; rerun into a new\noutput file after recovery. Existing output files are never overwritten.\n\nUnresolved commit identities are retained as names/emails with `user: null`;\nnever guess a handle or thank the merger as a substitute. The report preserves\nunknowns. This is a reviewed metadata snapshot, not independent proof that a\nhuman authored a patch. For unattributed identities, unusual merge strategies,\nbackports, reversions, or references that GitHub did not associate, inspect\nthe source PRs and diffs and report the limitation. The current collector uses\nconfirmed PR-closing relationships for issue-reporter credit; unrelated issue\nmentions are not automatically credited. Do not claim that merely inventoried\nwork still ships after a revert.\n\n## Write for users and retain credit\n\nRewrite only the newest `## [VERSION]` section in `CHANGELOG.md`, preserving its\nversion/date/link heading. Use single-line Markdown list items under:\n\n- `### Highlights`: a few release-defining user outcomes; no quota for small releases.\n- `### Changes`: capabilities and meaningful behavior changes.\n- `### Fixes`: reliability, correctness, compatibility, and safety fixes.\n- `### ⚠ BREAKING CHANGES`: retain when applicable, with migrations and original\n  PR/commit references required by the existing checkpoint validator.\n\nGroup related work by analyst workflow or user impact. Explain the resulting\nbehavior in short, concrete entries. Highlights summarize the release; avoid\nrepeating their full descriptions in Changes. Internal cleanup, tests, CI, and\nroutine documentation generally belong only in the provenance file. Read ambiguous PRs/diffs before making\nclaims. Distinguish simulated-provider checks from real-provider verification.\n\nCredit each represented contribution once in the public notes with its link\nand `Thanks @...` for its verified human author, known co-authors, and confirmed\nclosing-issue reporters. Grouping preserves all those credits in one line.\nWhen Highlights, detailed entries or migrations reference the same work,\nput its thanks in one of those entries, not all of them. Include issue links.\nDirect-commit bullets carry the commit link and known human credit.\nExclude GitHub bots and known agent accounts. REA's observed Anthropic, Cursor,\nCodex, and Copilot co-author trailers resolve to `@claude`, `@cursoragent`,\n`@codex`, and `@Copilot` with GitHub type `User`; the credit policy excludes\nthem while retaining their metadata.\nAt the REA maintainer's request, omit `@morluto` self-thanks while preserving\nauthorship in the inventory. Other human contributors remain eligible.\nUse explicit GitHub links for cross-repository references to avoid ambiguous\n`#NNN` numbers. Unknown handles stay unknown; they are not fabricated credit.\n\nAppend the generated `record --summary` provenance link verbatim at the end\nof this release. The linked inventory accounts for every discovered in-range\nPR and direct contribution, including internal work omitted from the prose.\nDo not paste the full `record` output into public notes: it duplicates thanks\nand obscures the user-facing changes. Full records remain available for review.\nDo not hand-edit generated credits to make validation pass. Refresh the inventory\nwhen product history changes; a prose-only correction can reuse the snapshot.\n\n## Finalize with Release Please\n\nBefore changing the live release PR, have authorization for that PR update.\nLocal preparation and validation can proceed independently.\n\n1. Add `rea:release-notes-finalized` to the selected open release PR **before**\n   editing its branch/body. Main proposal pushes respect this label. This is\n   our workflow guard, not Release Please's `autorelease: snooze` mechanism.\n   A proposal already running must finish before editing. Do not dispatch\n   manual preparation over finalized notes.\n2. On that release branch, save the reviewed inventory as\n   `docs/releases/VERSION.contributions.json`. This is durable public release\n   provenance, not a temporary planning file. Do not add credentials or local\n   environment dumps. Keep the existing version artifacts aligned.\n3. Run the existing checkpoint validator and the new checker:\n\n   ```bash\n   node scripts/release-notes.mjs check \\\n     --manifest docs/releases/VERSION.contributions.json\n   node scripts/release-notes.mjs render \\\n     --manifest docs/releases/VERSION.contributions.json \\\n     --output /tmp/rea-VERSION.notes.md\n   ```\n\n   The checker supports inline PR bodies, including their surrounding metadata,\n   up to GitHub's 65,536-character limit. It fails on larger notes rather than\n   truncating credit; Release Please's overflow-link bodies are not integrated.\n\n4. Update the release PR body with the rendered section while preserving its\n   Release Please header/footer and component/version structure. Use a body\n   file for `gh pr edit --body-file`; changing only `CHANGELOG.md` does not\n   change Release Please's release body. Push only authorized changes.\n5. Freshly fetch the PR body to a file and run `check --pr-body FILE`. Review\n   the complete diff and wait for current CI. Publication checks the body\n   again before release creation. Avoid further body edits while publishing.\n\nThe finalization label freezes bot refreshes, not main. New product changes\nafter the inventory target require refreshing the notes before publication.\nThe workflow checks target ancestry and allows only release metadata paths\nafter that target. It also requires the inventory target to equal the reviewed\nmerge's first parent, so intervening main commits require a fresh inventory.\nReview diffs within the allowed release metadata paths too: the path guard does\nnot prove that package dependency/script edits are version-only changes.\nTo resume automatic proposals, remove the finalization label and let the bot\nregenerate; expect editorial changes to be replaced.\n\nExisting releases without a contribution inventory retain their current\npublication path. Never retag or republish a package to correct release prose.\n",
+      "card": {
+        "title_zh": "REA 变更日志更新",
+        "purpose_zh": "从固定 Git 历史准备或改写 REA 发布变更日志与 GitHub 发布说明，核实贡献者致谢并同步 Release Please。",
+        "does": [
+          "拉取完整历史与标签，按清单基线标签和分支 SHA 生成贡献清单与记录",
+          "重写 CHANGELOG.md 最新版本段落，按 Highlights、Changes、Fixes、BREAKING CHANGES 分组",
+          "为已验证的人类作者、共同作者和确认的关单报告者添加带链接的致谢，排除机器人与代理账号",
+          "将审核后的清单保存为 docs/releases 下的持久来源文件并运行检查与渲染",
+          "用渲染结果更新发布 PR 正文，保留 Release Please 头尾结构，并再次校验 PR 正文",
+          "在发布 PR 上添加 finalization 标签以冻结机器人刷新，并说明恢复自动提案的方法"
+        ],
+        "inputs": [
+          "仓库根目录的 docs/development/releasing.md 发布规则",
+          "release PR 基础分支上的 .release-please-manifest.json 基线标签",
+          "基础分支的完整 SHA 作为编辑目标",
+          "拟发布版本号（含预发布后缀）",
+          "Git 历史、标签、PR 与关联 issue 数据",
+          "已审核的贡献清单 JSON 文件",
+          "发布 PR 正文文件"
+        ],
+        "outputs": [
+          "贡献清单 JSON（/tmp 临时文件或 docs/releases/VERSION.contributions.json）",
+          "record --summary 生成的来源记录 Markdown",
+          "改写后的 CHANGELOG.md 最新版本段落",
+          "渲染后的发布说明 Markdown 文件",
+          "更新后的发布 PR 正文"
+        ],
+        "scenarios": [
+          "准备 REA 新版本的发布变更日志",
+          "为发布说明核实并补全贡献者致谢",
+          "将审核后的贡献清单同步到 Release Please 发布 PR",
+          "校验发布说明长度与结构是否符合检查器要求"
+        ],
+        "prerequisites": [
+          "在仓库根目录操作并可读取 docs/development/releasing.md",
+          "已安装 Node 并可使用 scripts/release-notes.mjs",
+          "具备访问 GitHub 历史、PR 与 issue 的网络连接",
+          "修改线上发布 PR 前已获得该 PR 更新授权",
+          "发布 PR 上已添加 rea:release-notes-finalized 标签"
+        ],
+        "limits": [
+          "该技能只准备说明，不授权合并、打标签或发布",
+          "网络错误会中止生成，需恢复后重跑并写入新输出文件",
+          "已有输出文件不会被覆盖",
+          "检查器对超过 65536 字符的正文失败，不截断致谢",
+          "未解析的提交身份保留为姓名/邮箱，不猜测账号",
+          "不将完整 record 输出粘贴到公开说明",
+          "不手工编辑生成的致谢以通过校验",
+          "不得为修正说明而重新打标签或重新发布"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "自动化",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Prepare or rewrite REA release changelogs and GitHub release notes from pinned Git history, with verified contributor thanks and Release Please synchronization."
+          },
+          {
+            "field": "does",
+            "quote": "Fetch complete history and tags. Select the published baseline tag from `.release-please-manifest.json` on the release PR's **base branch**, and pin that branch's exact SHA as the editorial target."
+          },
+          {
+            "field": "does",
+            "quote": "Rewrite only the newest `## [VERSION]` section in `CHANGELOG.md`, preserving its version/date/link heading."
+          },
+          {
+            "field": "does",
+            "quote": "Credit each represented contribution once in the public notes with its link and `Thanks @...` for its verified human author, known co-authors, and confirmed closing-issue reporters."
+          },
+          {
+            "field": "does",
+            "quote": "On that release branch, save the reviewed inventory as `docs/releases/VERSION.contributions.json`."
+          },
+          {
+            "field": "does",
+            "quote": "Update the release PR body with the rendered section while preserving its Release Please header/footer and component/version structure."
+          },
+          {
+            "field": "does",
+            "quote": "Add `rea:release-notes-finalized` to the selected open release PR **before** editing its branch/body."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read [docs/development/releasing.md](../../../docs/development/releasing.md) from the repository root for publication authority and the existing checkpoint checks."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before changing the live release PR, have authorization for that PR update."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "GitHub connections are paginated. Network errors stop generation; rerun into a new output file after recovery."
+          },
+          {
+            "field": "limits",
+            "quote": "This skill prepares notes; it does not authorize merging, tagging, or publishing."
+          },
+          {
+            "field": "limits",
+            "quote": "Existing output files are never overwritten."
+          },
+          {
+            "field": "limits",
+            "quote": "It fails on larger notes rather than truncating credit; Release Please's overflow-link bodies are not integrated."
+          },
+          {
+            "field": "limits",
+            "quote": "Unresolved commit identities are retained as names/emails with `user: null`; never guess a handle or thank the merger as a substitute."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not paste the full `record` output into public notes: it duplicates thanks and obscures the user-facing changes."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not hand-edit generated credits to make validation pass."
+          },
+          {
+            "field": "limits",
+            "quote": "Never retag or republish a package to correct release prose."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "node scripts/release-notes.mjs inventory \\\n  --repository morluto/rea --base rea-agents-PREVIOUS \\\n  --target FULL_BASE_BRANCH_SHA --version VERSION \\\n  --manifest /tmp/rea-VERSION.contributions.json"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".agents/skills/rea-ci-tests-audit/SKILL.md",
+      "blob_sha": "246bb6dcae7b90681a6906f4aaca05120fb77457",
+      "source_url": "https://github.com/morluto/rea/blob/bbe2bcc979be747698d9ad9ce87af017b92e0f10/.agents/skills/rea-ci-tests-audit/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "rea-ci-tests-audit",
+        "description": "Audit REA CI and test suites for correctness, fixture drift, false passes, and measured performance; use for suite or workflow investigations and efficiency changes, rather than ordinary feature testing or a single test failure."
+      },
+      "excerpt": "---\nname: rea-ci-tests-audit\ndescription: Audit REA CI and test suites for correctness, fixture drift, false passes, and measured performance; use for suite or workflow investigations and efficiency changes, rather than ordinary feature testing or a single test failure.\n---\n\n# REA CI and tests audit\n\nEstablish which checks still catch real regressions and which costs can be\nremoved without losing that protection. The outcome may be a verified fix,\nan evidence-backed recommendation, or an explicit decision to stop.\n\nFollow the checkout's `AGENTS.md`, [testing guide](../../../docs/development/testing.md),\nand [contribution rules](../../../CONTRIBUTING.md). Use their current commands\nand pinned toolchain, rather than commands remembered from an earlier audit.\nPreserve the requested scope: investigation alone does not authorize edits;\nthis skill does not grant permission to publish issues, push, or merge. Existing\nuser authorization still applies. Keep audit notes and raw results outside the\ntracked tree, normally in a task-specific `/tmp` directory.\n\n## Establish the executed baseline\n\nFetch when the user asks for latest main. Pin the baseline SHA and inspected\nworkflow revision; use an isolated worktree when changing or comparing code.\nDo not modify another task's checkout. Record dirty changes and the exact\ncommand, toolchain, host, selected tests, instrumentation, and prerequisites.\nAn old run is evidence for its executed revision, even if main advances.\n\nTrace workflow triggers, changed-path selection, job dependencies, reusable\nactions, package scripts, test discovery, artifact producers, and report gates\nthrough to the commands that actually execute. Include scripts, generated data,\nruntime registration, and subprocess boundaries missing from import graphs.\nCheck positive and negative selection paths: required files must be discovered\nonce per intended test configuration; deliberate platform/configuration repeats\nare separate coverage. A missing explicit test or missing required report must\nnot turn green. Optional lanes may skip; preserve their stated prerequisites.\n\nUse existing timing and failure artifacts to select suspicious families. Run\nrelevant checks to establish a baseline; reserve a full local suite for broad\nCI diagnosis or uncertainty that focused checks cannot resolve. Do not rebuild\nor rerun an unchanged complete suite after every documentation edit.\n\n## Prove the failure or protection\n\nFor each candidate, state the expected observable behavior and its owner,\nthen construct the smallest reproduction against production behavior. Follow\nthe producer and affected consumers before deciding where to fix it.\n\n- For drift, compare fixtures with current admission requirements, protocol\n  replies, named contracts, tool versions, and actual public entrypoints. A\n  plausible-looking mock can fail before the behavior its test claims to cover.\n  Search the whole affected fixture family, including other version strings.\n  Preserve intentionally malformed fixtures and test their intended rejection.\n- For a suspicious green test, perturb the relevant behavior in an isolated\n  copy or inject a controlled failure. Verify that the existing assertion or\n  gate detects it. A test may merely repeat its mock, import abandoned code,\n  or hide a subprocess/checker failure. Restore mutations after the experiment.\n- For shared setup or pruning, map distinct assertions to their retained\n  scenarios. Preserve malformed inputs, cancellation, cleanup failure,\n  permissions, capacity, identity, and meaningful concurrency interactions.\n  A faster run that skips a case or weakens its oracle is not an improvement.\n- For provider coverage, separate fake-producer, boundary, and actual-engine\n  evidence. Inspect named skips and prerequisites; fixtures do not establish\n  real Ghidra, LLDB, browser, or other provider behavior.\n\nClassify findings as reproduced defects, supported costs, hypotheses, or\nunavailable evidence. Record the baseline command, observed output/exit status,\nexpected result, affected scope, and competing explanation. A failure on main\nmay be pre-existing; that does not by itself make it irrelevant to a CI audit.\nAttribute PR failures using the executed revision and a clean baseline, not\njust their resemblance to a previous failure. Retry only to test a specific\ntransient explanation; retain the original failure and stop when repetition\nadds no evidence. A passing retry does not establish a root cause or a fix.\n\n## Assess efficiency without losing the gate\n\nRead [measurement and CI checks](references/measurement-and-ci.md) when\ninvestigating slowness, caching, runner waits, shared artifacts, or log noise.\nCompare equivalent completed work before claiming a speedup. Distinguish\nsetup/build time, test execution, coverage instrumentation, dependency waits,\nand runner scheduling; state which costs remain unmeasured.\n\nPrefer removing proven duplicate preparation, reusing immutable setup, and\nreducing repeated subprocess work before shrinking correctness coverage.\nPreserve independent sessions where lifecycle or concurrency is the oracle.\nKeep live tests fresh; a cached previous pass cannot validate current host,\ninstalled provider contents, permissions, or external state.\n\n## Fix, verify, and hand off within scope\n\nIf implementation is authorized, make the smallest structural change at the\nowning boundary and add a regression that fails on the baseline for the right\nreason. Retest affected consumers and meaningful negative paths; verify cache\ninvalidation or discovery when those mechanisms change. Read the installed\nTurbo documentation before changing its configuration or commands.\n\nRun the repository's applicable checks and inspect complete current-head CI\nresults before an authorized merge. Preserve required coverage and discovery\ngates. Do not suppress a failure, add blanket retries, raise timeouts, or delete\ndistinct assertions solely to make CI green. Changes to these controls need\ntheir own demonstrated reason and retained failure detection.\n\nReport each confirmed issue with exact revision, reproduction, consequence,\nproposed correction, and validation limits. Report performance with workload\nand measurements, not just a percentage. Use English issue/PR records when\nrequested; follow the user's assignment, commit identity, review, and merge\npreferences without assuming them for other users. Open ready-for-review PRs\nonly when that lifecycle is authorized. Resolve necessary review findings and\ncheck final main against the tested tree after merging.\n\nStop when the authorized work is verified, remaining benefits are unproven,\nor further changes would trade correctness for speculative speed. List genuine\nuncertainties without turning them into additional optimization rounds.\n",
+      "card": {
+        "title_zh": "REA CI与测试审计",
+        "purpose_zh": "审计REA仓库的CI工作流与测试套件，判断哪些检查仍能捕获真实回归、哪些成本可安全削减，产出经核实的修复、有证据的建议或明确停止的决定。",
+        "does": [
+          "建立已执行基线：固定基线SHA与工作流版本，记录命令、工具链、主机与脏改动",
+          "追踪工作流触发、路径选择、作业依赖、可复用动作、测试发现与报告门禁到实际执行命令",
+          "用最小复现证明缺陷或保护有效，包括fixture漂移、可疑绿灯测试、共享setup与provider覆盖",
+          "在保留门禁前提下评估效率，区分setup、执行、覆盖率插桩、依赖等待与调度成本",
+          "在授权范围内做最小结构性修复并添加在基线上正确失败的回归测试",
+          "按修订、复现、后果、修正与验证局限报告问题，性能报告附工作负载与测量"
+        ],
+        "inputs": [
+          "用户指定的审计范围与授权（是否允许编辑、开PR、合并）",
+          "仓库checkout中的AGENTS.md、测试指南与贡献规则",
+          "现有计时与失败产物",
+          "用户要求时的最新main拉取"
+        ],
+        "outputs": [
+          "审计笔记与原始结果（存于tracked tree之外的/tmp目录）",
+          "分类发现：已复现缺陷、有支撑的成本、假设、不可得证据",
+          "经核实的修复及回归测试（若获授权）",
+          "带工作负载与测量的性能报告",
+          "英文issue/PR记录（若被要求）"
+        ],
+        "scenarios": [
+          "调查测试套件或CI工作流的正确性问题",
+          "排查fixture漂移或可疑的绿灯测试",
+          "评估CI效率改进而不削弱正确性覆盖",
+          "诊断PR失败归属（已执行修订与干净基线）",
+          "判断某项检查是否仍能捕获真实回归"
+        ],
+        "prerequisites": [
+          "遵循checkout的AGENTS.md、测试指南与贡献规则，使用其当前命令与固定工具链",
+          "调查本身不授权编辑；发布issue、push、合并需另行授权",
+          "审计笔记与原始结果放在tracked tree之外，通常为任务专属/tmp目录",
+          "改动或比较代码时使用隔离worktree，不修改其他任务的checkout",
+          "更改Turbo配置或命令前先阅读已安装的Turbo文档"
+        ],
+        "limits": [
+          "不用于普通功能测试或单个测试失败",
+          "调查本身不授予编辑、发布issue、push或合并权限",
+          "不得为让CI变绿而压制失败、加全局重试、提高超时或删除不同断言",
+          "不得用跳过用例或削弱oracle的更快运行冒充改进",
+          "fixture不能证明真实Ghidra、LLDB、浏览器等provider行为",
+          "缓存的上次通过不能验证当前主机、已安装provider内容、权限或外部状态",
+          "仅在测试特定瞬时解释时重试，重复无新证据即停止"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "运维部署",
+          "代码审查",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Audit REA CI and test suites for correctness, fixture drift, false passes, and measured performance"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Establish which checks still catch real regressions and which costs can be removed without losing that protection."
+          },
+          {
+            "field": "does",
+            "quote": "For each candidate, state the expected observable behavior and its owner, then construct the smallest reproduction against production behavior."
+          },
+          {
+            "field": "does",
+            "quote": "Compare equivalent completed work before claiming a speedup. Distinguish setup/build time, test execution, coverage instrumentation, dependency waits, and runner scheduling"
+          },
+          {
+            "field": "does",
+            "quote": "If implementation is authorized, make the smallest structural change at the owning boundary and add a regression that fails on the baseline for the right reason."
+          },
+          {
+            "field": "does",
+            "quote": "Report each confirmed issue with exact revision, reproduction, consequence, proposed correction, and validation limits."
+          },
+          {
+            "field": "inputs",
+            "quote": "Fetch when the user asks for latest main. Pin the baseline SHA and inspected workflow revision; use an isolated worktree when changing or comparing code."
+          },
+          {
+            "field": "outputs",
+            "quote": "Classify findings as reproduced defects, supported costs, hypotheses, or unavailable evidence."
+          },
+          {
+            "field": "outputs",
+            "quote": "Keep audit notes and raw results outside the tracked tree, normally in a task-specific `/tmp` directory."
+          },
+          {
+            "field": "scenarios",
+            "quote": "use for suite or workflow investigations and efficiency changes, rather than ordinary feature testing or a single test failure."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Follow the checkout's `AGENTS.md`, [testing guide](../../../docs/development/testing.md), and [contribution rules](../../../CONTRIBUTING.md). Use their current commands and pinned toolchain"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Preserve the requested scope: investigation alone does not authorize edits; this skill does not grant permission to publish issues, push, or merge."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the installed Turbo documentation before changing its configuration or commands."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not suppress a failure, add blanket retries, raise timeouts, or delete distinct assertions solely to make CI green."
+          },
+          {
+            "field": "limits",
+            "quote": "A faster run that skips a case or weakens its oracle is not an improvement."
+          },
+          {
+            "field": "limits",
+            "quote": "fixtures do not establish real Ghidra, LLDB, browser, or other provider behavior."
+          },
+          {
+            "field": "limits",
+            "quote": "Keep live tests fresh; a cached previous pass cannot validate current host, installed provider contents, permissions, or external state."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".agents/skills/rea-tool-design/SKILL.md",
+      "blob_sha": "d896081a6ba725678a35deac3f1c809c9c955fbd",
+      "source_url": "https://github.com/morluto/rea/blob/bbe2bcc979be747698d9ad9ce87af017b92e0f10/.agents/skills/rea-tool-design/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "rea-tool-design",
+        "description": "Audit, investigate, design, or change REA investigation tools, CLI/MCP contracts, provider capabilities, and Evidence semantics."
+      },
+      "excerpt": "---\nname: rea-tool-design\ndescription: Audit, investigate, design, or change REA investigation tools, CLI/MCP contracts, provider capabilities, and Evidence semantics.\n---\n\n# REA tool design\n\nUse the [tool-design guide](../../../docs/development/tool-design.md) for tool boundaries,\ncontract semantics, provider ownership, and discoverability. Inspect the current\ncontract and nearest existing tool relevant to the analyst question; source,\ndocumentation, and live catalogs may describe different versions.\n\nFor provider-backed work, exercise the analyst's task through REA and compare\nrelevant native provider and independent artifact observations where available.\nCheck applicable partial results, recovery and session boundaries; report what\nwas not exercised. For failure guidance, follow [design recovery around the\nfailure](../../../docs/development/tool-design.md#design-recovery-around-the-failure).\nUse [workflow verification](../../../docs/development/testing.md#provider-backed-workflow-verification)\nto select evidence for the proposed contract instead of seeking provider API\nparity.\n\nFor an audit, follow [audit existing tools](../../../docs/development/tool-design.md#audit-existing-tools):\nscope representative tasks, exercise the live workflow, and distinguish\nreproduced bugs, supported limitations, design opportunities and unverified\nclaims. Check relevant rendered MCP prompts, guided workflows and packaged skill\nadvice against the live contracts and exercise their suggested handoffs. Report\nworking alternatives and evidence limits as well as findings.\n\nFor wording audits and agent trials, use\n[focused tool-description trials](../../../docs/development/client-verification.md#focused-tool-description-trials).\nStart with representative workflow boundaries and repeat failures or ambiguous\noutcomes; keep actual arguments and supported final claims separate. Reuse the\nrepository's evaluation tooling and report actual runtime/model versions and\nsynthetic versus production coverage rather than copying a harness into a skill.\n\nFor a design request, return the proposed boundary, input/result shape, Evidence\nsemantics, nearest alternative, and verification approach. Implement when\nrequested, preserving the user's scope and existing authorization.\n\nFor implementation or verification, consult [testing](../../../docs/development/testing.md)\nfor the affected consumer and provider lanes, and\n[contributing](../../../CONTRIBUTING.md) for generated-file ownership. Read\nprovider/workflow guides only as the task requires.\n",
+      "card": {
+        "title_zh": "REA工具设计审查",
+        "purpose_zh": "审查、调查、设计或变更REA调查工具、CLI/MCP契约、提供方能力与Evidence语义，并给出边界、验证方式与证据限制。",
+        "does": [
+          "按工具设计指南审查工具边界、契约语义、提供方归属与可发现性",
+          "对提供方支持的工作通过REA执行分析任务并对比原生与独立产物观察",
+          "审计现有工具：界定代表性任务、跑通实际工作流、区分缺陷与限制",
+          "检查渲染后的MCP提示、引导工作流与打包技能建议是否符合实际契约",
+          "开展措辞审计与代理试验，复用仓库评估工具并报告运行时版本",
+          "按请求给出建议边界、输入结果形态、Evidence语义与验证方案，必要时实施"
+        ],
+        "inputs": [
+          "分析师的代表性任务或工作流边界",
+          "当前工具契约、文档与实时目录",
+          "提供方原生观察与独立产物观察",
+          "措辞审计或代理试验的失败与歧义结果"
+        ],
+        "outputs": [
+          "审计发现：复现缺陷、受支持限制、设计机会、未验证声明",
+          "建议的工具边界、输入/结果形态与Evidence语义",
+          "验证方法与证据限制说明",
+          "实际运行时/模型版本与合成或生产覆盖说明"
+        ],
+        "scenarios": [
+          "审查REA调查工具或CLI/MCP契约",
+          "设计新的工具边界与Evidence语义",
+          "对提供方支持的工作流做验证",
+          "审计工具描述措辞并做代理试验"
+        ],
+        "prerequisites": [
+          "可访问tool-design、testing、client-verification等开发文档",
+          "可运行REA并接触相关提供方与实时目录",
+          "仓库现有评估工具"
+        ],
+        "limits": [
+          "源码、文档与实时目录可能描述不同版本",
+          "需报告未实际执行的部分",
+          "实施须在请求时进行并保持用户范围与既有授权",
+          "仅在任务需要时阅读提供方/工作流指南"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "文档",
+          "测试",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Audit, investigate, design, or change REA investigation tools, CLI/MCP contracts, provider capabilities, and Evidence semantics."
+          },
+          {
+            "field": "does",
+            "quote": "Inspect the current contract and nearest existing tool relevant to the analyst question; source, documentation, and live catalogs may describe different versions."
+          },
+          {
+            "field": "does",
+            "quote": "For provider-backed work, exercise the analyst's task through REA and compare relevant native provider and independent artifact observations where available."
+          },
+          {
+            "field": "does",
+            "quote": "Check relevant rendered MCP prompts, guided workflows and packaged skill advice against the live contracts and exercise their suggested handoffs."
+          },
+          {
+            "field": "does",
+            "quote": "For a design request, return the proposed boundary, input/result shape, Evidence semantics, nearest alternative, and verification approach."
+          },
+          {
+            "field": "inputs",
+            "quote": "Start with representative workflow boundaries and repeat failures or ambiguous outcomes; keep actual arguments and supported final claims separate."
+          },
+          {
+            "field": "outputs",
+            "quote": "Report working alternatives and evidence limits as well as findings."
+          },
+          {
+            "field": "outputs",
+            "quote": "report actual runtime/model versions and synthetic versus production coverage rather than copying a harness into a skill."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Reuse the repository's evaluation tooling"
+          },
+          {
+            "field": "limits",
+            "quote": "Check applicable partial results, recovery and session boundaries; report what was not exercised."
+          },
+          {
+            "field": "limits",
+            "quote": "Implement when requested, preserving the user's scope and existing authorization."
+          },
+          {
+            "field": "limits",
+            "quote": "Read provider/workflow guides only as the task requires."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".agents/skills/reverse-engineer-anything/SKILL.md",
+      "blob_sha": "baea9f529b572dd28a72d874f192a75c426b845e",
+      "source_url": "https://github.com/morluto/rea/blob/bbe2bcc979be747698d9ad9ce87af017b92e0f10/.agents/skills/reverse-engineer-anything/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "reverse-engineer-anything",
+        "description": "Reverse engineer native, managed, Electron/JavaScript, packaged, firmware, and browser targets with REA, and build agent environments (AgentEnv bundles) of web applications from a live instance or a capture, and of Linux desktop apps with a task from a request. Use shipped-artifact or requested runtime evidence to explain features, compare versions, decompile code, or guide a reconstruction. Skip REA for ordinary source-repository architecture analysis."
+      },
+      "excerpt": "---\nname: reverse-engineer-anything\ndescription: Reverse engineer native, managed, Electron/JavaScript, packaged, firmware, and browser targets with REA, and build agent environments (AgentEnv bundles) of web applications from a live instance or a capture, and of Linux desktop apps with a task from a request. Use shipped-artifact or requested runtime evidence to explain features, compare versions, decompile code, or guide a reconstruction. Skip REA for ordinary source-repository architecture analysis.\nmetadata:\n  version: \"62\"\n---\n\n# REA\n\nUse REA when a claim depends on a shipped binary or package, decompilation,\nrequested runtime evidence, or comparison with\nbehavior not established by available source. For ordinary analysis of a\ncomplete source repository, use normal repository tools and do not run REA\nreadiness or provider commands.\n\n## Connect only when needed\n\nInstalling this skill supplies instructions; it does not register the REA MCP\nserver, install analysis engines, or add tools to an already-running agent.\nThe exception is a Claude Code, Codex, or Cursor Marketplace plugin install:\nthe plugin bundles this skill and registers its own `rea` server, outside the\nstate that `rea setup` and `rea doctor` manage.\n\nIf REA tools are available and their registration is not known to be stale,\nproceed directly to the target. Do not run diagnostics or setup before every\ninvestigation. Use the connected server's actual tool list and input schemas;\na skill installed from repository main may describe capabilities absent from\nan older npm release. Keep complete inline Evidence when that server does not\nadvertise retained references.\n\nIf tools are absent, a call is blocked by the client, or a required provider is\nunavailable, read [connection and recovery](references/connection-and-recovery.md).\nDiagnose the observed blocker, continue useful supported work, and resume the\noriginal task after repair. Client approval, shell PATH, registration and engine\navailability have different remedies; avoid repeating setup for all of them.\nIf the host times out without a REA result, do not repeat the unchanged call or\nassume work stopped. Read the recovery guide's deadline distinction before retrying.\nIf the MCP connection drops, retry that call once only when it is safe to\nrepeat or known not to have started. If it may already have changed the\ntarget, or it fails again, tell the user and ask them to restart the MCP\nclient. If REA could not start its connection, retry once, then tell the user\nand ask them to restart the MCP client. Do not retry a startup failure that\nreturns the same unchanged result. For plugin installs, follow\n[plugin recovery](references/connection-and-recovery.md#rea-installed-as-a-client-plugin).\nFor setup-owned registrations, run `rea doctor` when REA could not start\nor tools stay missing after that restart. For `cleanup_incomplete`, a retryable\ncapacity limit, or `configuration_invalid`, follow the recovery guide's ladder\nbefore asking for a restart. Read that guide before a second repair attempt.\n\nChoose the installation owner before repairing registration. Plugin installs use\n[plugin recovery](references/connection-and-recovery.md#rea-installed-as-a-client-plugin);\nonly setup-owned registrations use the guide's\n[registration repair plan](references/connection-and-recovery.md#repair-registration-when-needed).\nA plugin-only doctor result of `missing` does not call for `rea setup`.\n\nREA setup never installs or upgrades Node.js, npm, Homebrew, Java, Ghidra, IDA,\nJADX, Kuna, Binwalk, or Unblob. Use existing prerequisites; do not install unrelated\nsoftware to repair MCP registration. For an unsupported client, use manual stdio\nregistration with an existing installation’s absolute runtime and entry script, or continue through the CLI.\n\nA concrete CLI fallback for an operator-supplied JavaScript tree or ASAR is:\n\n```bash\nnpx -y rea-agents@latest analyze-javascript-application /absolute/path/to/app --json\n```\n\nNo MCP registration or native engine is required. Read the returned Evidence,\ngraph, limitations, and unknowns with the same care as an MCP result; the CLI\nreturns the Evidence record directly. This fallback does not establish that\nMCP is configured. Native CLI tasks still require their selected engine.\nPrefer an existing `rea` CLI. When none is installed and REA package acquisition\nis within the authorized scope, use `npx -y rea-agents@latest` in its place from a\ntrusted directory outside the target project, with absolute target paths. Managed\nsetup binds the current installation directly; retain its runtime and package\ncache entry, or restore that installation before repairing its registration.\nFor setup-owned registration, configuration repair starts with a read-only setup plan; show paths, backups and\nskill replacement before applying authorized changes. Preserve existing approval\nand target-execution boundaries.\n\n## Route the target first\n\nChoose the first tool from the target the user supplied. Use `open_binary` for\nactive-target native or archive workflows; target-free tools take their own\nexplicit path or endpoint and do not need it.\n\n- ASAR or extracted JavaScript/Electron tree:\n  `analyze_javascript_application`.\n- Archive/package member inventory (ZIP/APK/IPA/MSIX/AppX, DMG, or a PyInstaller\n  executable): `open_binary` with the supplied local path; use `inspect_artifact`\n  when its graph and findings help answer the question. A PyInstaller CArchive\n  is the application layer; the bootloader is only the native prefix. Start with\n  `detail: \"summary\"` for large inventories, then use retained inventory views\n  for selected member fields/pages. A complete small inventory can cost less\n  than extra calls and schemas. Runtime options are metadata, not files.\n  Compact delivery still inventories and hashes members. See the\n  [Python packaged applications guide](https://github.com/morluto/rea/blob/main/docs/python-packaged-applications.md).\n- Bun `--compile` executable: `open_binary`, then `inspect_artifact`; the Bun\n  module graph is the application layer. Extract stored modules and analyze the\n  JavaScript. See [Bun standalone executables](https://github.com/morluto/rea/blob/main/docs/bun-standalone.md).\n- Deno `deno compile` executable: `open_binary`, then `inspect_artifact`; the\n  embedded virtual filesystem is the application layer. Extract stored files and\n  analyze compatible JavaScript. Environment-file values and CA certificate bytes\n  are retained in local Evidence with their counts and byte lengths. The npm\n  snapshot length is reported and not decoded, and the executable is not run. See\n  [Deno compile executables](https://github.com/morluto/rea/blob/main/docs/deno-standalone.md).\n- Apple app plist, Interface Builder, asset catalog, or keyed archive resources:\n  `open_bundle_resources`, then the selected resource tool. This does not\n  require `CFBundleExecutable` or a deep provider. Resource sessions have no\n  executable digest or binary snapshot; use `open_binary` for native code.\n- Android APK code, classes, methods, or incoming references:\n  `inspect_android_package`, then focused Android tools when advertised.\n  Archive member inventory still uses the archive route above.\n- Managed PE/CLI assembly: `inspect_managed_artifact`.\n- Firmware image: `inspect_firmware_regions` when advertised. Use\n  `extract_firmware` when extraction is requested, with a caller-selected new\n  absolute output directory. These tools use caller-supplied Binwalk/Unblob on\n  Linux; see the [firmware guide](https://github.com/morluto/rea/blob/main/docs/guides/firmware/firmware-analysis.md).\n- ESP32-family app or bootloader image (`0xE9` magic): `inspect_artifact`\n  without a provider; see the ESP section of `references/native-and-artifacts.md`.\n- .NET NativeAOT PE/ELF: native Ghidra analysis. Native code can yield pseudocode;\n  consult the NativeAOT workflow in `references/native-and-artifacts.md` for\n  optional metadata recovery and its supported host/layo",
+      "card": null
+    },
+    {
+      "skill_path": ".cursor-plugin/skills/reverse-engineer-anything/SKILL.md",
+      "blob_sha": "baea9f529b572dd28a72d874f192a75c426b845e",
+      "source_url": "https://github.com/morluto/rea/blob/bbe2bcc979be747698d9ad9ce87af017b92e0f10/.cursor-plugin/skills/reverse-engineer-anything/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "reverse-engineer-anything",
+        "description": "Reverse engineer native, managed, Electron/JavaScript, packaged, firmware, and browser targets with REA, and build agent environments (AgentEnv bundles) of web applications from a live instance or a capture, and of Linux desktop apps with a task from a request. Use shipped-artifact or requested runtime evidence to explain features, compare versions, decompile code, or guide a reconstruction. Skip REA for ordinary source-repository architecture analysis."
+      },
+      "excerpt": "---\nname: reverse-engineer-anything\ndescription: Reverse engineer native, managed, Electron/JavaScript, packaged, firmware, and browser targets with REA, and build agent environments (AgentEnv bundles) of web applications from a live instance or a capture, and of Linux desktop apps with a task from a request. Use shipped-artifact or requested runtime evidence to explain features, compare versions, decompile code, or guide a reconstruction. Skip REA for ordinary source-repository architecture analysis.\nmetadata:\n  version: \"62\"\n---\n\n# REA\n\nUse REA when a claim depends on a shipped binary or package, decompilation,\nrequested runtime evidence, or comparison with\nbehavior not established by available source. For ordinary analysis of a\ncomplete source repository, use normal repository tools and do not run REA\nreadiness or provider commands.\n\n## Connect only when needed\n\nInstalling this skill supplies instructions; it does not register the REA MCP\nserver, install analysis engines, or add tools to an already-running agent.\nThe exception is a Claude Code, Codex, or Cursor Marketplace plugin install:\nthe plugin bundles this skill and registers its own `rea` server, outside the\nstate that `rea setup` and `rea doctor` manage.\n\nIf REA tools are available and their registration is not known to be stale,\nproceed directly to the target. Do not run diagnostics or setup before every\ninvestigation. Use the connected server's actual tool list and input schemas;\na skill installed from repository main may describe capabilities absent from\nan older npm release. Keep complete inline Evidence when that server does not\nadvertise retained references.\n\nIf tools are absent, a call is blocked by the client, or a required provider is\nunavailable, read [connection and recovery](references/connection-and-recovery.md).\nDiagnose the observed blocker, continue useful supported work, and resume the\noriginal task after repair. Client approval, shell PATH, registration and engine\navailability have different remedies; avoid repeating setup for all of them.\nIf the host times out without a REA result, do not repeat the unchanged call or\nassume work stopped. Read the recovery guide's deadline distinction before retrying.\nIf the MCP connection drops, retry that call once only when it is safe to\nrepeat or known not to have started. If it may already have changed the\ntarget, or it fails again, tell the user and ask them to restart the MCP\nclient. If REA could not start its connection, retry once, then tell the user\nand ask them to restart the MCP client. Do not retry a startup failure that\nreturns the same unchanged result. For plugin installs, follow\n[plugin recovery](references/connection-and-recovery.md#rea-installed-as-a-client-plugin).\nFor setup-owned registrations, run `rea doctor` when REA could not start\nor tools stay missing after that restart. For `cleanup_incomplete`, a retryable\ncapacity limit, or `configuration_invalid`, follow the recovery guide's ladder\nbefore asking for a restart. Read that guide before a second repair attempt.\n\nChoose the installation owner before repairing registration. Plugin installs use\n[plugin recovery](references/connection-and-recovery.md#rea-installed-as-a-client-plugin);\nonly setup-owned registrations use the guide's\n[registration repair plan](references/connection-and-recovery.md#repair-registration-when-needed).\nA plugin-only doctor result of `missing` does not call for `rea setup`.\n\nREA setup never installs or upgrades Node.js, npm, Homebrew, Java, Ghidra, IDA,\nJADX, Kuna, Binwalk, or Unblob. Use existing prerequisites; do not install unrelated\nsoftware to repair MCP registration. For an unsupported client, use manual stdio\nregistration with an existing installation’s absolute runtime and entry script, or continue through the CLI.\n\nA concrete CLI fallback for an operator-supplied JavaScript tree or ASAR is:\n\n```bash\nnpx -y rea-agents@latest analyze-javascript-application /absolute/path/to/app --json\n```\n\nNo MCP registration or native engine is required. Read the returned Evidence,\ngraph, limitations, and unknowns with the same care as an MCP result; the CLI\nreturns the Evidence record directly. This fallback does not establish that\nMCP is configured. Native CLI tasks still require their selected engine.\nPrefer an existing `rea` CLI. When none is installed and REA package acquisition\nis within the authorized scope, use `npx -y rea-agents@latest` in its place from a\ntrusted directory outside the target project, with absolute target paths. Managed\nsetup binds the current installation directly; retain its runtime and package\ncache entry, or restore that installation before repairing its registration.\nFor setup-owned registration, configuration repair starts with a read-only setup plan; show paths, backups and\nskill replacement before applying authorized changes. Preserve existing approval\nand target-execution boundaries.\n\n## Route the target first\n\nChoose the first tool from the target the user supplied. Use `open_binary` for\nactive-target native or archive workflows; target-free tools take their own\nexplicit path or endpoint and do not need it.\n\n- ASAR or extracted JavaScript/Electron tree:\n  `analyze_javascript_application`.\n- Archive/package member inventory (ZIP/APK/IPA/MSIX/AppX, DMG, or a PyInstaller\n  executable): `open_binary` with the supplied local path; use `inspect_artifact`\n  when its graph and findings help answer the question. A PyInstaller CArchive\n  is the application layer; the bootloader is only the native prefix. Start with\n  `detail: \"summary\"` for large inventories, then use retained inventory views\n  for selected member fields/pages. A complete small inventory can cost less\n  than extra calls and schemas. Runtime options are metadata, not files.\n  Compact delivery still inventories and hashes members. See the\n  [Python packaged applications guide](https://github.com/morluto/rea/blob/main/docs/python-packaged-applications.md).\n- Bun `--compile` executable: `open_binary`, then `inspect_artifact`; the Bun\n  module graph is the application layer. Extract stored modules and analyze the\n  JavaScript. See [Bun standalone executables](https://github.com/morluto/rea/blob/main/docs/bun-standalone.md).\n- Deno `deno compile` executable: `open_binary`, then `inspect_artifact`; the\n  embedded virtual filesystem is the application layer. Extract stored files and\n  analyze compatible JavaScript. Environment-file values and CA certificate bytes\n  are retained in local Evidence with their counts and byte lengths. The npm\n  snapshot length is reported and not decoded, and the executable is not run. See\n  [Deno compile executables](https://github.com/morluto/rea/blob/main/docs/deno-standalone.md).\n- Apple app plist, Interface Builder, asset catalog, or keyed archive resources:\n  `open_bundle_resources`, then the selected resource tool. This does not\n  require `CFBundleExecutable` or a deep provider. Resource sessions have no\n  executable digest or binary snapshot; use `open_binary` for native code.\n- Android APK code, classes, methods, or incoming references:\n  `inspect_android_package`, then focused Android tools when advertised.\n  Archive member inventory still uses the archive route above.\n- Managed PE/CLI assembly: `inspect_managed_artifact`.\n- Firmware image: `inspect_firmware_regions` when advertised. Use\n  `extract_firmware` when extraction is requested, with a caller-selected new\n  absolute output directory. These tools use caller-supplied Binwalk/Unblob on\n  Linux; see the [firmware guide](https://github.com/morluto/rea/blob/main/docs/guides/firmware/firmware-analysis.md).\n- ESP32-family app or bootloader image (`0xE9` magic): `inspect_artifact`\n  without a provider; see the ESP section of `references/native-and-artifacts.md`.\n- .NET NativeAOT PE/ELF: native Ghidra analysis. Native code can yield pseudocode;\n  consult the NativeAOT workflow in `references/native-and-artifacts.md` for\n  optional metadata recovery and its supported host/layo",
+      "card": {
+        "title_zh": "REA逆向工程技能",
+        "purpose_zh": "在结论依赖已发布二进制、包、反编译、运行时证据或版本行为对比时，用REA分析原生、托管、Electron/JavaScript、打包、固件与浏览器目标，并可构建Web或Linux桌面应用的AgentEnv环境。",
+        "does": [
+          "按目标类型路由到对应工具：ASAR/JS树、归档包、Bun/Deno可执行文件、APK、托管程序集、固件、ESP32镜像等",
+          "对原生程序做静态分析，并在需要时选择运行时观测、插桩或命令执行效果工作流",
+          "分析浏览器页面、被动流量捕获、HAR/SAZ/qlog抓包与Fiddler流量",
+          "用capture_browser_scenario录制浏览器场景，并用export_environment_bundle导出Web应用AgentEnv包",
+          "从请求出发在构建机上驱动Linux桌面应用，导出并见证其环境",
+          "对本地.app、安装目录、ASAR或可执行文件运行audit_release_exposure做发布暴露审计"
+        ],
+        "inputs": [
+          "用户提供的本地目标路径（二进制、归档、ASAR、APK、固件镜像等）",
+          "用户拥有的浏览器页面或Electron运行时目标",
+          "已保存的HAR/SAZ/qlog抓包文件或Fiddler Everywhere流量",
+          "浏览器动作声明（点击、输入、导航）",
+          "构建Linux桌面应用环境的任务描述",
+          "允许的源站列表allowed_origins"
+        ],
+        "outputs": [
+          "Evidence记录、图与发现结果",
+          "限制与未知项说明",
+          "导出的AgentEnv环境包",
+          "发布暴露审计报告（含检查id、状态与修复建议）",
+          "反编译代码或伪代码",
+          "归档成员清单与哈希"
+        ],
+        "scenarios": [
+          "判断某功能是否存在于已发布二进制或包中",
+          "反编译代码或对比不同版本行为",
+          "从实时实例或抓包构建Web应用的AgentEnv环境",
+          "为Linux桌面应用按任务构建Agent环境",
+          "审计本地发布产物的暴露面"
+        ],
+        "prerequisites": [
+          "需要已注册并连接的REA MCP服务器或可用的rea CLI；安装技能本身不注册服务器、不安装分析引擎",
+          "原生CLI任务需要其选定的分析引擎（如Ghidra、IDA、JADX等）已存在",
+          "固件工具需调用方自备Linux上的Binwalk/Unblob",
+          "插件安装（Claude Code、Codex、Cursor Marketplace）会自带注册rea服务器"
+        ],
+        "limits": [
+          "REA setup不安装或升级Node.js、npm、Homebrew、Java、Ghidra、IDA、JADX、Kuna、Binwalk、Unblob",
+          "普通完整源码仓库的架构分析不应使用REA",
+          "open_binary与trace_native_values只建立静态事实，不观测执行",
+          "qlog仅支持aioquic 1.5.0 JSON 0.3，其他布局与PCAP关联不支持",
+          "被动抓包默认仅限页面自身源站，需显式传入API源站",
+          "连接失败时不应重复相同调用，需按恢复指南处理"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "安全",
+          "代码审查",
+          "调研",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use REA when a claim depends on a shipped binary or package, decompilation, requested runtime evidence, or comparison with behavior not established by available source."
+          },
+          {
+            "field": "does",
+            "quote": "ASAR or extracted JavaScript/Electron tree: `analyze_javascript_application`."
+          },
+          {
+            "field": "does",
+            "quote": "Firmware image: `inspect_firmware_regions` when advertised. Use `extract_firmware` when extraction is requested, with a caller-selected new absolute output directory."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Installing this skill supplies instructions; it does not register the REA MCP server, install analysis engines, or add tools to an already-running agent."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "These tools use caller-supplied Binwalk/Unblob on Linux"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "the plugin bundles this skill and registers its own `rea` server"
+          },
+          {
+            "field": "limits",
+            "quote": "REA setup never installs or upgrades Node.js, npm, Homebrew, Java, Ghidra, IDA, JADX, Kuna, Binwalk, or Unblob."
+          },
+          {
+            "field": "limits",
+            "quote": "For ordinary analysis of a complete source repository, use normal repository tools and do not run REA readiness or provider commands."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx -y rea-agents@latest analyze-javascript-application /absolute/path/to/app --json"
+          },
+          {
+            "field": "hosts",
+            "quote": "The exception is a Claude Code, Codex, or Cursor Marketplace plugin install"
+          }
+        ]
+      }
+    }
+  ]
+}

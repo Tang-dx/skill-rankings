@@ -1,0 +1,321 @@
+{
+  "schema": 1,
+  "repo": "NVIDIA/SkillEvaluator",
+  "tree_sha": "db7f983b212f061e3543bb2af84656264f8302af",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/skillevaluator/SKILL.md",
+      "blob_sha": "5d6c5412b3fdbe3e3d9651481da5066ee72cfd8a",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/skills/skillevaluator/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "skillevaluator",
+        "description": "Run and interpret SkillEvaluator for agent skills. Use for any skill benchmark or eval - validating or scoring a SKILL.md, writing evals.json test cases or evals config, explaining benchmark reports, verdicts and exit codes, or gating skills in CI."
+      },
+      "excerpt": "---\nname: skillevaluator\ndescription: Run and interpret SkillEvaluator for agent skills. Use for any skill benchmark or eval - validating or scoring a SKILL.md, writing evals.json test cases or evals config, explaining benchmark reports, verdicts and exit codes, or gating skills in CI.\nlicense: Apache-2.0\ncompatibility: Requires Python 3.12-3.14 and the skillevaluator CLI; live evaluation also needs Docker (or another backend) and an LLM provider key.\nmetadata:\n  author: Christopher Kevin <christopherk@nvidia.com>\n  version: \"1.0.0\"\n  domain: [evaluation, ai-ml]\n  tags: [skills, evaluation, benchmarking, ci, security]\n---\n\n# SkillEvaluator\n\nRun the SkillEvaluator CLI on agent skills and report what the evidence shows:\nTier 1 validation (static, security, quality), Tier 2 deduplication, and Tier 3\nlive agent evaluation that compares runs with and without the skill.\n\n## Purpose\n\nGive an agent one reliable procedure for evaluating skills with\nSkillEvaluator: pick the right tier, check readiness, run it, and report\nscores, findings and exit codes truthfully.\n\n## When To Use\n\nUse this skill when the user wants to:\n\n- check whether a skill is well-formed, safe, and good enough to publish\n- get a quality score, rubric score, security or PII scan for a skill\n- find repeated guidance inside a skill or overlap across a skill collection\n- measure whether a skill actually helps an agent (Skill Lift, pass@k)\n- write or fix `<skill-dir>/evals/evals.json`, `<skill-dir>/evals/config.yml`, custom graders, or Harbor tasks\n- read a SkillEvaluator report, verdict, or exit code\n- add SkillEvaluator checks to GitHub Actions or GitLab CI\n\nDo not use it to write the target skill's domain content, to review ordinary\napplication code, or to evaluate an LLM without a skill. For converting an\nexisting benchmark into a custom grader, read\n[references/custom-graders.md](references/custom-graders.md).\n\n## Prerequisites\n\n- A target directory containing `SKILL.md` (or a folder of skills, `.mdc`\n  rules, or a plugin manifest).\n- The CLI: `pip install --upgrade \"skillevaluator[all]\"`, or from a checkout\n  `uv run --python 3.13 --extra all skillevaluator ...`. Check with\n  `skillevaluator --version`. Extras: `llm` (rubric), `security` (scanners),\n  `tier2`, `tier3`, `all`, `dashboard`.\n- No key for keyless commands (`quality-check`, `security-scan`, `pii-scan`,\n  `lint-scripts`, `tier1 PATH --no-llm`, `validate PATH --tiers 1`).\n- A provider for LLM stages, Tier 2 and Tier 3. Simplest:\n  `export SKILL_EVAL_LLM_PROVIDER=nv_build` and `export NVIDIA_API_KEY=...`.\n  Other providers: [references/providers.md](references/providers.md).\n- For Tier 3: an agent (`opencode`, `codex`, or `claude-code`) and a sandbox.\n  Harbor is installed with the `tier3` extra; you do not run it yourself.\n  The default `--env-mode docker` needs a Docker daemon. Without Docker, use\n  `--env-mode local` (experimental): it runs the agent CLI already installed\n  on the host under Bubblewrap (Linux) or Seatbelt (macOS); trusted skills only.\n\nNever print, echo, or commit API keys; keep them in the host environment.\n\n## Choose The Command\n\n| User goal | Command | Needs |\n| --- | --- | --- |\n| Fast keyless quality score | `skillevaluator quality-check <skill-dir>` | nothing |\n| Full static gate for one skill | `skillevaluator tier1 <skill-dir> --no-llm` | scanners (auto-installed) |\n| Static gate plus LLM rubric and security review | `skillevaluator tier1 <skill-dir>` | provider |\n| LLM rubric only | `skillevaluator rubric-eval <skill-dir>` | provider, `llm` extra |\n| Security / PII scan only | `skillevaluator security-scan <skill-dir>`, `skillevaluator pii-scan <skill-dir>` | nothing |\n| Repeated content inside one skill | `skillevaluator tier2 <skill-dir>` | provider with embeddings |\n| Overlap across a collection | `skillevaluator similarity-check <skills-dir>` | embeddings |\n| Does the skill help an agent? | `skillevaluator tier3 <skill-dir>` | provider, agent, Docker |\n| Same, without Docker | `skillevaluator tier3 evaluate <skill-dir> -a opencode --env-mode local` | provider, agent CLI on host |\n| Everything, with one exit code | `skillevaluator validate <skill-dir>` | all of the above |\n| CI-safe keyless gate | `skillevaluator validate <skills-dir> --profile default --tiers 1 -r json,markdown,sarif -o reports` | scanners |\n| Set up repo CI | `skillevaluator ci init` | GitHub checkout |\n\nFull flag tables: [Tier 1](references/commands-tier1.md),\n[validate](references/commands-validate.md),\n[Tier 2, Tier 3 and setup](references/commands-tier2-tier3.md).\n\n## Workflow\n\n1. **Locate the target.** Confirm the path has `SKILL.md` and that its\n   frontmatter `name` matches the directory name. For a folder of skills, the\n   commands evaluate each skill inside it.\n2. **Check readiness before paid runs.** Run `skillevaluator health-check --tier 1`\n   for scanners, `skillevaluator doctor --tier 2` for providers, and\n   `skillevaluator doctor --env-mode docker` (add `--verify-models`) for Tier 3.\n   Fix every failing row first.\n3. **Start keyless.** Run `skillevaluator tier1 <skill-dir> --no-llm`. Fix\n   CRITICAL and HIGH findings before anything else; `lint` findings are advisory.\n4. **Add LLM checks** when a provider is set: `skillevaluator tier1 <skill-dir>`\n   (rubric, LLM security, verification) and `skillevaluator tier2 <skill-dir>`.\n5. **Prepare Tier 3 cases.** If `<skill-dir>/evals/evals.json` is missing, first\n   capture task requests and observable outcomes in `<skill-dir>/evals/EVAL.md`;\n   headings alone do not qualify. Generate with\n   `skillevaluator create-eval-dataset <skill-dir> --full --prompt <skill-dir>/evals/EVAL.md`,\n   then review it. The default prefers author guidance, then matching retained\n   traces; existing datasets need `--force` or `--refine`. Skill-only\n   generation requires explicit opt-in with `--grounding skill`. Review:\n   positive cases (explicit, implicit, contextual) and at least one negative\n   case with `\"expected_skill\": null`. Required shape: top-level `skill_name`\n   and an `evals` array; each case has `id`, `prompt`, `expected_output`, and\n   `expected_skill` (optional `assertions`, `files`). Validate with\n   `skillevaluator tier3 validate <skill-dir> --strict`. Format:\n   [references/tier3-datasets.md](references/tier3-datasets.md); run policy and\n   scoring: [references/tier3-running.md](references/tier3-running.md).\n6. **Run live evaluation.** `skillevaluator tier3 <skill-dir>` (or\n   `skillevaluator tier3 evaluate <skill-dir> -a opencode --env-mode docker --n-attempts 3`).\n   Use `--max-cases 1` for a cheap smoke run first; such runs are never\n   publication evidence.\n7. **Read the results** (see below), open `skillevaluator view <skill-dir>`, and\n   for follow-up questions run `skillevaluator tier3 feedback <run-dir>`.\n8. **Iterate.** Change the skill, rerun the same command with the same cases,\n   agent and model, and compare. Treat a single run's lift as directional.\n\n## Read The Results\n\nExit codes: `0` success, `1` a gate failed, evidence is `INCOMPLETE`, or the\nrun could not complete, `2` usage error (bad flag or missing path; fix the\ncommand, not the skill).\n\n- **Quality** (0-100): Correctness 35%, Discoverability 25%, Reliability 25%,\n  Efficiency 15%. Grades A>=90, B>=80, C>=70. Passing needs `--min-score`\n  (default 70) and no HIGH/CRITICAL quality finding.\n- **Rubric** (0-100): nine criteria scored 0-10; passing needs the weighted\n  score >= `--min-score` and every criterion >= 7.\n- **Tier 2**: HIGH or CRITICAL duplicate findings exit `1` in `tier2 PATH`.\n- **Tier 3**: five dimensions (Security, Correctness, Discoverability,\n  Effectiveness, Efficiency), each PASS >= 0.50, NEUTRAL 0.40-0.50, FAIL < 0.40.\n  Verdict PASS needs every dimension >= 0.50 for at least one agent. Skill\n  Lift = with-skill overall - baseline overall; PASS >= +0.05. `INCONCLUSIVE:\n  skill never activated` means no positive trial loaded the skill; fix the\n  description or prompts, not the sco",
+      "card": {
+        "title_zh": "技能评测器",
+        "purpose_zh": "为代理技能提供统一的 SkillEvaluator 评测流程：选择层级、检查就绪状态、运行评测，并如实报告分数、发现项与退出码。",
+        "does": [
+          "运行 Tier 1 静态校验，检查结构、安全与质量并给出质量分",
+          "运行 Tier 2 去重，检测单个技能内重复内容或技能集合间重叠",
+          "运行 Tier 3 实时代理评测，对比有技能与无技能运行，计算 Skill Lift 与 pass@k",
+          "生成或修复 evals.json、config.yml、自定义评分器与 Harbor 任务",
+          "解读评测报告、判定结果与退出码",
+          "将 SkillEvaluator 检查接入 GitHub Actions 或 GitLab CI"
+        ],
+        "inputs": [
+          "包含 SKILL.md 的目标目录，或技能文件夹、.mdc 规则、插件清单",
+          "skillevaluator CLI（pip 安装或 uv 运行）",
+          "LLM 提供方及密钥（用于 LLM 评分、Tier 2、Tier 3）",
+          "Tier 3 所需的代理（opencode、codex 或 claude-code）与沙箱（默认 Docker）",
+          "可选的 evals/evals.json 测试用例与 evals/config.yml 配置"
+        ],
+        "outputs": [
+          "质量分（0-100）与等级",
+          "评分标准分（0-100）",
+          "安全与 PII 扫描发现项",
+          "Tier 2 重复内容发现项",
+          "Tier 3 五维评分、判定结果与 Skill Lift",
+          "退出码（0 成功、1 门禁失败或证据不完整、2 用法错误）",
+          "JSON、Markdown、SARIF 等格式报告文件"
+        ],
+        "scenarios": [
+          "检查技能是否格式正确、安全且足以发布",
+          "获取技能的质量分、评分标准分、安全或 PII 扫描结果",
+          "查找技能内重复指导或技能集合间重叠",
+          "衡量技能是否真正帮助代理",
+          "在 CI 中为技能设置门禁检查"
+        ],
+        "prerequisites": [
+          "目标目录含 SKILL.md，且 frontmatter 的 name 与目录名一致",
+          "安装 skillevaluator CLI，可用 skillevaluator --version 检查",
+          "LLM 阶段需设置 SKILL_EVAL_LLM_PROVIDER 及对应密钥",
+          "Tier 3 需代理与沙箱，默认 --env-mode docker 需 Docker 守护进程",
+          "运行前用 health-check 与 doctor 检查就绪状态"
+        ],
+        "limits": [
+          "Tier 1 与质量分为静态检查，不验证技能是否真正有效",
+          "LLM 评判在不同运行与模型间有波动，只能同模型、同用例、同尝试次数比较",
+          "Tier 3 按用例×尝试×代理×两组消耗模型 token 与沙箱时间",
+          "validate --tiers 总是包含 Tier 1，不能只指定 2 或 3",
+          "代理凭据仅来自宿主环境，config.yml 的 runtime_env 拒绝提供方密钥",
+          "缺失分数记为 NO SCORE 或 None，不按 0 平均"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "测试",
+          "代码审查",
+          "安全",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Give an agent one reliable procedure for evaluating skills with SkillEvaluator: pick the right tier, check readiness, run it, and report scores, findings and exit codes truthfully."
+          },
+          {
+            "field": "does",
+            "quote": "write or fix `<skill-dir>/evals/evals.json`, `<skill-dir>/evals/config.yml`, custom graders, or Harbor tasks"
+          },
+          {
+            "field": "does",
+            "quote": "read a SkillEvaluator report, verdict, or exit code"
+          },
+          {
+            "field": "does",
+            "quote": "add SkillEvaluator checks to GitHub Actions or GitLab CI"
+          },
+          {
+            "field": "inputs",
+            "quote": "A target directory containing `SKILL.md` (or a folder of skills, `.mdc` rules, or a plugin manifest)."
+          },
+          {
+            "field": "inputs",
+            "quote": "The CLI: `pip install --upgrade \"skillevaluator[all]\"`, or from a checkout `uv run --python 3.13 --extra all skillevaluator ...`."
+          },
+          {
+            "field": "inputs",
+            "quote": "A provider for LLM stages, Tier 2 and Tier 3. Simplest: `export SKILL_EVAL_LLM_PROVIDER=nv_build` and `export NVIDIA_API_KEY=...`."
+          },
+          {
+            "field": "inputs",
+            "quote": "For Tier 3: an agent (`opencode`, `codex`, or `claude-code`) and a sandbox."
+          },
+          {
+            "field": "outputs",
+            "quote": "Exit codes: `0` success, `1` a gate failed, evidence is `INCOMPLETE`, or the run could not complete, `2` usage error (bad flag or missing path; fix the command, not the skill)."
+          },
+          {
+            "field": "outputs",
+            "quote": "**Quality** (0-100): Correctness 35%, Discoverability 25%, Reliability 25%, Efficiency 15%."
+          },
+          {
+            "field": "outputs",
+            "quote": "**Tier 3**: five dimensions (Security, Correctness, Discoverability, Effectiveness, Efficiency), each PASS >= 0.50, NEUTRAL 0.40-0.50, FAIL < 0.40."
+          },
+          {
+            "field": "scenarios",
+            "quote": "check whether a skill is well-formed, safe, and good enough to publish"
+          },
+          {
+            "field": "scenarios",
+            "quote": "measure whether a skill actually helps an agent (Skill Lift, pass@k)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Confirm the path has `SKILL.md` and that its frontmatter `name` matches the directory name."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "src/skillevaluator/tier3/reference_skills/api-caller/SKILL.md",
+      "blob_sha": "0c5e40ef9b789673c38042c6fbfc9b3a0ff3d91b",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/src/skillevaluator/tier3/reference_skills/api-caller/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "api-caller",
+        "description": "Call any REST API dynamically. Make GET, POST, PUT, DELETE requests to any endpoint with custom headers and JSON body."
+      },
+      "excerpt": "---\nname: api-caller\ndescription: Call any REST API dynamically. Make GET, POST, PUT, DELETE requests to any endpoint with custom headers and JSON body.\nmetadata:\n  author: SkillEvaluator Maintainers <maintainers@example.com>\n---\n\n# API Caller Skill\n\nGeneric skill to call any REST API dynamically. Can work with OpenAPI specs or direct endpoint calls.\n\n## Capabilities\n\n- Call any REST API endpoint (GET, POST, PUT, DELETE)\n- Parse OpenAPI/Swagger specs to discover endpoints\n- Handle common authentication (API keys, Bearer tokens)\n- JSON request/response handling\n\n## Instructions\n\n1. Read this SKILL.md to choose the direct-call or OpenAPI workflow.\n2. Use `scripts/parse_openapi.py` first when the user gives an OpenAPI or Swagger spec.\n3. Use `scripts/call_api.py` for the actual HTTP request.\n4. Return the request result and any recoverable error details to the user.\n\n## Scripts\n\n### scripts/parse_openapi.py\n\n**Use this first** when given an API spec URL. Parses an OpenAPI/Swagger spec and returns available operations with parameters. Run commands from the skill base directory; script paths are relative to this SKILL.md file.\n\n**Usage:**\n```\npython scripts/parse_openapi.py <spec_url> [filter_path]\n```\n\n**Arguments:**\n- `<spec_url>` - URL to the OpenAPI spec (required)\n- `[filter_path]` - Optional: filter operations by path substring\n\n**Example:**\n```bash\npython scripts/parse_openapi.py \"https://api.example.com/openapi.json\"\n```\n\nReturns: API name, base URL, and list of operations with their parameters, request body schema, etc.\n\n### scripts/call_api.py\n\nCall a REST API endpoint directly or using an OpenAPI spec. Run commands from the skill base directory; script paths are relative to this SKILL.md file.\n\n**Usage:**\n```\npython scripts/call_api.py --url <endpoint_url> [options]\n```\n\n**Arguments:**\n- `--url <endpoint_url>` - Direct API endpoint URL (required if no --spec)\n- `--method <GET|POST|PUT|DELETE>` - HTTP method (default: GET)\n- `--data <json_string>` - Request body as JSON string\n- `--headers <json_string>` - Custom headers as JSON string\n- `--spec <openapi_url>` - OpenAPI spec URL (optional, for discovery)\n- `--operation <operation_id>` - Operation ID from OpenAPI spec\n- `--params <json_string>` - Path/query parameters as JSON\n\n## Examples\n\n### Direct API Call (Simple)\n\n```bash\npython scripts/call_api.py --url \"https://api.example.com/data\" --method GET\n```\n\n### With Query Parameters\n\n```bash\n# Call API with query parameters appended to URL\npython scripts/call_api.py --url \"https://en.wikipedia.org/w/api.php\" --params '{\"action\": \"query\", \"titles\": \"NVIDIA\", \"format\": \"json\"}'\n```\n\n### With Headers (API Key)\n\n```bash\n# Call API with authentication\npython scripts/call_api.py --url \"https://api.example.com/data\" --headers '{\"Authorization\": \"Bearer TOKEN\"}'\n```\n\n### POST with JSON Body\n\n```bash\n# Create a resource\npython scripts/call_api.py --url \"https://api.example.com/items\" --method POST --data '{\"name\": \"test\", \"value\": 123}'\n```\n\n### Using OpenAPI Spec (Advanced)\n\n```bash\n# Discover and call an endpoint from OpenAPI spec\npython scripts/call_api.py --spec \"https://api.example.com/openapi.json\" --operation \"getItems\" --params '{\"param\": \"value\"}'\n```\n\n## Notes\n\n- For APIs requiring authentication, pass API keys via `--headers`\n- The skill automatically parses JSON responses\n- Timeout is 30 seconds by default\n- For complex API workflows, consider using `code-generator` skill instead\n- **Limiting results**: Try common params like `?_limit=N`, `?limit=N`, `?per_page=N`. If unsupported, fetch all and filter with `code-generator`\n\n## Workflow: Using an API Spec\n\nWhen given an OpenAPI spec URL, follow this workflow:\n\n1. **Parse the spec** first with `python scripts/parse_openapi.py`:\n   ```bash\n   python scripts/parse_openapi.py \"<spec_url>\"\n   ```\n\n2. **Review operations** - Look at the returned operations, their paths, methods, and parameters\n\n3. **Call the API** with `python scripts/call_api.py` using the discovered endpoint and parameters\n\n## When to Use\n\n- Quick API calls without writing code\n- Exploring new APIs\n- Simple GET requests for data retrieval\n- When you know the exact endpoint URL\n- **When given an API spec to explore**\n\n## When NOT to Use\n\n- Complex multi-step API workflows (use `code-generator`)\n- APIs requiring OAuth flows\n- When you need to process response data extensively\n",
+      "card": {
+        "title_zh": "REST API 调用器",
+        "purpose_zh": "动态调用任意 REST API，支持 GET/POST/PUT/DELETE 请求、自定义请求头与 JSON 请求体，并可解析 OpenAPI/Swagger 规范以发现接口。",
+        "does": [
+          "调用任意 REST API 端点，支持 GET、POST、PUT、DELETE 方法",
+          "解析 OpenAPI/Swagger 规范，返回可用操作及其参数",
+          "通过自定义请求头传入 API Key 或 Bearer Token 认证",
+          "处理 JSON 请求体与 JSON 响应解析",
+          "按路径子串过滤 OpenAPI 规范中的操作",
+          "根据 OpenAPI 规范中的操作 ID 与参数发起调用"
+        ],
+        "inputs": [
+          "端点 URL（--url）",
+          "HTTP 方法（--method，默认 GET）",
+          "JSON 字符串请求体（--data）",
+          "JSON 字符串自定义请求头（--headers）",
+          "OpenAPI 规范 URL（--spec）",
+          "操作 ID（--operation）",
+          "路径/查询参数 JSON（--params）",
+          "OpenAPI 规范 URL 及可选路径过滤（parse_openapi.py 参数）"
+        ],
+        "outputs": [
+          "API 名称、基础 URL 及操作列表（含参数与请求体 schema）",
+          "HTTP 请求结果",
+          "可恢复的错误详情"
+        ],
+        "scenarios": [
+          "无需写代码的快速 API 调用",
+          "探索新 API",
+          "简单 GET 请求获取数据",
+          "已知确切端点 URL 时直接调用",
+          "拿到 API 规范后进行接口探索"
+        ],
+        "prerequisites": [
+          "运行环境需具备 Python 以执行 scripts 目录下脚本",
+          "需在技能基础目录下运行命令，脚本路径相对 SKILL.md",
+          "认证类 API 需自行通过 --headers 传入 API Key 或 Token"
+        ],
+        "limits": [
+          "默认超时 30 秒",
+          "不支持 OAuth 流程",
+          "不适合复杂多步 API 工作流，建议改用 code-generator 技能",
+          "不适合需要对响应数据做大量处理的场景",
+          "结果数量限制依赖 API 自身是否支持 limit 类参数，不支持时需取全量再过滤"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "needs_secret"
+        ],
+        "tags": [
+          "后端",
+          "自动化",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Generic skill to call any REST API dynamically. Can work with OpenAPI specs or direct endpoint calls."
+          },
+          {
+            "field": "does",
+            "quote": "Call any REST API endpoint (GET, POST, PUT, DELETE)"
+          },
+          {
+            "field": "does",
+            "quote": "Parse OpenAPI/Swagger specs to discover endpoints"
+          },
+          {
+            "field": "does",
+            "quote": "Handle common authentication (API keys, Bearer tokens)"
+          },
+          {
+            "field": "does",
+            "quote": "JSON request/response handling"
+          },
+          {
+            "field": "outputs",
+            "quote": "Returns: API name, base URL, and list of operations with their parameters, request body schema, etc."
+          },
+          {
+            "field": "outputs",
+            "quote": "Return the request result and any recoverable error details to the user."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run commands from the skill base directory; script paths are relative to this SKILL.md file."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "For APIs requiring authentication, pass API keys via `--headers`"
+          },
+          {
+            "field": "limits",
+            "quote": "Timeout is 30 seconds by default"
+          },
+          {
+            "field": "limits",
+            "quote": "Complex multi-step API workflows (use `code-generator`)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "src/skillevaluator/tier3/reference_skills/calculator/SKILL.md",
+      "blob_sha": "8ef553c5fac53b867881c42143c50db5fbe574e6",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/src/skillevaluator/tier3/reference_skills/calculator/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "calculator",
+        "description": "Evaluate mathematical expressions and unit conversions. Handles arithmetic, percentages, exponents, and common unit conversions (temperature, distance, weight). No external dependencies."
+      },
+      "excerpt": "---\nname: calculator\ndescription: Evaluate mathematical expressions and unit conversions. Handles arithmetic, percentages, exponents, and common unit conversions (temperature, distance, weight). No external dependencies.\ncompatibility: Python 3.10+, no external dependencies\nmetadata:\n  author: SkillEvaluator Maintainers <maintainers@example.com>\n---\n\n# Calculator\n\nEvaluate math expressions and perform unit conversions from the command line.\n\n## Purpose\n\nProvide a safe, sandboxed calculator for arithmetic expressions and common\nunit conversions without relying on `eval()` or external services.\n\n## Agent Instructions\n\n1. Read this SKILL.md to understand capabilities.\n2. Run `scripts/calc.py` with the user's expression or conversion.\n3. Return the computed result to the user.\n\n## Examples\n\n### Usage\n\n```bash\n# Arithmetic expressions\npython scripts/calc.py \"2 + 3 * 4\"\npython scripts/calc.py \"(100 - 25) / 3\"\npython scripts/calc.py \"2 ** 10\"\n\n# Percentage calculations\npython scripts/calc.py \"15% of 200\"\n\n# Unit conversions\npython scripts/calc.py \"100 celsius to fahrenheit\"\npython scripts/calc.py \"5 miles to km\"\npython scripts/calc.py \"10 kg to lbs\"\n```\n\n### Output\n\nA single line with the result, e.g.:\n```\nResult: 14\n```\n\nFor conversions:\n```\n100 celsius = 212.0 fahrenheit\n```\n\n## Limitations\n\n- No symbolic algebra (no variables, no equations).\n- Only supports basic arithmetic operators: `+`, `-`, `*`, `/`, `**`, `%`, parentheses.\n- Unit conversions are limited to: celsius/fahrenheit, miles/km, kg/lbs, meters/feet.\n\n## Troubleshooting\n\n| Problem | Fix |\n|---------|-----|\n| `Invalid expression` | Check for unsupported operators or variables |\n| `Unknown conversion` | Use supported units: celsius, fahrenheit, miles, km, kg, lbs, meters, feet |\n",
+      "card": null
+    },
+    {
+      "skill_path": "src/skillevaluator/tier3/reference_skills/create-custom-grader/SKILL.md",
+      "blob_sha": "01bada3d4ceb7a7b71f1fdc3c895e5739bb07033",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/src/skillevaluator/tier3/reference_skills/create-custom-grader/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "create-custom-grader",
+        "description": "Use when converting an existing benchmark, rubric, verifier, task YAML/JSON, or domain check into SkillEvaluator BYOG/BYOT custom evaluation."
+      },
+      "excerpt": "---\nname: create-custom-grader\ndescription: Use when converting an existing benchmark, rubric, verifier, task YAML/JSON, or domain check into SkillEvaluator BYOG/BYOT custom evaluation.\nmetadata:\n  author: SkillEvaluator Maintainers <maintainers@example.com>\n---\n\n# Create Custom Grader\n\nConvert team-owned benchmark definitions into runnable SkillEvaluator custom graders\nand, when needed, native Harbor tasks.\n\n## Purpose\n\nHelp an agent author valid SkillEvaluator BYOG/BYOT files from a user's\nbenchmark instead of leaving the user with empty grader templates.\n\n## When To Use\n\nUse this skill when the user wants to:\n\n- bring an existing benchmark into SkillEvaluator\n- turn a rubric into `evals/grader.py` or `evals/grader.sh`\n- add custom metrics beside the default evaluator metrics\n- convert task files such as `task.yaml`, `task.json`, pytest checks, or shell\n  verifiers into BYOG or BYOT\n- prove a team can run its own benchmark through SkillEvaluator\n\nDo not use this skill for ordinary `evals/evals.json` authoring when no custom\ngrading logic is needed. Use the normal dataset authoring workflow for that.\n\n## Instructions\n\n1. Read the target skill, existing `evals/`, benchmark prompts, fixtures, and any verifier code.\n2. Choose `default_plus_custom` when custom metrics should complement default evaluator scoring.\n3. Choose `custom_only` only when the user wants the custom grader to own pass/fail semantics.\n4. Write or update `evals/grader.py` or `evals/grader.sh`, then validate the Harbor contract.\n\n## Examples\n\n```bash\nskillevaluator init-custom-grader <skill-dir> --language python --mode default_plus_custom\nskillevaluator tier3 validate <skill-dir>\n```\n\n## Prerequisites\n\n- The target skill directory should contain `SKILL.md`.\n- The SkillEvaluator CLI should be available as `skillevaluator`.\n- Full E2E evaluation may need agent credentials, sandbox access, GPU access, or\n  service credentials depending on the benchmark.\n\n## Core Choice\n\nChoose one path before writing files:\n\n| User need | Evaluator shape |\n| --- | --- |\n| Existing `evals.json` task plus extra domain checks | Top-level BYOG: `evals/grader.py` or `evals/grader.sh` |\n| Existing benchmark prompt/rubric that can run in the generated workspace | Top-level BYOG plus `evals/evals.json` and `evals/files/` |\n| Benchmark owns task layout, setup, service lifecycle, or verifier harness | Native BYOT/BYOG: `evals/harbor/<case>/...` |\n| User wants only custom reward/pass criteria | `grading.mode: custom_only` |\n| User wants default evaluator dimensions plus custom metrics | `grading.mode: default_plus_custom` |\n\nDefault to `default_plus_custom` unless the user explicitly wants the custom\ngrader to replace the default evaluator metrics.\n\n## Workflow\n\n1. Resolve the target skill and benchmark source.\n   Read the target `SKILL.md`, existing `evals/`, benchmark prompts, fixtures,\n   rubric, reference solution, tags, and any expected trigger/non-trigger\n   metadata.\n\n2. Map benchmark fields into evaluator inputs.\n   Use benchmark prompts or prompt variants as `question` entries. Use the\n   target skill as `expected_skill`. Put each case's required starter files\n   under `evals/files/<case-id>/`, and declare\n   `files: [\"evals/files/<case-id>\"]` on every corresponding eval entry. Do not\n   omit `files` in a multi-case dataset, because omission intentionally stages\n   the entire shared directory for legacy compatibility. Preserve\n   benchmark-specific rubric text in the entry only when the grader needs to\n   read it.\n\n3. Scaffold the evaluator contract.\n   For generated tasks:\n   ```bash\n   skillevaluator init-custom-grader <skill-dir> --language python --mode default_plus_custom\n   ```\n   For shell checks:\n   ```bash\n   skillevaluator init-custom-grader <skill-dir> --language shell --mode default_plus_custom\n   ```\n   For native Harbor tasks:\n   ```bash\n   skillevaluator init-harbor-task <skill-dir> --case-id <case-id> --with-config\n   ```\n\n4. Replace scaffold placeholders.\n   The custom grader is real executable logic, not metadata. It must read\n   available evidence, compute numeric scores, and write the evaluator reward\n   contract.\n\n5. Validate before running.\n   ```bash\n   skillevaluator validate <skill-dir> --harbor-contract\n   ```\n   Fix missing files, invalid Python, missing reward output, and native Harbor\n   ID mismatches before evaluation.\n\n6. Run the deepest practical proof.\n   Prefer a real with-skill/baseline run. If services, credentials, GPU, or\n   cost block full E2E, state exactly what was validated and what was not.\n\n## Grader Contract\n\nPython and shell graders run inside the Harbor verifier context. They may read:\n\n- `/logs/agent/trajectory.json` for agent actions and final answer evidence\n- `/tests/entry.json` for the eval case metadata\n- `/workspace/input/` for the entry's declared committed fixtures from\n  `evals/files/`\n- `/solution/` or other task outputs only when the task environment produces\n  them\n\nThey must write:\n\n- `/logs/verifier/reward.json`\n- `/logs/verifier/reward.txt` with a numeric score from `0.0` to `1.0`\n\nUse this reward shape:\n\n```json\n{\n  \"overall\": 0.92,\n  \"custom_metrics\": {\n    \"domain_repair\": 1.0,\n    \"domain_verification\": 0.8\n  },\n  \"details\": {\n    \"domain_repair\": {\n      \"score\": 1.0,\n      \"reason\": \"The solution repaired the required files.\"\n    }\n  }\n}\n```\n\nIn `default_plus_custom`, default evaluator scoring keeps its `overall`\nauthoritative and adds the grader's `custom_metrics` into reports. In\n`custom_only`, the grader's `overall` is the pass/fail reward.\n\nNever emit custom metric names that collide with reserved evaluator fields:\n`security`, `skill_execution`, `skill_efficiency`, `accuracy`,\n`goal_accuracy`, `behavior_check`, `overall`, `details`, `metrics`,\n`metric_set`, or `entry_id`.\n\n## Translation Rules\n\n- Convert each rubric item into a deterministic check when possible.\n- If a rubric item requires judgment, encode observable proxies and explain the\n  limits in `details`.\n- Keep metrics stable across baseline and with-skill runs.\n- Score only the generated task workspace. Do not accidentally score copied\n  skill source files, reference fixtures, or grader templates.\n- Keep custom metric values clamped to `0.0` through `1.0`.\n- Preserve benchmark prompt variants as separate eval entries only when they\n  exercise meaningfully different behavior.\n- Convert expected trigger/non-trigger metadata into `expected_skill`,\n  `expected_behavior`, negative cases, or custom metrics that inspect\n  trajectory evidence.\n\n## RAPIDS-Style Example\n\nFor a benchmark task with `task.yaml`, `code/`, prompt variants, coverage, and a\nrubric:\n\n1. Copy `code/` into `evals/files/<case-id>/`.\n2. Create one or more `evals/evals.json` entries from the prompt variants, and\n   set `files: [\"evals/files/<case-id>\"]` on each corresponding entry.\n3. Set `expected_skill` to the benchmark's target skill.\n4. Implement `evals/grader.py` to inspect the agent trajectory and changed\n   workspace files.\n5. Emit custom metrics for each rubric criterion, for example\n   `rapids_diagnosis`, `rapids_requirements_repair`,\n   `rapids_repair_safety`, and `rapids_verification`.\n6. Validate and run SkillEvaluator with and without the target skill, then\n   report both default evaluator metrics and custom metric deltas.\n\n## Limitations\n\n- The skill can design and implement deterministic checks, but ambiguous rubric\n  judgment still needs explicit observable proxies or a human-approved scoring\n  policy.\n- `init-custom-grader` creates scaffolding only; the agent must replace the\n  placeholder scoring logic.\n- Local validation proves file contracts, not live agent behavior. Do not call\n  the benchmark proven until an evaluation run has produced real rewards.\n\n## Troubleshooting\n\n| Problem | Fix |\n| --- | --- |\n| `evals/evals.json` missing | Create entries from the benchmark prompt or run `init-custom-grader` to seed one. |\n| Custom metrics do not appear | Ensure `reward.json` has numeric values und",
+      "card": null
+    },
+    {
+      "skill_path": "src/skillevaluator/tier3/reference_skills/task-list/SKILL.md",
+      "blob_sha": "de1668dbda33c113e117282e25cbc00399432708",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/src/skillevaluator/tier3/reference_skills/task-list/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "task-list",
+        "description": "Required for 4+ step requests; add tasks at start and update status after each step."
+      },
+      "excerpt": "---\nname: task-list\ndescription: Required for 4+ step requests; add tasks at start and update status after each step.\nmetadata:\n  author: SkillEvaluator Maintainers <maintainers@example.com>\n---\n\n# Task List Skill\n\nTrack multi-step tasks to ensure nothing is forgotten.\n\n## When to use\n\n- The request requires 4 or more distinct steps\n- You need to perform several operations in sequence\n\n## Instructions\n\n1. Add tasks before starting multi-step work.\n2. Mark exactly one task in progress while working.\n3. Update task status as each step completes.\n4. Keep task text concise and action-oriented.\n\n## How to use\n\nUse the `tasks` tool directly. Do NOT use run_code, execute, or write_file for task management.\n\n### 1. Add tasks at the start\n```\ntasks(operation=\"add_multiple\", content=\"Step one; Step two; Step three\")\n```\nThis clears any previous tasks. Each request starts fresh.\n\n## Examples\n\n```python\ntasks(operation=\"add_multiple\", content=\"Inspect repo; Run tests; Summarize findings\")\ntasks(operation=\"start\", task_id=\"task_1\")\ntasks(operation=\"complete\", task_id=\"task_1\")\n```\n\n### 2. Start a task before working on it\n```\ntasks(operation=\"start\", task_id=\"task_1\")\n```\n\n### 3. Complete a task when done\n```\ntasks(operation=\"complete\", task_id=\"task_1\")\n```\n\n### 4. Check what's next\n```\ntasks(operation=\"next\")\n```\n\n## All operations\n\n| Operation | Args | Description |\n|-----------|------|-------------|\n| `add_multiple` | `content=\"t1; t2; t3\"` | Add tasks (clears previous) |\n| `start` | `task_id=\"task_1\"` | Mark in_progress |\n| `complete` | `task_id=\"task_1\"` | Mark completed |\n| `cancel` | `task_id=\"task_1\"` | Cancel a task |\n| `list` | (none) | Show all tasks |\n| `next` | (none) | Get next pending task |\n\n## Rules\n\n- One task in_progress at a time\n- Start before working, complete when done\n- Do not leave tasks hanging\n",
+      "card": null
+    }
+  ]
+}

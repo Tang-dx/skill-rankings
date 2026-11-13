@@ -1,0 +1,1103 @@
+{
+  "schema": 1,
+  "repo": "mattpocock/skills",
+  "tree_sha": "dc6b596b851e6a987f86aeb934672d28cb767e5f",
+  "truncated_paths": 27,
+  "skills": [
+    {
+      "skill_path": "skills/engineering/ask-matt/SKILL.md",
+      "blob_sha": "4bfeeb61dae548b8b7754c4fba7bd40ab3926099",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/ask-matt/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ask-matt",
+        "description": "Ask which skill or flow fits your situation. A router over the skills in this repo."
+      },
+      "excerpt": "---\nname: ask-matt\ndescription: Ask which skill or flow fits your situation. A router over the skills in this repo.\ndisable-model-invocation: true\n---\n\n# Ask Matt\n\nYou don't remember every skill, so ask.\n\nBefore stating what a skill does or recommending a step be skipped, read that skill's SKILL.md: the summaries here are for orientation only.\n\nA **flow** is a path through the skills. Most paths run along one **main flow**, and two **on-ramps** merge onto it. Everything else is standalone, or a vocabulary layer that runs underneath.\n\n## The main flow: idea → ship\n\nThe route most work travels. You have an idea and want it built.\n\n1. **`/grill-with-docs`** sharpens the idea by interview. Start here whenever you are **working in a working directory**: it's stateful, retaining what it learns in `GLOSSARY.md` and ADRs. (No working directory? Use `/grill-me` instead, covered under Standalone. Both run the same `/grilling` primitive; `grill-with-docs` is the one that leaves a paper trail, which makes it the better of the two whenever a repo is there to leave it in.)\n2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype, bridged by **`/handoff`** in both directions (a prototype lives in its own directory, which is exactly what `/handoff` is for; see Phase boundaries):\n   - **`/handoff`** out, then open a fresh session against that file,\n   - **`/prototype`** to answer the question with throwaway code,\n   - **`/handoff`** back what you learned, and reference it from the original idea thread.\n3. **Branch: is this a multi-session build?**\n   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. Then work the tickets one of two ways:\n     - **`/implement`** per ticket, **`/clear`ing context between each one**. On a local tracker that's one file per ticket under `.scratch/<feature>/issues/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed. Each ticket is self-contained, so the last one's context is disposable.\n     - **`/implement-spec`** for the whole spec in one run. It reads the tickets as a **task graph**, runs implementer subagents across the ready **frontier** in parallel, and lands everything on one **integration branch**. Reach for it when you'd rather orchestrate the build than drive each ticket yourself.\n   - **No** → **`/implement`** right here, in the same context window.\n\n   Either way, the code gets built by driving **`/tdd`** (one red-green slice at a time) and closes out with **`/code-review`**, a two-axis review (Standards + Spec) of the diff. `/implement` runs both per ticket; `/implement-spec`'s implementers each drive `/tdd`, and it runs one `/code-review` over the integration branch. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review a branch or PR against a fixed point.\n\n   When the work goes up as a pull request, **`/pr`** shapes the body: the smallest visual that shows the change, before/after evidence that it works, and a one-way or two-way door call. It's model-invoked, so the agent reaches for it whenever it writes a PR.\n\n4. **`/retro`** closes the loop. After a build, and especially one that went sideways, it looks back over the session and suggests changes to the agent's **environment**, not the code: navigation pointers, automated checks, the coding standards `/code-review` enforces, steering files, tooling. Mechanical mistakes become deterministic checks; judgement calls become coding standards. The next build then starts from a better environment.\n\n### Context hygiene\n\nKeep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket. Run `/retro` in the session it's looking back on, before you clear; after clearing, point it at that session's log instead.\n\nThe limit on this is the **[smart zone](https://www.aihero.dev/ai-coding-dictionary/smart-zone)**: the window (~150k tokens on state-of-the-art models) within which the model still reasons sharply. If a session approaches it before `/to-tickets`, don't push on degraded; `/compact` at the nearest phase boundary and carry on (see Phase boundaries).\n\n## On-ramps\n\nA starting situation that generates work, then merges onto the main flow.\n\n- **Bugs and requests piling up** → **`/triage`**. It moves issues through triage roles and produces agent-ready issues, which **`/implement`** later picks up.\n\n  Triage is only for issues **you didn't create**: bug reports, incoming feature requests, anything that arrives raw. Tickets that `/to-tickets` produced are already agent-ready, so **don't triage them**.\n\n- **Something's broken** → **`/diagnosing-bugs`**. For the hard ones: the bug that resists a first glance, the intermittent flake, the regression that crept in between two known-good states. It refuses to theorise until it has a **tight feedback loop** (one command that already goes red on *this* bug), then fixes with a regression test. Once the fix is in, run **`/retro`** in the same session to ask what would have prevented the bug; where the real finding is that there's no good seam to lock it down, that's a job for **`/improve-codebase-architecture`**.\n\n- **A huge, foggy effort: a greenfield project or a huge feature build, too big for one session** → **`/wayfinder`**, the most cognitively demanding flow here. When the way from here to the destination isn't visible yet, it charts a **shared map** of **decision tickets** on the issue tracker and resolves them one at a time, producing **decisions, not deliverables**, until the fog is pushed back and the way is clear. Where **`/grill-with-docs`** sharpens an idea you can hold in one session, wayfinder is for the idea you can't, and it's slower and denser, so save it for exactly that, never a well-scoped feature.\n\n  When the map clears, **it hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-tickets` and `/implement` as usual. Looping the map straight into `/implement` skips that collapse and throws the linked detail away, so go straight to `/implement` only when the effort turned out genuinely small.\n\n## Codebase health\n\nNot feature work, just upkeep.\n\n- **`/improve-codebase-architecture`** runs whenever you have a spare moment to keep the codebase good for agents to operate in. It surfaces **deepening opportunities**; picking one _generates an idea_ you can take into the main flow at `/grill-with-docs`. It's the survey that finds the candidates; **`/codebase-design`** (below) is the bench you design the chosen one on.\n\n## Vocabulary underneath\n\nTwo model-invoked references that run *beneath* the other skills, each the single source of truth for its vocabulary. Reach for them directly when the **words**, not the process, are the problem; or let the skills above pull them in.\n\n- **`/domain-modeling`**: sharpen the project's *domain* language: challenge a fuzzy term, resolve an overloaded word (\"account\" doing three jobs), record a hard-to-reverse decision as an ADR. It's the active discipline `/grill-with-docs` drives to keep `GLOSSARY.md` a clean glossary.\n- **`/codebase-design`** is the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality) for designing a module's *shape*: a lot of behaviour behind a small interface at a clean seam. `/tdd` and `/improve-codebase-architecture` both speak it.\n\n## Phase boundaries\n\nA **phase** is a chunk of work inside a session: the grilling, the implementation, the QA. At the **bo",
+      "card": {
+        "title_zh": "技能路由导航",
+        "purpose_zh": "作为仓库内各技能与流程的路由器，帮助用户判断当前情境该用哪个技能或流程，并说明主流程、入口、代码库维护与底层词汇层之间的关系。",
+        "does": [
+          "按情境推荐应使用的技能或流程",
+          "说明主流程从想法到交付的各阶段与分支",
+          "介绍缺陷、请求、大型模糊项目等入口流程",
+          "说明代码库健康维护与底层词汇类技能的定位",
+          "解释阶段边界处的继续、清空、交接、子代理、压缩等选项",
+          "强调在陈述技能功能前应先阅读该技能的 SKILL.md"
+        ],
+        "inputs": [
+          "用户当前所处的情境或问题描述",
+          "仓库中各技能的 SKILL.md 原文"
+        ],
+        "outputs": [
+          "推荐使用的技能或流程路径",
+          "对流程阶段、分支与阶段边界的说明",
+          "对技能摘要的定位性指引"
+        ],
+        "scenarios": [
+          "不确定该用哪个技能时进行询问",
+          "规划从想法到交付的完整开发路径",
+          "判断多会话构建与单会话构建的分支",
+          "处理缺陷报告与外部请求的入口选择",
+          "在阶段边界决定继续、清空、交接或压缩"
+        ],
+        "prerequisites": [
+          "需要可读取仓库中各技能的 SKILL.md 以核实其功能"
+        ],
+        "limits": [
+          "文中摘要仅用于定位，不能替代阅读对应技能的 SKILL.md",
+          "不自行执行构建，只做路由与说明",
+          "部分流程细节需参阅 PHASE-BOUNDARIES.md"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "产品规划",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Ask which skill or flow fits your situation. A router over the skills in this repo."
+          },
+          {
+            "field": "does",
+            "quote": "Before stating what a skill does or recommending a step be skipped, read that skill's SKILL.md: the summaries here are for orientation only."
+          },
+          {
+            "field": "does",
+            "quote": "A **flow** is a path through the skills. Most paths run along one **main flow**, and two **on-ramps** merge onto it."
+          },
+          {
+            "field": "does",
+            "quote": "## The main flow: idea → ship"
+          },
+          {
+            "field": "does",
+            "quote": "## On-ramps"
+          },
+          {
+            "field": "does",
+            "quote": "## Codebase health"
+          },
+          {
+            "field": "does",
+            "quote": "## Vocabulary underneath"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before stating what a skill does or recommending a step be skipped, read that skill's SKILL.md"
+          },
+          {
+            "field": "limits",
+            "quote": "the summaries here are for orientation only."
+          },
+          {
+            "field": "limits",
+            "quote": "When the map clears, **it hands off, it doesn't build**"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/code-review/SKILL.md",
+      "blob_sha": "83183e0ad36fd0eef25d37c7e483284b7e34c1f0",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/code-review/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "code-review",
+        "description": "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\"."
+      },
+      "excerpt": "---\nname: code-review\ndescription: \"Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \\\"review since X\\\".\"\n---\n\nTwo-axis review of the diff between `HEAD` and a fixed point the user supplies:\n\n- **Standards**: does the code conform to this repo's documented coding standards?\n- **Spec**: does the code faithfully implement the originating issue / spec?\n\nBoth axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings. Start every sub-agent with a fresh context window.\n\nThe issue tracker should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`.\n\n## Process\n\n### 1. Pin the fixed point\n\nWhatever the user said is the fixed point (a commit SHA, branch name, tag, `main`, `HEAD~5`, etc.). If they didn't specify one, ask for it.\n\nCapture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.\n\nBefore going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside two parallel sub-agents.\n\n### 2. Identify the spec source\n\nLook for the originating spec, in this order:\n\n1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.), fetched via the workflow in the tracker doc.\n2. A path the user passed as an argument.\n3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.\n4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report \"no spec available\".\n\n### 3. Identify the standards sources\n\nSearch the repo for every file that documents how code should be written. When `CODING_STANDARDS.md` or `CONTRIBUTING.md` exists, it must be on the list.\n\nOn top of whatever the repo documents, the Standards axis always carries the **smell baseline** below: a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:\n\n- **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.\n- **Always a judgement call.** Each smell is a labelled heuristic (\"possible Feature Envy\"), never a hard violation. Like any standard here, skip anything tooling already enforces.\n\nEach smell reads *what it is* → *how to fix*; match it against the diff:\n\n- **Mysterious Name**: a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.\n- **Duplicated Code**: the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.\n- **Feature Envy**: a method that reaches into another object's data more than its own. → move the method onto the data it envies.\n- **Data Clumps**: the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.\n- **Primitive Obsession**: a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.\n- **Repeated Switches**: the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.\n- **Shotgun Surgery**: one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.\n- **Divergent Change**: one file or module is edited for several unrelated reasons. → split so each module changes for one reason.\n- **Speculative Generality**: abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.\n- **Message Chains**: long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.\n- **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.\n- **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.\n\n### 4. Spawn both sub-agents in parallel\n\nIssue both sub-agent calls together, in the foreground, and aggregate the reports they return.\n\n**Standards sub-agent prompt** should include:\n\n- The full diff command and commit list.\n- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full (the sub-agent has no other access to it).\n- The brief: \"Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words.\"\n\n**Spec sub-agent prompt** should include:\n\n- The diff command and commit list.\n- The path or fetched contents of the spec.\n- The brief: \"Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words.\"\n\nIf the spec is missing, skip the Spec sub-agent and note this in the final report.\n\n### 5. Aggregate\n\nPresent the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings, because the two axes are deliberately separate (see _Why two axes_).\n\nEnd with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes: that's the reranking the separation exists to prevent.\n\n## Why two axes\n\nA change can pass one axis and fail the other:\n\n- Code that follows every standard but implements the wrong thing → **Standards pass, Spec fail.**\n- Code that does exactly what the issue asked but breaks the project's conventions → **Spec pass, Standards fail.**\n\nReporting them separately stops one axis from masking the other.\n",
+      "card": {
+        "title_zh": "双轴代码审查",
+        "purpose_zh": "对 HEAD 与用户指定固定点之间的 diff 做 Standards 与 Spec 两轴并行审查，分别报告后并列汇总，避免一轴掩盖另一轴。",
+        "does": [
+          "确定固定点并确认可解析、diff 非空",
+          "用三点 diff 与提交列表界定审查范围",
+          "按顺序定位 spec 来源，找不到则询问用户",
+          "搜集仓库编码规范文件并附加 Fowler 代码坏味道基线",
+          "并行启动 Standards 与 Spec 两个子代理审查",
+          "按两轴分别汇总并给出各轴问题数与最严重问题"
+        ],
+        "inputs": [
+          "固定点（commit SHA、分支、tag、main、HEAD~5 等）",
+          "可选的 spec 路径参数",
+          "提交信息中的 issue 引用",
+          "仓库中的编码规范文档",
+          "issue tracker 配置"
+        ],
+        "outputs": [
+          "Standards 轴审查报告",
+          "Spec 轴审查报告",
+          "每轴发现总数与最严重问题的一行总结"
+        ],
+        "scenarios": [
+          "审查分支或 PR",
+          "审查进行中的改动",
+          "用户要求 review since X",
+          "核对实现是否符合原始 issue/spec",
+          "检查改动是否符合仓库编码规范"
+        ],
+        "prerequisites": [
+          "issue tracker 已提供，否则需运行 /setup-matt-pocock-skills",
+          "用户提供固定点，未提供则需询问",
+          "固定点可被 git rev-parse 解析且 diff 非空"
+        ],
+        "limits": [
+          "两个子代理报告均限制在 400 字以内",
+          "spec 缺失时跳过 Spec 子代理并注明",
+          "不合并或重排两轴发现，不跨轴选唯一最严重问题",
+          "坏味道基线始终是判断性提示，仓库文档规范优先",
+          "跳过工具已强制检查的内容"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "代码审查",
+          "测试",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Two-axis review of the diff between `HEAD` and a fixed point the user supplies"
+          },
+          {
+            "field": "does",
+            "quote": "Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base)."
+          },
+          {
+            "field": "does",
+            "quote": "Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty."
+          },
+          {
+            "field": "does",
+            "quote": "Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings."
+          },
+          {
+            "field": "does",
+            "quote": "If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report \"no spec available\"."
+          },
+          {
+            "field": "does",
+            "quote": "When `CODING_STANDARDS.md` or `CONTRIBUTING.md` exists, it must be on the list."
+          },
+          {
+            "field": "does",
+            "quote": "Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The issue tracker should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If they didn't specify one, ask for it."
+          },
+          {
+            "field": "limits",
+            "quote": "Under 400 words."
+          },
+          {
+            "field": "limits",
+            "quote": "If the spec is missing, skip the Spec sub-agent and note this in the final report."
+          },
+          {
+            "field": "limits",
+            "quote": "Don't pick a single winner across axes: that's the reranking the separation exists to prevent."
+          },
+          {
+            "field": "limits",
+            "quote": "**The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell."
+          },
+          {
+            "field": "limits",
+            "quote": "Skip anything tooling enforces."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Also note the list of commits via `git log <fixed-point>..HEAD --oneline`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/codebase-design/SKILL.md",
+      "blob_sha": "3f63c8146dd2604b419c929e9876b90c30d410e9",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/codebase-design/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "codebase-design",
+        "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary."
+      },
+      "excerpt": "---\nname: codebase-design\ndescription: Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.\n---\n\n# Codebase Design\n\nDesign **deep modules**: a lot of behaviour behind a small interface, placed at a clean seam, testable through that interface. Use this language and these principles wherever code is being designed or restructured. The aim is leverage for callers, locality for maintainers, and testability for everyone.\n\n## Glossary\n\nUse these terms exactly: don't substitute \"component,\" \"service,\" \"API,\" or \"boundary.\" Consistent language is the whole point.\n\n**Module**: anything with an interface and an implementation. Deliberately scale-agnostic: a function, class, package, or tier-spanning slice. _Avoid_: unit, component, service.\n\n**Interface**: everything a caller must know to use the module correctly: the type signature, but also invariants, ordering constraints, error modes, required configuration, and performance characteristics. _Avoid_: API, signature (too narrow, they refer only to the type-level surface).\n\n**Implementation**: what's inside a module, its body of code. Distinct from **Adapter**: a thing can be a small adapter with a large implementation (a Postgres repo) or a large adapter with a small implementation (an in-memory fake). Reach for \"adapter\" when the seam is the topic; \"implementation\" otherwise.\n\n**Depth**: leverage at the interface. The amount of behaviour a caller (or test) can exercise per unit of interface they have to learn. A module is **deep** when a large amount of behaviour sits behind a small interface, **shallow** when the interface is nearly as complex as the implementation.\n\n**Seam** _(Michael Feathers)_: a place where you can alter behaviour without editing in that place; the *location* at which a module's interface lives. Where to put the seam is its own design decision, distinct from what goes behind it. _Avoid_: boundary (overloaded with DDD's bounded context).\n\n**Adapter**: a concrete thing that satisfies an interface at a seam. Describes *role* (what slot it fills), not substance (what's inside).\n\n**Leverage**: what callers get from depth. More capability per unit of interface they learn. One implementation pays back across N call sites and M tests.\n\n**Locality**: what maintainers get from depth. Change, bugs, knowledge, and verification concentrate in one place rather than spreading across callers. Fix once, fixed everywhere.\n\n## Deep vs shallow\n\n**Deep module** = small interface + lots of implementation:\n\n```\n┌─────────────────────┐\n│   Small Interface   │  ← Few methods, simple params\n├─────────────────────┤\n│                     │\n│  Deep Implementation│  ← Complex logic hidden\n│                     │\n└─────────────────────┘\n```\n\n**Shallow module** = large interface + little implementation (avoid):\n\n```\n┌─────────────────────────────────┐\n│       Large Interface           │  ← Many methods, complex params\n├─────────────────────────────────┤\n│  Thin Implementation            │  ← Just passes through\n└─────────────────────────────────┘\n```\n\nWhen designing an interface, ask:\n\n- Can I reduce the number of methods?\n- Can I simplify the parameters?\n- Can I hide more complexity inside?\n\n## Principles\n\n- **Depth is a property of the interface, not the implementation.** A deep module can be internally composed of small, mockable, swappable parts; they just aren't part of the interface. A module can have **internal seams** (private to its implementation, used by its own tests) as well as the **external seam** at its interface.\n- **The deletion test.** Imagine deleting the module. If complexity vanishes, it was a pass-through. If complexity reappears across N callers, it was earning its keep.\n- **The interface is the test surface.** Callers and tests cross the same seam. If you want to test *past* the interface, the module is probably the wrong shape.\n- **One adapter means a hypothetical seam. Two adapters means a real one.** Don't introduce a seam unless something actually varies across it.\n\n## Designing for testability\n\nGood interfaces make testing natural:\n\n1. **Accept dependencies, don't create them.**\n\n   ```typescript\n   // Testable\n   function processOrder(order, paymentGateway) {}\n\n   // Hard to test\n   function processOrder(order) {\n     const gateway = new StripeGateway();\n   }\n   ```\n\n2. **Return results, don't produce side effects.**\n\n   ```typescript\n   // Testable\n   function calculateDiscount(cart): Discount {}\n\n   // Hard to test\n   function applyDiscount(cart): void {\n     cart.total -= discount;\n   }\n   ```\n\n3. **Small surface area.** Fewer methods = fewer tests needed. Fewer params = simpler test setup.\n\n## Relationships\n\n- A **Module** has exactly one **Interface** (the surface it presents to callers and tests).\n- **Depth** is a property of a **Module**, measured against its **Interface**.\n- A **Seam** is where a **Module**'s **Interface** lives.\n- An **Adapter** sits at a **Seam** and satisfies the **Interface**.\n- **Depth** produces **Leverage** for callers and **Locality** for maintainers.\n\n## Rejected framings\n\n- **Depth as ratio of implementation-lines to interface-lines** (Ousterhout): rewards padding the implementation. We use depth-as-leverage instead.\n- **\"Interface\" as the TypeScript `interface` keyword or a class's public methods**: too narrow: interface here includes every fact a caller must know.\n- **\"Boundary\"**: overloaded with DDD's bounded context. Say **seam** or **interface**.\n\n## Going deeper\n\n- **Deepening a cluster given its dependencies**, see [DEEPENING.md](DEEPENING.md): dependency categories, seam discipline, and replace-don't-layer testing.\n- **Exploring alternative interfaces**, see [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md): spin up parallel sub-agents to design the interface several radically different ways, then compare on depth, locality, and seam placement.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/engineering/diagnosing-bugs/SKILL.md",
+      "blob_sha": "d039541ddd1c46e6ddbd662fe99d49b686fc5e12",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/diagnosing-bugs/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "diagnosing-bugs",
+        "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow."
+      },
+      "excerpt": "---\nname: diagnosing-bugs\ndescription: Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow.\n---\n\n# Diagnosing Bugs\n\nA discipline for hard bugs. Skip phases only when explicitly justified.\n\nWhen exploring the codebase, read `GLOSSARY.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.\n\n## Redact\n\nThis skill has you show commands, outputs and captured artifacts. **Redact every secret first**: write `<REDACTED>` in its place. Build loops against env vars, so the credential stays in the environment rather than in what you show. Captured artifacts carry auth headers: quote only the lines that carry the signal.\n\nIf the redacted output is not enough to diagnose the bug, say so and ask the user.\n\n## Phase 1: Build a feedback loop\n\n**This is the skill.** Everything else is mechanical. If you have a **tight** pass/fail signal for the bug (one that goes red on _this_ bug), you will find the cause; bisection, hypothesis-testing, and instrumentation all just consume it. If you don't have one, no amount of staring at code will save you.\n\nSpend disproportionate effort here. **Be aggressive. Be creative. Refuse to give up.**\n\n### Ways to construct one, in roughly this order\n\n1. **Failing test** at whatever seam reaches the bug: unit, integration, e2e.\n2. **Curl / HTTP script** against a running dev server.\n3. **CLI invocation** with a fixture input, diffing stdout against a known-good snapshot.\n4. **Headless browser script** (Playwright / Puppeteer) that drives the UI and asserts on DOM/console/network.\n5. **Replay a captured trace.** Save a real network request / payload / event log to disk; replay it through the code path in isolation.\n6. **Throwaway harness.** Spin up a minimal subset of the system (one service, mocked deps) that exercises the bug code path with a single function call.\n7. **Property / fuzz loop.** If the bug is \"sometimes wrong output\", run 1000 random inputs and look for the failure mode.\n8. **Bisection harness.** If the bug appeared between two known states (commit, dataset, version), automate \"boot at state X, check, repeat\" so you can `git bisect run` it.\n9. **Differential loop.** Run the same input through old-version vs new-version (or two configs) and diff outputs.\n10. **HITL bash script.** Last resort. If a human must click, drive _them_ with `scripts/hitl-loop.template.sh` so the loop is still structured. Captured output feeds back to you.\n\nBuild the right feedback loop, and the bug is 90% fixed.\n\n### Tighten the loop\n\nTreat the loop as a product. Once you have _a_ loop, **tighten** it:\n\n- Can I make it faster? (Cache setup, skip unrelated init, narrow the test scope.)\n- Can I make the signal sharper? (Assert on the specific symptom, not \"didn't crash\".)\n- Can I make it more deterministic? (Pin time, seed RNG, isolate filesystem, freeze network.)\n\nA 30-second flaky loop is barely better than no loop; a 2-second deterministic one is tight, a debugging superpower.\n\n### Non-deterministic bugs\n\nThe goal is not a clean repro but a **higher reproduction rate**. Loop the trigger 100×, parallelise, add stress, narrow timing windows, inject sleeps. A 50%-flake bug is debuggable; 1% is not, so keep raising the rate until it's debuggable.\n\n### When you genuinely cannot build a loop\n\nStop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a redacted captured artifact (HAR file, log dump, core dump, screen recording with timestamps), or (c) permission to add temporary production instrumentation. Do **not** proceed to hypothesise without a loop.\n\n### Completion criterion: a tight loop that goes red\n\nPhase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** (a script path, a test invocation, a curl) that you have **already run at least once** (show the invocation and its output, redacted), and that is:\n\n- [ ] **Red-capable**: it drives the actual bug code path and asserts the **user's exact symptom**, so it can go red on this bug and green once fixed. Not \"runs without erroring\"; it must be able to _catch this specific bug_.\n- [ ] **Deterministic**: same verdict every run (flaky bugs: a pinned, high reproduction rate, per above).\n- [ ] **Fast**: seconds, not minutes.\n- [ ] **Agent-runnable**: you can run it unattended; a human in the loop only via `scripts/hitl-loop.template.sh`.\n\nIf you catch yourself reading code to build a theory before this command exists, **stop: jumping straight to a hypothesis is the exact failure this skill prevents.** No red-capable command, no Phase 2.\n\n## Phase 2: Reproduce + minimise\n\nRun the loop. Watch it go red as the bug appears.\n\nConfirm:\n\n- [ ] The loop produces the failure mode the **user** described, not a different failure that happens to be nearby. Wrong bug = wrong fix.\n- [ ] The failure is reproducible across multiple runs (or, for non-deterministic bugs, reproducible at a high enough rate to debug against).\n- [ ] You have captured the exact symptom (error message, wrong output, slow timing) so later phases can verify the fix actually addresses it.\n\n### Minimise\n\nOnce it's red, shrink the repro to the **smallest scenario that still goes red**. Cut inputs, callers, config, data, and steps **one at a time**, re-running the loop after each cut, and keep only what's load-bearing for the failure.\n\nWhy bother: a minimal repro shrinks the hypothesis space in Phase 3 (fewer moving parts left to suspect) and becomes the clean regression test in Phase 5.\n\nDone when **every remaining element is load-bearing**: removing any one of them makes the loop go green.\n\nDo not proceed until you have reproduced **and** minimised.\n\n## Phase 3: Hypothesise\n\nGenerate **3–5 ranked hypotheses** before testing any of them. Single-hypothesis generation anchors on the first plausible idea.\n\nEach hypothesis must be **falsifiable**: state the prediction it makes.\n\n> Format: \"If <X> is the cause, then <changing Y> will make the bug disappear / <changing Z> will make it worse.\"\n\nIf you cannot state the prediction, the hypothesis is a vibe: discard or sharpen it.\n\n**Show the ranked list to the user before testing.** They often have domain knowledge that re-ranks instantly (\"we just deployed a change to #3\"), or know hypotheses they've already ruled out. Cheap checkpoint, big time saver. Don't block on it; proceed with your ranking if the user is AFK.\n\n## Phase 4: Instrument\n\nEach probe must map to a specific prediction from Phase 3. **Change one variable at a time.**\n\nTool preference:\n\n1. **Debugger / REPL inspection** if the env supports it. One breakpoint beats ten logs.\n2. **Targeted logs** at the boundaries that distinguish hypotheses.\n3. Never \"log everything and grep\".\n\n**Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.\n\n**Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then bisect. Measure first, fix second.\n\n## Phase 5: Fix + regression test\n\nWrite the regression test **before the fix**, but only if there is a **correct seam** for it.\n\nA correct seam is one where the test exercises the **real bug pattern** as it occurs at the call site. If the only available seam is too shallow (single-caller test when the bug needs multiple callers, unit test that can't replicate the chain that triggered the bug), a regression test there gives false confidence.\n\n**If no correct seam exists, that itself is the finding.** Note it. The codebase architecture is preventing the bug from being locked down. Flag this for the next phase.\n\nIf a correct seam exists:\n\n1. Turn the minimised repro into a failing test at that seam.\n2. Watch it fail. If you forced the red by mutating code",
+      "card": {
+        "title_zh": "疑难缺陷诊断流程",
+        "purpose_zh": "为疑难缺陷和性能回归提供一套分阶段诊断纪律：先构建紧致可复现的反馈回路，再复现最小化、提出可证伪假设、定向插桩、修复并补回归测试，最后清理调试痕迹。",
+        "does": [
+          "指导构建能对目标缺陷变红的反馈回路，并收紧速度、信号与确定性",
+          "要求先复现用户描述的症状并逐步最小化到每个元素都必要",
+          "要求提出3至5个带预测的可证伪假设并按序测试",
+          "要求每个探针对应具体预测，一次只改一个变量，调试日志加唯一前缀",
+          "修复前在正确接缝写回归测试，修复后重跑原始反馈回路",
+          "完成前清理调试插桩、临时原型，并在提交信息中记录正确假设"
+        ],
+        "inputs": [
+          "用户报告的缺陷、报错、失败或变慢现象",
+          "代码库（可选阅读 GLOSSARY.md 与相关 ADR）",
+          "可复现问题的环境或捕获的产物（HAR、日志、核心转储等）",
+          "用户对假设排序的领域知识反馈"
+        ],
+        "outputs": [
+          "一条已运行过、能变红且确定、快速的反馈回路命令及其脱敏输出",
+          "最小化复现用例",
+          "排序后的可证伪假设列表",
+          "回归测试（或记录缺少正确接缝的发现）",
+          "清理后的代码与提交/PR 信息中的根因说明"
+        ],
+        "scenarios": [
+          "用户说 diagnose 或 debug this 时",
+          "报告某功能损坏、抛错、失败或变慢时",
+          "排查难以稳定复现的偶发缺陷",
+          "排查性能回归",
+          "需要为缺陷建立回归测试时"
+        ],
+        "prerequisites": [
+          "展示命令、输出和产物前必须先脱敏，密钥写为 REDACTED",
+          "通过环境变量构建回路，使凭据留在环境中",
+          "若脱敏后输出不足以诊断，应说明并询问用户",
+          "没有能变红的命令不得进入第二阶段"
+        ],
+        "limits": [
+          "无法构建回路时应停下并明确说明，列出尝试过的方法，不得直接假设",
+          "非确定性缺陷目标不是干净复现而是提高复现率",
+          "无正确接缝时回归测试会带来虚假信心，应记录为发现",
+          "性能回归不宜依赖日志，应先建立基线测量再二分",
+          "人工点击仅作为最后手段，通过 hitl-loop 模板脚本驱动"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "代码审查",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Diagnosis loop for hard bugs and performance regressions."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "A discipline for hard bugs. Skip phases only when explicitly justified."
+          },
+          {
+            "field": "does",
+            "quote": "**This is the skill.** Everything else is mechanical. If you have a **tight** pass/fail signal for the bug (one that goes red on _this_ bug), you will find the cause"
+          },
+          {
+            "field": "does",
+            "quote": "Once it's red, shrink the repro to the **smallest scenario that still goes red**."
+          },
+          {
+            "field": "does",
+            "quote": "Generate **3–5 ranked hypotheses** before testing any of them."
+          },
+          {
+            "field": "does",
+            "quote": "**Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`."
+          },
+          {
+            "field": "does",
+            "quote": "Write the regression test **before the fix**, but only if there is a **correct seam** for it."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Redact every secret first**: write `<REDACTED>` in its place."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Build loops against env vars, so the credential stays in the environment rather than in what you show."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the redacted output is not enough to diagnose the bug, say so and ask the user."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "No red-capable command, no Phase 2."
+          },
+          {
+            "field": "limits",
+            "quote": "Stop and say so explicitly. List what you tried."
+          },
+          {
+            "field": "limits",
+            "quote": "The goal is not a clean repro but a **higher reproduction rate**."
+          },
+          {
+            "field": "limits",
+            "quote": "**If no correct seam exists, that itself is the finding.**"
+          },
+          {
+            "field": "limits",
+            "quote": "For performance regressions, logs are usually wrong."
+          },
+          {
+            "field": "limits",
+            "quote": "**HITL bash script.** Last resort."
+          },
+          {
+            "field": "hosts",
+            "quote": "When exploring the codebase, read `GLOSSARY.md` (if it exists)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/domain-modeling/SKILL.md",
+      "blob_sha": "a4438c6879c517d1a08e2b5fbca049b632688dfe",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/domain-modeling/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "domain-modeling",
+        "description": "Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a GLOSSARY.md, or recording or editing an ADR."
+      },
+      "excerpt": "---\nname: domain-modeling\ndescription: Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a GLOSSARY.md, or recording or editing an ADR.\n---\n\n# Domain Modeling\n\nActively build and sharpen the project's domain model as you design. This is the *active* discipline: challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. (Merely *reading* `GLOSSARY.md` for vocabulary is not this skill: that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.)\n\n## File structure\n\nMost repos have a single context:\n\n```\n/\n├── GLOSSARY.md\n├── docs/\n│   └── adr/\n│       ├── 0001-event-sourced-orders.md\n│       └── 0002-postgres-for-write-model.md\n└── src/\n```\n\nIf a `GLOSSARY-MAP.md` exists at the root, the repo has multiple contexts. The map points to where each one lives:\n\n```\n/\n├── GLOSSARY-MAP.md\n├── docs/\n│   └── adr/                          ← system-wide decisions\n├── src/\n│   ├── ordering/\n│   │   ├── GLOSSARY.md\n│   │   └── docs/adr/                 ← context-specific decisions\n│   └── billing/\n│       ├── GLOSSARY.md\n│       └── docs/adr/\n```\n\nCreate files lazily: only when you have something to write. If no `GLOSSARY.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.\n\n## During the session\n\n### Challenge against the glossary\n\nWhen the user uses a term that conflicts with the existing language in `GLOSSARY.md`, call it out immediately. \"Your glossary defines 'cancellation' as X, but you seem to mean Y. Which is it?\"\n\n### Sharpen fuzzy language\n\nWhen the user uses vague or overloaded terms, propose a precise canonical term. \"You're saying 'account': do you mean the Customer or the User? Those are different things.\"\n\n### Discuss concrete scenarios\n\nWhen domain relationships are being discussed, stress-test them with specific scenarios. Invent scenarios that probe edge cases and force the user to be precise about the boundaries between concepts.\n\n### Cross-reference with code\n\nWhen the user states how something works, check whether the code agrees. If you find a contradiction, surface it: \"Your code cancels entire Orders, but you just said partial cancellation is possible. Which is right?\"\n\n### Update GLOSSARY.md inline\n\nWhen a term is resolved, update `GLOSSARY.md` right there. Don't batch these up: capture them as they happen. Use the format in [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md).\n\n`GLOSSARY.md` should be totally devoid of implementation details. Do not treat `GLOSSARY.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.\n\n### Offer ADRs sparingly\n\nOnly offer to create an ADR when all three are true:\n\n1. **Hard to reverse**: the cost of changing your mind later is meaningful\n2. **Surprising without context**: a future reader will wonder \"why did they do it this way?\"\n3. **The result of a real trade-off**: there were genuine alternatives and you picked one for specific reasons\n\nIf any of the three is missing, skip the ADR. Use the format in [ADR-FORMAT.md](./ADR-FORMAT.md).\n",
+      "card": {
+        "title_zh": "领域建模",
+        "purpose_zh": "在设计过程中主动构建并打磨项目的领域模型：挑战术语、构造边界场景、及时写下术语表与架构决策记录。",
+        "does": [
+          "对照 GLOSSARY.md 指出用户用词与既有定义冲突",
+          "把模糊或一词多义的术语收敛为精确的规范术语",
+          "用具体边界场景压力测试领域概念之间的关系",
+          "将用户描述与代码实际行为交叉核对并暴露矛盾",
+          "术语确定后立即就地更新 GLOSSARY.md",
+          "仅在难以逆转、脱离上下文会令人困惑、且源于真实权衡时提议创建 ADR"
+        ],
+        "inputs": [
+          "用户对代码库术语的讨论与表述",
+          "现有 GLOSSARY.md 或根目录 GLOSSARY-MAP.md",
+          "代码库实际实现",
+          "GLOSSARY-FORMAT.md 与 ADR-FORMAT.md 格式说明"
+        ],
+        "outputs": [
+          "更新后的 GLOSSARY.md（纯术语表，不含实现细节）",
+          "按需创建的 docs/adr/ 下的 ADR 文件",
+          "对术语冲突与代码矛盾的指正说明"
+        ],
+        "scenarios": [
+          "讨论代码库术语、需要统一用词时",
+          "编写或编辑 GLOSSARY.md 时",
+          "记录或编辑 ADR 时",
+          "发现用户说法与代码行为不一致时",
+          "需要澄清模糊或过载概念时"
+        ],
+        "prerequisites": [
+          "仓库中已有或允许创建 GLOSSARY.md",
+          "多上下文仓库需有根目录 GLOSSARY-MAP.md 指向各上下文位置",
+          "参考 GLOSSARY-FORMAT.md 与 ADR-FORMAT.md 的格式"
+        ],
+        "limits": [
+          "仅阅读 GLOSSARY.md 获取词汇不属于本技能范围",
+          "GLOSSARY.md 不得包含实现细节，不作规格或草稿本使用",
+          "文件按需惰性创建，无内容时不建",
+          "ADR 需同时满足难以逆转、脱离上下文令人困惑、真实权衡三条才提议"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "产品规划",
+          "后端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Actively build and sharpen the project's domain model as you design."
+          },
+          {
+            "field": "does",
+            "quote": "When the user uses a term that conflicts with the existing language in `GLOSSARY.md`, call it out immediately."
+          },
+          {
+            "field": "does",
+            "quote": "When the user uses vague or overloaded terms, propose a precise canonical term."
+          },
+          {
+            "field": "does",
+            "quote": "Invent scenarios that probe edge cases and force the user to be precise about the boundaries between concepts."
+          },
+          {
+            "field": "does",
+            "quote": "When the user states how something works, check whether the code agrees."
+          },
+          {
+            "field": "does",
+            "quote": "When a term is resolved, update `GLOSSARY.md` right there. Don't batch these up: capture them as they happen."
+          },
+          {
+            "field": "does",
+            "quote": "Only offer to create an ADR when all three are true:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If a `GLOSSARY-MAP.md` exists at the root, the repo has multiple contexts."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use the format in [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use the format in [ADR-FORMAT.md](./ADR-FORMAT.md)."
+          },
+          {
+            "field": "limits",
+            "quote": "Merely *reading* `GLOSSARY.md` for vocabulary is not this skill"
+          },
+          {
+            "field": "limits",
+            "quote": "`GLOSSARY.md` should be totally devoid of implementation details."
+          },
+          {
+            "field": "limits",
+            "quote": "Create files lazily: only when you have something to write."
+          },
+          {
+            "field": "limits",
+            "quote": "If any of the three is missing, skip the ADR."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/grill-with-docs/SKILL.md",
+      "blob_sha": "62b9efb6f991d1b229adee7506962f13ced0c499",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/grill-with-docs/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "grill-with-docs",
+        "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go."
+      },
+      "excerpt": "---\nname: grill-with-docs\ndescription: A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.\ndisable-model-invocation: true\n---\n\nCall the Skill tool twice, for \"grilling\" and \"domain-modeling\".\n",
+      "card": {
+        "title_zh": "文档化拷问计划",
+        "purpose_zh": "通过反复追问打磨计划或设计，并在过程中生成文档（ADR 与术语表）。",
+        "does": [
+          "对计划或设计进行持续追问以打磨完善",
+          "在追问过程中创建 ADR 文档",
+          "在追问过程中创建术语表",
+          "调用 grilling 技能",
+          "调用 domain-modeling 技能"
+        ],
+        "inputs": [],
+        "outputs": [
+          "ADR 文档",
+          "术语表"
+        ],
+        "scenarios": [
+          "打磨计划或设计",
+          "需要同步沉淀架构决策记录",
+          "需要建立领域术语表"
+        ],
+        "prerequisites": [
+          "可调用 Skill 工具",
+          "存在名为 grilling 的技能",
+          "存在名为 domain-modeling 的技能"
+        ],
+        "limits": [
+          "原文未说明追问轮次或停止条件",
+          "原文未说明文档存放位置与格式细节",
+          "原文未说明适用平台"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "产品规划",
+          "文档",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go."
+          },
+          {
+            "field": "does",
+            "quote": "Call the Skill tool twice, for \"grilling\" and \"domain-modeling\"."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Call the Skill tool twice, for \"grilling\" and \"domain-modeling\"."
+          },
+          {
+            "field": "outputs",
+            "quote": "which also creates docs (ADR's and glossary) as we go."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/implement-spec/SKILL.md",
+      "blob_sha": "73d36c23958bd04423ba3ded1c90ff0d0b858b72",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/implement-spec/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "implement-spec",
+        "description": "Implement the result of /to-spec and /to-tickets in code."
+      },
+      "excerpt": "---\nname: implement-spec\ndescription: \"Implement the result of /to-spec and /to-tickets in code.\"\ndisable-model-invocation: true\n---\n\nYou have been provided a spec. This spec should have tickets associated with it, describing how to implement the spec.\n\nThe issue tracker should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`.\n\nThe goal is the entire spec implemented on a single **integration branch**, with every ticket resolved the way the issue tracker closes work.\n\nThe tickets are not a list of steps. They are a **task graph** with blocking relationships between them. This means there is always a **frontier** of tickets which are ready to be grabbed.\n\nStart every subagent with a fresh context window.\n\nCommunication to and from subagents should be sparse. Communicate primarily through **context pointers**: to the spec, tickets, research notes, and previous commits. Don't duplicate information already available via pointers.\n\n**Implementer subagents** should be run in the background where possible for maximum concurrency.\n\n## Steps\n\n1. Read the spec and tickets to understand the task graph.\n\n2. (optional) Use an **exploration subagent** to conduct any exploration required by the tickets - relevant codebase files or external documentation. Ensure the exploration subagent can save files - it should save its markdown notes in a directory outside the repo, accessible by all future subagents. This lets **implementer subagents** focus on implementation rather than exploration.\n\n3. Create the integration branch. If the issue tracker closes work through PRs, or the user asks for one, open a draft PR after the first merge in step 5 (a branch with no commits ahead of main can't open one), marked as closing the spec and tickets.\n\n4. Use a fresh **implementer subagent** for each ticket, each in its own worktree on its own branch. Each implementer subagent:\n   - confirms its worktree is based on the integration branch before starting, and resets onto it if not;\n   - calls the Skill tool with `tdd` to build the ticket;\n   - merges the integration branch tip into its own branch before reporting done\n\n5. Once an **implementer subagent** completes, merge its work to the integration branch with a **merger subagent**.\n\n6. If this changes the **frontier** of available tickets, kick off more **implementer subagents** to work on the new tickets. This allows for maximum concurrency.\n\n7. Once all tickets are complete, call the Skill tool with `code-review` on the integration branch. Fix all issues raised by the code review in a single fresh **implementer subagent**.\n\n8. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch.\n\n9. Clean up all **implementer subagent** worktrees.\n",
+      "card": {
+        "title_zh": "按规格实现工单",
+        "purpose_zh": "依据 /to-spec 与 /to-tickets 产出的规格和工单，在单一集成分支上以任务图方式并发实现全部工单，最后做代码审查并收尾。",
+        "does": [
+          "读取规格与工单，理解工单间的阻塞关系与可执行前沿",
+          "可选地派探索子代理调研代码库或外部文档，并把笔记存到仓库外目录",
+          "创建集成分支，必要时在首次合并后开草稿 PR",
+          "为每个工单派全新上下文的实现子代理，各自在独立 worktree 与分支上调用 tdd 技能实现",
+          "用合并子代理把实现结果合入集成分支，并随前沿变化继续派发新子代理",
+          "全部完成后在集成分支调用 code-review 技能，由单个新子代理修复问题，最后收尾并清理 worktree"
+        ],
+        "inputs": [
+          "已提供的规格（spec）",
+          "与规格关联的工单（tickets）",
+          "已配置的 issue tracker",
+          "用户对 PR 的需求（可选）"
+        ],
+        "outputs": [
+          "单一集成分支上的完整实现",
+          "按 issue tracker 方式关闭的各工单，或标记为可审查的 PR",
+          "代码审查后的修复提交",
+          "清理后的 worktree 状态"
+        ],
+        "scenarios": [
+          "已有规格和拆好的工单，需要批量落地为代码",
+          "工单之间存在阻塞依赖，需要按前沿并发推进",
+          "希望用 TDD 方式逐工单实现并统一合并",
+          "实现完成后需要一轮代码审查并修复"
+        ],
+        "prerequisites": [
+          "已提供规格及其关联工单",
+          "已提供 issue tracker，否则需先运行 /setup-matt-pocock-skills",
+          "环境中可使用 tdd 与 code-review 技能",
+          "支持子代理、worktree 与分支的工作环境"
+        ],
+        "limits": [
+          "原文未说明具体宿主平台",
+          "子代理之间应保持稀疏通信，主要通过上下文指针传递信息",
+          "草稿 PR 需在首次合并后才能创建",
+          "原文未给出失败处理、冲突解决或回滚策略"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "自动化",
+          "代码审查",
+          "产品规划",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "The goal is the entire spec implemented on a single **integration branch**, with every ticket resolved the way the issue tracker closes work."
+          },
+          {
+            "field": "does",
+            "quote": "Use a fresh **implementer subagent** for each ticket, each in its own worktree on its own branch."
+          },
+          {
+            "field": "does",
+            "quote": "calls the Skill tool with `tdd` to build the ticket;"
+          },
+          {
+            "field": "does",
+            "quote": "Once all tickets are complete, call the Skill tool with `code-review` on the integration branch."
+          },
+          {
+            "field": "does",
+            "quote": "Create the integration branch."
+          },
+          {
+            "field": "does",
+            "quote": "Clean up all **implementer subagent** worktrees."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The issue tracker should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`."
+          },
+          {
+            "field": "limits",
+            "quote": "Communication to and from subagents should be sparse."
+          },
+          {
+            "field": "limits",
+            "quote": "open a draft PR after the first merge in step 5 (a branch with no commits ahead of main can't open one)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/implement/SKILL.md",
+      "blob_sha": "bd49e472984c7b99aac40286fdae749bb955a842",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/implement/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "implement",
+        "description": "Implement a piece of work based on a spec or set of tickets."
+      },
+      "excerpt": "---\nname: implement\ndescription: \"Implement a piece of work based on a spec or set of tickets.\"\ndisable-model-invocation: true\n---\n\nImplement the work described by the user in the spec or tickets.\n\nIf the user passes a ticket reference, fetch it from the issue tracker and state its title before starting. If the reference is ambiguous, ask.\n\nCall the Skill tool with \"tdd\" where possible, at pre-agreed seams.\n\nRun typechecking regularly, single test files regularly, and the full test suite once at the end.\n\nOnce done, call the Skill tool with \"code-review\" to review the work.\n\nCommit your work to the current branch.\n",
+      "card": {
+        "title_zh": "按规格实现",
+        "purpose_zh": "依据用户提供的规格或工单实现一项工作，过程中按约定接缝调用 tdd、定期类型检查与测试，完成后调用 code-review 并提交到当前分支。",
+        "does": [
+          "按用户给出的规格或工单描述实现工作",
+          "用户传入工单引用时从问题跟踪器获取并先说明其标题，引用不明确则询问",
+          "在预先约定的接缝处尽可能调用 Skill 工具执行 tdd",
+          "定期运行类型检查和单个测试文件，最后运行一次完整测试套件",
+          "完成后调用 Skill 工具执行 code-review 审查工作",
+          "将工作提交到当前分支"
+        ],
+        "inputs": [
+          "用户提供的规格或工单描述",
+          "可选的工单引用"
+        ],
+        "outputs": [
+          "实现完成的代码改动",
+          "提交到当前分支的提交"
+        ],
+        "scenarios": [
+          "按规格文档实现功能",
+          "按问题跟踪器工单实现改动",
+          "需要以测试驱动方式推进的实现任务"
+        ],
+        "prerequisites": [
+          "用户需提供规格或工单",
+          "存在可访问的问题跟踪器以获取工单引用",
+          "存在 tdd 与 code-review 两个 Skill 可供调用",
+          "具备类型检查与测试运行环境",
+          "处于可提交的当前分支"
+        ],
+        "limits": [
+          "原文未说明支持的语言、框架或平台",
+          "原文未说明工单引用的具体跟踪器类型",
+          "原文未说明测试或类型检查的具体命令",
+          "原文未说明失败或冲突时的处理方式"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "后端",
+          "测试",
+          "代码审查",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Implement the work described by the user in the spec or tickets."
+          },
+          {
+            "field": "does",
+            "quote": "If the user passes a ticket reference, fetch it from the issue tracker and state its title before starting. If the reference is ambiguous, ask."
+          },
+          {
+            "field": "does",
+            "quote": "Call the Skill tool with \"tdd\" where possible, at pre-agreed seams."
+          },
+          {
+            "field": "does",
+            "quote": "Run typechecking regularly, single test files regularly, and the full test suite once at the end."
+          },
+          {
+            "field": "does",
+            "quote": "Once done, call the Skill tool with \"code-review\" to review the work."
+          },
+          {
+            "field": "does",
+            "quote": "Commit your work to the current branch."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Call the Skill tool with \"tdd\" where possible, at pre-agreed seams."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Once done, call the Skill tool with \"code-review\" to review the work."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run typechecking regularly, single test files regularly, and the full test suite once at the end."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "blob_sha": "f1eabb568464f03ae79a3346fc1918fdde6d8285",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/improve-codebase-architecture/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "improve-codebase-architecture",
+        "description": "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick."
+      },
+      "excerpt": "---\nname: improve-codebase-architecture\ndescription: Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.\ndisable-model-invocation: true\n---\n\n# Improve Codebase Architecture\n\nSurface architectural friction and propose **deepening opportunities**: refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.\n\nThis command is _informed_ by the project's domain model and built on a shared design vocabulary:\n\n- Call the Skill tool with \"codebase-design\" for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, \"the interface is the test surface\", \"one adapter = hypothetical seam, two = real\"). Use these terms exactly in every suggestion, and don't drift into \"component,\" \"service,\" \"API,\" or \"boundary.\"\n- The domain language in `GLOSSARY.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.\n\n## Process\n\n### 1. Explore\n\n**Scope before you scan: YAGNI.** Deepening a module pays off by making future changes to it easier, so put extra weight on the parts of the codebase that have recently changed. Decide *where* to look before you look:\n\n- If the user named a direction (a module, a subsystem, a pain point), take it, and skip the inference below.\n- Otherwise, walk back a good stretch of the commit history (`git log --oneline`) to find the codebase's hot spots, the files and areas that keep coming up, and let those paths pull your attention first. If the changes are scattered with no clear hot spot, widen the net.\n\nRead the project's domain glossary (`GLOSSARY.md`) and any ADRs in the area you're touching first.\n\nThen spawn a sub-agent with a fresh context window to walk the codebase. Don't follow rigid heuristics; explore organically and note where you experience friction:\n\n- Where does understanding one concept require bouncing between many small modules?\n- Where are modules **shallow**, with an interface nearly as complex as the implementation?\n- Where have pure functions been extracted just for testability, but the real bugs hide in how they're called (no **locality**)?\n- Where do tightly-coupled modules leak across their seams?\n- Which parts of the codebase are untested, or hard to test through their current interface?\n\nApply the **deletion test** to anything you suspect is shallow: would deleting it concentrate complexity, or just move it? A \"yes, concentrates\" is the signal you want.\n\n### 2. Present candidates as an HTML report\n\nWrite a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Open it for the user (`xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows) and tell them the absolute path.\n\nThe report uses **Tailwind via CDN** for layout and styling, and **Mermaid via CDN** for diagrams where a graph/flow/sequence reliably communicates the structure. Mix Mermaid with hand-crafted CSS/SVG visuals: use Mermaid when relationships are graph-shaped (call graphs, dependencies, sequences), and hand-built divs/SVG when you want something more editorial (mass diagrams, cross-sections, collapse animations). Each candidate gets a **before/after visualisation**. Be visual.\n\nFor each candidate, render a card with:\n\n- **Files**: which files/modules are involved\n- **Problem**: why the current architecture is causing friction\n- **Solution**: plain English description of what would change\n- **Benefits**: explained in terms of locality and leverage, and how tests would improve\n- **Before / After diagram**: side-by-side, custom-drawn, illustrating the shallowness and the deepening\n- **Recommendation strength**: one of `Strong`, `Worth exploring`, `Speculative`, rendered as a badge\n\nEnd the report with a **Top recommendation** section: which candidate you'd tackle first and why.\n\n**Use GLOSSARY.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** If `GLOSSARY.md` defines \"Order,\" talk about \"the Order intake module,\" not \"the FooBarHandler,\" and not \"the Order service.\"\n\n**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _\"contradicts ADR-0007, but worth reopening because…\"_). Don't list every theoretical refactor an ADR forbids.\n\nSee [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.\n\nDo NOT propose interfaces yet. After the file is written, ask the user: \"Which of these would you like to explore?\"\n\n### 3. Grilling loop\n\nOnce the user picks a candidate, call the Skill tool with \"grilling\" to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.\n\nSide effects happen inline as decisions crystallize; call the Skill tool with \"domain-modeling\" to keep the domain model current as you go:\n\n- **Naming a deepened module after a concept not in `GLOSSARY.md`?** Add the term to `GLOSSARY.md`. Create the file lazily if it doesn't exist.\n- **Sharpening a fuzzy term during the conversation?** Update `GLOSSARY.md` right there.\n- **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _\"Want me to record this as an ADR so future architecture reviews don't re-suggest it?\"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing; skip ephemeral reasons (\"not worth it right now\") and self-evident ones.\n- **Want to explore alternative interfaces for the deepened module?** Call the Skill tool with \"codebase-design\" and use its design-it-twice parallel sub-agent pattern.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/engineering/pr/SKILL.md",
+      "blob_sha": "84dd4fb2f068e9f6282690235d20dd505b418119",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/pr/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "pr",
+        "description": "Use when writing a PR body."
+      },
+      "excerpt": "---\nname: pr\ndescription: \"Use when writing a PR body.\"\nmetadata:\n  credits:\n    skill: show-me\n    author: Dex Horthy\n    organisation: Humanlayer\n    url: \"https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md\"\n---\n\nUse this template for writing the PR body:\n\n```markdown\n## Summary\n\n<diagram, diff-sketch, or tree>\n\n## Evidence\n\n- **Before:** <screenshot/output/failing test run>\n  **After:** <screenshot/output/passing test run>\n\n## Merge Danger\n\n**Door:** <one-way or two-way>\n\n<optional: description>\n\n**Blast Radius:** <one-word description>\n\n<optional: potential ramifications of merge>\n```\n\n## Sections\n\nSkip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.\n\n### Summary\n\nPick the smallest view that makes the key point clear.\n\n- Show logic or an algorithm as pseudocode:\n\n```text\non(save)\n  if content is unchanged\n    return cached result\n  write new content\n  return fresh result\n```\n\n- Show runtime control flow as a call tree:\n\n```text\nsubmitForm\n  createSession\n    persistPrompt\n    launchAgent\n  navigateToSession\n```\n\n- Show UI structure as a component tree, including state and module boundaries that matter:\n\n```text\n<SessionPage> (apps/example/src/routes/session.tsx)\n  useSessionEvents()\n  <SessionToolbar>\n    <RunSkillButton> (packages/ui)\n```\n\n- Show file responsibility or a broad refactor as a shallow file tree:\n\n```text\nsrc/\n├── commands/       # parses user actions\n├── sessions/       # owns session state\n└── transport/      # sends API requests\n```\n\n- Show component interaction, control flow, or data flow with Mermaid:\n\n```mermaid\nsequenceDiagram\n    participant User\n    participant UI\n    participant Daemon\n    User->>UI: choose command\n    UI->>Daemon: send expanded prompt\n    Daemon-->>UI: stream result\n```\n\n- Use `diff` when the point is what changes and the surrounding shape already exists. Match the diff shape to the topic.\n\nFor a component change:\n\n```diff\n <SessionPage>\n   useSessionEvents()\n   <SessionToolbar>\n+    <RunSkillButton />\n   <SessionTimeline>\n+    <SkillResultCard />\n```\n\nFor a file-layout change:\n\n```diff\n src/\n ├── commands/\n+│   └── show-me.ts       # expands the slash command\n ├── sessions/\n-└── transport.ts\n+└── transport/\n+    ├── client.ts\n+    └── stream.ts\n```\n\nFor a call-tree or call-stack change:\n\n```diff\n submitForm\n   createSession\n     persistPrompt\n+    expandSkillMention\n     launchAgent\n-  navigateToSession\n+  navigateToSession\n+    subscribeToEvents\n```\n\nFor a state or control-flow change:\n\n```diff\n on(save)\n-  write content\n+  if content is unchanged\n+    return cached result\n+  write new content\n+  invalidate cache\n```\n\n- Show the whole block when most of it is new, when omitted context would hide ownership or order, or when the user needs a copyable target shape:\n\n```ts\nfunction expandSkill(command: string): string {\n  const skillName = command.slice(1);\n  return `use the ${skillName} skill`;\n}\n```\n\n#### Guidance\n\nPlace each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to answer the user's current question or the options to resolve the current discussion point.\n\nYou may use one of these, you may use several, it is unlikely you will use all of them. Use your judgement and don't overwhelm the user.\n\n### Evidence\n\nConcrete evidence that the change works. Show a before and after.\n\nScreenshots are S-tier - when the environment is set up for it and the change is visual.\n\nExecution-based evidence is A-tier. Test results, console output. Show the exact test that now fails and passes, using pseudocode.\n\n### Merge Danger\n\nDescribe whether it's a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. A PR that is cheap to roll back is lower risk. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.\n\nThe blast radius is the potential impact or scope of the changes introduced by this PR. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.\n",
+      "card": {
+        "title_zh": "PR 正文撰写模板",
+        "purpose_zh": "在撰写 PR 正文时提供结构化模板，包含 Summary、Evidence、Merge Danger 三部分，并指导用伪代码、调用树、组件树、文件树、Mermaid 或 diff 等最小视图说明要点。",
+        "does": [
+          "提供 PR 正文的 Markdown 模板，含 Summary、Evidence、Merge Danger 三节",
+          "指导 Summary 按场景选用伪代码、调用树、组件树、文件树、Mermaid 或 diff 展示",
+          "要求 Evidence 给出改动前后的具体证据，如截图、输出或测试结果",
+          "要求 Merge Danger 说明单向门或双向门及影响范围",
+          "建议省略前言、保持文字简短并使用 GLOSSARY.md 中的领域语言"
+        ],
+        "inputs": [
+          "待撰写的 PR 改动内容",
+          "GLOSSARY.md 中的领域术语"
+        ],
+        "outputs": [
+          "结构化的 PR 正文（Markdown）"
+        ],
+        "scenarios": [
+          "为代码改动撰写 PR 描述",
+          "需要向评审者展示改动前后证据",
+          "需要评估并说明合并风险与影响范围"
+        ],
+        "prerequisites": [
+          "使用用户领域语言时需参考 GLOSSARY.md"
+        ],
+        "limits": [
+          "仅为写作模板与指导，不自动生成或校验 PR 内容",
+          "视觉形式的选择依赖撰写者判断，原文未规定强制项"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "代码审查",
+          "写作"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this template for writing the PR body:"
+          },
+          {
+            "field": "does",
+            "quote": "Pick the smallest view that makes the key point clear."
+          },
+          {
+            "field": "does",
+            "quote": "Concrete evidence that the change works. Show a before and after."
+          },
+          {
+            "field": "does",
+            "quote": "Describe whether it's a one-way or two-way door."
+          },
+          {
+            "field": "does",
+            "quote": "Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use the user's domain language from `GLOSSARY.md`."
+          },
+          {
+            "field": "limits",
+            "quote": "You may use one of these, you may use several, it is unlikely you will use all of them. Use your judgement and don't overwhelm the user."
+          },
+          {
+            "field": "scenarios",
+            "quote": "The blast radius is the potential impact or scope of the changes introduced by this PR."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/prototype/SKILL.md",
+      "blob_sha": "a0044501fe0d385b4d8575b610188ede9b236ccf",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/prototype/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "prototype",
+        "description": "Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like."
+      },
+      "excerpt": "---\nname: prototype\ndescription: Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like.\n---\n\n# Prototype\n\nA prototype is **throwaway code that answers a question**. The question decides the shape.\n\n## Pick a branch\n\nIdentify which question is being answered, using the user's prompt, the surrounding code, or by asking if the user is around:\n\n- **\"Does this logic / state model feel right?\"** → [LOGIC.md](LOGIC.md). Build a single shareable HTML file (free-play buttons plus tabbed guided walkthroughs) that pushes the state machine through cases that are hard to reason about on paper, and that a non-developer can drive.\n- **\"What should this look like?\"** → [UI.md](UI.md). Generate several radically different UI variations on a single route, switchable via a URL search param and a floating bottom bar.\n\nThe two branches produce very different artifacts, so getting this wrong wastes the whole prototype. If the question is genuinely ambiguous and the user isn't reachable, default to whichever branch better matches the surrounding code (a backend module → logic; a page or component → UI) and state the assumption at the top of the prototype.\n\n## Rules that apply to both\n\n1. **Throwaway from day one, and clearly marked as such.** Locate the prototype code close to where it will actually be used (next to the module or page it's prototyping for) so context is obvious, but name it so a casual reader can see it's a prototype, not production. For throwaway UI routes, obey whatever routing convention the project already uses; don't invent a new top-level structure.\n2. **Trivial to run.** A UI prototype starts from one command in the project's task runner: `pnpm <name>`, `python <path>`, `bun <path>`, etc. A logic demo is a single HTML file the user double-clicks. Either way, no thinking required to start it.\n3. **No persistence by default.** State lives in memory. Persistence is the thing the prototype is _checking_, not something it should depend on. If the question explicitly involves a database, hit a scratch DB or a local file with a clear \"PROTOTYPE, wipe me\" name.\n4. **Skip the polish.** No tests, no error handling beyond what makes the prototype _runnable_, no abstractions. The point is to learn something fast.\n5. **Surface the state.** After every action (logic) or on every variant switch (UI), print or render the full relevant state so the user can see what changed.\n6. **Capture it when done.** Fold any validated decision into the real code, then capture the prototype itself as a **primary source**: commit it to a throwaway branch, out of main, and leave a context pointer to that branch on the implementation issue. Capture the answer too (the verdict and the question it settled) in the issue or a commit. The main branch keeps only the validated decision.\n",
+      "card": {
+        "title_zh": "一次性原型构建",
+        "purpose_zh": "构建一次性原型来回答设计问题：验证状态模型或逻辑是否合理，或探索界面应该长什么样。",
+        "does": [
+          "判断要回答的是逻辑/状态模型问题还是界面外观问题，并选择对应分支",
+          "逻辑分支生成单个可分享的 HTML 文件，含自由操作按钮和分标签引导流程",
+          "界面分支在同一路由上生成多个差异很大的界面变体，通过 URL 参数和底部浮动栏切换",
+          "原型代码放在实际使用位置附近，并明确标注为原型",
+          "默认不做持久化，状态保存在内存中",
+          "完成后把验证结论并入真实代码，并将原型提交到一次性分支留存"
+        ],
+        "inputs": [
+          "用户的设计问题或提示",
+          "周边代码上下文",
+          "用户对分支选择的确认（若用户在线）"
+        ],
+        "outputs": [
+          "一次性原型代码（逻辑分支为单个 HTML 文件，界面分支为多界面变体）",
+          "原型运行时的完整相关状态展示",
+          "记录在 issue 或提交中的验证结论",
+          "指向一次性分支的上下文指针"
+        ],
+        "scenarios": [
+          "验证某个状态机或逻辑模型是否合理",
+          "让非开发者也能操作并体验状态流转",
+          "探索某个页面或组件应该长什么样",
+          "在写正式实现前快速试错设计方向"
+        ],
+        "prerequisites": [
+          "明确要回答的设计问题",
+          "了解项目已有的路由约定和任务运行器命令"
+        ],
+        "limits": [
+          "原型是一次性代码，不写测试、不做多余错误处理、不做抽象",
+          "默认不做持久化，状态只存在内存中",
+          "若问题涉及数据库，只能使用临时数据库或明确标注可清除的本地文件",
+          "问题含糊且无法联系用户时需自行假设并在原型顶部说明",
+          "主分支只保留已验证的决策，原型本身放到一次性分支"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "产品规划",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like."
+          },
+          {
+            "field": "does",
+            "quote": "Generate several radically different UI variations on a single route, switchable via a URL search param and a floating bottom bar."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "obey whatever routing convention the project already uses; don't invent a new top-level structure."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "A UI prototype starts from one command in the project's task runner: `pnpm <name>`, `python <path>`, `bun <path>`, etc."
+          },
+          {
+            "field": "limits",
+            "quote": "If the question explicitly involves a database, hit a scratch DB or a local file with a clear \"PROTOTYPE, wipe me\" name."
+          },
+          {
+            "field": "limits",
+            "quote": "The main branch keeps only the validated decision."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "commit it to a throwaway branch, out of main"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/engineering/research/SKILL.md",
+      "blob_sha": "ffc9eb89849cc4cf74962ce93d786ffd17c6a5dc",
+      "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/research/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "research",
+        "description": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent."
+      },
+      "excerpt": "---\nname: research\ndescription: Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.\n---\n\nSpin up a **background agent** to do the research, so you keep working while it reads. Start it with a fresh context window.\n\nIts job:\n\n1. Investigate the question against **primary sources** (official docs, source code, specs, first-party APIs), not a secondary write-up of them. Follow every claim back to the source that owns it.\n2. Write the findings to a single Markdown file, citing each claim's source.\n3. Save it where the repo already keeps such notes; match the existing convention, and if there is none, put it somewhere sensible and say where.\n",
+      "card": {
+        "title_zh": "后台调研代理",
+        "purpose_zh": "启动后台代理针对高可信一手来源调研问题，并将带引用的发现写成仓库中的 Markdown 文件。",
+        "does": [
+          "启动具有全新上下文窗口的后台代理执行调研",
+          "针对官方文档、源码、规范、一方 API 等一手来源调查问题",
+          "将每条论断追溯到拥有它的来源",
+          "把发现写入单个 Markdown 文件并标注每条论断的来源",
+          "按仓库既有笔记惯例保存文件，无惯例时选合理位置并说明"
+        ],
+        "inputs": [
+          "待调研的问题",
+          "仓库中既有笔记的存放惯例（可选）"
+        ],
+        "outputs": [
+          "带来源引用的 Markdown 调研文件"
+        ],
+        "scenarios": [
+          "用户希望调研某个主题",
+          "需要收集文档或 API 事实",
+          "把阅读工作委派给后台代理"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "要求使用一手来源而非二手转述",
+          "发现须汇总到单个 Markdown 文件",
+          "文件位置需匹配仓库既有惯例"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "调研",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo."
+          },
+          {
+            "field": "does",
+            "quote": "Spin up a **background agent** to do the research, so you keep working while it reads. Start it with a fresh context window."
+          },
+          {
+            "field": "does",
+            "quote": "Investigate the question against **primary sources** (official docs, source code, specs, first-party APIs), not a secondary write-up of them. Follow every claim back to the source that owns it."
+          },
+          {
+            "field": "does",
+            "quote": "Write the findings to a single Markdown file, citing each claim's source."
+          },
+          {
+            "field": "does",
+            "quote": "Save it where the repo already keeps such notes; match the existing convention, and if there is none, put it somewhere sensible and say where."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Write the findings to a single Markdown file, citing each claim's source."
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,876 @@
+{
+  "schema": 1,
+  "repo": "microsoft/vscode",
+  "tree_sha": "beeb69e3c00ffed98c71829e0c1075c089a4b0b1",
+  "truncated_paths": 71,
+  "skills": [
+    {
+      "skill_path": ".agents/skills/launch/SKILL.md",
+      "blob_sha": "126c35bdf234433295d890939584f90e755ce901",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.agents/skills/launch/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "launch",
+        "description": "Launch Code OSS (VS Code from sources) into an isolated throwaway profile with unique debug ports so you can drive it with @playwright/cli AND attach a Node debugger via dap-cli in the same session. Use when working on VS Code itself and you want to interact with the running workbench, automate chat or UI flows, test UI features, take screenshots, set breakpoints in the renderer / extension host / main process, or combine UI driving with debugging."
+      },
+      "excerpt": "---\nname: launch\ndescription: \"Launch Code OSS (VS Code from sources) into an isolated throwaway profile with unique debug ports so you can drive it with @playwright/cli AND attach a Node debugger via dap-cli in the same session. Use when working on VS Code itself and you want to interact with the running workbench, automate chat or UI flows, test UI features, take screenshots, set breakpoints in the renderer / extension host / main process, or combine UI driving with debugging.\"\n---\n\n# Code OSS Dev - Launch + Debug\n\nYou're working on VS Code itself and you want to:\n\n1. Launch a Code OSS build from sources that is **already signed in** (Copilot, GitHub, etc.) so chat / agent flows work end-to-end.\n2. Drive it with `@playwright/cli` over CDP (UI automation).\n3. Optionally attach a debugger via **dap-cli** to set breakpoints in the renderer, extension host, or main process.\n4. Run multiple instances at once without port conflicts.\n\nThis skill provides a launcher that clones an authenticated user-data-dir to a throwaway temp folder, picks free ports for every debug surface, and prints them as JSON so you can pick them up programmatically.\n\nThe clone is **slim**: workspace storage, browser caches, file history, cached VSIX backups, and old logs are excluded by default. On macOS, auth tokens live in the OS keychain plus small files inside `User/globalStorage` - both of which *are* preserved. On Windows the GitHub session lives in the **shared-data-dir** instead, which the launcher seeds separately (see [Windows authentication](#windows-authentication)).\n\n## Prerequisites\n\n- macOS, Linux, or Windows.\n  - **macOS / Linux**: the launcher is a bash script (`scripts/launch.sh`) and depends on `rsync`, `nohup`, and Node on `PATH`.\n  - **Windows**: use `scripts\\launch.ps1` instead. It needs no extra tooling beyond Node on `PATH`, and works on both Windows PowerShell 5.1 and PowerShell 7+. Parse launcher output with `ConvertFrom-Json`. If Node is managed with [fnm](https://github.com/Schniz/fnm), put it on `PATH` first:\n    ```powershell\n    fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression\n    fnm use   # picks up the repo's .nvmrc\n    ```\n- A VS Code checkout with `node_modules/` installed (`pnpm install` if missing — do **not** symlink from a sibling worktree; that breaks builds in subtle ways).\n- A VS Code checkout with sources built. Run `pnpm run compile` once (one-shot) or `pnpm run watch` for incremental rebuilds. Both build the full client **and** all built-in extensions under `extensions/`. You must build the full product to run successfully, building just the client is not enough.\n  - The launcher compiles only when outputs are missing; it does **not** detect stale dependencies or `out/` files. After pulling, switching branches, or changing dependency manifests, run `pnpm install` when needed and rebuild before launching.\n- An authenticated Code OSS profile is recommended but not required. By default the launcher tries to seed from `~/.vscode-oss-dev` on macOS/Linux or `$env:USERPROFILE\\.vscode-oss-dev` on Windows, which is the user-data-dir the repo's `launch.json` configs use. Only pass `--source-user-data-dir <path>` (or set `$CODE_OSS_DEV_AUTHED_USER_DATA_DIR`) when you specifically want to seed from a different profile (e.g. your regular `~/Library/Application Support/Code` install). If the source profile is missing, the launcher continues with an empty isolated profile.\n- `@playwright/cli` available (it's a devDependency in the vscode repo - `pnpm install` then use `npx @playwright/cli`).\n- For debugger work: `dap-cli` on `PATH`. If debugger support would be useful but the `dap-cli` skill is not present, prompt the user to install it from https://github.com/roblourens/dap-cli.\n- CSS selectors are internal implementation details. If a selector-based `eval` stops working, take a fresh `snapshot`, inspect the current DOM, and update the selector rather than assuming an old one still applies.\n- Code OSS cannot be launched or driven from a sandboxed agent terminal. On Windows the sandbox either cannot start without local network access or the launcher fails with `[launch.ps1] Access is denied`; enabling local network access alone is not enough. If your shell tool can request unsandboxed execution, use that for the launcher, `@playwright/cli`, and cleanup. Otherwise, before launching, ask the user once to turn off terminal sandboxing for this session (Permissions picker → \"Sandboxing for terminal\") and continue after they confirm.\n\n> The launcher **copies** the source profile to a temp dir and never mutates the original. Each launch gets its own isolated `--user-data-dir` and `--extensions-dir`.\n\n> The launcher always sets `files.simpleDialog.enable: true` in the launched profile's `User/settings.json`. This is required for automation: VS Code's native OS file dialogs cannot be driven via `@playwright/cli` over CDP and are completely unreachable over SSH on headless macOS. The simple (quick-input) dialog can be navigated with `press` and clipboard paste. The override is per-launch and only affects throwaway profiles.\n\n> Before launching from an agent session, call `get_current_session` and pass its `title` as `--session-title`. For a regular editor window, the launcher writes that title into the throwaway profile's `window.title` setting. For an Agents window, it passes the title to the Command Center. This never modifies the source profile.\n\n> For unattended automation, pass `--disable-workspace-trust` so a trust dialog cannot block the flow or extension-host startup. The override is process-scoped and does not modify the source profile. Only use it with content you trust.\n\n## Launch\n\nThe launcher script lives next to this SKILL.md at `scripts/launch.sh` (macOS/Linux) or `scripts\\launch.ps1` (Windows). Resolve it relative to wherever this skill file is installed - do not hardcode an absolute path.\n\n```bash\n# LAUNCH=<dir-of-this-SKILL.md>/scripts/launch.sh\nSESSION_TITLE=<title-from-get_current_session>\n\"$LAUNCH\" --session-title \"$SESSION_TITLE\"   # default: workbench\n\"$LAUNCH\" --agents --session-title \"$SESSION_TITLE\"\n\"$LAUNCH\" -- <workspace-path>                # forward extra args to code.sh\n\"$LAUNCH\" --source-user-data-dir <path>      # pick a specific authed profile\n\"$LAUNCH\" --repo <vscode-repo-root>          # if not run from the repo\n\"$LAUNCH\" --clone-extensions                 # start with a copy of the source extensions/ (~few seconds)\n\"$LAUNCH\" --full                             # skip slim excludes; copy everything\n\"$LAUNCH\" --skip-prelaunch                   # reuse already-current build outputs\n\"$LAUNCH\" --disable-workspace-trust          # avoid trust prompts for trusted automation inputs\n```\n\nOn Windows, invoke the PowerShell launcher with the same flags:\n\n```powershell\n$skillDir = '<dir-of-this-SKILL.md>'\n$launch = Join-Path $skillDir 'scripts\\launch.ps1'\n$sessionTitle = '<title-from-get_current_session>'\n& $launch --session-title $sessionTitle         # default: workbench\n& $launch --agents --session-title $sessionTitle\n& $launch -- --use-mock-keychain               # forward extra args to code.bat\n& $launch --source-user-data-dir C:\\path\\to\\profile\n& $launch --repo C:\\path\\to\\vscode\n& $launch --clone-extensions\n& $launch --full\n& $launch --skip-prelaunch\n& $launch --disable-workspace-trust\n```\n\nIf the local execution policy blocks scripts, invoke it with `powershell -ExecutionPolicy Bypass -File <path-to-launch.ps1>`. The Windows implementation has the same profile isolation, slim-copy excludes, settings merge, port allocation, foreground pre-launch, and CDP-ready contract as the bash launcher; only the shell commands and path syntax differ.\n\n### Handle a missing sign-in\n\nIf the source profile is missing or has no stored GitHub session, **do not stop and do not ask before launching**. Continue until the isolated Code OSS window reaches the normal GitHub/Copilot sign-in UI. Don't give up when Code OSS needs a si",
+      "card": {
+        "title_zh": "Code OSS 启动调试",
+        "purpose_zh": "启动源码构建的 Code OSS 到隔离临时配置目录，分配独立调试端口，供 Playwright 驱动界面并通过 dap-cli 附加调试器。",
+        "does": [
+          "将已认证的用户数据目录克隆到临时目录，生成隔离的 user-data-dir 与 extensions-dir",
+          "为各调试接口分配空闲端口并以 JSON 输出，便于程序读取",
+          "启动 Code OSS 工作台或 Agents 窗口，支持传入工作区路径等额外参数",
+          "默认精简复制配置，保留认证相关存储，排除缓存、历史与旧日志",
+          "在 Windows 上额外复制 shared-data-dir 以保留 GitHub 会话",
+          "提供 bootstrap 脚本引导用户登录以预认证后续启动"
+        ],
+        "inputs": [
+          "--session-title 会话标题",
+          "--source-user-data-dir 指定源配置目录",
+          "--repo 指定 VS Code 仓库根目录",
+          "--agents 启动 Agents 窗口",
+          "--clone-extensions 复制源扩展目录",
+          "--full 跳过精简排除",
+          "--skip-prelaunch 复用现有构建输出",
+          "--disable-workspace-trust 禁用工作区信任提示"
+        ],
+        "outputs": [
+          "包含各调试端口的 JSON 输出",
+          "隔离的临时用户数据目录与扩展目录",
+          "启动日志路径（bootstrap 场景）",
+          "exitMarker（bootstrap 输出）"
+        ],
+        "scenarios": [
+          "开发 VS Code 本身时与运行中的工作台交互",
+          "自动化聊天或 UI 流程、测试 UI 功能、截图",
+          "在渲染进程、扩展宿主或主进程设置断点",
+          "同时运行多个实例而不产生端口冲突",
+          "将界面驱动与调试结合使用"
+        ],
+        "prerequisites": [
+          "macOS、Linux 或 Windows 环境",
+          "macOS/Linux 需 rsync、nohup 及 PATH 中的 Node；Windows 需 PATH 中的 Node",
+          "已安装 node_modules 的 VS Code 检出",
+          "已构建源码，需构建完整产品含内置扩展",
+          "@playwright/cli 可用",
+          "调试需 PATH 中有 dap-cli",
+          "终端不能处于沙箱环境"
+        ],
+        "limits": [
+          "启动器不检测过期依赖或 out 文件，切换分支后需重新安装与构建",
+          "CSS 选择器属内部实现细节，失效时需重新快照并更新",
+          "沙箱化终端无法启动或驱动 Code OSS",
+          "bootstrap 需用户明确选择，且使用持久配置与共享认证存储",
+          "Windows 上 GitHub 会话存于 shared-data-dir，与配置目录分离"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "前端",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Launch Code OSS (VS Code from sources) into an isolated throwaway profile with unique debug ports so you can drive it with @playwright/cli AND attach a Node debugger via dap-cli in the same session."
+          },
+          {
+            "field": "does",
+            "quote": "The clone is **slim**: workspace storage, browser caches, file history, cached VSIX backups, and old logs are excluded by default."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**macOS / Linux**: the launcher is a bash script (`scripts/launch.sh`) and depends on `rsync`, `nohup`, and Node on `PATH`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "A VS Code checkout with sources built. Run `pnpm run compile` once (one-shot) or `pnpm run watch` for incremental rebuilds."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "For debugger work: `dap-cli` on `PATH`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Code OSS cannot be launched or driven from a sandboxed agent terminal."
+          },
+          {
+            "field": "limits",
+            "quote": "The launcher compiles only when outputs are missing; it does **not** detect stale dependencies or `out/` files."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "The launcher **copies** the source profile to a temp dir and never mutates the original. Each launch gets its own isolated `--user-data-dir` and `--extensions-dir`."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "\"$LAUNCH\" --session-title \"$SESSION_TITLE\"   # default: workbench"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/accessibility/SKILL.md",
+      "blob_sha": "c7f49d531c2025ff9343947156c8d24ec2241459",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/accessibility/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "accessibility",
+        "description": "Primary accessibility skill for VS Code. REQUIRED for new feature and contribution work, and also applies to updates of existing UI. Covers accessibility help dialogs, accessible views, verbosity settings, signals, ARIA announcements, keyboard navigation, and ARIA labels/roles."
+      },
+      "excerpt": "---\nname: accessibility\ndescription: Primary accessibility skill for VS Code. REQUIRED for new feature and contribution work, and also applies to updates of existing UI. Covers accessibility help dialogs, accessible views, verbosity settings, signals, ARIA announcements, keyboard navigation, and ARIA labels/roles.\n---\n\n## When to Use This Skill\n\nUse this skill for any VS Code feature work that introduces or changes interactive UI. Use this skill by default for new features and contributions, including when the request does not explicitly mention accessibility.\n\nTrigger examples:\n- \"add a new feature\"\n- \"implement a new panel/view/widget\"\n- \"add a new command or workflow\"\n- \"new contribution in workbench/editor/extensions\"\n- \"update existing UI interactions\"\n\nDo not skip this skill just because accessibility is not named in the prompt.\n\nWhen adding a **new interactive UI surface** to VS Code — a panel, view, widget, editor overlay, dialog, or any rich focusable component the user interacts with — you **must** provide three accessibility components (if they do not already exist for the feature):\n\n1. **An Accessibility Help Dialog** — opened via the accessibility help keybinding when the feature has focus.\n2. **An Accessible View** — a plain-text read-only editor that presents the feature's content to screen reader users (when the feature displays non-trivial visual content).\n3. **An Accessibility Verbosity Setting** — a boolean setting that controls whether the \"open accessibility help\" hint is announced.\n\nExamples of existing features that have all three: the **terminal**, **chat panel**, **notebook**, **diff editor**, **inline completions**, **comments**, **debug REPL**, **hover**, and **notifications**. Features with only a help dialog (no accessible view) include **find widgets**, **source control input**, **keybindings editor**, **problems panel**, and **walkthroughs**.\n\nSections 4–7 below (signals, ARIA announcements, keyboard navigation, ARIA labels) apply more broadly to **any UI change**, including modifications to existing features.\n\nWhen **updating an existing feature** — for example, adding new commands, keyboard shortcuts, or interactive capabilities — you must also update the feature's existing accessibility help dialog (`provideContent()`) to document the new functionality. Screen reader users rely on the help dialog as the primary way to discover available actions.\n\n---\n\n## 1. Accessibility Help Dialog\n\nAn accessibility help dialog tells the user what the feature does, which keyboard shortcuts are available, and how to interact with it via a screen reader.\n\n### Steps\n\n1. **Create a class implementing `IAccessibleViewImplementation`** with `type = AccessibleViewType.Help`.\n   - Set a `priority` (higher = shown first when multiple providers match).\n   - Set `when` to a `ContextKeyExpression` that matches when the feature is focused.\n   - `getProvider(accessor)` returns an `AccessibleContentProvider`.\n\n2. **Create a content-provider class** implementing `IAccessibleViewContentProvider`.\n   - `id` — add a new entry in the `AccessibleViewProviderId` enum in `src/vs/platform/accessibility/browser/accessibleView.ts`.\n   - `verbositySettingKey` — reference the new `AccessibilityVerbositySettingId` entry (see §3).\n   - `options` — `{ type: AccessibleViewType.Help }`.\n   - `provideContent()` — return localized, multi-line help text.\n\n3. **Implement `onClose()`** to restore focus to whatever element was focused before the help dialog opened. This ensures keyboard users and screen reader users return to their previous context.\n\n4. **Register** the implementation:\n   ```ts\n   AccessibleViewRegistry.register(new MyFeatureAccessibilityHelp());\n   ```\n   in the feature's `*.contribution.ts` file.\n\n### Example skeleton\n\nThe simplest approach is to return an `AccessibleContentProvider` directly from `getProvider()`. This is the most common pattern in the codebase (used by chat, inline chat, quick chat, etc.):\n\n```ts\nimport { AccessibleViewType, AccessibleContentProvider, AccessibleViewProviderId } from '../../../../platform/accessibility/browser/accessibleView.js';\nimport { IAccessibleViewImplementation } from '../../../../platform/accessibility/browser/accessibleViewRegistry.js';\nimport { AccessibilityVerbositySettingId } from '../../../../platform/accessibility/common/accessibilityConfiguration.js';\n\nexport class MyFeatureAccessibilityHelp implements IAccessibleViewImplementation {\n\treadonly priority = 100;\n\treadonly name = 'my-feature';\n\treadonly type = AccessibleViewType.Help;\n\treadonly when = MyFeatureContextKeys.isFocused;\n\n\tgetProvider(accessor: ServicesAccessor) {\n\t\tconst helpText = [\n\t\t\tlocalize('myFeature.help.overview', \"You are in My Feature. …\"),\n\t\t\tlocalize('myFeature.help.key1', \"- {0}: Do something\", '<keybinding:myFeature.doSomething>'),\n\t\t].join('\\n');\n\t\treturn new AccessibleContentProvider(\n\t\t\tAccessibleViewProviderId.MyFeature,\n\t\t\t{ type: AccessibleViewType.Help },\n\t\t\t() => helpText,\n\t\t\t() => { /* onClose — refocus whatever was focused before */ },\n\t\t\tAccessibilityVerbositySettingId.MyFeature,\n\t\t);\n\t}\n}\n```\n\nAlternatively, if the provider needs injected services or must track state (e.g., storing a reference to the previously focused element), create a custom class that extends `Disposable` and implements `IAccessibleViewContentProvider`, then instantiate it via `IInstantiationService` (see `CommentsAccessibilityHelpProvider` for an example):\n\n```ts\nclass MyFeatureAccessibilityHelpProvider extends Disposable implements IAccessibleViewContentProvider {\n\treadonly id = AccessibleViewProviderId.MyFeature;\n\treadonly verbositySettingKey = AccessibilityVerbositySettingId.MyFeature;\n\treadonly options: IAccessibleViewOptions = { type: AccessibleViewType.Help };\n\n\tprovideContent(): string { /* … */ }\n\tonClose(): void { /* … */ }\n}\n\n// In getProvider():\ngetProvider(accessor: ServicesAccessor) {\n\treturn accessor.get(IInstantiationService).createInstance(MyFeatureAccessibilityHelpProvider);\n}\n```\n\n---\n\n## 2. Accessible View\n\nAn accessible view presents the feature's visual content as plain text in a read-only editor. It is required when the feature renders rich or visual content that a screen reader cannot directly read (for example: chat responses, hover tooltips, notifications, terminal output, inline completions).\n\nIf the feature is purely keyboard-driven with native text input/output (e.g., a simple input field), an accessible view is not needed — only an accessibility help dialog is required.\n\n### Steps\n\n1. **Create a class implementing `IAccessibleViewImplementation`** with `type = AccessibleViewType.View`.\n2. **Create a content-provider** similar to the help dialog, but:\n   - `options` — `{ type: AccessibleViewType.View }`, optionally with a `language` for syntax highlighting.\n   - `provideContent()` — return the feature's current content as plain text.\n   - Optionally implement `provideNextContent()` / `providePreviousContent()` for item-by-item navigation.\n   - Implement `onClose()` to restore focus to whatever was focused before the accessible view was opened.\n   - Optionally provide `actions` for actions the user can take from the accessible view.\n3. **Register** alongside the help dialog:\n   ```ts\n   AccessibleViewRegistry.register(new MyFeatureAccessibleView());\n   ```\n\n### Example skeleton\n\n```ts\nexport class MyFeatureAccessibleView implements IAccessibleViewImplementation {\n\treadonly priority = 100;\n\treadonly name = 'my-feature';\n\treadonly type = AccessibleViewType.View;\n\treadonly when = MyFeatureContextKeys.isFocused;\n\n\tgetProvider(accessor: ServicesAccessor) {\n\t\t// Retrieve services, build content from the feature's current state\n\t\tconst content = getMyFeatureContent();\n\t\tif (!content) {\n\t\t\treturn undefined;\n\t\t}\n\t\treturn new AccessibleContentProvider(\n\t\t\tAccessibleViewProviderId.MyFeature,\n\t\t\t{ type: AccessibleViewType.View },\n\t\t\t() => content,\n\t\t\t() => { /* onClose — refocus whatever was focused before the accessible view opene",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agent-host-chat-contributions/SKILL.md",
+      "blob_sha": "d16eecad129f78d79c0d9cd76a45cb3d5c077297",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/agent-host-chat-contributions/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agent-host-chat-contributions",
+        "description": "Build and review cross-cutting agent-host chat behavior through lifecycle contributions. Use when adding turn lifecycle side effects, prompt or context injection, restored-history transformation, protocol-action observation, or when reviewing changes that add code to AgentSideEffects or AgentService."
+      },
+      "excerpt": "---\nname: agent-host-chat-contributions\ndescription: Build and review cross-cutting agent-host chat behavior through lifecycle contributions. Use when adding turn lifecycle side effects, prompt or context injection, restored-history transformation, protocol-action observation, or when reviewing changes that add code to AgentSideEffects or AgentService.\n---\n\n# Agent Host Chat Contributions\n\nUse the contribution model for a self-contained behavior that crosses an agent-host chat lifecycle boundary. Read these files before changing the model:\n\n- `src/vs/platform/agentHost/common/agentHostChatContributionsService.ts`\n- `src/vs/platform/agentHost/node/agentHostChatContributionsService.ts`\n- `src/vs/platform/agentHost/node/chatContributions/TODO.md`\n- `src/vs/platform/agentHost/node/chatContributions/builtInChatContributions.ts`\n\n## The rule that prevents the old failure mode\n\n> **New cross-cutting features go in contributions, not in `AgentSideEffects` or `AgentService`.**\n\n`AgentSideEffects` has shed well over 700 lines by extracting seventeen behaviors. Do not put another lifecycle side effect, outgoing-prompt addition, restored-turn enrichment, admission check, or action observer back into either large orchestration class. `AgentSideEffects` dispatches the lifecycle and retains routing and send mechanics; `AgentService` owns session lifecycle and invokes hydration and memento eviction. See `agentSideEffects.ts` and `agentService.ts`.\n\nThis is also a review rule: code added to either file needs a specific reason that it is routing, a correctness invariant, provider-shaped behavior, or a dispatcher call site. \"It was convenient to add here\" is not a reason.\n\n## Decide before you code\n\nWrite a contribution when the behavior answers yes to this test:\n\n1. Does it react to a lifecycle moment the hooks already name — a turn request asking to proceed, a completed turn, a dispatched action, a turn about to be sent, a restored turn list, or a chat being restored?\n2. Can an explicitly registered, dependency-injected unit own it without changing protocol routing or provider mapping?\n3. Does it compose with other behavior in a defined order?\n\nExamples are admission gating, local-command interception, checkpoint and changeset work, queue draining, GitHub-reference attachment, title handling, persisted usage, session input-needed aggregation, session flag persistence, chat drafts, a chat's own config, worktree announcements, unread state, rich-link guidance, and chat-surface guidance. Their directories under `node/chatContributions/` are the reference implementations.\n\nDo **not** use a contribution for the following:\n\n- Subagent signal routing and buffering in `node/agentSideEffects.ts` are routing fabric and correctness invariants.\n- Turn-id remapping in `node/agentSideEffects.ts` is also routing fabric.\n- The three SDK event mappers and three attachment serializers are provider-shaped.\n- Provider-shaped overlays applied during restore, such as seeding a draft's model from `IAgent`-supplied session metadata in `_doRestoreSession`. Moving one would push provider metadata into `IHydrationContext` for one consumer.\n\nIf the answer is \"this must route every signal correctly before state changes\" or \"this differs by SDK,\" it is not a contribution. Open work and standing caveats are tracked in `node/chatContributions/TODO.md`.\n\n## Keep the hook surface small\n\n`IAgentHostChatContribution` has seven hooks in `common/agentHostChatContributionsService.ts`. Only add another method when no existing payload can express the behavior.\n\nThe set was once reduced from six to four:\n\n- `onTurnConsumable` became `onTurnEnd` with `TurnEndReason.kind === 'localCommand'`.\n- `onUserMessage` became `onOutgoingTurn`.\n\nPrefer adding a discriminant or payload to an existing type, such as a new `TurnEndReason` variant, over adding a hook. A proposed single-purpose hook with one caller and one implementer is the smell that produced both removals. Do not create an abstraction merely to move one direct call.\n\nThe three hooks added since clear a specific bar: **no existing payload could express them because they fire at a different moment or from a different source, not merely with different data.**\n\n- `onHydrateChat` restores host-owned chat state *before* a chat enters the catalog. `onHydrateTurns` runs lazily, after a provider returns turns, so reusing it would leave a restored peer chat untitled until it was opened.\n- `onIncomingRequest` gates a turn before it reaches a provider, and can reject it. No observer hook can refuse.\n- `onDidDispatchAction` observes server-dispatched and rejected actions, which `onDidApplyClientAction` structurally cannot see.\n\nAdding a `{ kind: ... }` discriminant to an existing hook was considered and rejected for `onHydrateChat`: the discriminant guidance covers payload variants *within* one moment, the way `TurnEndReason` discriminates outcomes of a single turn ending.\n\n## Anatomy and registration\n\nGive every contribution its own directory under `node/chatContributions/<feature>/`. It owns its implementation, helpers, and tests as it grows. A contribution must have:\n\n- `static readonly id`, unique across registrations.\n- An explicit `order`, even when it currently appears independent.\n- A constructor whose first parameter is `IAgentHostChatContributionContext`, followed by injected services.\n- A single registration in `node/chatContributions/builtInChatContributions.ts`.\n\nThis is the complete shape of the existing Markdown plan rich-link contribution, adapted from `markdownPlanRichLinks/markdownPlanRichLinksContribution.ts`:\n\n```ts\nexport class MarkdownPlanRichLinksContribution extends Disposable implements IAgentHostChatContribution {\n\tstatic readonly id = 'markdownPlanRichLinks';\n\treadonly order = 100;\n\n\tconstructor(\n\t\tprotected readonly _context: IAgentHostChatContributionContext,\n\t\t@IAgentConfigurationService private readonly _agentConfigService: IAgentConfigurationService,\n\t) {\n\t\tsuper();\n\t}\n\n\tonOutgoingTurn(turn: IOutgoingTurn): ISendContribution | undefined {\n\t\treturn this._agentConfigService.getRootValue(platformRootSchema, AgentHostMarkdownPlanRichLinksEnabledConfigKey)\n\t\t\t? { instructions: [createMarkdownPlanRichLinksInstruction(turn.chat)] }\n\t\t\t: undefined;\n\t}\n}\n```\n\nAdd its constructor to the one built-in list with `contributions.registerContribution(MarkdownPlanRichLinksContribution)`. That list is activated by `activateAgentHostContributions` in `node/agentHostContributions.ts`; do not add a competing registration site. The dispatcher constructs each contribution through `IInstantiationService`, rejects duplicate ids, and disposes it on unregistration.\n\n## The seven hooks\n\n| Hook | Fires when | Must not assume | Existing example |\n|---|---|---|---|\n| `onIncomingRequest` | A turn request asks to proceed to a provider, before any side effect. **Synchronous, and fails closed.** | It decides admission, so a throw rejects rather than being skipped. Return `accept`, `handled`, or `reject`; the first non-accept wins and later contributions are not consulted. | `localCommand` 50, `turnAdmission` 100 |\n| `onTurnEnd` | Any terminal outcome a started turn can reach, plus a request refused before its turn started. | Discriminate `rejected` from `error`: the former has no started turn to finalize and no checkpoint to capture. Do not throw. It does not fire for an agent-emitted terminal action arriving with no active turn, because the reducer no-ops for those. | `checkpointAndChangeset`, `queueDrain`, `githubReferences`, `sessionTitle`, `markUnread` |\n| `onDidApplyClientAction` | A client-dispatched action was applied to host state. | It never sees server-dispatched or rejected actions. Anything it sees definitely reduced. | `queueDrain` tracks queued senders; `sessionTitle` persists user title changes. |\n| `onDidDispatchAction` | Any action was dispatched and its outcome is known, from any origin. | It also delivers **rejected** actions that never reduced — check",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agent-host-e2e-tests/SKILL.md",
+      "blob_sha": "27c8d7a844bb75ff24bc9014fb82f4f63c6fc3aa",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/agent-host-e2e-tests/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agent-host-e2e-tests",
+        "description": "Use when writing, recording, updating, validating, or troubleshooting Agent Host end-to-end and real-provider integration tests under src/vs/platform/agentHost/test/node/e2e and providerIntegration. Covers adding a cross-provider test, re-recording fixtures after an SDK bump, required cross-platform Azure validation, gating non-deterministic or platform-specific tests, and diagnosing replay cache misses."
+      },
+      "excerpt": "---\nname: agent-host-e2e-tests\ndescription: Use when writing, recording, updating, validating, or troubleshooting Agent Host end-to-end and real-provider integration tests under src/vs/platform/agentHost/test/node/e2e and providerIntegration. Covers adding a cross-provider test, re-recording fixtures after an SDK bump, required cross-platform Azure validation, gating non-deterministic or platform-specific tests, and diagnosing replay cache misses.\n---\n\n# Agent host end-to-end tests\n\nThese tests run the whole agent host end-to-end (real server, real bundled provider SDK/CLI, real AHP protocol) while replaying recorded model traffic from committed YAML fixtures — deterministic and tokenless.\n\n**Before doing anything, read the architecture + troubleshooting reference:** `src/vs/platform/agentHost/test/node/e2e/README.md`\n\nIt documents the mental model, the fixture format, every config flag, and a symptom→cause→fix troubleshooting table. This skill is only the *workflows*; the README is the source of truth for *how it works*.\n\nWhen validating an upstream provider/runtime fix, use [ci-artifact-testing](../ci-artifact-testing/SKILL.md) to check for a compatible CI artifact before building locally. Run the same strict replay against the bundled baseline and candidate; preserve the test assertions and existing cross-platform validation requirements.\n\n## Core invariants\n\n1. **Replay is default and strict.** No env var serves committed fixtures without a token or network. An unrecorded request is a hard cache miss.\n2. **Fixture names derive from test titles.** Renaming a model-backed test orphans `${provider}-${slug}.yaml`; re-record after a rename. Tests registered with `conformanceTest(...)` or `providerHostOnlyTest(...)` share `captures/empty.yaml`.\n3. **Recording is intentional and credentialed.** `AGENT_HOST_REPLAY_RECORD=1` talks to real CAPI and needs `GITHUB_TOKEN` or `gh auth token`. Keep prompts trivial and read-only in temporary directories.\n4. **Fixtures are generated, never hand-edited.** Fix normalization or redaction and re-record if a capture contains unstable or sensitive data.\n5. **Disabled variants stay accountable.** Record every gate in `e2e/KNOWN_ISSUES.md` with its scope, expected and observed behavior, and focused reproduction command.\n6. **Azure validation is required.** Every new Agent Host E2E or real-provider integration test must pass a focused build from VS Code pipeline definition `111` before merge.\n\n## Basic workflow: write and evaluate an E2E test\n\n1. **Choose the boundary and tier.** Put provider-invariant AHP behavior in conformance, provider behavior in parity, and use `providerHostOnlyTest(...)` only when provider-specific behavior must not cross the model boundary.\n2. **Add the test to the closest suite.** Create and register a focused suite module only when the behavior is distinct. Keep provider-specific assertions in the provider's `*.integrationTest.ts`.\n3. **Implement the smallest deterministic scenario.** Keep prompts minimal, drive behavior over AHP, wait for the exact prerequisite and completion states, and drain every model-backed turn.\n4. **Assert the contract's primary observable result.** Check the real protocol result or external side effect; snapshot additional traffic only when ordering, routing, or lifecycle is part of the contract.\n5. **Record every enabled provider fixture.** Host-only tests use the shared strict empty fixture. Follow the recording workflow below for model-backed tests.\n6. **Review generated artifacts.** Check fixture and snapshot diffs for the intended behavior, normalized paths, no credentials or usernames, and no unintended model or request changes.\n7. **Evaluate locally.** Run the focused test in strict replay, run adjacent tests when helpers or shared state changed, repeat timing- or lifecycle-sensitive scenarios, then run the full deterministic suite and required coverage, type-check, hygiene, and layer checks from the E2E README.\n8. **Evaluate in CI.** Open or update a draft PR and complete the cross-platform Azure validation below. Timing, process-lifecycle, filesystem-watching, reconnect, restart, and worktree tests require two clean executions on every supported platform.\n\n## General best practices and mistakes to avoid\n\nKeep this section curated. Add or refine a principle only when root-cause analysis reveals a pattern likely to improve other tests; keep failure-specific commands, logs, and mechanics in the E2E README or investigation report.\n\n- **Wait for the contract state, not a proxy.** Existence, discovery, or an emitted intermediate action may not mean a dependency is operational. For example, wait for the target chat's MCP server to report `Ready`, not merely for its plugin child to appear.\n- **Assert primary outcomes before secondary effects.** A hook, notification, assistant response, or persisted record can be downstream of the behavior under test. First prove the actual tool result or external side effect succeeded.\n- **Do not confuse replay success with execution success.** Replay controls model traffic; live tools, MCP servers, hooks, commands, and filesystem operations can still fail. Recorded assistant text is not an oracle for those operations.\n- **Synchronize on observable state, never elapsed time.** Use protocol notifications or exact state polling instead of sleeps, timeout increases, or existence-only checks.\n- **Respect scope and lifecycle.** Readiness can belong to a specific chat, session, provider process, or workspace. Exercise reconfiguration before the first turn as well as after established history: a running provider process does not prove a resumable conversation exists. Materialize and observe the same scope the operation will use, drain work before teardown, and clean up owned resources. Keep temporary workspaces outside instruction-bearing ancestors: changing their location can inject unrelated repository customizations into a provider's model request.\n- **Separate storage semantics from device latency.** RAM-backed files can retain real SQLite transactions, close/reopen, and host-restart behavior; keep required disk-backed lifecycle coverage separately. Compare unchanged workloads on the same worker and inspect phase timings, not just pass counts, before attributing a timeout to physical storage.\n- **Centralize recurring lifecycle barriers.** If several tests need the same multi-step prerequisite, encode it in a shared helper so tests cannot choose a weaker intermediate condition.\n- **Gate genuine nondeterminism narrowly.** Use record-only or provider/platform gates only for behavior that cannot replay deterministically or is unsupported; never use a gate to hide an unexplained failure.\n\n## Record or re-record fixtures\n\nRe-record when you add a test, or when a bundled SDK/CLI bump changes its wire behavior (new endpoint, different turn count, changed tool schema).\n\n1. Ensure a token is available: `gh auth token` (or export `GITHUB_TOKEN`).\n2. Record per provider:\n   ```bash\n   AGENT_HOST_REPLAY_RECORD=1 ./scripts/test-integration.sh --run \\\n     src/vs/platform/agentHost/test/node/e2e/providers/claudeAgentHostE2E.integrationTest.ts\n   ```\n   Repeat for `copilotAgentHostE2E` / `codexAgentHostE2E` as needed.\n3. **Review `git diff` on the fixtures**: no local usernames/absolute paths, no tokens, no unreleased model ids. If something leaked, the fix is to extend normalization/redaction in `capiReplayProxy.ts` (`_normalize` + the `*_RE` redactors) and re-record — not to edit the fixture.\n4. Run plain replay (no env var) to confirm green, then commit.\n\nIf an SDK now hits a new **ancillary/bootstrap** endpoint (a probe, not a real model turn), add it to `capiStubs.ts` (served, not recorded) instead of recording it — see how `/models/session` is handled.\n\n## Gate a variant that cannot replay deterministically\n\nReal-time streaming, mid-turn aborts, and POSIX-specific local execution (shell tools, `pwd`, git worktrees) don't replay reliably. Gate the",
+      "card": {
+        "title_zh": "Agent Host 端到端测试",
+        "purpose_zh": "指导编写、录制、更新、验证和排查 Agent Host 端到端及真实 provider 集成测试，覆盖跨 provider 测试、SDK 升级后重录 fixture、跨平台 Azure 验证、非确定性测试门控与回放缓存未命中诊断。",
+        "does": [
+          "说明编写与评估 E2E 测试的流程：选择边界与层级、注册测试、实现最小确定性场景、断言主要可观测结果",
+          "说明录制或重录 fixture 的流程：准备 token、按 provider 运行录制命令、审查 git diff、再以纯回放确认",
+          "说明对无法确定性回放的变体进行门控：仅录制、POSIX 限定、provider/OS 特定回放，并登记 KNOWN_ISSUES",
+          "说明跨平台 Azure 验证：排队 CI 流水线、监控各平台 Agent Host E2E 任务、失败隔离重跑",
+          "说明验证与排查方法：单 provider 回放、按测试标题过滤、读取 Copilot 运行时日志、按 README 排查表定位症状"
+        ],
+        "inputs": [
+          "待编写或修改的 Agent Host E2E 或 providerIntegration 测试代码",
+          "已提交的 YAML fixture 回放文件",
+          "录制时所需的 GITHUB_TOKEN 或 gh auth token",
+          "测试标题（fixture 名称由其派生）",
+          "E2E README 中的架构与排查参考",
+          "Azure 流水线分支与构建结果"
+        ],
+        "outputs": [
+          "确定性、无 token 的 E2E 回放测试结果",
+          "录制生成的 fixture 与快照变更",
+          "KNOWN_ISSUES.md 中的门控条目",
+          "Windows、Linux、macOS 三平台的 Azure 验证结论",
+          "失败时的运行时日志与排查结论"
+        ],
+        "scenarios": [
+          "新增跨 provider 的 Agent Host E2E 测试",
+          "捆绑 SDK/CLI 升级后重录 fixture",
+          "为无法确定性回放的变体添加门控并登记",
+          "在合并前完成跨平台 Azure 验证",
+          "诊断回放缓存未命中、超时或 fixture 泄漏敏感信息"
+        ],
+        "prerequisites": [
+          "先阅读 src/vs/platform/agentHost/test/node/e2e/README.md 的架构与排查参考",
+          "录制时需可用 token：gh auth token 或导出 GITHUB_TOKEN",
+          "新增 E2E 或真实 provider 集成测试须通过 VS Code 流水线定义 111 的聚焦构建",
+          "跨平台验证需推送分支并打开或更新草稿 PR，排队流水线定义 727"
+        ],
+        "limits": [
+          "回放默认且严格，未录制的请求即为硬缓存未命中",
+          "fixture 为生成产物，不得手工编辑；泄漏时应扩展归一化/脱敏后重录",
+          "门控不得用于掩盖无法解释的失败",
+          "实时流式、回合中途中止、POSIX 特定本地执行无法可靠回放",
+          "Claude/Codex 运行时日志不在 Copilot 日志捕获范围内",
+          "仅本地或 GitHub PR CI 不足以判定可合并"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "测试",
+          "后端",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use when writing, recording, updating, validating, or troubleshooting Agent Host end-to-end and real-provider integration tests under src/vs/platform/agentHost/test/node/e2e and providerIntegration."
+          },
+          {
+            "field": "does",
+            "quote": "Record per provider:"
+          },
+          {
+            "field": "does",
+            "quote": "Gate a variant that cannot replay deterministically"
+          },
+          {
+            "field": "inputs",
+            "quote": "Fixture names derive from test titles."
+          },
+          {
+            "field": "inputs",
+            "quote": "Ensure a token is available: `gh auth token` (or export `GITHUB_TOKEN`)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Before doing anything, read the architecture + troubleshooting reference:** `src/vs/platform/agentHost/test/node/e2e/README.md`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Every new Agent Host E2E or real-provider integration test must pass a focused build from VS Code pipeline definition `111` before merge."
+          },
+          {
+            "field": "limits",
+            "quote": "**Replay is default and strict.** No env var serves committed fixtures without a token or network. An unrecorded request is a hard cache miss."
+          },
+          {
+            "field": "limits",
+            "quote": "**Fixtures are generated, never hand-edited.**"
+          },
+          {
+            "field": "limits",
+            "quote": "Real-time streaming, mid-turn aborts, and POSIX-specific local execution (shell tools, `pwd`, git worktrees) don't replay reliably."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/agent-host-logs/SKILL.md",
+      "blob_sha": "2eeae2840b7717cadf8d536df586639e493daeee",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/agent-host-logs/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agent-host-logs",
+        "description": "Analyze Agent Host debug log exports. Use when given an ah-logs or ahp-logs zip/folder, an Export Agent Host Debug Logs bundle, events.jsonl, AHP JSONL transport logs, Agent Host.log, remote-agenthost.log, or copilot-logs."
+      },
+      "excerpt": "---\nname: agent-host-logs\ndescription: 'Analyze Agent Host debug log exports. Use when given an ah-logs or ahp-logs zip/folder, an Export Agent Host Debug Logs bundle, events.jsonl, AHP JSONL transport logs, Agent Host.log, remote-agenthost.log, or copilot-logs.'\n---\n\n# Agent Host Debug Logs\n\nUse this skill to orient to bundles produced by `Developer: Export Agent Host Debug Logs...`. These are different from the normal timestamped Code OSS log directory.\n\nTreat the bundle as sensitive: it can contain tokens, prompts, file contents, terminal output, paths, and settings. Keep analysis local and avoid quoting secrets or unrelated user content. Timestamps, event names, IDs, status values, and general property values are fine.\n\n## Open the Bundle\n\nThe export name usually starts with `ah-logs` and may be a zip or an already-unpacked folder. For a zip, use the bundled extractor:\n\n```bash\npython3 .github/skills/agent-host-logs/scripts/extract.py \"<archive>.zip\"\n```\n\nThe final line gives the temporary extraction path. Work from that folder and delete only that exact folder when finished.\n\nDesktop ZIP exports keep host-owned logs compressed inside `host-logs.zip`, alongside the client-owned logs and sidecars. If that entry is present, run the same extractor on `<extracted-folder>/host-logs.zip` and inspect both extraction folders. The host archive contains `events.jsonl`, provider logs, Agent Host process logs, and Mission Control transport logs. Folder exports place these files directly in the export folder.\n\nExports remain cancellable while collecting and saving logs. The final destination swap disables Cancel until it finishes or restores the previous export. If restoration fails, the error identifies the backup holding the previous export. Partial host-log collection or copying produces a warning alongside the saved client logs.\n\nFiles are collected best-effort, so a valid bundle may contain only some of these:\n\n```text\nevents.jsonl\nusage.jsonl\ncustomizations.json\nagenthost.log\nagenthost.1.log\nagenthost-server.log\nvscode-logs/Window/renderer.log\nvscode-logs/Window/renderer.1.log\nvscode-logs/Shared/sharedprocess.log\nahp/*.jsonl\nahp/mission-control/*.jsonl\ncopilot-logs/*.log\nremote-agenthost.log\n```\n\n## What the Files Mean\n\nThe basic flow is:\n\n```text\nWindow/client <-> AHP <-> Agent Host process <-> Copilot SDK\n```\n\n| Path | What it shows |\n|---|---|\n| `host-logs.zip` | Compressed host-owned portion of a desktop export. Extract it separately to access the host files described below. |\n| `events.jsonl` | Persisted Copilot SDK events for the selected session: turns, messages, tools, permissions, hooks, skills, and subagents. It can cover a much longer period than the other logs. |\n| `usage.jsonl` | Client-captured token/credit usage, one record per model call (`turnId`, model, input/output/cache tokens, cumulative `totalNanoAiu`). The SDK's `assistant.usage` event is ephemeral and never reaches `events.jsonl`, so this is the only per-call usage record. Present only when agent-host debug logging was on. |\n| `customizations.json` | Snapshot of the skills/hooks/agents/MCP servers loaded for the session. The SDK's `session.*_loaded` events are ephemeral, so this is the only record of what was actually active. Present only when agent-host debug logging was on. |\n| `ahp/*.jsonl` | AHP traffic for a client connection. `_ahpLog.dir` is `c2s` or `s2c`; `_ahpLog.ts` is when the logging process handled the message, not when it was sent. Use this to see requests, responses, subscriptions, actions, notifications, and client-visible ordering. |\n| `ahp/mission-control/*.jsonl` | Host-side traffic for incoming Mission Control clients, including authentication failures before a session is selected. `_ahpLog.transport` is `mission-control`; `connectionId` combines the client ID and connection generation. Host exports include up to ten most recently modified files, including rotated segments, within the remaining 1,000-entry artifact budget, even for a session-specific export. These logs can contain traffic for other shared sessions. |\n| `agenthost*.log` | Local or server Agent Host process behavior: startup, auth, sessions, provider events, tools, Git/worktrees, and host-side errors. Numbered files are older rotated segments. |\n| `copilot-logs/*.log` | Copilot SDK process logs that mention the selected session ID. A process log may contain other sessions too. |\n| `vscode-logs/Window/*` | Current and rotated files from the Window log group, including renderer/client behavior, network activity, views, and other window-owned logs. |\n| `vscode-logs/Shared/*` | Current and rotated files from the Shared log group. Usually secondary evidence and often noisy. |\n| `Agent Host (<name>).log` | Forwarded logs from a named remote Agent Host. |\n| `remote-agenthost.log` | A directly downloaded remote `agenthost.log`, when available. |\n\n## How to Start\n\n1. List the files and note their sizes.\n2. Identify the reported symptom, approximate time, local or remote host, and any known session, chat, turn, request, or tool ID.\n3. Start with the file closest to the symptom:\n   - Turn or provider behavior: `events.jsonl`\n   - Token/credit usage or cost questions: `usage.jsonl`\n   - Client/server state or ordering: `ahp/*.jsonl`\n   - Host implementation failure: `agenthost*.log`\n   - SDK behavior: `copilot-logs/*.log`\n   - UI behavior: `vscode-logs/Window/renderer.log` and its rotated segments\n4. Search by the known time or ID, then follow the same operation into the adjacent layer.\n\nUseful correlation fields include the raw session ID, session/chat URI, `turnId`, `interactionId`, tool/request IDs, JSON-RPC request `id`, AHP `serverSeq`, and event `id`/`parentId`.\n\n## Copilot Session Refresh Failures\n\nAt the default Info log level, `agenthost*.log` records the refresh operation, configuration and SDK session IDs, chat, turn, and first matching `reason`. Only the first matching trigger is reported, preserving the restart checks' short-circuit order. Structural reasons distinguish client tools, client plugins, and root MCP configuration without logging their contents.\n\nFollow `Preparing SDK session` and the paired `SDK resumeSession started` / `settled` records by `attemptId`. Follow each attached SDK session's shutdown and disconnect records by `instanceId`, which distinguishes successive wrappers of the same SDK session. A `disconnect wait completed` record with `disconnectRpc=pending` and `shutdownReceived=true` means the shutdown notification unblocked the caller before the disconnect RPC settled. A later RPC completion or failure, including after `disposed=true`, is logged separately. Neither the notification nor the host-side wait alone proves that native cleanup finished; correlate these with the SDK process log before concluding there was a teardown/resume race.\n\n## Important Tips\n\n- `events.jsonl`, Copilot SDK logs, and AHP timestamps are normally UTC. The plain `.log` files may use local machine time; remote logs may use another timezone.\n- An AHP log is connection-scoped and can contain multiple sessions. A Copilot SDK process log can also contain multiple sessions.\n- Mission Control lane traffic is logged independently of the desktop client's `chat.agentHost.ahpJsonlLoggingEnabled` setting. Authentication request tokens are redacted, but other session content remains sensitive.\n- Mission Control history is retained across connection generations within ten files and 750 MiB per host log directory. A directory export keeps client-local fallback candidates until the host copy succeeds; if the host artifact is unavailable, Mission Control logs appear under `ahp/` instead.\n- AHP files rotate as `.jsonl`, `.1.jsonl`, `.2.jsonl`, and so on. Use `_ahpLog.ts` to reconstruct order.\n- A `subscribe` result can contain a full snapshot; its contents did not necessarily change at subscription time.\n- `_ahpLog.truncated: true` means large values were omitted from that log record.\n- Warning or error severit",
+      "card": {
+        "title_zh": "Agent Host 调试日志分析",
+        "purpose_zh": "用于分析 Developer: Export Agent Host Debug Logs 导出的 ah-logs 或 ahp-logs 压缩包或文件夹，帮助定位会话、轮次、用量、传输与宿主进程问题。",
+        "does": [
+          "解压 ah-logs 压缩包并给出临时解压路径",
+          "识别并说明 events.jsonl、usage.jsonl、customizations.json、ahp、agenthost、copilot-logs、vscode-logs 等文件含义",
+          "按症状、时间或 ID 选择最接近的日志文件开始排查",
+          "用 session ID、turnId、interactionId、serverSeq 等字段跨层关联同一操作",
+          "说明 Copilot 会话刷新失败相关日志记录与判读方式",
+          "提示日志敏感性与时间戳时区等注意事项"
+        ],
+        "inputs": [
+          "ah-logs 或 ahp-logs 的 zip 压缩包或已解压文件夹",
+          "Export Agent Host Debug Logs 导出的日志包",
+          "events.jsonl、usage.jsonl、customizations.json 等日志文件",
+          "已知的症状、大致时间、本地或远程主机、会话/聊天/轮次/请求/工具 ID"
+        ],
+        "outputs": [
+          "解压后的临时目录路径",
+          "各日志文件的作用说明",
+          "按症状定位的排查起点与跨层关联线索",
+          "对会话刷新失败等日志记录的判读结论"
+        ],
+        "scenarios": [
+          "拿到 ah-logs 导出包需要快速了解包内结构与文件含义",
+          "排查某次轮次或 provider 行为异常",
+          "排查 token/credit 用量或成本问题",
+          "排查客户端/服务端状态或消息顺序问题",
+          "排查宿主进程实现失败或 SDK 行为"
+        ],
+        "prerequisites": [
+          "已获得 Export Agent Host Debug Logs 导出的日志包",
+          "需要 Python3 环境以运行捆绑的 extract.py 解压脚本"
+        ],
+        "limits": [
+          "导出文件为尽力收集，缺失文件属正常",
+          "日志包可能含令牌、提示词、文件内容、终端输出、路径和设置，需本地分析并避免引用秘密",
+          "AHP 日志按连接记录，可能包含多个会话",
+          "Mission Control 日志可能包含其他共享会话的流量",
+          "时间戳时区不一致：jsonl 与 SDK 日志通常为 UTC，普通 .log 可能为本地时间",
+          "警告或错误严重级别本身不能证明因果关系",
+          "_ahpLog.truncated 为 true 表示该记录中大型值被省略"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "运维部署",
+          "数据分析",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this skill to orient to bundles produced by `Developer: Export Agent Host Debug Logs...`."
+          },
+          {
+            "field": "does",
+            "quote": "For a zip, use the bundled extractor:"
+          },
+          {
+            "field": "does",
+            "quote": "The final line gives the temporary extraction path. Work from that folder and delete only that exact folder when finished."
+          },
+          {
+            "field": "does",
+            "quote": "| `events.jsonl` | Persisted Copilot SDK events for the selected session: turns, messages, tools, permissions, hooks, skills, and subagents."
+          },
+          {
+            "field": "does",
+            "quote": "Start with the file closest to the symptom:"
+          },
+          {
+            "field": "does",
+            "quote": "Useful correlation fields include the raw session ID, session/chat URI, `turnId`, `interactionId`, tool/request IDs, JSON-RPC request `id`, AHP `serverSeq`, and event `id`/`parentId`."
+          },
+          {
+            "field": "does",
+            "quote": "Follow `Preparing SDK session` and the paired `SDK resumeSession started` / `settled` records by `attemptId`."
+          },
+          {
+            "field": "inputs",
+            "quote": "Use when given an ah-logs or ahp-logs zip/folder, an Export Agent Host Debug Logs bundle, events.jsonl, AHP JSONL transport logs, Agent Host.log, remote-agenthost.log, or copilot-logs."
+          },
+          {
+            "field": "inputs",
+            "quote": "Identify the reported symptom, approximate time, local or remote host, and any known session, chat, turn, request, or tool ID."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "python3 .github/skills/agent-host-logs/scripts/extract.py \"<archive>.zip\""
+          },
+          {
+            "field": "limits",
+            "quote": "Treat the bundle as sensitive: it can contain tokens, prompts, file contents, terminal output, paths, and settings."
+          },
+          {
+            "field": "limits",
+            "quote": "Files are collected best-effort, so a valid bundle may contain only some of these:"
+          },
+          {
+            "field": "limits",
+            "quote": "An AHP log is connection-scoped and can contain multiple sessions."
+          },
+          {
+            "field": "limits",
+            "quote": "These logs can contain traffic for other shared sessions."
+          },
+          {
+            "field": "limits",
+            "quote": "`events.jsonl`, Copilot SDK logs, and AHP timestamps are normally UTC. The plain `.log` files may use local machine time; remote logs may use another timezone."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 .github/skills/agent-host-logs/scripts/extract.py \"<archive>.zip\""
+          },
+          {
+            "field": "risk_flags",
+            "quote": "The final line gives the temporary extraction path. Work from that folder and delete only that exact folder when finished."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/author-contributions/SKILL.md",
+      "blob_sha": "540becc35ef1b1fc912a5edccd31cf2b91d710da",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/author-contributions/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "author-contributions",
+        "description": "Identify all files a specific author contributed to on a branch vs its upstream, tracing code through renames. Use when asked who edited what, what code an author contributed, or to audit authorship before a merge. This skill should be run as a subagent — it performs many git operations and returns a concise table."
+      },
+      "excerpt": "---\nname: author-contributions\ndescription: Identify all files a specific author contributed to on a branch vs its upstream, tracing code through renames. Use when asked who edited what, what code an author contributed, or to audit authorship before a merge. This skill should be run as a subagent — it performs many git operations and returns a concise table.\n---\n\nWhen asked to find all files a specific author contributed to on a branch (compared to main or another upstream), follow this procedure. The goal is to produce a simple table that both humans and LLMs can consume.\n\n## Run as a Subagent\n\nThis skill involves many sequential git commands. Delegate it to a subagent with a prompt like:\n\n> Find every file that author \"Full Name\" contributed to on branch `<branch>` compared to `<upstream>`. Trace contributions through file renames. Return a markdown table with columns: Status (DIRECT or VIA_RENAME), File Path, and Lines (+/-). Include a summary line at the end.\n\n## Procedure\n\n### 1. Identify the author's exact git identity\n\n```bash\ngit log --format=\"%an <%ae>\" <upstream>..<branch> | sort -u\n```\n\nMatch the requested person to their exact `--author=` string. Do not guess — short usernames won't match full display names (resolve via `git log` or the GitHub MCP `get_me` tool).\n\n### 2. Collect all files the author directly committed to\n\n```bash\ngit log --author=\"<Exact Name>\" --format=\"%H\" <upstream>..<branch>\n```\n\nFor each commit hash, extract touched files:\n\n```bash\ngit diff-tree --no-commit-id --name-only -r <hash>\n```\n\nUnion all results into a set (`author_files`).\n\n### 3. Build rename map across the entire branch\n\nFor **every** commit on the branch (not just the author's), extract renames:\n\n```bash\ngit diff-tree --no-commit-id -r -M <hash>\n```\n\nParse lines with `R` status to build a map: `new_path → {old_paths}`.\n\n### 4. Get the merge diff file list\n\n```bash\ngit diff --name-only <upstream>..<branch>\n```\n\nThese are the files that will actually land when the branch merges.\n\n### 5. Classify each file in the merge diff\n\nFor each file in step 4:\n- If it's in `author_files` → **DIRECT**\n- Else, walk the rename map transitively (follow chains: current → old → older) and check if any ancestor is in `author_files` → **VIA_RENAME**\n- Otherwise → not this author's contribution\n\n### 6. Get diff stats\n\n```bash\ngit diff --stat <upstream>..<branch> -- <file1> <file2> ...\n```\n\n### 7. Return the table\n\nFormat the result as a markdown table:\n\n```\n| Status | File | +/- |\n|--------|------|-----|\n| DIRECT | src/vs/foo/bar.ts | +120/-5 |\n| VIA_RENAME | src/vs/baz/qux.ts | +300 |\n| ... | ... | ... |\n\n**Total: N files, +X/-Y lines**\n```\n\n## Important Notes\n\n- **Use Python for the heavy lifting.** Shell loops with inline comments break in zsh. Write a temp `.py` script, run it, then delete it.\n- **Author matching is exact.** Always run step 1 first. `--author` does substring matching but you must verify the right person is matched (e.g., don't match \"Joshua Smith\" when looking for \"Josh S.\"). Use the GitHub MCP `get_me` tool or `git log` output to resolve the correct full name.\n- **Renames can be multi-hop.** A file may have moved `contrib/chat/` → `agentSessions/` → `sessions/`. The rename map must be walked transitively.\n- **Only report files in the merge diff** (step 4). Files the author touched that were later deleted entirely should not appear — they won't land in the upstream.\n- **The rename map must include all authors' commits**, not just the target author's. Other people often do the rename commits (e.g., bulk refactors/moves).\n\n## Example Python Script\n\n```python\nimport subprocess, os\n\nos.chdir('<repo_root>')\nUPSTREAM = 'main'\nAUTHOR = '<Author Name>'  # Resolve via `git log` or GitHub MCP `get_me`\n\n# Step 2: author's files\ncommits = subprocess.check_output(\n    ['git', 'log', f'--author={AUTHOR}', '--format=%H', f'{UPSTREAM}..HEAD'],\n    text=True).strip().split('\\n')\nauthor_files = set()\nfor h in (c for c in commits if c):\n    files = subprocess.check_output(\n        ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', h],\n        text=True).strip().split('\\n')\n    author_files.update(f for f in files if f)\n\n# Step 3: rename map from ALL commits\nall_commits = subprocess.check_output(\n    ['git', 'log', '--format=%H', f'{UPSTREAM}..HEAD'],\n    text=True).strip().split('\\n')\nrename_map = {}  # new_name -> set(old_names)\nfor h in (c for c in all_commits if c):\n    out = subprocess.check_output(\n        ['git', 'diff-tree', '--no-commit-id', '-r', '-M', h],\n        text=True, timeout=5).strip()\n    for line in out.split('\\n'):\n        if not line:\n            continue\n        parts = line.split('\\t')\n        if len(parts) >= 3 and 'R' in parts[0]:\n            rename_map.setdefault(parts[2], set()).add(parts[1])\n\n# Step 4: merge diff\ndiff_files = subprocess.check_output(\n    ['git', 'diff', '--name-only', f'{UPSTREAM}..HEAD'],\n    text=True).strip().split('\\n')\n\n# Step 5: classify\nresults = []\nfor f in (x for x in diff_files if x):\n    if f in author_files:\n        results.append(('DIRECT', f))\n    else:\n        # walk rename chain\n        chain, to_check = set(), [f]\n        while to_check:\n            cur = to_check.pop()\n            if cur in chain:\n                continue\n            chain.add(cur)\n            to_check.extend(rename_map.get(cur, []))\n        chain.discard(f)\n        if chain & author_files:\n            results.append(('VIA_RENAME', f))\n\n# Step 6: stats\nif results:\n    stat = subprocess.check_output(\n        ['git', 'diff', '--stat', f'{UPSTREAM}..HEAD', '--'] +\n        [f for _, f in results], text=True)\n    print(stat)\n\n# Step 7: table\nfor kind, f in sorted(results, key=lambda x: x[1]):\n    print(f'| {kind:12s} | {f} |')\nprint(f'\\nTotal: {len(results)} files')\n```\n\n### Alternative Script\n\nAfter following the process above, run this script to cross-check files touched by an author against the branch diff.   You can do this both with an without src/vs/sessions.\n\n```\nAUTHOR=\"\"\n\n# 1. Find commits by author on this branch (not on main)\ngit log main...HEAD --author=\"$AUTHOR\" --format=\"%H\"\n\n# 2. Get unique files touched across all those commits, excluding src/vs/sessions/\ngit log main...HEAD --author=\"$AUTHOR\" --format=\"%H\" \\\n  | xargs -I{} git diff-tree --no-commit-id -r --name-only {} \\\n  | sort -u \\\n  | grep -v '^src/vs/sessions/'\n\n# 3. Cross-reference with branch diff to keep only files still changed vs main\ngit log main...HEAD --author=\"$AUTHOR\" --format=\"%H\" \\\n  | xargs -I{} git diff-tree --no-commit-id -r --name-only {} \\\n  | sort -u \\\n  | grep -v '^src/vs/sessions/' \\\n  | while read f; do git diff main...HEAD --name-only -- \"$f\" 2>/dev/null; done \\\n  | sort -u\n```\n",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/auto-perf-optimize/SKILL.md",
+      "blob_sha": "edff6c4db3a233f594cc6dc445cb348d9ff6b92f",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/auto-perf-optimize/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "auto-perf-optimize",
+        "description": "Run agent-driven VS Code performance or memory investigations. Use when asked to launch Code OSS, automate a VS Code scenario, run the Chat memory smoke runner, capture renderer heap snapshots, take workflow screenshots, compare run summaries, or drive a repeatable scenario before heap-snapshot analysis."
+      },
+      "excerpt": "---\nname: auto-perf-optimize\ndescription: \"Run agent-driven VS Code performance or memory investigations. Use when asked to launch Code OSS, automate a VS Code scenario, run the Chat memory smoke runner, capture renderer heap snapshots, take workflow screenshots, compare run summaries, or drive a repeatable scenario before heap-snapshot analysis.\"\nmetadata:\n  allowed-tools: Bash(npx @playwright/cli:*)\n---\n\n# VS Code Performance Workflow\n\nDrive a repeatable VS Code scenario, collect memory/performance artifacts, verify that the scenario actually happened, then hand the resulting heap snapshots to the generic heap-snapshot-analysis skill when object-level investigation is needed.\n\n## When to Use\n\n- User describes a VS Code workflow and asks whether it leaks or grows memory\n- User asks the agent to launch VS Code, drive a scenario, and capture heap snapshots\n- User asks to run the Chat memory smoke runner bundled with this skill\n- User wants screenshots, `summary.json`, renderer heap samples, and targeted `.heapsnapshot` files for one scenario\n- User wants a new automation runner for a non-Chat VS Code scenario\n\nDo not use this skill when snapshots already exist and the user only wants heap object/retainer analysis. Use heap-snapshot-analysis directly.\n\n## The Story\n\n1. **Define the scenario.** Write down one warmup action, one repeatable iteration, and one quiescent point where it is fair to force GC and sample memory.\n2. **Develop the automation.** Start with a tiny no-snapshot run. If it fails or the UI state is uncertain, keep the Code window open, connect `@playwright/cli` to the same CDP port, take workspace-local screenshots, inspect snapshots, and update the runner's selectors/waits.\n3. **Run a fast smoke.** Disable heap snapshots first. Prove the scenario completes and the artifact summary says what you think it says.\n4. **Capture targeted snapshots.** Snapshot a warmed-up baseline and a later iteration. Do not snapshot every sample unless necessary; snapshots are huge and slow.\n5. **Verify the run.** Inspect `summary.json` and screenshots. Do not analyze a failed login, trust prompt, stuck progress row, or wrong UI state.\n6. **Analyze snapshots.** Switch to heap-snapshot-analysis for compare scripts, object grouping, and retainer paths.\n7. **Fix and verify.** After identifying leaks, make product-code fixes. Then rerun the same scenario with the same snapshot labels and compare like-for-like. Do not stop at analysis — the goal is to ship a fix, not just a report.\n8. **Document.** Save a summary of findings, fixes, and before/after measurements to session memory so the work is preserved.\n\n## Checked-in Runners\n\nThe `scripts/` folder contains stable, generic runners. Use them directly or as templates for scratchpad scripts:\n\n- **[chat-memory-smoke.mts](./scripts/chat-memory-smoke.mts)** — Multi-turn chat smoke runner. Sends prompts, waits for responses, samples heap, takes optional snapshots. The most versatile runner.\n- **[chat-session-switch-smoke.mts](./scripts/chat-session-switch-smoke.mts)** — Creates multiple chat sessions with different content types, then repeatedly switches between them via the sessions sidebar.\n- **[userDataProfile.mts](./scripts/userDataProfile.mts)** — Utility for managing user-data profiles in smoke test runs.\n\n### Chat Workflow: Chat Memory Smoke Runner\n\nUse the bundled [Chat memory smoke runner](./scripts/chat-memory-smoke.mts) when the scenario is Chat-specific or can be expressed as repeated Chat prompts. It launches Code OSS, opens Chat, sends prompts, waits for responses, writes screenshots and `summary.json`, samples renderer heap, and can take selected heap snapshots.\n\nFast health check:\n\n```bash\nnode .github/skills/auto-perf-optimize/scripts/chat-memory-smoke.mts --iterations 3 --no-heap-snapshots\n```\n\nTargeted post-warmup snapshots:\n\n```bash\nnode .github/skills/auto-perf-optimize/scripts/chat-memory-smoke.mts --iterations 8 --heap-snapshot-label 03-iteration-01 --heap-snapshot-label 03-iteration-08\n```\n\nUser-described Chat scenario:\n\n```bash\nnode .github/skills/auto-perf-optimize/scripts/chat-memory-smoke.mts --iterations 8 --message 'For memory investigation iteration {iteration}, summarize the active workspace in one paragraph.' --heap-snapshot-label 03-iteration-01 --heap-snapshot-label 03-iteration-08\n```\n\nImportant runner behavior:\n\n- The default profile is persistent at `.build/auto-perf-optimize/user-data` so auth can be reused by all runners in this skill.\n- Pass `--temporary-user-data` only if a clean profile is part of the scenario.\n- Pass `--seed-user-data-dir <path>` to copy a logged-in profile into a fresh target profile before launch. The target profile may contain auth secrets; keep it inside ignored local `.build/...` folders and never attach it to issues or PRs.\n\n**Safety: chat runs execute on the real machine.** The Code OSS instance launched by these runners is a full VS Code with Copilot auth on the user's actual computer — not a sandbox. Chat prompts you craft will be sent to a real LLM, and any tool calls the agent makes (terminal commands, file edits, etc.) will execute for real. Be responsible:\n\n- **Use a throwaway workspace**, not the real repo. Pass `--workspace <scratch-folder>` pointing to a temporary or gitignored directory (e.g., the runner's scratchpad subfolder, or a folder under `.build/`). The default workspace in checked-in runners is the repo root for convenience, but scratchpad runners for Chat scenarios should always override it to avoid accidental file modifications in the source tree.\n- Use **safe, read-only commands** for prompts that trigger terminal tools (e.g., `touch /tmp/foo`, `git log --oneline`, `ls`). Never instruct the agent to delete files, run destructive commands, or modify the user's workspace.\n- If you need tool calls for testing, use harmless operations and clean up any temp files afterward.\n- Don't be afraid to run terminal commands — just be thoughtful about what you ask.\n- Pass `--keep-open` when the user needs to log in or watch the window, then close the window before the next automated run unless intentionally reusing it.\n- Pass `--reuse` only when attaching to a Code window that was launched with `--enable-smoke-test-driver` and the chosen remote-debugging port.\n\n## Profiles and Auth\n\nPrefer the shared persistent performance profile for routine runs:\n\n```bash\nnode .github/skills/auto-perf-optimize/scripts/chat-memory-smoke.mts --keep-open --iterations 1 --no-heap-snapshots\n```\n\nIf Chat asks for auth, let the user sign in once, close the Code window, then rerun the fast smoke without `--keep-open`. The same profile is reused by the bundled Chat runner and by other runners that follow this skill's profile convention.\n\nTo bootstrap the shared performance profile from an older logged-in automation profile, copy it once into the default target:\n\n```bash\nnode .github/skills/auto-perf-optimize/scripts/chat-memory-smoke.mts --seed-user-data-dir .build/chat-memory-smoke/user-data --keep-open --iterations 1 --no-heap-snapshots\n```\n\nTo run a fresh disposable copy of a logged-in seed:\n\n```bash\nnode .github/skills/auto-perf-optimize/scripts/chat-memory-smoke.mts --temporary-user-data --seed-user-data-dir .build/auto-perf-optimize/user-data --iterations 3 --no-heap-snapshots\n```\n\nSeed-copy rules:\n\n- The seed Code window must be closed. Never copy a profile while a Code process is using it.\n- The target user-data-dir must be absent or empty. If the script refuses to copy, pick a fresh `--user-data-dir`, use `--temporary-user-data`, or delete the local target deliberately.\n- The copy skips root-level caches, logs, crash dumps, singleton lock/socket files, and session storage. It intentionally keeps user/global storage that may contain auth or extension state.\n- Use explicit `--user-data-dir <fresh-path> --seed-user-data-dir <seed-path>` when you want to keep the copied profile after the run. User-provided `--user-data-dir` is never deleted by the runner.\n\n##",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/azure-pipelines/SKILL.md",
+      "blob_sha": "423a32c156a26cce80b79a0129321f6acb19a8c3",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/azure-pipelines/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "azure-pipelines",
+        "description": "Use when validating Azure DevOps pipeline changes for the VS Code build. Covers queueing builds, checking build status, viewing logs, and iterating on pipeline YAML changes without waiting for full CI runs."
+      },
+      "excerpt": "---\nname: azure-pipelines\ndescription: Use when validating Azure DevOps pipeline changes for the VS Code build. Covers queueing builds, checking build status, viewing logs, and iterating on pipeline YAML changes without waiting for full CI runs.\n---\n\n# Validating Azure Pipeline Changes\n\nWhen modifying Azure DevOps pipeline files (YAML files in `build/azure-pipelines/`), you can validate changes locally using the Azure CLI before committing. This avoids the slow feedback loop of pushing changes, waiting for CI, and checking results.\n\n## Prerequisites\n\n1. **Check if Azure CLI is installed**:\n   ```bash\n   az --version\n   ```\n\n   If not installed, install it:\n   ```bash\n   # macOS\n   brew install azure-cli\n\n   # Windows (PowerShell as Administrator)\n   winget install Microsoft.AzureCLI\n\n   # Linux (Debian/Ubuntu)\n   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash\n   ```\n\n2. **Check if the DevOps extension is installed**:\n   ```bash\n   az extension show --name azure-devops\n   ```\n\n   If not installed, add it:\n   ```bash\n   az extension add --name azure-devops\n   ```\n\n3. **Authenticate**:\n   ```bash\n   az login\n   az devops configure --defaults organization=https://dev.azure.com/monacotools project=Monaco\n   ```\n\n## VS Code Main Build\n\nThe main VS Code build pipeline:\n- **Organization**: `monacotools`\n- **Project**: `Monaco`\n- **Definition ID**: `111`\n- **URL**: https://dev.azure.com/monacotools/Monaco/_build?definitionId=111\n\n## VS Code CI Build\n\nThe CI builds of `main` and `release/*` commits run in their own pipeline, `build/azure-pipelines/product-build-ci.yml`. It has the quality checks and the CI test jobs of the product build, and it never signs or publishes:\n- **Definition ID**: `727`\n- **URL**: https://dev.azure.com/monacotools/Monaco/_build?definitionId=727\n\nTo investigate a red `main` CI, list the builds of definition `727` (`--definition 727`). Definition `111` runs only the scheduled and manual product builds.\n\n## VS Code Insider Scheduled Builds\n\nTwo Insider builds run automatically on a scheduled basis:\n- **Morning build**: ~7:00 AM CET\n- **Evening build**: ~7:00 PM CET\n\nThese scheduled builds use the same pipeline definition (`111`) but run on the `main` branch to produce Insider releases.\n\n---\n\n## Queueing a Build\n\nUse the [queue command](./azure-pipeline.ts) to queue a validation build:\n\n```bash\n# Queue a build on the current branch\nnode .github/skills/azure-pipelines/azure-pipeline.ts queue\n\n# Queue with a specific source branch\nnode .github/skills/azure-pipelines/azure-pipeline.ts queue --branch my-feature-branch\n\n# Queue with custom parameters\nnode .github/skills/azure-pipelines/azure-pipeline.ts queue --parameter \"VSCODE_BUILD_WEB=false\" --parameter \"VSCODE_PUBLISH=false\"\n\n# Parameter value with spaces\nnode .github/skills/azure-pipelines/azure-pipeline.ts queue --parameter \"VSCODE_BUILD_TITLE_PREFIX=My Validation \"\n```\n\n> **Important**: Before queueing a new build, cancel any previous builds on the same branch that you no longer need. This frees up build agents and reduces resource waste:\n> ```bash\n> # Find the build ID from status, then cancel it\n> node .github/skills/azure-pipelines/azure-pipeline.ts status\n> node .github/skills/azure-pipelines/azure-pipeline.ts cancel --build-id <id>\n> node .github/skills/azure-pipelines/azure-pipeline.ts queue\n> ```\n\n### Script Options\n\n| Option | Description |\n|--------|-------------|\n| `--branch <name>` | Source branch to build (default: current git branch) |\n| `--definition <id>` | Pipeline definition ID (default: 111) |\n| `--parameter <entry>` | Pipeline parameter in `KEY=value` format (repeatable); **use this when the value contains spaces** |\n| `--parameters <list>` | Space-separated parameters in `KEY=value KEY2=value2` format; values **must not** contain spaces |\n| `--dry-run` | Print the command without executing |\n\n### Product Build Queue Parameters (`build/azure-pipelines/product-build.yml`)\n\n| Name | Type | Default | Allowed Values | Description |\n|------|------|---------|----------------|-------------|\n| `VSCODE_QUALITY` | string | `insider` | `exploration`, `insider`, `stable` | Build quality channel |\n| `VSCODE_BUILD_TITLE_PREFIX` | string | `none` | any | Prefix of the build title |\n| `NPM_REGISTRY` | string | `https://pkgs.dev.azure.com/monacotools/Monaco/_packaging/vscode/npm/registry/` | any URL | Custom npm registry |\n| `CARGO_REGISTRY` | string | `sparse+https://pkgs.dev.azure.com/monacotools/Monaco/_packaging/vscode/Cargo/index/` | any URL | Custom Cargo registry |\n| `VSCODE_BUILD_WIN32` | boolean | `true` | `true`, `false` | Build Windows x64 |\n| `VSCODE_BUILD_WIN32_ARM64` | boolean | `true` | `true`, `false` | Build Windows arm64 |\n| `VSCODE_BUILD_LINUX` | boolean | `true` | `true`, `false` | Build Linux x64 |\n| `VSCODE_BUILD_LINUX_SNAP` | boolean | `true` | `true`, `false` | Build Linux x64 Snap |\n| `VSCODE_BUILD_LINUX_ARM64` | boolean | `true` | `true`, `false` | Build Linux arm64 |\n| `VSCODE_BUILD_LINUX_ARMHF` | boolean | `true` | `true`, `false` | Build Linux armhf |\n| `VSCODE_BUILD_ALPINE` | boolean | `true` | `true`, `false` | Build Alpine x64 |\n| `VSCODE_BUILD_ALPINE_ARM64` | boolean | `true` | `true`, `false` | Build Alpine arm64 |\n| `VSCODE_BUILD_MACOS` | boolean | `true` | `true`, `false` | Build macOS x64 |\n| `VSCODE_BUILD_MACOS_ARM64` | boolean | `true` | `true`, `false` | Build macOS arm64 |\n| `VSCODE_BUILD_MACOS_UNIVERSAL` | boolean | `true` | `true`, `false` | Build macOS universal (requires both macOS arches) |\n| `VSCODE_BUILD_WEB` | boolean | `true` | `true`, `false` | Build Web artifacts |\n| `VSCODE_PUBLISH` | boolean | `true` | `true`, `false` | Publish to builds.code.visualstudio.com |\n| `VSCODE_RELEASE` | boolean | `false` | `true`, `false` | Trigger release flow if successful |\n| `VSCODE_STEP_ON_IT` | boolean | `false` | `true`, `false` | Skip tests |\n| `VSCODE_USE_LEGACY_OSS_NOTICE` | boolean | `false` | `true`, `false` | Keep the legacy mixin ThirdPartyNotices.txt instead of the Component Governance notice |\n\nExample: run the CI build (quality checks and the Windows, Linux and macOS CI test jobs) of the current branch, which never signs or publishes:\n\n```bash\nnode .github/skills/azure-pipelines/azure-pipeline.ts queue --definition 727\n```\n\n---\n\n## Checking Build Status\n\nUse the [status command](./azure-pipeline.ts) to monitor a running build:\n\n```bash\n# Get status of the most recent builds\nnode .github/skills/azure-pipelines/azure-pipeline.ts status\n\n# Get overview of a specific build by ID\nnode .github/skills/azure-pipelines/azure-pipeline.ts status --build-id 123456\n\n# Watch build status (refreshes every 30 seconds)\nnode .github/skills/azure-pipelines/azure-pipeline.ts status --watch\n\n# Watch with custom interval (60 seconds)\nnode .github/skills/azure-pipelines/azure-pipeline.ts status --watch 60\n```\n\n### Script Options\n\n| Option | Description |\n|--------|-------------|\n| `--build-id <id>` | Specific build ID (default: most recent on current branch) |\n| `--branch <name>` | Filter builds by branch name (shows last 20 builds for branch) |\n| `--reason <reason>` | Filter builds by reason: `manual`, `individualCI`, `batchedCI`, `schedule`, `pullRequest` |\n| `--definition <id>` | Pipeline definition ID (default: 111) |\n| `--watch [seconds]` | Continuously poll status until build completes (default: 30s) |\n| `--download-log <id>` | Download a specific log to /tmp |\n| `--download-artifact <name>` | Download artifact to /tmp |\n| `--json` | Output raw JSON for programmatic consumption |\n\n---\n\n## Cancelling a Build\n\nUse the [cancel command](./azure-pipeline.ts) to stop a running build:\n\n```bash\n# Cancel a build by ID (use status command to find IDs)\nnode .github/skills/azure-pipelines/azure-pipeline.ts cancel --build-id 123456\n\n# Dry run (show what would be cancelled)\nnode .github/skills/azure-pipelines/azure-pipeline.ts cancel --build-id 123456 --dry-run\n```\n\n### Script Options\n\n| Option | Description |\n|--------|-------------|\n| `--build-id <id>` ",
+      "card": {
+        "title_zh": "Azure流水线验证",
+        "purpose_zh": "在提交前用 Azure CLI 本地验证 VS Code 的 Azure DevOps 流水线 YAML 改动，涵盖排队构建、查看状态、下载日志与取消构建，避免等待完整 CI。",
+        "does": [
+          "排队触发 Azure DevOps 构建，可指定分支、定义 ID 与构建参数",
+          "查看最近或指定构建的状态，支持定时轮询与 JSON 输出",
+          "下载指定日志或构建产物到 /tmp",
+          "按构建 ID 取消正在运行的构建，支持 dry-run",
+          "提供轮询构建直至完成的 shell 循环与 --watch 用法",
+          "列出产品构建与 CI 构建的常用参数及允许值"
+        ],
+        "inputs": [
+          "Azure CLI 与 azure-devops 扩展",
+          "az login 认证及默认组织/项目配置",
+          "源分支名",
+          "流水线定义 ID（默认 111，CI 为 727）",
+          "构建参数 KEY=value 列表",
+          "构建 ID（用于状态查询、取消、下载日志）"
+        ],
+        "outputs": [
+          "构建排队结果与构建 ID",
+          "构建状态信息（阶段、产物、日志 ID）",
+          "原始 JSON 输出",
+          "下载到 /tmp 的日志或产物文件"
+        ],
+        "scenarios": [
+          "修改 build/azure-pipelines/ 下 YAML 后快速验证",
+          "排查 main 分支 CI 失败",
+          "用自定义参数缩减构建矩阵以加快验证",
+          "取消过时构建以释放构建代理",
+          "下载日志或产物深入排查构建问题"
+        ],
+        "prerequisites": [
+          "已安装 Azure CLI（az --version 可验证）",
+          "已安装 azure-devops 扩展",
+          "已通过 az login 认证并配置默认组织与项目"
+        ],
+        "limits": [
+          "脚本路径为 .github/skills/azure-pipelines/azure-pipeline.ts，需 Node 运行",
+          "--parameters 的值不能含空格，含空格须用 --parameter",
+          "--watch 默认每 30 秒轮询",
+          "下载日志与产物固定到 /tmp",
+          "取消命令必须提供 --build-id"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "运维部署",
+          "自动化",
+          "测试"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "When modifying Azure DevOps pipeline files (YAML files in `build/azure-pipelines/`), you can validate changes locally using the Azure CLI before committing."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Covers queueing builds, checking build status, viewing logs, and iterating on pipeline YAML changes without waiting for full CI runs."
+          },
+          {
+            "field": "does",
+            "quote": "Use the [queue command](./azure-pipeline.ts) to queue a validation build:"
+          },
+          {
+            "field": "does",
+            "quote": "Use the [status command](./azure-pipeline.ts) to monitor a running build:"
+          },
+          {
+            "field": "does",
+            "quote": "Use the [cancel command](./azure-pipeline.ts) to stop a running build:"
+          },
+          {
+            "field": "does",
+            "quote": "| `--download-log <id>` | Download a specific log to /tmp |"
+          },
+          {
+            "field": "does",
+            "quote": "| `--download-artifact <name>` | Download artifact to /tmp |"
+          },
+          {
+            "field": "does",
+            "quote": "| `--json` | Output raw JSON for programmatic consumption |"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Check if Azure CLI is installed**:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "az extension add --name azure-devops"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "az login"
+          },
+          {
+            "field": "limits",
+            "quote": "| `--parameters <list>` | Space-separated parameters in `KEY=value KEY2=value2` format; values **must not** contain spaces |"
+          },
+          {
+            "field": "limits",
+            "quote": "| `--watch [seconds]` | Continuously poll status until build completes (default: 30s) |"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "brew install azure-cli"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/build-champ-triage/SKILL.md",
+      "blob_sha": "9eabd8a69ccebafad2973ed31f7ddf36bed0f91e",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/build-champ-triage/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "build-champ-triage",
+        "description": "Find out why a build has failed"
+      },
+      "excerpt": "---\nname: build-champ-triage\ndescription: Find out why a build has failed\ndisable-model-invocation: true\n---\n# Role\nYou are the build champion for the VS Code team. Your task is to triage a {{build}} by following these steps:\n\n# Instructions\n1. Display the warning message written below.\n2. Investigate the failing jobs of a given {{build}}.\n  - **Prioritize investigating failing unit test steps first** - these often reveal the root cause of failures\n3. Find the most recent {{successful-build}} prior to the failed {{build}}, then identify the {{first-failing-build}} after the {{successful-build}}. Note the commit ids of {{successful-build}} and {{first-failing-build}}.\n  - Ensure the branch is the same for all builds involved.\n4. Using the commit id between the two builds, identify all PRs that were merged in that range.\n5. For each PR, analyze the changes to determine if they could have caused the failure.\n6. Draft a minimal, succinct, inline-linked message including:\n  - Build URL\n  - Failing job URL\n  - Raw log URL\n  - GitHub compare view URL in the format: \"GitHub Compare View <commit1>...<commit2>\"\n  - List of possible root cause PRs. Ensure the PR numbers are linked to the actual PRs.\n7. If no PRs seem to be the cause, suggest rerunning the failed tests and filing an issue on GitHub if the problem persists.\n\n# Variables\n- {{build}}: Provided by the user. If the build is provided as a github url, decode the build URL from it.\n- {{successful-build}}: The most recent successful build prior to the failed {{build}}.\n- {{first-failing-build}}: The first failing build after the {{successful-build}}.\n\n## Guidelines\n- Include links to relevant PRs, commits, and builds in your output.\n- For now, ignore Component Governance Warnings\n- Be minimal in your output, focusing on clarity and conciseness.\n\n## Warning Message\n<message>\n**⚠️ Known Issues with Build Champion Agent ⚠️**\nThis agent should be used in parallel while investigating build failures, as it has some known issues:\n1. **Double check the error discovered by the agent:** The agent often confuses missing `.build/logs` as an infrastructure issue. This is incorrect, as the missing logs are typically caused by test or build failures.\n2. **Pay attention to the build numbers discovered by the agent:** The agent sometimes incorrectly finds the previous successful build.\n3. **Double check the list of PRs:** The agent sometimes fails to list all PRs merged between builds. Use the github compare link provided.\n\n**Please update this prompt file as you discover ways it can be improved.**\n\n---\n</message>\n\n## Known Scenarios\n\n### Expired Approval Step\nIf a build appears to have an elapsed time of 30 days, this indicates this build was meant to be a release build, but no one approved the release. There is no action needed in this scenario.\n",
+      "card": {
+        "title_zh": "构建失败分诊助手",
+        "purpose_zh": "用于排查 VS Code 构建失败原因：定位失败作业与首个失败构建，比对提交区间内合并的 PR，并起草带链接的根因分析消息。",
+        "does": [
+          "先展示已知问题警告消息",
+          "优先排查失败的单元测试步骤",
+          "找出失败构建之前最近的成功构建及之后首个失败构建，并记录提交 id",
+          "用两次构建之间的提交区间列出合并的 PR",
+          "逐个分析 PR 改动是否可能导致失败",
+          "起草含构建、作业、日志、对比视图与疑似根因 PR 链接的简洁消息"
+        ],
+        "inputs": [
+          "失败的构建（build），可为 GitHub URL 并从中解码构建地址",
+          "最近一次成功构建（successful-build）",
+          "首个失败构建（first-failing-build）"
+        ],
+        "outputs": [
+          "含构建 URL、失败作业 URL、原始日志 URL 的简洁消息",
+          "GitHub Compare View 链接（commit1...commit2）",
+          "带链接的疑似根因 PR 列表",
+          "若无 PR 可疑，建议重跑失败测试并在 GitHub 提 issue"
+        ],
+        "scenarios": [
+          "构建失败后排查根因",
+          "定位失败构建与最近成功构建之间的可疑 PR",
+          "构建耗时显示 30 天时判断为发布审批未通过、无需处理"
+        ],
+        "prerequisites": [
+          "可访问构建系统与 GitHub 仓库信息",
+          "用户提供失败的构建"
+        ],
+        "limits": [
+          "存在已知问题：常把缺失 .build/logs 误判为基础设施问题",
+          "有时找错上一次成功构建",
+          "有时漏列两次构建之间合并的 PR",
+          "暂忽略 Component Governance 警告",
+          "输出要求极简，聚焦清晰与简洁"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "运维部署",
+          "测试",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Your task is to triage a {{build}} by following these steps:"
+          },
+          {
+            "field": "does",
+            "quote": "Prioritize investigating failing unit test steps first"
+          },
+          {
+            "field": "does",
+            "quote": "Using the commit id between the two builds, identify all PRs that were merged in that range."
+          },
+          {
+            "field": "does",
+            "quote": "For each PR, analyze the changes to determine if they could have caused the failure."
+          },
+          {
+            "field": "does",
+            "quote": "Draft a minimal, succinct, inline-linked message including:"
+          },
+          {
+            "field": "does",
+            "quote": "If no PRs seem to be the cause, suggest rerunning the failed tests and filing an issue on GitHub if the problem persists."
+          },
+          {
+            "field": "inputs",
+            "quote": "{{build}}: Provided by the user. If the build is provided as a github url, decode the build URL from it."
+          },
+          {
+            "field": "outputs",
+            "quote": "GitHub compare view URL in the format: \"GitHub Compare View <commit1>...<commit2>\""
+          },
+          {
+            "field": "outputs",
+            "quote": "List of possible root cause PRs. Ensure the PR numbers are linked to the actual PRs."
+          },
+          {
+            "field": "scenarios",
+            "quote": "If a build appears to have an elapsed time of 30 days, this indicates this build was meant to be a release build, but no one approved the release. There is no action needed in this scenario."
+          },
+          {
+            "field": "limits",
+            "quote": "The agent often confuses missing `.build/logs` as an infrastructure issue."
+          },
+          {
+            "field": "limits",
+            "quote": "The agent sometimes incorrectly finds the previous successful build."
+          },
+          {
+            "field": "limits",
+            "quote": "The agent sometimes fails to list all PRs merged between builds."
+          },
+          {
+            "field": "limits",
+            "quote": "For now, ignore Component Governance Warnings"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Investigate the failing jobs of a given {{build}}."
+          },
+          {
+            "field": "hosts",
+            "quote": "disable-model-invocation: true"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/chat-customizations-editor/SKILL.md",
+      "blob_sha": "36a9cf25abd5912bfb23cd1ca3e2af296bff2521",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/chat-customizations-editor/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "chat-customizations-editor",
+        "description": "Use when working on the Chat Customizations editor — the management UI for agents, skills, instructions, hooks, prompts, MCP servers, and plugins."
+      },
+      "excerpt": "---\nname: chat-customizations-editor\ndescription: Use when working on the Chat Customizations editor — the management UI for agents, skills, instructions, hooks, prompts, MCP servers, and plugins.\nmetadata:\n  allowed-tools: Bash(npx @playwright/cli:*)\n---\n\n# Chat Customizations Editor\n\nSplit-view management pane for AI customization items across workspace, user, extension, and plugin storage. Supports harness-based filtering (Local, Copilot CLI, Claude).\n\n## Spec\n\n**`src/vs/sessions/AI_CUSTOMIZATIONS.md`** — read for ownership and interface contracts. Update it only when those contracts change; behavior and regressions belong in focused tests.\n\n## Key Folders\n\n| Folder | What |\n|--------|------|\n| `src/vs/workbench/contrib/chat/common/` | `ICustomizationHarnessService`, `ISectionOverride`, `ICustomizationItemProvider` — shared interfaces |\n| `src/vs/workbench/contrib/chat/browser/aiCustomization/` | Management editor, list widgets (prompts, MCP, plugins), harness service registration |\n| `src/vs/sessions/contrib/chat/browser/` | Sessions-window overrides (harness service, workspace service) |\n| `src/vs/sessions/contrib/sessions/browser/` | Sessions tree view counts and toolbar |\n\nWhen changing harness descriptor interfaces or factory functions, verify both core and sessions registrations compile.\n\n## Key Interfaces\n\n- **`IHarnessDescriptor`** — drives harness behavior declaratively (hidden sections, button overrides, item providers, agent gating). See spec for the stable ownership contract.\n- **`ISectionOverride`** — per-section button customization (command invocation, root file creation, type labels, file extensions).\n- **`ICustomizationItemProvider`** / **`ICustomizationItem`** — internal interfaces (in `customizationHarnessService.ts`) for extension-contributed providers that supply items directly. These mirror the proposed extension API types.\n\nPrinciple: the UI widgets read everything from the descriptor — no harness-specific conditionals in widget code.\n\nSearch: every Customizations search must go through the shared matcher in `src/vs/workbench/contrib/chat/common/aiCustomizationSearch.ts`, never ad-hoc `toLowerCase().includes()`. See the Search section of `.github/instructions/ai-customization.instructions.md`.\n\n## Extension API (`chatSessionCustomizationProvider`)\n\nThe proposed API in `src/vscode-dts/vscode.proposed.chatSessionCustomizationProvider.d.ts` lets extensions register customization providers. Changes to `ICustomizationItem` or `ICustomizationItemProvider` must be kept in sync across the full chain:\n\n| Layer | File | Type |\n|-------|------|------|\n| Extension API | `vscode.proposed.chatSessionCustomizationProvider.d.ts` | `ChatSessionCustomizationItem` |\n| IPC DTO | `extHost.protocol.ts` | `IChatSessionCustomizationItemDto` |\n| ExtHost mapping | `extHostChatAgents2.ts` | `$provideChatSessionCustomizations()` |\n| MainThread mapping | `mainThreadChatAgents2.ts` | `provideChatSessionCustomizations` callback |\n| Internal interface | `customizationHarnessService.ts` | `ICustomizationItem` |\n\nWhen adding fields to `ICustomizationItem`, update all five layers. The proposed API `.d.ts` is additive-only (new optional fields are backward-compatible and do not require a version bump).\n\n## Testing\n\nComponent explorer fixtures (see `component-fixtures` skill): `aiCustomizationListWidget.fixture.ts`, `aiCustomizationManagementEditor.fixture.ts` under `src/vs/workbench/test/browser/componentFixtures/`.\n\nManagement sections must reuse the editor's shared content-panel surface and common tree/list primitives. A registry-contributed section should match neighboring sections' background, border, inset, title/search alignment, row states, and group headers rather than introducing section-specific approximations.\n\n### Screenshotting specific tabs\n\nThe management editor fixture supports a `selectedSection` option to render any tab. Each tab has Dark/Light variants auto-generated by `defineThemedFixtureGroup`.\n\n**Available fixture IDs** (use with `mcp_component-exp_screenshot`):\n\n| Fixture ID pattern | Tab shown |\n|---|---|\n| `chat/aiCustomizations/aiCustomizationManagementEditor/AgentsTab/{Dark,Light}` | Agents |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/SkillsTab/{Dark,Light}` | Skills |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/InstructionsTab/{Dark,Light}` | Instructions |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/HooksTab/{Dark,Light}` | Hooks |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/PromptsTab/{Dark,Light}` | Prompts |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/McpServersTab/{Dark,Light}` | MCP Servers |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/PluginsTab/{Dark,Light}` | Plugins |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/CanvasesTab/{Dark,Light}` | Source sections with extension parents, Canvas children, and parent-only enablement |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/LocalHarness/{Dark,Light}` | Default (Agents, Local harness) |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/CliHarness/{Dark,Light}` | Default (Agents, CLI harness) |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/ClaudeHarness/{Dark,Light}` | Default (Agents, Claude harness) |\n| `chat/aiCustomizations/aiCustomizationManagementEditor/Sessions/{Dark,Light}` | Sessions window variant |\n\n**Adding a new tab fixture:** Add a variant to the `defineThemedFixtureGroup` in `aiCustomizationManagementEditor.fixture.ts`:\n```typescript\nMyNewTab: defineComponentFixture({\n    labels: { kind: 'screenshot' },\n    render: ctx => renderEditor(ctx, {\n        harness: CustomizationHarness.VSCode,\n        selectedSection: AICustomizationManagementSection.MySection,\n    }),\n}),\n```\n\nThe `selectedSection` calls `editor.selectSectionById()` after `setInput`, which navigates to the specified tab and re-layouts.\n\n### Populating test data\n\nEach customization type requires its own mock path in `createMockPromptsService`:\n- **Agents** — `getCustomAgents()` returns agent objects\n- **Skills** — `findAgentSkills()` returns `IAgentSkill[]`\n- **Prompts** — `getPromptSlashCommands()` returns `IChatPromptSlashCommand[]`\n- **Instructions/Hooks** — `listPromptFiles()` filtered by `PromptsType`\n- **MCP Servers** — `mcpWorkspaceServers`/`mcpUserServers` arrays passed to `IMcpWorkbenchService` mock\n- **Plugins** — `IPluginMarketplaceService.installedPlugins` and `IAgentPluginService.plugins` observables\n\nAll test data lives in `allFiles` (prompt-based items) and the `mcpWorkspace/UserServers` arrays. Add enough items per category (8+) to invoke scrolling.\n\n### Exercising scope grouping\n\nItems are grouped by scope: User, Workspace (one group per folder in a multi-root workspace), and Built-in. Items supplied by a plugin, an extension, or an organization are nested under one row per supplier inside the scope they apply to (extensions and organizations under User); the row is tagged Plugin, Extension, or Organization and links to the plugin or extension details. In Built-in, items the agent provides are tagged with the agent's name (for example Copilot). The MCP Servers, Plugins, and Tools pages follow the same model. `aiCustomizationOrganization.fixture.ts` covers these states for the local harness (prompts-service discovery) and a remote Agent Host harness (the real `AgentCustomizationItemProvider` over an in-memory file system), including synced items, multi-root workspaces, many plugins, search, and narrow layouts.\n\nItems from the default chat extension appear in the Built-in group, and its organization files (`…/github/<org>/…`) under Account. For fixtures to exercise this:\n1. Mock `IProductService.defaultChatAgent.chatExtensionId` (e.g., `'GitHub.copilot-chat'`)\n2. Give mock items extension provenance via `extensionId` / `extensionDisplayName` matching that ID\n\nWithout both, these items fall back to the generic extension origin.\n\n### Editor contribution service mocks\n\nThe",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/chat-perf/SKILL.md",
+      "blob_sha": "198c08f55cc19b340b64244d0cd49c22bbfdfbb6",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/chat-perf/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "chat-perf",
+        "description": "Run chat perf benchmarks and memory leak checks against the local dev build or any published VS Code version. Use when investigating chat rendering regressions, validating perf-sensitive changes to chat UI, or checking for memory leaks in the chat response pipeline."
+      },
+      "excerpt": "---\nname: chat-perf\ndescription: Run chat perf benchmarks and memory leak checks against the local dev build or any published VS Code version. Use when investigating chat rendering regressions, validating perf-sensitive changes to chat UI, or checking for memory leaks in the chat response pipeline.\n---\n\n# Chat Performance Testing\n\n## When to use\n\n- Before/after modifying chat rendering code (`chatListRenderer.ts`, `chatInputPart.ts`, markdown rendering)\n- When changing the streaming response pipeline or SSE processing\n- When modifying disposable/lifecycle patterns in chat components\n- To compare performance between two VS Code releases\n- In CI to gate PRs that touch chat UI code\n\n## Quick start\n\n```bash\n# Run perf regression test (compares local dev build vs VS Code 1.115.0):\npnpm run perf:chat --scenario text-only --runs 3\n\n# Run all scenarios with no baseline (just measure):\npnpm run perf:chat --no-baseline --runs 3\n\n# Compare two local builds (apples-to-apples):\npnpm run perf:chat --build /path/to/build-A --baseline-build /path/to/build-B --runs 5\n\n# Build a local production package and compare against a release:\npnpm run perf:chat --production-build --baseline-build 1.115.0 --runs 5\n\n# Run memory leak check (10 messages in one session):\npnpm run perf:chat-leak\n\n# Run leak check with more messages for accuracy:\npnpm run perf:chat-leak --messages 20 --verbose\n```\n\n## Perf regression test\n\n**Script:** `scripts/chat-simulation/test-chat-perf-regression.js` **npm:** `pnpm run perf:chat`\n\nLaunches VS Code via Playwright Electron, opens the chat panel, sends a message with a mock LLM response, and measures timing, layout, and rendering metrics. By default, downloads VS Code 1.115.0 as a baseline, benchmarks it, then benchmarks the local dev build and compares.\n\n> **You don't always need a baseline.** A baseline exists only for *comparison* (regression detection). If you just want the current build's numbers — profiling a single change, capturing traces/heap snapshots, or iterating on a scenario — pass `--no-baseline` to skip downloading and benchmarking the baseline entirely (roughly halves runtime). Baseline comparison is what turns raw measurements into a pass/fail verdict; without it you still get all the metrics, just no verdict.\n\n### Key flags\n\n| Flag | Default | Description |\n|---|---|---|\n| `--runs <n>` | `5` | Runs per scenario. More = more stable. Use 5+ for CI. |\n| `--scenario <id>` / `-s` | all | Scenario to test (repeatable). See `common/perf-scenarios.js`. |\n| `--build <path\\|ver>` / `-b` | local dev | Build to test. Accepts path or version (`1.110.0`, `insiders`, commit hash). |\n| `--baseline <path>` | — | Compare against a previously saved baseline JSON file. |\n| `--baseline-build <path\\|ver>` | `1.115.0` | Version or local path to benchmark as baseline. |\n| `--no-baseline` | — | Skip the baseline entirely — just measure the test build (no download, no comparison, ~2× faster). Use when you only need raw numbers, not a regression verdict. |\n| `--save-baseline` | — | Save results as the new baseline (requires `--baseline <path>`). |\n| `--resume <path>` | — | Resume a previous run, adding more iterations to increase confidence. |\n| `--threshold <frac>` | `0.2` | Regression threshold (0.2 = flag if 20% slower). |\n| `--production-build` | — | Build a local bundled package via `gulp vscode` for comparison against a release baseline. |\n| `--no-cache` | — | Ignore cached baseline data, always run fresh. |\n| `--force` | — | Skip build mode mismatch confirmation prompt. |\n| `--ci` | — | CI mode: write Markdown summary to `ci-summary.md` (implies `--no-cache`, `--heap-snapshots`, `--cleanup-diagnostics`). |\n| `--heap-snapshots` | — | Take heap snapshots after each run (slow; auto-enabled in `--ci` mode). |\n| `--gc-object-stats` | — | **GC deep-dives only.** Enables V8 `gc_stats` tracing (per-type heap object dump on every GC). ⚠️ Corrupts all timing metrics — a major GC landing mid-request adds ~550ms — so never use it for benchmarking. Off by default; prefer heap snapshots for memory analysis. |\n| `--cleanup-diagnostics` | — | Delete heap snapshots, CPU profiles, and traces to save disk. During runs, only the latest run's files are kept; after comparison, files for non-regressed scenarios are deleted. Auto-enabled in `--ci` mode. |\n| `--setting <k=v>` | — | Set a VS Code setting override for all builds (repeatable). |\n| `--test-setting <k=v>` | — | Set a VS Code setting override for the test build only. |\n| `--baseline-setting <k=v>` | — | Set a VS Code setting override for the baseline build only. |\n| `--verbose` | — | Print per-run details including response content. |\n\n### Comparing two remote builds\n\n```bash\n# Compare 1.110.0 against 1.115.0 (no local build needed):\npnpm run perf:chat --build 1.110.0 --baseline-build 1.115.0 --runs 5\n```\n\n### Comparing two local builds\n\nBoth `--build` and `--baseline-build` accept local paths to VS Code executables. This enables apples-to-apples comparisons between any two builds:\n\n```bash\n# Compare two dev builds (e.g. feature branch vs main):\npnpm run perf:chat \\\n  --build .build/electron/Code\\ -\\ OSS.app/Contents/MacOS/Code\\ -\\ OSS \\\n  --baseline-build /path/to/other/Code\\ -\\ OSS.app/Contents/MacOS/Code\\ -\\ OSS \\\n  --runs 5\n\n# Compare two production builds:\npnpm run perf:chat \\\n  --build ../VSCode-darwin-arm64-feature/Code\\ -\\ OSS.app/Contents/MacOS/Code\\ -\\ OSS \\\n  --baseline-build ../VSCode-darwin-arm64-main/Code\\ -\\ OSS.app/Contents/MacOS/Code\\ -\\ OSS \\\n  --runs 5\n```\n\nLocal path baselines are never cached (the build may change between runs). Version string baselines are cached for reuse.\n\n### Build modes and mismatch detection\n\nThe tool classifies builds into three modes based on the executable path:\n\n| Mode | Source | Characteristics |\n|---|---|---|\n| `dev` | `.build/electron/` (local dev) | Unbundled sources, `VSCODE_DEV=1`, `NODE_ENV=development`. Higher memory and startup overhead. |\n| `production` | `../VSCode-<platform>-<arch>/` (from `gulp vscode`) | Bundled JS, no dev flags. Matches release characteristics but uses local source. |\n| `release` | `.vscode-test/` (downloaded via `@vscode/test-electron`) | Official published build. |\n\nWhen test and baseline builds have different modes (e.g. dev vs release), the tool shows a warning and prompts for confirmation. Use `--force` or `--ci` to skip the prompt.\n\nUsing `--production-build` builds a local bundled package via `gulp vscode` for fair comparison against a release baseline. This eliminates dev-mode overhead while still testing your local changes.\n\n```bash\n# Production build vs release baseline (fair comparison):\npnpm run perf:chat --production-build --baseline-build 1.115.0 --runs 5\n```\n\n### Settings overrides\n\nUse `--setting`, `--test-setting`, and `--baseline-setting` to inject VS Code settings into the launched instance. This is useful for A/B testing experimental features:\n\n```bash\n# Enable a feature for the test build only:\npnpm run perf:chat --test-setting chat.experimental.incrementalRendering.enabled=true --runs 3\n\n# Compare two builds with different settings:\npnpm run perf:chat \\\n  --baseline-build \"../vscode2/.build/electron/Code - OSS.app/Contents/MacOS/Code - OSS\" \\\n  --baseline-setting chat.experimental.incrementalRendering.enabled=true \\\n  --test-setting chat.experimental.incrementalRendering.enabled=false \\\n  --runs 3\n\n# Set a value for both builds:\npnpm run perf:chat --setting chat.mcp.enabled=false --runs 3\n```\n\nPrecedence: `--test-setting` / `--baseline-setting` override `--setting` for the same key. Values are auto-parsed: `true`/`false` become booleans, numbers become numbers, everything else stays a string.\n\n### Resuming a run for more confidence\n\nWhen results exceed the threshold but aren't statistically significant, the tool prints a `--resume` hint. Use it to add more iterations to an existing run:\n\n```bash\n# Initial run with 3 iterations — may be inconclusive:\npnpm run perf:chat --scenario text-only --runs 3\n\n# Add 3 mor",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/chat-pet-sprite-creation/SKILL.md",
+      "blob_sha": "a118e7a5cd50d7a0a1e21ac25b3c3153422273ff",
+      "source_url": "https://github.com/microsoft/vscode/blob/3c73cdb5febd74e8e2aa5b359df5ce4feeb29e4f/.github/skills/chat-pet-sprite-creation/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "chat-pet-sprite-creation",
+        "description": "Use when creating or changing VS Code chat pet sprite art, sprite sheets, state animations, eye treatments, Stable/Insiders variants, or pet transitions under src/vs/workbench/contrib/chat/browser/widget/media/chatPet."
+      },
+      "excerpt": "---\nname: chat-pet-sprite-creation\ndescription: Use when creating or changing VS Code chat pet sprite art, sprite sheets, state animations, eye treatments, Stable/Insiders variants, or pet transitions under src/vs/workbench/contrib/chat/browser/widget/media/chatPet.\n---\n\n# Chat Pet Sprite Creation\n\nCreate pet sprites that feel like one continuous character rather than separate drawings. Start from the current pet body, preserve its visual anchor, and make every difference intentional.\n\n## Source of truth\n\n- Sprite art: `src/vs/workbench/contrib/chat/browser/widget/media/chatPet/`\n- Runtime states, dimensions, timing, and transitions: `src/vs/workbench/contrib/chat/browser/widget/chatPetWidget.ts`\n- Eye geometry, facing, clipping, and motion CSS: `src/vs/workbench/contrib/chat/browser/widget/media/chatPet.css`\n- Unit tests: `src/vs/workbench/contrib/chat/test/browser/widget/chatPetWidget.test.ts`\n\nRead the current implementation before drawing. Existing dimensions and timings may have changed since this skill was written.\n\n## PR precedence and lineage\n\nThis skill distills the complete pet PR history. When rules conflict, use this precedence:\n\n1. Current code and tests\n2. The newest relevant open PR\n3. Newer merged PRs\n4. Older historical behavior\n\nIn particular, animation cleanup PR #330399 supersedes the old revive-sign flow and several earlier sprite/timing assumptions.\n\n| PR | Durable learning |\n|---|---|\n| #327063 | The pet is one semantic button; sprite canvases, images, eyes, and effects are visual-only and `aria-hidden`. Resolve asset URLs through `FileAccess`. |\n| #327412 | Model reactions as explicit states. Do not immediately repeat ordinary random reactions; sample rare transformations separately. |\n| #327588 | Double-buffer sprite images and swap only after the pending image loads. Never blank the active sprite while a new source is loading. |\n| #327696 | Stable/Insiders is a typed, persisted appearance choice. Keep variant naming and geometry systematic. |\n| #327714 | Animated art is a horizontal sprite sheet plus a deliberate static reduced-motion PNG. Timing is runtime data, not image metadata. |\n| #328334 | Persistent behavior such as “on the run” belongs in service state. Multi-phase animations advance from completion signals, not guessed delays. |\n| #328480 | A drag release must not also trigger a click reaction. Gestures that share pointer events need explicit suppression/ownership. |\n| #328530 | Waking consumes the interaction that woke the pet; it must not also trigger a random reaction. Reduced motion may skip the wake transition. |\n| #329121 | Coalesce gaze updates, pause sprite timers while the document is hidden, and resume from elapsed time rather than replaying missed frames. |\n| #329347 | Keep pixel-art pose changes in sprite frames and spatial motion in layout/CSS/physics. Complete falls from transition signals. |\n| #329729 | Face the interaction before starting a reaction. Give each transient state an explicit lifetime and use real completion events for chained phases. |\n| #329852 | Pointer and keyboard gestures need equivalent outcomes. Reduced motion preserves the state change while removing the travel animation. |\n| #329867 | Attention animations are bounded; clapping stops after the confirmation-attention window even if the confirmation remains pending. |\n| #330160 | Eyes are a composited runtime layer with tracking/blinking modes. Rapid facing changes can trigger a separate dizzy state. Wide art must respect live bounds. |\n| #330275 | Physics uses the body footprint, bounded frame steps, and explicit impact moments. Recompute geometry when layout changes during flight. |\n| #330399 | Latest animation contract: wide sleep/wake art, frame-aware blink composition, fixed-orientation decorations, and reverse despawn → forward respawn using one effect sheet. |\n\n## The logical pixel\n\nThe canonical art unit is one **logical pixel**:\n\n- `8×8` source pixels\n- `4×4` CSS pixels at the standard `96×96` source → `48×48` display scale\n\nCore silhouettes, facial features, props, and repeated details must use the same logical-pixel scale. Do not make a new object from smaller or larger blocks simply to fit more detail.\n\nEffects may deliberately subdivide the logical pixel—for example, small stars, bubbles, or curved motion—but the subdivision must:\n\n1. Serve a specific effect that cannot read on the core grid.\n2. Stay consistent throughout that effect.\n3. Never come from antialiasing or resampling.\n\nUse nearest-neighbor rendering only. Keep transparent backgrounds and hard pixel edges. Do not introduce blur, feathered alpha, color interpolation, or accidental off-grid scaling.\n\n## Start from a baseline\n\nNever redraw the pet body from memory.\n\n- Use the current **idle** sprite as the baseline for resting, pointer-driven, or playful states.\n- Use the current **rendering** sprite as the baseline for request/processing states.\n- Copy the complete body first, then alter only the parts required by the new state.\n\nThis preserves:\n\n- Body width and height\n- Bottom baseline\n- Antenna roots and spacing\n- Highlight and shadow ramps\n- Eye sockets\n- Collision/interaction footprint\n\nThe first and last key poses must transition cleanly to idle or rendering without a body-position, silhouette, baseline, or scale pop.\n\n## Canvas and anchoring\n\nThe default source canvas is `96×96`, or `12×12` logical pixels.\n\nUse a larger canvas only when content intentionally extends outside the canonical body box:\n\n- A terminal or button may need extra width.\n- A note, star, or bubble may need extra height.\n- The body must remain anchored exactly where it sits in the baseline sprite.\n\nDo not center the body inside a wider frame. Keep the body in the canonical `96×96` region and let the prop/effect overhang. Declare every nonstandard source dimension in `chatPetWidget.ts` and update wide-sprite boundary handling.\n\nThe runtime collision and movement box belongs to the pet body, not to a decorative overhang.\n\n## Eyes\n\nThe standard open eye is **`1×2` logical pixels**:\n\n- `8×16` source pixels\n- `4×8` CSS pixels\n\nUse a different eye shape only when the state communicates a special expression, such as sleep, dizzy, love, worry, or impact.\n\n### DOM eye layer\n\nThe DOM eye layer has two independent modes:\n\n- **Tracking** supplies gaze, facing, blink, and drag expressions.\n- **Blinking** can temporarily show DOM eyes for a non-tracking state and can vary by sprite frame.\n\nStates that use runtime gaze must use eye-less `*-tracking-96` assets. States that use DOM blinking, such as typing, button press, or love in PR #330399, must also leave the corresponding pupil area available for the overlay.\n\nWhen adding or changing a DOM-eye state:\n\n1. Keep the sprite eye sockets empty.\n2. Add cursor behavior to `doesChatPetStateTrackCursor` when appropriate.\n3. Add blink behavior to `doesChatPetStateBlink(state, frameIndex)` when appropriate.\n4. Verify the tall-eye blink, state-specific eye height, and pointer offsets in both facing directions.\n5. Verify frames that intentionally stop blinking, such as a held terminal pose.\n\nNever combine baked pupils with the runtime eye overlay.\n\n### Baked-eye states\n\nStates with a fixed expression should bake the eyes into the art and opt out of cursor tracking. Preserve the standard eye position unless the expression intentionally changes it.\n\n## Stable and Insiders parity\n\nStable and Insiders are palette variants of the same animation.\n\nThey must have identical:\n\n- Canvas dimensions\n- Frame count and ordering\n- Alpha mask and geometry\n- Body anchor and overhang\n- Static fallback pose\n- Timing and iteration behavior\n\nCreate one geometry master and apply the two established palettes. Do not redraw variants independently.\n\nReview the two variants side by side. Any shape difference is a bug unless the product explicitly requires it.\n\n## Facing and mirroring\n\nAuthor one canonical facing direction and let the runtime mirror it for the other direction.\n\nTes",
+      "card": {
+        "title_zh": "聊天宠物精灵图制作",
+        "purpose_zh": "指导为 VS Code 聊天宠物制作或修改精灵图、精灵表、状态动画、眼睛处理、Stable/Insiders 变体及宠物过渡，强调从现有基线出发保持角色连续一致。",
+        "does": [
+          "从当前 idle 或 rendering 精灵基线复制完整身体，只改动新状态所需部分",
+          "定义逻辑像素规范（8×8 源像素、4×4 CSS 像素）与最近邻渲染、硬像素边缘要求",
+          "规定画布尺寸与锚定方式，非标准尺寸需在 chatPetWidget.ts 声明",
+          "区分 DOM 眼睛层（追踪/眨眼模式）与烘焙眼睛状态，避免叠加瞳孔",
+          "要求 Stable 与 Insiders 变体几何、帧数、时序完全一致，仅换调色板",
+          "规定静态 PNG 与水平精灵表命名及尺寸契约"
+        ],
+        "inputs": [
+          "当前宠物精灵图与实现代码",
+          "目标状态或动画需求",
+          "Stable/Insiders 调色板变体",
+          "配件图集与挂载轨道定义"
+        ],
+        "outputs": [
+          "状态精灵图与水平精灵表",
+          "减少动态效果用的静态 PNG",
+          "DOM 眼睛层配置（追踪/眨眼）",
+          "配件图集与挂载轨道更新"
+        ],
+        "scenarios": [
+          "新增或修改聊天宠物状态动画",
+          "制作宠物精灵表与静态回退图",
+          "调整宠物眼睛追踪或眨眼表现",
+          "制作 Stable/Insiders 外观变体",
+          "添加可穿戴配件图集"
+        ],
+        "prerequisites": [
+          "先阅读当前实现：精灵图目录、chatPetWidget.ts、chatPet.css 与单元测试",
+          "以当前代码和测试为最高优先级，其次最新相关 PR",
+          "不得凭记忆重绘宠物身体，须从现有基线复制"
+        ],
+        "limits": [
+          "仅适用于 VS Code 聊天宠物相关路径与文件",
+          "逻辑像素与画布尺寸规则严格，非标准尺寸需显式声明",
+          "不得使用模糊、羽化 alpha、颜色插值或意外非网格缩放",
+          "不得将烘焙瞳孔与运行时眼睛覆盖层混用",
+          "方向性装饰不得烘焙进会被镜像的图层"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "设计/UI",
+          "图像",
+          "前端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Create pet sprites that feel like one continuous character rather than separate drawings. Start from the current pet body, preserve its visual anchor, and make every difference intentional."
+          },
+          {
+            "field": "does",
+            "quote": "Use the current **idle** sprite as the baseline for resting, pointer-driven, or playful states."
+          },
+          {
+            "field": "does",
+            "quote": "The canonical art unit is one **logical pixel**:"
+          },
+          {
+            "field": "does",
+            "quote": "Use nearest-neighbor rendering only. Keep transparent backgrounds and hard pixel edges."
+          },
+          {
+            "field": "does",
+            "quote": "The default source canvas is `96×96`, or `12×12` logical pixels."
+          },
+          {
+            "field": "does",
+            "quote": "Never combine baked pupils with the runtime eye overlay."
+          },
+          {
+            "field": "does",
+            "quote": "Stable and Insiders are palette variants of the same animation."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the current implementation before drawing. Existing dimensions and timings may have changed since this skill was written."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "When rules conflict, use this precedence:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Never redraw the pet body from memory."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not introduce blur, feathered alpha, color interpolation, or accidental off-grid scaling."
+          },
+          {
+            "field": "limits",
+            "quote": "Declare every nonstandard source dimension in `chatPetWidget.ts` and update wide-sprite boundary handling."
+          }
+        ]
+      }
+    }
+  ]
+}

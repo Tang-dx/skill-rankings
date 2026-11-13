@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "repo": "lxe/phoneuse",
+  "tree_sha": "77f92d8edb1fdf829adcc061ffb3aa4679b5dd8e",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skill/SKILL.md",
+      "blob_sha": "636587182d56b063866d0cc415b86046d50923bc",
+      "source_url": "https://github.com/lxe/phoneuse/blob/4f130cb9b40afd7524744382fdecb705cf2b0828/skill/SKILL.md",
+      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "phoneuse",
+        "description": "See and operate the user's iPhone from this PC (Linux or Windows) with the `phoneuse` CLI (AirPlay mirror for the screen, Bluetooth mouse/keyboard for input). Use when a task needs the iPhone: open or use an app, read what is on the phone screen, tap, type, swipe, check a notification, change a phone setting, or test something on the device. Also use when the mirror or the Bluetooth link needs starting or fixing."
+      },
+      "excerpt": "---\nname: phoneuse\ndescription: See and operate the user's iPhone from this PC (Linux or Windows) with the `phoneuse` CLI (AirPlay mirror for the screen, Bluetooth mouse/keyboard for input). Use when a task needs the iPhone: open or use an app, read what is on the phone screen, tap, type, swipe, check a notification, change a phone setting, or test something on the device. Also use when the mirror or the Bluetooth link needs starting or fixing.\n---\n\n# Operating the iPhone with Phone Use\n\nThe `phoneuse` command drives a real, unmodified iPhone. Its screen arrives over\nAirPlay as a mirror window on this PC and as a live page at\nhttp://localhost:8777, and input goes in as a Bluetooth mouse and keyboard.\nEverything an agent does is a `phoneuse` subcommand; run `phoneuse --help` for\nthe full list.\n\n## Before acting\n\n1. Run `phoneuse status`. You need `iPhone app: 1 paired` (or more), `HID service:\n   active`, `connected=True`, and `Mirror window: ... showing the phone` (Windows:\n   `Mirror: showing the phone`). \"not paired\": stop and ask the user to pair the Phone\n   Use app (Pair iPhone in the Phone Use window); every action is refused until they\n   do. If something is off and you don't see why, `phoneuse doctor` checks the whole\n   setup and prints the fix for each problem.\n2. No mirror window: check whether `phoneuse up` is running. If it isn't, start it\n   somewhere the user can see it (a terminal or tmux window they use), not hidden in\n   the background. \"not mirroring\" (or no window): ask the user to start Screen\n   Mirroring to this PC's receiver (\"Phone Use on <computer>\"; `phoneuse status`\n   names it) from the iPhone's Control Center. You can't start\n   mirroring from the PC, and every input command refuses until it runs.\n3. **Show the user the phone** before your first action, so they can watch what\n   you do: open http://localhost:8777 (`phoneuse view --print` prints the address).\n   If you have a browser of your own, such as a built-in browser pane, open it\n   there. Otherwise run `phoneuse view`, which opens it in the user's default\n   browser. Do this once per task; if the page is already open, leave it. The page\n   is for the user to watch: act through `phoneuse` commands, never by clicking in\n   the page.\n4. `connected=False`: run `phoneuse status` again after a few seconds (the daemon\n   reconnects), then ask the user to tap \"Phone Use\" in the iPhone's Bluetooth settings\n   (Windows: the PC's name, which `phoneuse status` shows as `name=`).\n5. HID service not active: on Linux `phoneuse install` (needs sudo) sets it up; on\n   Windows `phoneuse up` starts it (it keeps running after `up` stops).\n\n## Notes in results\n\nEvery action waits (up to 3 s) for the phone's first visible change and prints\n`ok`, then any notes. When a note says no change showed, the action may have done\nnothing or the phone is slow: look before repeating it, never just repeat. When a\nnote says the phone is slow, leave time between actions.\n\n## The loop\n\nLook, decide, act, look again. Look with text first; it costs a few hundred\ntokens, where a screenshot image costs about 1,300.\n\n```bash\nphoneuse text                         # every text line on screen: \"x y  text\"\nphoneuse tap-on \"Wi-Fi\"               # tap a text label (exact position from OCR)\nphoneuse tap 0.5 0.35 --text          # any action + --text: act, then print the screen\n```\n\nEnd actions with `--text` to read the result in the same call; it waits until\nthe screen stops changing (apps launching, pages sliding in) before reading.\n`phoneuse text` drops the status bar and stray icon glyphs (`--all` keeps\nthem), shows the back chevron as `[back]`, and lists on/off switches as\n`[switch on]` / `[switch off]` at their positions, since OCR can't read them\n(dark mode only).\n\n`tap-on` looks for the words among the screen's text and taps that line exactly.\nWords that aren't on screen are refused, so scroll first. It is also refused when\nthat part of the screen changed since your last look (you decided from an older\npicture): look again. Icons and pictures have no text: take a screenshot and tap\nthem by position. OCR runs locally through a service that starts on first use\n(the first call takes a few seconds).\n\nTake a real screenshot when text isn't enough: pictures, icon-only screens,\nchecking a layout.\n\n```bash\nphoneuse screenshot $SCRATCH/s1.png   # then look at the image with the Read tool\nphoneuse tap 0.5 0.35                 # fractions of the screenshot (x, y)\nphoneuse screenshot $SCRATCH/s2.png   # waits until the screen has settled\n```\n\nWrite screenshots into your own scratch directory with a new name each time,\nso you never read a stale image. They come from the mirror's video itself, so\nwindows covering the mirror don't matter. The grey AssistiveTouch button near the lower right stays on screen\nand can hide what is under it; scroll a little if you need that spot.\n\nCoordinates are fractions of the screenshot from 0 to 1, or iPhone points when\nany value is above 1 (the screen is 402 × 874 pt). To tap something, read its\ncentre off the screenshot and divide by the image size. Taps land exactly; one\ntry is enough.\n\n## Working fast\n\nEvery round trip with the phone costs you a turn, so make each one count.\n\n- **Never `sleep`.** `--text` and `phoneuse text` wait until the screen has\n  settled (apps launching, pages sliding in) and then read it. A fixed sleep is\n  either too short or wasted time.\n- **Chain the steps you can already predict** in one call, and read once at the\n  end: `phoneuse open X && phoneuse tap-on \"Search\" && phoneuse type \"from:lxe\" --text`.\n  Stop chaining where the next step depends on what appears.\n- **Read with text, not images.** `--text` costs a few hundred tokens and is\n  enough for menus, lists, feeds and counts. Take a screenshot only for\n  pictures, icon-only screens, or when text lands somewhere surprising.\n- **Feeds you act on (X, Instagram home, lists): `scroll`, then look, then tap.**\n  `phoneuse scroll down 0.6` moves the content without momentum, so it stops where\n  the finger lifts and your next screenshot stays true. A flick keeps the feed\n  gliding after your screenshot, and a tap from that picture hits the wrong post.\n- **Flicks only for snap feeds**: `phoneuse gesture down 0.5 0.75 move 0.5 0.25 0.2 up` moves\n  Reels, TikTok or Shorts to the next item.\n- **Taps by position are checked**: `tap` and `gesture` (at its first `down`) refuse when the\n  area around the point changed since your last look (screenshot, `--text`, or an\n  gesture's film), because the position then belongs to something else. Look\n  again and tap. `--force` taps anyway, for fixed controls like\n  a tab bar right after a page change.\n- **Repeat cheap actions in one call** when you know the layout, e.g. three\n  flicks with a text read after each:\n  `for i in 1 2 3; do phoneuse gesture down 0.5 0.75 move 0.5 0.25 0.2 up --text | head -8; done`.\n\n## Gestures: every touch\n\nAny touch other than a plain tap is a **gesture**: steps for one finger, in order.\n\n```\ndown X Y      touch down at X Y (the pointer moves there and settles first)\nmove X Y [S]  slide to X Y over S seconds (default 0.3), finger still down\nhold S        stay still S seconds (finger down or up)\nup            lift (a gesture ends lifted anyway)\n```\n\n```bash\nphoneuse gesture down 0.5 0.4 hold 0.8 up                           # long press\nphoneuse gesture down 0.5 0.8 move 0.5 0.2 0.3 up                   # swipe up\nphoneuse gesture down 0.2 0.3 hold 1.0 move 0.7 0.6 1.0 hold 0.5 up # press, then drag (move an icon)\nphoneuse gesture down 0.5 0.4 up hold 0.1 down 0.5 0.4 up           # double tap\n```\n\n**Every gesture comes back as a film**: one image with a frame at the end of each\nmove, at the end of each hold while the finger is down, just before a long press\nlifts, and 0.3 and 0.8 s after the lift (frames that didn't change are merged).\nEach frame is labelled with its step, and a ring marks the finger (orange with a\ndot while down, white once up",
+      "card": {
+        "title_zh": "iPhone 远程操作",
+        "purpose_zh": "通过 phoneuse 命令行在 Linux 或 Windows 电脑上查看并操作真实 iPhone：AirPlay 镜像屏幕、蓝牙鼠标键盘输入，用于打开应用、读屏、点击、输入、滑动、查看通知、改设置或设备测试。",
+        "does": [
+          "用 phoneuse status/doctor 检查配对、HID 服务、连接与镜像状态",
+          "通过 text 读取屏幕文字，或用 screenshot 截图查看界面",
+          "用 tap、tap-on、scroll、gesture 执行点击、滑动、长按、拖拽等触摸操作",
+          "用 open、type、key 打开应用、输入文字和按键",
+          "用 recipe 执行或保存命名手势，如返回、主屏、控制中心、通知中心",
+          "用 notifications-read 读取通知，用 done 结束会话交还手机"
+        ],
+        "inputs": [
+          "phoneuse 子命令及参数（坐标、文本、手势步骤等）",
+          "iPhone 需已与 Phone Use 应用配对并开启屏幕镜像",
+          "用户提供的任务目标（要打开的应用、要读的内容等）"
+        ],
+        "outputs": [
+          "命令结果 ok 及屏幕变化说明",
+          "屏幕文字列表（x y text 格式）",
+          "截图 PNG 文件",
+          "手势过程胶片图像（film: PATH）",
+          "本地镜像网页 http://localhost:8777"
+        ],
+        "scenarios": [
+          "在 iPhone 上打开或操作某个应用",
+          "读取手机屏幕上的内容或通知",
+          "在设备上测试某个功能",
+          "修改手机设置",
+          "启动或修复镜像与蓝牙连接"
+        ],
+        "prerequisites": [
+          "运行 phoneuse status 确认已配对、HID 服务 active、connected=True、镜像窗口显示手机",
+          "未配对时需用户在 Phone Use 窗口完成配对",
+          "镜像未运行时需在用户可见处启动 phoneuse up，并由用户在 iPhone 控制中心开启屏幕镜像",
+          "首次操作前打开 http://localhost:8777 让用户观看",
+          "Linux 上 HID 服务未激活需 phoneuse install（需要 sudo）"
+        ],
+        "limits": [
+          "无法从电脑端启动屏幕镜像，需用户在 iPhone 上操作",
+          "未配对或镜像未运行时所有输入命令被拒绝",
+          "tap-on 只能点击屏幕上已有文字，图标和图片需截图后按坐标点击",
+          "输入文字会被手机自动纠错，精确文本需核对",
+          "屏幕区域自上次查看后变化时点击会被拒绝，需重新查看",
+          "用户接管手机（PAUSED 或提示 took over）时必须停止等待",
+          "通知属隐私内容，仅使用任务所需部分"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "测试",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "See and operate the user's iPhone from this PC (Linux or Windows) with the `phoneuse` CLI (AirPlay mirror for the screen, Bluetooth mouse/keyboard for input)."
+          },
+          {
+            "field": "does",
+            "quote": "phoneuse text                         # every text line on screen: \"x y  text\""
+          },
+          {
+            "field": "does",
+            "quote": "phoneuse screenshot $SCRATCH/s1.png   # then look at the image with the Read tool"
+          },
+          {
+            "field": "does",
+            "quote": "phoneuse tap-on \"Wi-Fi\"               # tap a text label (exact position from OCR)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run `phoneuse status`. You need `iPhone app: 1 paired` (or more), `HID service:\n   active`, `connected=True`, and `Mirror window: ... showing the phone`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "\"not paired\": stop and ask the user to pair the Phone\n   Use app (Pair iPhone in the Phone Use window); every action is refused until they\n   do."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "ask the user to start Screen\n   Mirroring to this PC's receiver"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "open http://localhost:8777 (`phoneuse view --print` prints the address)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "HID service not active: on Linux `phoneuse install` (needs sudo) sets it up"
+          },
+          {
+            "field": "limits",
+            "quote": "You can't start\n   mirroring from the PC, and every input command refuses until it runs."
+          },
+          {
+            "field": "limits",
+            "quote": "Words that aren't on screen are refused, so scroll first."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Its screen arrives over\nAirPlay as a mirror window on this PC and as a live page at\nhttp://localhost:8777"
+          }
+        ]
+      }
+    }
+  ]
+}
