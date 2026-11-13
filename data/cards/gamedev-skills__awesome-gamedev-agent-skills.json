@@ -1,0 +1,1171 @@
+{
+  "schema": 1,
+  "repo": "gamedev-skills/awesome-gamedev-agent-skills",
+  "tree_sha": "f694e16f8d38e62f61d3287f79b3ffb70c3b943a",
+  "truncated_paths": 68,
+  "skills": [
+    {
+      "skill_path": "skills/disciplines/ai-behavior-trees-utility-ai/SKILL.md",
+      "blob_sha": "4fe71b48dc6fc194dc8ceeccf2f5624d7bef6f83",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/ai-behavior-trees-utility-ai/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ai-behavior-trees-utility-ai",
+        "description": "Engine-neutral behavior tree and utility AI code for NPCs in any language: Blackboard, reactive composites, decorators and response-curve scoring. Use when an enemy keeps chasing after losing sight, restarts its action every frame or flip-flops between choices. Not for FSMs, steering or pathfinding (`game-ai`) or Unreal BT, EQS and StateTree (`unreal-behavior-trees`)."
+      },
+      "excerpt": "---\nname: ai-behavior-trees-utility-ai\ndescription: >\n  Engine-neutral behavior tree and utility AI code for NPCs in any language: Blackboard, reactive\n  composites, decorators and response-curve scoring. Use when an enemy keeps chasing after losing\n  sight, restarts its action every frame or flip-flops between choices. Not for FSMs, steering or\n  pathfinding (`game-ai`) or Unreal BT, EQS and StateTree (`unreal-behavior-trees`).\n---\n\n# Behavior trees and Utility AI\n\nA behavior tree (BT) gives an agent ordered, interruptible priorities; Utility AI scores every\noption and picks the most wanted one. The code is plain C# so it ports to any engine; the\nnon-obvious part is the lifecycle contract (who resets what, and when), which is where almost\nevery BT bug lives.\n\n## When to use\n\n- Build or fix a reusable BT runtime: Blackboard, leaves, composites, decorators.\n- Build a utility decider: curves, considerations, a selector with hysteresis.\n- Combine them: a BT branch that hands a graded choice (which attack, which target) to utility.\n\n**Not this skill:** choosing FSM vs BT, steering, A*, flow fields and perception belong to\n`game-ai`. Unreal's `BehaviorTree`/`Blackboard` assets, `BTTask`/`BTService`, EQS and StateTree\nbelong to `unreal-behavior-trees`. The agent that physically moves (`NavMeshAgent`,\n`NavigationAgent3D`) belongs to the engine navigation skill.\n\n## Workflow\n\n1. **Read what exists.** Find the current AI code, its tick site and how it reads the world. If\n   the project already ships a BT plugin (Godot LimboAI or Beehave, Unity Behavior, NodeCanvas),\n   extend it instead of adding a second runtime.\n2. **Pick the default shape: BT outside, utility inside.** The BT decides engage, flee or patrol;\n   a utility node inside the engage branch picks how. Use utility at the top only when every\n   top-level behavior is a graded trade-off (needs-driven villagers), because it is harder to\n   debug and prone to thrashing.\n3. **Design the Blackboard first.** Perception writes facts (`targetPos`, `health01`,\n   `distToPlayer`); leaves read them. Nodes never hold references to each other.\n4. **Choose memory or reactive per composite.** Priority selectors at the top are reactive so\n   a higher branch can preempt; a `Sequence` whose first child is a guard condition must be a\n   `ReactiveSequence`, or the guard stops being checked once the action runs.\n5. **Normalize every utility input to 0..1** through a curve before combining; multiply with\n   compensation so a 0 still vetoes.\n6. **Tick on a decision cadence** (5-15 Hz for most NPCs) from an accumulator, staggered across\n   agents. Movement and animation still run every frame.\n7. **Prove it with a headless tick test** (below): script the Blackboard, tick N times and\n   assert the status sequence and reset counts. Then draw the running leaf and per-action\n   scores on screen while tuning.\n\n## The lifecycle contract\n\nEvery node returns `Success`, `Failure` or `Running`. Parents reset a child as soon as it returns\na terminal status and when they abandon it while `Running`; the tree resets a terminal root.\n`Reset()` must be idempotent and must clear only execution-local state (timers, reservations),\nnever persistent state such as a cooldown deadline.\n\n```csharp\n// Selector = fallback/OR: return the first child that is not Failure.\n// `Current` (from Composite) remembers a Running child so the next tick resumes there.\npublic sealed class Selector : Composite\n{\n    public override Status Tick(Blackboard bb, float dt)\n    {\n        for (; Current < Children.Count; Current++)\n        {\n            var s = Children[Current].Tick(bb, dt);\n            if (s == Status.Running) return Status.Running;            // resume here next tick\n            Children[Current].Reset();                                // terminal child can re-enter cleanly\n            if (s == Status.Success) { Current = 0; return Status.Success; }\n        }\n        Current = 0;\n        return Status.Failure;                                         // every child failed\n    }\n}\n```\n\nThis is the memory variant: it cannot be preempted. `Sequence`, `ReactiveSelector`,\n`ReactiveSequence`, `Parallel`, the decorators and `BehaviorTree` follow the same contract in\n`references/behavior-tree-core.md`.\n\n## Utility scoring in one snippet\n\n```csharp\n// A consideration maps one raw fact to 0..1 through a response curve.\nfloat Score(Blackboard bb)\n{\n    float distance01 = Curves.InverseLerp01(bb.Get<float>(\"distToPlayer\"), 20f, 2f); // near = 1\n    float health01   = Curves.Sigmoid(bb.Get<float>(\"health01\"), k: 8f, mid: 0.4f);  // hurt = low\n    // A 0 in any factor still vetoes the action; compensation stops each extra\n    // consideration from dragging every score toward 0. No allocation per call.\n    return Curves.Compensate(distance01 * health01, count: 2);\n}\n```\n\nSelection: argmax with an inertia bonus of about 0.05 for the running action is the default;\nsoftmax (temperature about 0.2) when designers want variety without silly picks.\n\n## Headless tick test\n\nRun this shape in the project's test runner (Unity Test Framework, GdUnit4, xUnit) before\ntuning by eye; `Assert` stands for the framework's assertion. A probe leaf counts ticks and\nresets, so lifecycle bugs show up as numbers.\n\n```csharp\nsealed class Probe : Leaf\n{\n    public int Ticks, Resets; readonly int _after; readonly Status _end;\n    public Probe(int after, Status end = Status.Success) { _after = after; _end = end; }\n    public override Status Tick(Blackboard bb, float dt) => ++Ticks >= _after ? _end : Status.Running;\n    public override void Reset() { Ticks = 0; Resets++; }\n}\n// Guard lost mid-action: the running action must be aborted, not resumed.\nvar bb = new Blackboard(); var chase = new Probe(after: 3);\nvar seq = new ReactiveSequence().Add(new Condition(b => b.Get<bool>(\"sees\"))).Add(chase);\nbb.Set(\"sees\", true);  Assert(seq.Tick(bb, 0.1f) == Status.Running);\nbb.Set(\"sees\", false); Assert(seq.Tick(bb, 0.1f) == Status.Failure && chase.Ticks == 0);\n```\n\nCover at least: a `Wait` that runs twice in a row takes full time both runs; a lost guard\naborts its action; a cooldown still blocks after its branch is aborted; utility returns `null`\n(and the caller copes) when every action scores 0.\n\n## Gotchas\n\n- **Guard not re-checked.** A memory `Sequence` resumes at its running child, so\n  `[CanSeePlayer?, Chase]` chases forever after sight is lost. Use `ReactiveSequence`, or make\n  the action fail when its Blackboard input disappears.\n- **Priority never preempts.** A memory `Selector` at the root keeps resuming a running Patrol\n  and never re-asks Attack. Top-level priority selectors are reactive, and they must `Reset()`\n  the branch they abandon or its move or animation keeps running.\n- **Timed actions finish instantly the second time.** `Wait`/`Repeat` accumulators were not\n  cleared because the parent skipped `Reset()` on a terminal child.\n- **Cooldown bypass.** A `Cooldown` that clears its ready-time in `Reset()` lets an agent attack\n  every time it flickers between branches. Keep the deadline across resets.\n- **`Parallel` restarts finished children.** Re-ticking a child that already succeeded restarts\n  it, and `RequireAll` then never sees all children succeed on one tick. Store per-child results.\n- **Cooldown inside a `Sequence` makes the agent step back to patrol** for a tick each time it is\n  blocked. Wrap it in `ForceSuccess` when \"wait for the cooldown\" should hold the branch.\n- **Mixed ranges.** One consideration in 0..100 next to others in 0..1 dominates and makes\n  weights meaningless. Clamp every curve output to 0..1.\n- **Plain products sink with more considerations.** Five factors of 0.8 give 0.33. Apply the\n  compensation factor (`Curves.Compensate`), which keeps an exact 0 as a veto.\n- **Inertia revives a vetoed action.** Add the hysteresis bonus only to positive raw scores.\n- **Softmax overflows** at small temperatures (`exp(score / 0.01)` is infinity in float). Subtract\n  the best sco",
+      "card": {
+        "title_zh": "行为树与效用AI",
+        "purpose_zh": "提供引擎无关的行为树与效用AI代码，用于NPC决策：黑板、响应式组合节点、装饰器与响应曲线评分，并给出生命周期契约与常见陷阱。",
+        "does": [
+          "构建或修复可复用行为树运行时：黑板、叶子、组合节点、装饰器",
+          "构建效用决策器：曲线、考量项、带迟滞的选择器",
+          "将行为树与效用AI结合，由效用节点在分支内做分级选择",
+          "按决策频率分帧Tick，并在屏幕上绘制运行叶子与各动作分数",
+          "用无头Tick测试断言状态序列与重置次数，验证生命周期",
+          "指出守卫不重查、优先级不抢占、冷却绕过等常见陷阱"
+        ],
+        "inputs": [
+          "现有AI代码、其Tick位置及读取世界的方式",
+          "黑板中的事实数据，如targetPos、health01、distToPlayer",
+          "项目所用引擎与已有行为树插件情况"
+        ],
+        "outputs": [
+          "行为树运行时与效用评分代码（C#，无引擎类型）",
+          "无头Tick测试用例与断言",
+          "调试用的运行叶子与动作分数屏幕显示"
+        ],
+        "scenarios": [
+          "敌人失去视野后仍持续追击",
+          "NPC每帧重启动作或在选项间反复横跳",
+          "需要为NPC构建可中断的优先级行为",
+          "需要在多个动作间按分数做分级选择"
+        ],
+        "prerequisites": [
+          "项目中已有AI代码与Tick调用点",
+          "若已使用行为树插件（LimboAI、Beehave、Unity Behavior、NodeCanvas）应在其上扩展",
+          "测试需在项目测试运行器中进行（Unity Test Framework、GdUnit4、xUnit）"
+        ],
+        "limits": [
+          "不涉及FSM与行为树选型、转向、A*、流场与感知",
+          "不涉及Unreal的BehaviorTree/Blackboard资产、BTTask/BTService、EQS与StateTree",
+          "不涉及实际移动的NavMeshAgent或NavigationAgent3D",
+          "效用AI置于顶层较难调试且易抖动，默认建议行为树在外、效用在内"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "游戏",
+          "后端",
+          "测试"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Engine-neutral behavior tree and utility AI code for NPCs in any language: Blackboard, reactive composites, decorators and response-curve scoring."
+          },
+          {
+            "field": "does",
+            "quote": "Build or fix a reusable BT runtime: Blackboard, leaves, composites, decorators."
+          },
+          {
+            "field": "does",
+            "quote": "Build a utility decider: curves, considerations, a selector with hysteresis."
+          },
+          {
+            "field": "does",
+            "quote": "Combine them: a BT branch that hands a graded choice (which attack, which target) to utility."
+          },
+          {
+            "field": "does",
+            "quote": "Then draw the running leaf and per-action scores on screen while tuning."
+          },
+          {
+            "field": "inputs",
+            "quote": "Perception writes facts (`targetPos`, `health01`, `distToPlayer`); leaves read them."
+          },
+          {
+            "field": "outputs",
+            "quote": "The code is plain C# so it ports to any engine"
+          },
+          {
+            "field": "outputs",
+            "quote": "Run this shape in the project's test runner (Unity Test Framework, GdUnit4, xUnit) before tuning by eye"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when an enemy keeps chasing after losing sight, restarts its action every frame or flip-flops between choices."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the project already ships a BT plugin (Godot LimboAI or Beehave, Unity Behavior, NodeCanvas), extend it instead of adding a second runtime."
+          },
+          {
+            "field": "limits",
+            "quote": "Not for FSMs, steering or pathfinding (`game-ai`) or Unreal BT, EQS and StateTree (`unreal-behavior-trees`)."
+          },
+          {
+            "field": "limits",
+            "quote": "The agent that physically moves (`NavMeshAgent`, `NavigationAgent3D`) belongs to the engine navigation skill."
+          },
+          {
+            "field": "limits",
+            "quote": "Use utility at the top only when every top-level behavior is a graded trade-off (needs-driven villagers), because it is harder to debug and prone to thrashing."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/disciplines/audio-design/SKILL.md",
+      "blob_sha": "a6d742b98a9bb39afa567b26ea908650f4031835",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/audio-design/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "audio-design",
+        "description": "Engine-neutral game audio technique: bus layout, volume sliders in decibels, loudness, ducking music under dialogue, adaptive music and SFX variation, with Godot, Unity and FMOD/Wwise mappings. Use when mixing a game, making music react to combat, fixing repetitive footsteps or beat sync, or a mix that clips or pumps. Not for the Godot audio API (`godot-audio`)."
+      },
+      "excerpt": "---\nname: audio-design\ndescription: >\n  Engine-neutral game audio technique: bus layout, volume sliders in decibels, loudness, ducking\n  music under dialogue, adaptive music and SFX variation, with Godot, Unity and FMOD/Wwise\n  mappings. Use when mixing a game, making music react to combat, fixing repetitive footsteps or\n  beat sync, or a mix that clips or pumps. Not for the Godot audio API (`godot-audio`).\n---\n\n# Audio design\n\nGame audio is a mixing graph plus a music system. Every sound plays into a small set of buses\nthat the settings sliders and ducking act on, and music reacts to play through layers and\nsegments instead of one loop. This skill owns those decisions; `godot-audio`, Unity's\nAudioMixer or FMOD/Wwise supply the API.\n\n## When to use\n\n- Design a bus layout, volume sliders, group effects and a loudness target.\n- Duck music and ambience under voice or big impacts.\n- Build adaptive music, SFX variation, or beat-quantized gameplay.\n\n**Not this skill:** Godot node, bus and stream API questions go to `godot-audio`; settings menu\nlayout goes to `game-ui-ux`; triggering sounds from hits goes through `game-feel`'s feedback\nbundle.\n\n## Workflow\n\n1. **Inventory first.** List every player or `AudioSource` and the bus or mixer group it\n   outputs to; anything on Master or with no group bypasses the sliders.\n2. **Lay out buses**: `Master ← Music ← MusicDuck`, `SFX`, `Ambience`, `UI`, `Voice`. Sliders map\n   to bus gain; nobody sets per-clip volumes by hand.\n3. **Map sliders to decibels**: square the 0..1 slider, convert with `linear_to_db`, mute at 0.\n4. **Set headroom and a loudness target**: true peak at or below -1 dBTP; integrated loudness\n   about -24 LUFS (±2) for console/PC on TV or speakers and about -18 LUFS (±2) for handheld and\n   mobile. Streaming-music targets such as -14 LUFS are not game targets.\n5. **Duck** music under voice with a sidechain compressor or by tweening a dedicated duck bus.\n6. **Make music adaptive**: vertical layers for intensity, horizontal segments switched on bar\n   lines for state changes, stingers for one-off events (see the reference).\n7. **Vary repeated SFX** with sample pools and small pitch and volume offsets.\n8. **Measure, then listen.** Capture a representative 2-5 minute session and meter it:\n   - Godot: `xvfb-run -a godot --path . --write-movie capture.avi --fixed-fps 60 --quit-after 9000`\n     (needs a renderer; Movie Maker crashes under `--headless`). Other engines: ask the user to\n     record the game's output to a WAV and share the path.\n   - `ffmpeg -hide_banner -nostats -i capture.avi -vn -af ebur128=peak=true:framelog=quiet -f null -`\n     prints integrated loudness (`I:`) and true peak (`Peak:`). Compare with step 4.\n   - Then ask the user to listen on headphones and speakers and report whether ducking is\n     audible but not pumping and whether music transitions land on the beat.\n\n## Patterns\n\nSnippets are Godot 4.7 GDScript; the Unity 6.3 LTS and middleware equivalents follow each one.\n\n### 1. Bus routing and slider-to-gain mapping\n\n```gdscript\n# Route sounds to named buses; control GROUPS, not individual clips.\nsfx_player.bus = &\"SFX\"\nmusic_player.bus = &\"Music\"\n\n# Map a 0..1 settings slider to bus gain. Squaring the slider first spreads the\n# audible change over the whole travel; a raw linear-amplitude slider puts most of\n# the change in the bottom fifth.\nfunc set_bus_volume(bus_name: StringName, slider01: float) -> void:\n    var idx := AudioServer.get_bus_index(bus_name)\n    var gain := clampf(slider01, 0.0, 1.0)\n    AudioServer.set_bus_mute(idx, gain <= 0.0)             # true silence at 0\n    AudioServer.set_bus_volume_linear(idx, gain * gain)    # = set_bus_volume_db(idx, linear_to_db(gain * gain))\n# WRONG: AudioServer.set_bus_volume_db(idx, slider01): \"0.5\" is +0.5 dB (no audible\n# change) and 0 is 0 dB (full volume).\n```\n\nUnity 6.3 LTS: expose the group's Volume as a mixer parameter, then\n`mixer.SetFloat(\"MusicVolume\", 20f * Mathf.Log10(Mathf.Max(gain * gain, 0.0001f)))` (the mixer\nfloor is -80 dB). An `AudioSource` whose Output group is empty plays outside your mixer groups,\nso no category slider or snapshot affects it: route every source.\n\n### 2. Ducking via sidechain (music dips under voice)\n\nA compressor on the music bus, keyed by the voice bus, lowers the music while dialogue plays and\nreleases afterwards. Starting values: threshold about -30 dB on the voice signal, ratio 4:1 to\n8:1, attack as fast as the effect allows (up to ~10 ms), release 300-500 ms.\n\n```gdscript\n# Godot 4.7: AudioEffectCompressor reads its sidechain bus for threshold detection.\nfunc _ready() -> void:\n    var duck := AudioEffectCompressor.new()\n    duck.sidechain = &\"Voice\"      # the bus that triggers the dip\n    duck.threshold = -30.0         # dB, range -60..0\n    duck.ratio = 8.0               # range 1..48\n    duck.attack_us = 2000.0        # MICROseconds, range 20..2000 (2 ms is the maximum)\n    duck.release_ms = 400.0        # milliseconds, range 20..2000\n    AudioServer.add_bus_effect(AudioServer.get_bus_index(&\"Music\"), duck)\n\n# No-compressor alternative: tween a dedicated \"MusicDuck\" bus that sits between\n# Music and Master, so ducking never overwrites the player's Music slider.\nfunc duck_music(active: bool) -> void:\n    var idx := AudioServer.get_bus_index(&\"MusicDuck\")\n    var from := AudioServer.get_bus_volume_db(idx)\n    var to := -12.0 if active else 0.0\n    create_tween().tween_method(\n        func(db: float) -> void: AudioServer.set_bus_volume_db(idx, db), from, to, 0.25)\n```\n\nUnity 6.3 LTS: add a **Duck Volume** effect to the Music group and a **Send** effect on the Voice\ngroup targeting it. FMOD Studio and Wwise have sidechain/auto-ducking on buses; prefer those over\nscript tweens when the project already uses middleware.\n\n### 3. SFX variation (kill the \"machine gun\" repeat)\n\n```gdscript\n# Godot 4.7: AudioStreamRandomizer picks a take (no immediate repeats by default)\n# and randomizes pitch and volume on every play. No per-shot node allocation.\nfunc make_footsteps(samples: Array[AudioStream]) -> void:\n    var rnd := AudioStreamRandomizer.new()\n    for s in samples:\n        rnd.add_stream(-1, s)                 # -1 appends; optional third arg = weight\n    rnd.random_pitch_semitones = 1.0          # up to +/-1 semitone (about 6%)\n    rnd.random_volume_offset_db = 2.0         # up to +/-2 dB\n    $Footsteps.stream = rnd\n    $Footsteps.max_polyphony = 4              # overlapping steps without new players\n```\n\nUnity 6.3 LTS: put the takes in an **Audio Random Container** asset (Random or Shuffle playback,\nAvoid Repeating Last, volume and pitch randomization) and assign it to the `AudioSource`'s\nAudio Resource (`AudioSource.resource`); with Manual trigger each `Play()` picks a new take. For\nfull script control, keep an array of clips, pick one that differs from the last, set `pitch` in\na small range, and call `PlayOneShot` on a pooled `AudioSource`.\n\n### 4. Beat-synced events (quantize to the music grid)\n\n```gdscript\n# Schedule gameplay/visuals on musical time, not frame time, so they land on beat.\nconst BPM := 120.0\nconst SECONDS_PER_BEAT := 60.0 / BPM\n\n# What the player HEARS now: playback position, plus time since the last mix\n# (the position only updates once per mixed chunk), minus output latency.\nfunc song_time() -> float:\n    return ($Music.get_playback_position() + AudioServer.get_time_since_last_mix()\n            - AudioServer.get_output_latency())\n\nfunc current_beat() -> int:\n    return floori(song_time() / SECONDS_PER_BEAT)  # negative means beat 0 is not audible yet\n\n# Quantize an action to the NEXT beat boundary instead of firing immediately.\nfunc time_until_next_beat() -> float:\n    var time := song_time()\n    if time < 0.0:\n        return -time                             # pre-roll: wait for the first audible beat\n    return SECONDS_PER_BEAT - fposmod(time, SECONDS_PER_BEAT)\n# At an exact non-negative beat boundary, NEXT means one full beat later.\n```\n\nUnity 6.3 LTS: read `AudioSe",
+      "card": {
+        "title_zh": "游戏音频设计",
+        "purpose_zh": "面向游戏混音与音乐系统的引擎中立音频设计方法：总线布局、音量滑杆分贝映射、响度目标、对白闪避、自适应音乐与音效变化，并给出 Godot、Unity、FMOD/Wwise 对应做法。",
+        "does": [
+          "设计总线布局与音量滑杆到分贝的映射",
+          "设定余量、真峰值与整体响度目标",
+          "用侧链压缩或闪避总线在对白下压低音乐",
+          "构建分层/分段自适应音乐与节拍量化事件",
+          "用采样池和音高音量偏移消除重复音效",
+          "录制片段并用 ffmpeg ebur128 测量响度与峰值"
+        ],
+        "inputs": [
+          "玩家或 AudioSource 及其输出总线的清单",
+          "0..1 音量滑杆与总线名称",
+          "音乐、音效、语音等音频素材",
+          "代表性 2-5 分钟游戏录制片段或 WAV 路径"
+        ],
+        "outputs": [
+          "总线布局与滑杆增益映射方案",
+          "响度与真峰值测量结果及对比结论",
+          "闪避、自适应音乐、音效变化实现代码或配置",
+          "试听反馈：闪避是否自然、转场是否踩拍"
+        ],
+        "scenarios": [
+          "为游戏设计混音总线与设置菜单音量滑杆",
+          "对白播放时自动压低背景音乐",
+          "让音乐随战斗强度变化或按小节切换",
+          "修复重复脚步声等机械感音效",
+          "排查混音削波、抽吸或节拍不同步"
+        ],
+        "prerequisites": [
+          "使用 Godot 4.7、Unity 6.3 LTS 或 FMOD/Wwise 之一",
+          "测量需 ffmpeg（ebur128 滤镜）",
+          "Godot 录制需渲染器，Movie Maker 在 --headless 下会崩溃",
+          "其他引擎需用户自行录制 WAV 并提供路径"
+        ],
+        "limits": [
+          "不涉及 Godot 音频 API 细节，那属于 godot-audio",
+          "不涉及设置菜单界面布局",
+          "不涉及由打击触发的音效反馈逻辑",
+          "仅 Ogg Vorbis 与 MP3 流携带 bpm/bar_beats 供小节量化",
+          "编辑器电平表只显示峰值，不能替代整段响度测量"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "游戏",
+          "设计/UI",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Engine-neutral game audio technique: bus layout, volume sliders in decibels, loudness, ducking music under dialogue, adaptive music and SFX variation, with Godot, Unity and FMOD/Wwise mappings."
+          },
+          {
+            "field": "does",
+            "quote": "**Lay out buses**: `Master ← Music ← MusicDuck`, `SFX`, `Ambience`, `UI`, `Voice`. Sliders map to bus gain; nobody sets per-clip volumes by hand."
+          },
+          {
+            "field": "does",
+            "quote": "**Map sliders to decibels**: square the 0..1 slider, convert with `linear_to_db`, mute at 0."
+          },
+          {
+            "field": "does",
+            "quote": "**Set headroom and a loudness target**: true peak at or below -1 dBTP; integrated loudness about -24 LUFS (±2) for console/PC on TV or speakers and about -18 LUFS (±2) for handheld and mobile."
+          },
+          {
+            "field": "does",
+            "quote": "**Duck** music under voice with a sidechain compressor or by tweening a dedicated duck bus."
+          },
+          {
+            "field": "does",
+            "quote": "**Make music adaptive**: vertical layers for intensity, horizontal segments switched on bar lines for state changes, stingers for one-off events (see the reference)."
+          },
+          {
+            "field": "does",
+            "quote": "**Vary repeated SFX** with sample pools and small pitch and volume offsets."
+          },
+          {
+            "field": "does",
+            "quote": "`ffmpeg -hide_banner -nostats -i capture.avi -vn -af ebur128=peak=true:framelog=quiet -f null -` prints integrated loudness (`I:`) and true peak (`Peak:`). Compare with step 4."
+          },
+          {
+            "field": "inputs",
+            "quote": "**Inventory first.** List every player or `AudioSource` and the bus or mixer group it outputs to; anything on Master or with no group bypasses the sliders."
+          },
+          {
+            "field": "inputs",
+            "quote": "Other engines: ask the user to record the game's output to a WAV and share the path."
+          },
+          {
+            "field": "outputs",
+            "quote": "Then ask the user to listen on headphones and speakers and report whether ducking is audible but not pumping and whether music transitions land on the beat."
+          },
+          {
+            "field": "scenarios",
+            "quote": "- Design a bus layout, volume sliders, group effects and a loudness target.\n- Duck music and ambience under voice or big impacts.\n- Build adaptive music, SFX variation, or beat-quantized gameplay."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Snippets are Godot 4.7 GDScript; the Unity 6.3 LTS and middleware equivalents follow each one."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "(needs a renderer; Movie Maker crashes under `--headless`)"
+          },
+          {
+            "field": "limits",
+            "quote": "**Not this skill:** Godot node, bus and stream API questions go to `godot-audio`; settings menu layout goes to `game-ui-ux`; triggering sounds from hits goes through `game-feel`'s feedback bundle."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Godot: `xvfb-run -a godot --path . --write-movie capture.avi --fixed-fps 60 --quit-after 9000`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/disciplines/camera-systems/SKILL.md",
+      "blob_sha": "5f8a09963e006459c1ce559c6f5d3c9b24243d84",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/camera-systems/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "camera-systems",
+        "description": "Builds and tunes game cameras, engine-neutral with Godot and Cinemachine 3 mappings: 2D follow with deadzone and look-ahead, third-person orbit, first-person look and split-screen. Use when the camera lags, jitters while following, shows past the level edge, clips through walls or changes with frame rate. Not for shake (`game-feel`) or physics timestep jitter (`physics-tuning`)."
+      },
+      "excerpt": "---\nname: camera-systems\ndescription: >\n  Builds and tunes game cameras, engine-neutral with Godot and Cinemachine 3 mappings: 2D follow\n  with deadzone and look-ahead, third-person orbit, first-person look and split-screen. Use when\n  the camera lags, jitters while following, shows past the level edge, clips through walls or\n  changes with frame rate. Not for shake (`game-feel`) or physics timestep jitter\n  (`physics-tuning`).\n---\n\n# Camera systems\n\nA good camera follows smoothly at any frame rate, leads the action, never shows outside the\nlevel and never clips through walls. This skill owns those techniques and maps them onto each\nengine's camera node or rig; prefer the engine's built-in rig before hand-rolling one.\n\n## When to use\n\n- A 2D camera should follow smoothly, ignore small movements, lead motion and stay in bounds.\n- A 3D third-person orbit or first-person look controller, or framing several targets.\n- Fixing jitter, snapping, motion sickness or a camera that peeks past the level.\n\n**Not this skill:** shake magnitude and triggers (`game-feel`; this skill only exposes the\noffset), physics jitter of the body itself (`physics-tuning`), `Camera3D` and environment setup\n(`godot-3d-essentials`), player movement (`godot-2d-movement` or the engine movement skill),\nlook-sensitivity input curves (`input-systems`).\n\n## Core workflow\n\n1. **Decide what the camera serves.** Platformer (lead the jump, see hazards), top-down (centre\n   with deadzone), third-person (orbit plus collision), first-person (look only).\n2. **Use the built-in rig first**: Godot `Camera2D` smoothing, limits and drag margins, or\n   `SpringArm3D`; Unity Cinemachine 3 (`CinemachineCamera` plus Position Composer, Orbital\n   Follow, Deoccluder, Confiner). Hand-roll only what the rig cannot do.\n3. **Smooth with `1 - exp(-rate * dt)`** or a critically damped spring (`SmoothDamp`), never a\n   fixed `lerp(a, b, 0.1)` per frame.\n4. **Add a deadzone, then look-ahead** eased toward its goal so direction flips don't whip.\n5. **Clamp the view, not the centre**, to the level rectangle, accounting for zoom.\n6. **For 3D, separate look from collision**: yaw and pitch on a pivot, a spring arm or ray pulls\n   the camera in, pitch clamped.\n7. **Update after the target moves** (late update, or after physics) and follow the target's\n   interpolated transform when physics interpolation is on.\n8. **Verify with a runnable check, then by eye.** Step the follow code headless with a target\n   moving at 300 px/s for 2 s at `dt = 1/30` and at `dt = 1/144`, and compare how far the camera\n   trails the target. With `rate = 8` exponential smoothing the lag is about 33 px and 37 px; a\n   fixed `lerp(..., 0.1)` gives about 90 px and 19 px, a sign the follow is frame-rate\n   dependent. Then ask the user to run into corners, walls and level edges at low and high frame\n   rates and report any jitter, peeking or snapping.\n\n## Patterns\n\n### 1. Godot 2D built-in follow: smoothing + bounds (don't hand-roll first)\n\n```gdscript\n# Godot 4.7 Camera2D. Engine-provided smoothing + hard limits + drag margins.\n@onready var cam := $Camera2D\nfunc _ready() -> void:\n    cam.make_current()\n    cam.position_smoothing_enabled = true\n    cam.position_smoothing_speed = 6.0           # higher = snappier; lower = floatier\n    cam.limit_left = 0; cam.limit_top = 0        # clamp to the level rect (pixels)\n    cam.limit_right = level_width; cam.limit_bottom = level_height\n    cam.drag_horizontal_enabled = true           # built-in deadzone via drag margins\n```\n\n### 2. Frame-rate-independent smooth follow (when you hand-roll it)\n\n```gdscript\n# RIGHT: exponential smoothing — same feel at any FPS. `rate` ~ 5..12.\nfunc _follow(dt: float) -> void:\n    var t := 1.0 - exp(-rate * dt)               # converges correctly regardless of dt\n    global_position = global_position.lerp(target.global_position, t)\n# WRONG: global_position = global_position.lerp(target.global_position, 0.1)\n#        → faster smoothing at higher FPS; different feel on every machine.\n# Unity 6.3 LTS: Vector3.SmoothDamp(transform.position, target.position, ref vel, smoothTime) in\n# LateUpdate gives the same spring behavior with built-in frame-rate correction.\n```\n\n### 3. Deadzone + look-ahead (lead the player, ignore jitter)\n\n```gdscript\n# Camera only chases once the target leaves the deadzone box, then aims AHEAD of motion.\nfunc _camera_target(dt: float) -> Vector2:\n    var to := target.global_position - _focus\n    var dz := deadzone_half_extents                  # e.g. Vector2(48, 32)\n    # Only move the focus by the overflow beyond the deadzone (per axis).\n    _focus.x += clampf(absf(to.x) - dz.x, 0, INF) * signf(to.x)\n    _focus.y += clampf(absf(to.y) - dz.y, 0, INF) * signf(to.y)\n    var lead := target.velocity.normalized() * look_ahead_dist    # aim ahead of travel\n    return _focus + lead\n```\n\n### 4. 3D third-person orbit with collision push-in\n\n```gdscript\n# Godot 4.7. Yaw/pitch a pivot; a SpringArm3D auto-pulls the camera in when blocked.\nfunc _unhandled_input(e):\n    if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:\n        # screen_relative is unscaled; `relative` is scaled by the stretch settings, so\n        # sensitivity would change with window size. The docs recommend screen_relative\n        # for captured-mouse aiming.\n        _yaw -= e.screen_relative.x * sensitivity\n        _pitch = clampf(_pitch - e.screen_relative.y * sensitivity,\n                        deg_to_rad(-80.0), deg_to_rad(45.0))       # clamp pitch!\nfunc _process(_dt):\n    pivot.rotation = Vector3(_pitch, _yaw, 0)\n    # $SpringArm3D handles wall collision: set spring_length + collision_mask; the child\n    # Camera3D slides in automatically. RIGHT: spring arm. WRONG: camera clips through walls.\n# Unity 6.3 LTS: a Cinemachine 3 CinemachineCamera (namespace Unity.Cinemachine) with an Orbital\n# Follow + Cinemachine Deoccluder; the CinemachineBrain on the Camera blends automatically.\n```\n\n### 5. Screen shake hook (owned trigger lives in `game-feel`)\n\n```gdscript\n# Expose an additive offset the game-feel trauma model writes to; follow + shake compose.\nvar shake_offset := Vector2.ZERO                 # set each frame by game-feel (trauma^2 * noise)\nfunc _apply(final_focus: Vector2) -> void:\n    global_position = final_focus + shake_offset  # shake rides ON TOP of smooth follow\n# Unity Cinemachine 3: CinemachineBasicMultiChannelPerlin (AmplitudeGain/FrequencyGain) for\n# continuous noise driven by trauma; for one-off impacts, a CinemachineImpulseSource on the\n# hitter plus a CinemachineImpulseListener on the camera.\n```\n\n## Gotchas\n\n- **`lerp(pos, target, const)` per frame** is frame-rate dependent: floatier at 30 FPS,\n  snappier at 144. Use `1 - exp(-rate * dt)` or `SmoothDamp`.\n- **Jitter while following a physics body**: the body moves at the physics tick (60 Hz) and the\n  camera at the display rate. Turn on physics interpolation (Godot\n  `physics/common/physics_interpolation`) and follow the body's interpolated transform in\n  `_process` (`get_global_transform_interpolated()` in 3D), or follow in the physics step with\n  `Camera2D.process_callback = CAMERA2D_PROCESS_PHYSICS`. Mixing the two is what jitters.\n- **One-frame lag** when following in the normal update before the target has moved. Follow in\n  `LateUpdate` (Unity) or after movement and physics resolve.\n- **Camera parented to the moving player** inherits every bump and fights interpolation. Keep\n  the camera on its own branch (or `top_level = true`) and follow in code or with a rig.\n- **Clamping the centre instead of the view** shows black past the edge. Clamp to\n  `[min + half_view, max - half_view]`, and centre on any axis where the level is smaller than\n  the view.\n- **No deadzone in twitchy games** makes the camera twitch with every micro-movement; a box\n  deadzone and a circular one feel different, so pick deliberately.\n- **Unclamped pitch** flips the camera over the top. About -80° to +45° for an orbit, ±80° ",
+      "card": null
+    },
+    {
+      "skill_path": "skills/disciplines/create-game-assets/SKILL.md",
+      "blob_sha": "c91726e70cd2d891ad04d06d0a6b035a9e6dba79",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/create-game-assets/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "create-game-assets",
+        "description": "Plans, generates or sources, and validates consistent game art: style guides, sprites, pixel art, tilesets, icons and textures, with QA and licence records. Use when making or AI-generating game art, fixing fake transparency, or checking Steam AI disclosure. Not for engine import (`godot-tilemap`, `godot-animation`, `unity-tilemap-2d`), UI layout (`game-ui-ux`) or sound (`audio-design`)."
+      },
+      "excerpt": "---\nname: create-game-assets\ndescription: >\n  Plans, generates or sources, and validates consistent game art: style guides, sprites, pixel\n  art, tilesets, icons and textures, with QA and licence records. Use when making or AI-generating\n  game art, fixing fake transparency, or checking Steam AI disclosure. Not for engine import\n  (`godot-tilemap`, `godot-animation`, `unity-tilemap-2d`), UI layout (`game-ui-ux`) or sound\n  (`audio-design`).\n---\n\n# Create Game Assets\n\nTurn a game's visual intent into a consistent, engine-ready asset set. Treat image generation as\none production tool inside a controlled pipeline, never as proof that an asset is shippable.\n\n## When to use\n\n- Defining or refreshing an art direction, or writing a style guide other contributors follow.\n- Producing a family of sprites, tiles, icons, backgrounds or textures that must match.\n- Generating art with an image tool, or sourcing licensed packs, and making the result usable.\n- Auditing what was generated or licensed before release.\n\n**Not this skill:** importing into the engine (`godot-tilemap`, `unity-tilemap-2d`,\n`pixijs-rendering`, `threejs-gltf-loading`), animating the sprites (`godot-animation`,\n`unity-animation`), atlas and texture-memory budgets at runtime (`performance-optimization`).\n\n## Core workflow\n\n1. **Inspect before inventing.** Find existing screenshots, concept art, sprites, models, fonts,\n   import settings, camera framing, target resolution, and naming conventions. Preserve a coherent\n   existing direction unless the user asks for a redesign.\n2. **Lock the technical frame.** Record engine, 2D/3D, camera/view, native display size, asset\n   dimensions, world scale, transparency, palette, filtering, animation frames, texture budget,\n   and target platforms. Use `assets/art-direction-brief.md` as a copyable brief.\n3. **Name the visual system.** Define shape language, silhouette priorities, value structure,\n   palette roles, materials, lighting, detail density, edge treatment, and motion character. Use\n   concrete visual properties; do not substitute a living artist's name for an art direction.\n4. **Make an asset manifest.** Copy `assets/asset-manifest.json`, then list every required asset,\n   state, variant, size, pivot, collision role, source, license, and approval status. Separate\n   production assets from disposable greybox placeholders.\n5. **Approve one visual target.** Create or select a representative hero asset or small style\n   board before producing a full set. Judge it at actual game scale and against a gameplay\n   background. If the user delegated the choice, pick the strongest viable direction and record\n   the decision instead of blocking.\n6. **Produce related assets as families.** Reuse the approved target as an edit/reference input.\n   Keep palette, view, proportions, lighting, outline, and texture density invariant. Generate\n   small coherent batches; avoid unrelated one-off prompts that drift.\n7. **Normalize deterministically.** Crop, size, anchor, slice, name, compress, and check alpha with\n   ordinary image/DCC tools. Never trust generated grids, transparency, seams, pivots, topology,\n   or dimensions without inspection. Use the bundled scripts for raster QA and contact sheets.\n8. **Import with engine-native settings.** Set filtering, mipmaps, pixels-per-unit/world scale,\n   color space, compression, sprite slicing, texture types, materials, and collision deliberately.\n   Read the relevant engine skill before editing engine files.\n9. **Validate in context.** Inspect a contact sheet and the actual game at native resolution.\n   Check silhouette, scale, animation stability, seams, legibility, palette, collision fit, memory,\n   and compression artifacts. Iterate on the source asset, not only on runtime compensations.\n10. **Record provenance.** Keep the source URL/tool, license or generation note, edit history, and\n    restrictions beside the manifest. Preserve embedded provenance metadata when the pipeline can.\n11. **Finish with the checks.** Run `scripts/asset_report.py` over every file in the batch with\n    the manifest's size, alpha and colour limits and `--json`; it must exit 0. Build a contact\n    sheet with `scripts/build_preview_sheet.py` and look at it. Confirm every shipped manifest\n    entry has a source, licence and `technical_checks_passed: true`. Then ask the user to view\n    the assets in the running game at native resolution and report anything that does not read.\n\n## Choose the production path\n\n| Need | Default path |\n|------|--------------|\n| Existing asset needs a controlled change | Edit the original/reference; state what must remain unchanged |\n| New 2D visual family | Approve seed → generate/source family → normalize → preview → import |\n| True pixel art | Use generated work as a draft; enforce grid, palette, clusters, and frames with pixel tools |\n| Tileable surface or tileset | Produce a small family; repair seams; test repeated 3×3 before approval |\n| UI art or icons | Keep text and interaction code-native; prefer SVG/vector for simple geometric symbols |\n| 3D model or material | Use concepts as reference; author/clean in a DCC; validate topology, UVs, scale, pivots, and LODs |\n| No generation/edit tool is available | Build the brief and manifest; source licensed assets or keep explicit greybox placeholders |\n| Audio asset | Route sound implementation and mixing to `audio-design`; still track source/license in the manifest |\n\n## Image-generation handoff\n\nWhen a capable image generation or editing tool is installed, use it for live visual creation. If\nthe workspace exposes an `imagegen` skill, read and follow it for the actual generation/edit call;\nthis skill owns the game-art brief, constraints, normalization, and acceptance gates. Generation\nAPIs usually bill per image: tell the user the batch size and ask before large or repeated runs.\n\nBuild prompts from these blocks:\n\n```text\nROLE/PURPOSE: production asset for [gameplay role]\nSUBJECT: [specific object/character and action]\nVIEW: [orthographic/top-down/side/three-quarter], [camera and facing]\nART DIRECTION: [shape language], [palette roles], [materials], [edge treatment]\nGAME-SCALE READ: [silhouette and focal details that must survive at WxH]\nTECHNICAL OUTPUT: [dimensions/aspect], [transparent or scene background], [frame/slot count]\nLOCKS: preserve [identity, proportions, palette, costume, lighting, line weight]\nEXCLUDE: text, labels, mockup frames, scenery, duplicate objects, cropped edges, signatures\n```\n\nFor edits, say both what changes and what stays fixed. Ask for transparent output through the\ntool's native transparency option when available, then verify the alpha channel—prompt wording\nalone does not guarantee transparency.\n\n## Raster QA recipes\n\nInspect constraints and emit a machine-readable report. `--require-alpha` also fails an RGBA file\nwhose every pixel is opaque, which is how a baked background or fake checkerboard shows up:\n\n```bash\npython scripts/asset_report.py assets/player-idle.png \\\n  --expect-size 64x64 --require-alpha --max-colors 48 --json\n```\n\nBuild a nearest-neighbor contact sheet over a checkerboard:\n\n```bash\npython scripts/build_preview_sheet.py output/player/*.png \\\n  --out output/player-preview.png --columns 4 --cell-size 192\n```\n\nRun script paths relative to this skill directory, or resolve the installed skill path first.\nBoth scripts need Python and Pillow (see Version notes). Install the only dependency with\n`python -m pip install -r scripts/requirements.txt` when it is not already available.\n`asset_report.py` exits 1 when any explicit constraint fails, so it can gate a build.\n\n## Quality gates\n\n- **Cohesion:** related assets share palette roles, line/edge treatment, view, light direction,\n  scale, and detail density.\n- **Gameplay read:** silhouettes and state changes remain clear at native resolution, in motion,\n  and over real backgrounds.\n- **Technical fit:** exact size/frame count, usable alpha, stable anchors/pivots, correct color\n  spa",
+      "card": {
+        "title_zh": "游戏美术资产制作",
+        "purpose_zh": "把游戏视觉意图转化为风格一致、可导入引擎的资产集：制定美术方向与清单、生成或采购素材、做栅格质检与来源记录，并明确不负责引擎导入、UI 布局与音效。",
+        "does": [
+          "梳理现有截图、概念图、导入设置与命名规范，锁定引擎、分辨率、调色板等技术框架",
+          "定义形状语言、剪影、明度结构、材质与光照等视觉系统，并建立资产清单",
+          "先批准一个代表性主资产或风格板，再以家族方式批量产出相关素材",
+          "用脚本做栅格质检与拼版预览，检查尺寸、透明通道、颜色数与接缝",
+          "记录每个资产的来源、许可与生成说明，供发布前审计",
+          "按质量门检查内聚性、游戏内可读性、动画稳定性与权利合规"
+        ],
+        "inputs": [
+          "现有截图、概念图、精灵、模型、字体与导入设置",
+          "引擎、2D/3D、相机视角、原生分辨率、纹理预算与目标平台",
+          "资产清单（含状态、变体、尺寸、轴心、碰撞角色、来源、许可）",
+          "可用的图像生成或编辑工具（可选）",
+          "Python 3.10+ 与 Pillow 环境"
+        ],
+        "outputs": [
+          "美术方向简报与视觉系统定义",
+          "资产清单（asset-manifest.json）",
+          "风格一致的精灵、瓦片、图标、背景或纹理资产",
+          "栅格质检 JSON 报告与拼版预览图",
+          "来源、许可与生成记录"
+        ],
+        "scenarios": [
+          "制定或刷新游戏美术方向并撰写风格指南",
+          "批量产出需保持一致的精灵、瓦片、图标或纹理",
+          "用图像工具生成美术或采购授权素材包并使其可用",
+          "修复假透明、伪像素画、切片错位等栅格问题",
+          "发布前审计生成或授权内容，含 Steam AI 内容披露"
+        ],
+        "prerequisites": [
+          "已确定引擎、视角、原生分辨率与目标平台",
+          "具备 Python 3.10+ 与 Pillow，必要时安装 scripts/requirements.txt",
+          "有可用的图像生成或编辑工具（无工具时只能做简报与清单）"
+        ],
+        "limits": [
+          "不负责引擎导入（godot-tilemap、unity-tilemap-2d 等）",
+          "不负责精灵动画、UI 布局与音效实现",
+          "不能仅凭提示词结果判定资产可发布",
+          "生成 API 通常按图计费，大批量前需告知用户",
+          "脚本路径需相对技能目录或先解析安装路径"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "游戏",
+          "图像",
+          "设计/UI",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Turn a game's visual intent into a consistent, engine-ready asset set."
+          },
+          {
+            "field": "does",
+            "quote": "Run `scripts/asset_report.py` over every file in the batch with the manifest's size, alpha and colour limits and `--json`; it must exit 0."
+          },
+          {
+            "field": "inputs",
+            "quote": "Record engine, 2D/3D, camera/view, native display size, asset dimensions, world scale, transparency, palette, filtering, animation frames, texture budget, and target platforms."
+          },
+          {
+            "field": "outputs",
+            "quote": "Build a contact sheet with `scripts/build_preview_sheet.py` and look at it."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Defining or refreshing an art direction, or writing a style guide other contributors follow."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Generating art with an image tool, or sourcing licensed packs, and making the result usable."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Auditing what was generated or licensed before release."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Both scripts need Python and Pillow (see Version notes). Install the only dependency with `python -m pip install -r scripts/requirements.txt` when it is not already available."
+          },
+          {
+            "field": "limits",
+            "quote": "Generation APIs usually bill per image: tell the user the batch size and ask before large or repeated runs."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python scripts/asset_report.py assets/player-idle.png \\"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Install the only dependency with `python -m pip install -r scripts/requirements.txt` when it is not already available."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Build a nearest-neighbor contact sheet over a checkerboard:"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/disciplines/dialogue-systems/SKILL.md",
+      "blob_sha": "4589deb1170d1de032bf19d02109c701e7f0e707",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/dialogue-systems/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "dialogue-systems",
+        "description": "Builds engine-neutral branching dialogue with Ink, Yarn Spinner or a small JSON graph runner: lines, choices, conditions, variables and localization IDs. Use for NPC conversations, dialogue trees, barks, .ink or .yarn files, or dialogue that dead-ends. Not for visual-novel backlog and skip (`visual-novel`), quests (`rpg`) or text box widgets (`godot-ui-control`, `game-ui-ux`)."
+      },
+      "excerpt": "---\nname: dialogue-systems\ndescription: >\n  Builds engine-neutral branching dialogue with Ink, Yarn Spinner or a small JSON graph runner:\n  lines, choices, conditions, variables and localization IDs. Use for NPC conversations, dialogue\n  trees, barks, .ink or .yarn files, or dialogue that dead-ends. Not for visual-novel backlog and\n  skip (`visual-novel`), quests (`rpg`) or text box widgets (`godot-ui-control`, `game-ui-ux`).\n---\n\n# Dialogue systems\n\nModel conversations as a graph: nodes hold lines, choices branch, conditions gate options and\na variable store remembers what the player did. The first decision is build or adopt: Ink or\nYarn Spinner when writers need real flow control, a small data-driven runner when lines,\nchoices and flags are enough. Never build a new scripting language.\n\n## When to use\n\n- Designing branching conversations, choice menus or narrative state that later lines read.\n- Choosing between Ink, Yarn Spinner and a custom JSON/resource graph.\n- Wiring a dialogue runtime into the game loop: advance, show choices, run commands, persist.\n\n**Not this skill:** VN presentation and flow (`visual-novel`), quest logic (`rpg`), widget\ncode (`godot-ui-control`, `roblox-ui`) and UI layout rules (`game-ui-ux`), persisting variables\nacross sessions (`save-systems`).\n\n## Core workflow\n\n1. **Inspect the project**: existing `.ink`/`.yarn`/`.yarnproject` files, an installed\n   integration (ink-unity-integration, inkjs, Yarn Spinner for Unity or Godot), or a JSON graph.\n   Keep what exists.\n2. **Choose the tool.**\n   - **Ink**: prose-first, weave and gather flow, read counts as free flags; best for\n     dialogue-heavy or choose-your-own-adventure narrative.\n   - **Yarn Spinner**: node-based, explicit `<<commands>>` dispatched to game code, built-in\n     line IDs for localization; best for game-driven dialogue with many engine hooks.\n   - **Custom runner**: a JSON graph plus about 100 lines of interpreter, when you need full\n     control or no dependency.\n3. **Define the node contract**: a node yields a line (speaker plus line ID), a choice set, a\n   command, or an end/jump. The runner hands lines and choices to the UI and waits.\n4. **Keep variables outside the UI** in one store the dialogue reads and writes, so cutscenes,\n   tests and saves see the same state.\n5. **Author line IDs from day one**; display text comes from a per-locale string table.\n6. **Apply costs on the transition** (the choice), not on a node the player can revisit.\n7. **Validate before handing back:**\n   - Ink: `inklecate -o story.json story.ink` exits 1 on compile errors.\n   - Yarn: `ysc compile story.yarn` reports errors; `ysc run --auto-advance story.yarn` plays it\n     in the terminal.\n   - Custom graph: run `validate_graph()` from `references/runner.md`; it must return no\n     problems (missing targets, nodes without an exit, undeclared variables, unreachable nodes).\n   - Then walk each choice path once with a script that picks choices in order.\n\n## Patterns\n\n### 1. Engine-neutral dialogue graph (data, not code)\n\n```json\n{\n  \"start\": \"guard_intro\",\n  \"vars\": { \"gold\": 0, \"gate_open\": false },\n  \"nodes\": {\n    \"guard_intro\": {\n      \"speaker\": \"Guard\", \"line\": \"DLG_GUARD_001\",\n      \"choices\": [\n        { \"text\": \"DLG_OPT_BRIBE\", \"to\": \"bribe\", \"if\": \"gold >= 50\",\n          \"set\": { \"gold\": \"gold - 50\" } },\n        { \"text\": \"DLG_OPT_LEAVE\", \"to\": \"end\" }\n      ]\n    },\n    \"bribe\": {\n      \"speaker\": \"Guard\", \"line\": \"DLG_GUARD_BRIBED\",\n      \"set\": { \"gate_open\": true },\n      \"next\": \"end\"\n    },\n    \"end\": { \"end\": true }\n  }\n}\n```\n\n`line`/`text` are **string-table IDs** (localization), not literal text. `if`\ngates a choice; `set` mutates the variable store. The gold cost sits on the\n*choice*, so it is paid once per pick even if the `bribe` node is revisited; the\nidempotent `gate_open` write can live on the node. A string `set` value is an\nexpression, so a literal string needs inner quotes: `\"mood\": \"'angry'\"`. The full\ninterpreter that walks this graph is in `references/runner.md`. Its variable store\nstarts from `vars`; replace those defaults with the player's saved narrative state\nwhen starting a real conversation. Declare every referenced variable so unknown\nnames still expose authoring mistakes.\n\n### 2. Runner step (a state machine over the graph)\n\n```gdscript\n# Godot 4.7. The runner holds the current node and a variable store. Every line\n# waits for the player: the UI calls choose() or the continue callback.\nfunc goto(id: String) -> void:\n    current = graph.nodes[id]\n    apply_set(current.get(\"set\", {}))\n    if current.get(\"end\", false):\n        ui.close()\n        return\n    if current.has(\"line\"):\n        ui.show_line(current.get(\"speaker\", \"\"), localize(current.line))\n    if current.has(\"choices\"):\n        var shown = current.choices.filter(func(c): return eval_cond(c.get(\"if\", \"\")))\n        ui.show_choices(shown)            # only choices whose condition passes\n    elif current.has(\"next\"):\n        var next_id: String = current.next\n        ui.show_continue(func(): goto(next_id))   # advance when the player continues\n\nfunc choose(choice: Dictionary) -> void:   # called when the player picks a choice\n    apply_set(choice.get(\"set\", {}))       # write on the transition (revisit-safe)\n    goto(choice.to)\n```\n\n### 3. Ink — branching with knots, choices, and variables (inkle)\n\n```ink\n// Ink: '*' = once-only choice, '+' = sticky. [bracketed] text shows only in the\n// choice, not the printed result. '->' diverts; '-> END' stops the flow.\nVAR gold = 60\n-> guard_intro                    // the story starts at the top: divert into a knot\n\n=== guard_intro ===\nThe guard blocks the gate.\n* {gold >= 50} [Offer 50 gold]   \"Here, take it.\"\n    ~ gold = gold - 50\n    The guard pockets it and steps aside. -> END\n* [Leave]   You turn back. -> END\n```\n\nInk tracks how often each knot was seen, so `{visited_knot}` is a built-in\ncondition. Variables are global (`VAR`) or temporary (`~ temp`).\n\n### 4. Yarn Spinner — nodes, options, and commands (Yarn Spinner 3.x)\n\n```yarn\ntitle: GuardIntro\n---\n<<declare $gold = 60>>\n<<declare $gate_open = false>>\nGuard: You can't pass.\n-> Offer 50 gold <<if $gold >= 50>>\n    <<set $gold = $gold - 50>>\n    Guard: ...fine. Go on through.\n    <<set $gate_open to true>>\n-> Leave\n    Guard: Good choice.\n===\n```\n\nYarn lines may start with `Speaker:`; options use `->`; `<<set>>`/`<<declare>>`\nmanage `$variables`; `<<if>>` gates an option; `<<jump NodeName>>` moves between\nnodes. Interpolate values in text with `{$gold}`. Declare every variable before first\nuse: an undeclared one still compiles (Yarn infers its type and a zero/false/empty\nstart value) with only a warning, which hides typos. These constructs are unchanged from\nYarn Spinner 2.x.\n\n## Gotchas\n\n- **Display strings in the script** instead of line IDs turn localization into a rewrite.\n  Yarn tags lines with `#line:` IDs (`ysc tag` adds them); Ink has no line IDs, so tag lines\n  yourself (`#id:guard_01`) or translate whole files.\n- **A cost on a revisitable node** (`gold - 50` on `bribe`) is paid again on every visit. Put it\n  on the choice, or guard it with a seen-flag.\n- **Ink `*` versus `+`.** `*` choices vanish after one use, so a looping hub menu built from `*`\n  empties itself. Hub menus use sticky `+`.\n- **Ink choice text printed twice or not at all.** Text inside `[brackets]` shows only in the\n  choice; text before them shows in both; text after only in the output.\n- **Ink runtime loop stops after a choice.** After `ChooseChoiceIndex(i)` call `Continue()` (or\n  `ContinueMaximally()`) again; the chosen branch prints nothing until you do.\n- **Yarn undeclared variables compile with only a warning** and start at 0, false or \"\", which\n  hides typos. `<<declare>>` everything.\n- **Yarn 3 syntax in a Yarn 2 project** (`<<once>>`, `<<detour>>`, `when:` node groups) fails\n  with \"requires version 3 or later\". Check the `.yarnproject` language version.\n- **Ink Unity integration 2.0** imports `.ink` as ",
+      "card": {
+        "title_zh": "分支对话系统",
+        "purpose_zh": "用 Ink、Yarn Spinner 或小型 JSON 图运行器构建引擎无关的分支对话，涵盖台词、选项、条件、变量与本地化 ID，并校验死路与未声明变量。",
+        "does": [
+          "在 Ink、Yarn Spinner 与自定义 JSON 图之间做选型",
+          "定义节点契约：台词、选项集、命令、结束或跳转",
+          "把变量集中存放在 UI 之外的单一存储中",
+          "从第一天起编写行 ID 并用本地化字符串表显示文本",
+          "把代价写在选项转移上而非可重访节点上",
+          "用 inklecate、ysc 或 validate_graph 校验并逐条走通选项路径"
+        ],
+        "inputs": [
+          "现有 .ink、.yarn、.yarnproject 文件或 JSON 图",
+          "已安装的集成（ink-unity-integration、inkjs、Yarn Spinner for Unity 或 Godot）",
+          "对话节点、选项、条件与变量设计",
+          "本地化字符串表与行 ID"
+        ],
+        "outputs": [
+          "分支对话图（Ink、Yarn 或 JSON 数据）",
+          "对话运行器状态机代码",
+          "校验结果（缺失目标、无出口节点、未声明变量、不可达节点）",
+          "带行 ID 的本地化台词"
+        ],
+        "scenarios": [
+          "设计分支对话、选项菜单或后续台词读取的叙事状态",
+          "在 Ink、Yarn Spinner 与自定义 JSON 图之间选型",
+          "把对话运行时接入游戏循环：推进、显示选项、执行命令、持久化",
+          "排查对话死路或 Ink 选项后运行循环停止的问题"
+        ],
+        "prerequisites": [
+          "项目中已有或需新建 .ink、.yarn 或 JSON 图文件",
+          "使用 Ink 需 inklecate；使用 Yarn 需 ysc 命令行工具",
+          "自定义图需 references/runner.md 中的解释器与 validate_graph()"
+        ],
+        "limits": [
+          "不负责视觉小说演出与流程、任务逻辑、UI 控件代码与布局、跨会话变量持久化",
+          "Ink 没有行 ID，需自行标注或整文件翻译",
+          "Yarn 未声明变量只警告不报错，会掩盖拼写错误",
+          "Yarn 3 语法在 Yarn 2 项目中会报版本错误",
+          "Godot GDScript 版 Yarn Spinner 处于抢先体验，C# 版为开发中，Unreal 为预发布",
+          "禁止对对话表达式使用 eval()，应使用白名单求值器"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "游戏",
+          "写作",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Builds engine-neutral branching dialogue with Ink, Yarn Spinner or a small JSON graph runner: lines, choices, conditions, variables and localization IDs."
+          },
+          {
+            "field": "does",
+            "quote": "The first decision is build or adopt: Ink or Yarn Spinner when writers need real flow control, a small data-driven runner when lines, choices and flags are enough."
+          },
+          {
+            "field": "does",
+            "quote": "Custom graph: run `validate_graph()` from `references/runner.md`; it must return no problems (missing targets, nodes without an exit, undeclared variables, unreachable nodes)."
+          },
+          {
+            "field": "outputs",
+            "quote": "Then walk each choice path once with a script that picks choices in order."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Designing branching conversations, choice menus or narrative state that later lines read."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Wiring a dialogue runtime into the game loop: advance, show choices, run commands, persist."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Ink: `inklecate -o story.json story.ink` exits 1 on compile errors."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Yarn: `ysc compile story.yarn` reports errors; `ysc run --auto-advance story.yarn` plays it in the terminal."
+          },
+          {
+            "field": "limits",
+            "quote": "Yarn tags lines with `#line:` IDs (`ysc tag` adds them); Ink has no line IDs, so tag lines yourself (`#id:guard_01`) or translate whole files."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Ink: `inklecate -o story.json story.ink` exits 1 on compile errors."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/disciplines/game-ai/SKILL.md",
+      "blob_sha": "44832c77908c2707538dbf819ea736380c8cde43",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/game-ai/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "game-ai",
+        "description": "Designs engine-neutral enemy and NPC AI: picks FSM, behavior tree, utility or GOAP, and builds perception, steering and A* pathfinding. Use for patrol and chase, \"find a path to the player\", agents stuck on corners or AI that sees through walls. Not for BT or utility code (`ai-behavior-trees-utility-ai`), Unreal AI (`unreal-behavior-trees`) or Unity NavMesh (`unity-navmesh`)."
+      },
+      "excerpt": "---\nname: game-ai\ndescription: >\n  Designs engine-neutral enemy and NPC AI: picks FSM, behavior tree, utility or GOAP, and builds\n  perception, steering and A* pathfinding. Use for patrol and chase, \"find a path to the player\",\n  agents stuck on corners or AI that sees through walls. Not for BT or utility code\n  (`ai-behavior-trees-utility-ai`), Unreal AI (`unreal-behavior-trees`) or Unity NavMesh\n  (`unity-navmesh`).\n---\n\n# Game AI architecture\n\nSplit every agent into layers that pass one small value to the next: **perceive** (facts on a\nBlackboard) → **decide** (an intent such as \"go to X\", \"attack Y\") → **path** (waypoints) →\n**steer** (a velocity) → **animate**. Most \"dumb AI\" bugs are a layer doing another layer's job:\na state that raycasts, a pathfinder called every frame, steering that ignores the path.\n\n## When to use\n\n- Choose a decision model, or fix one that has grown into flag soup.\n- Build or debug an FSM, perception, steering, A* on a grid or graph, or a flow field.\n- Diagnose agents that get stuck, oscillate, react unfairly fast or see through walls.\n\n**Not this skill:** BT and utility runtimes go to `ai-behavior-trees-utility-ai`; Unreal\n`BehaviorTree`, EQS and StateTree go to `unreal-behavior-trees`; Unity `NavMeshSurface` and\n`NavMeshAgent` go to `unity-navmesh`. Movement and collision feel go to `physics-tuning`.\n\n## Pick the decision model\n\n| Situation | Default |\n|---|---|\n| 2-6 states, transitions obvious (door, turret, simple guard) | FSM |\n| Several states share exits (stunned, dead, alerted from anywhere) | Hierarchical FSM: a parent state owns the shared exits |\n| Many prioritized, interruptible behaviors, reused across enemy types | Behavior tree, built with `ai-behavior-trees-utility-ai` |\n| Graded trade-offs (which target, heal or attack, needs) | Utility scoring, same skill; usually inside a BT branch |\n| Multi-step plans with preconditions the designers want to emerge | GOAP; only if a BT cannot express it, because plans are hard to debug |\n\nCommon shipping mix: an FSM for the top mode (Idle, Combat, Dead) with a BT inside Combat.\nStart with the FSM; promote a state to a BT when its transitions stop fitting on one screen.\n\n## Workflow\n\n1. **Read the project first.** Engine, existing AI code, navigation (navmesh, `AStarGrid2D`,\n   a tile grid), and how enemies find the player today. Extend what exists.\n2. **Write perception once.** One sensor per agent writes `target`, `last_known_pos`,\n   `can_see`, `heard_at` to a Blackboard on a timer (5-10 Hz). Decisions read those facts; they\n   never raycast.\n3. **Pick the model** from the table and keep transitions inside states (or a table), not in\n   scattered `if state == ...` checks.\n4. **Path on the coarsest graph that works** (waypoints or a nav grid beats a dense pixel grid),\n   cache the path, and follow the next waypoint with steering.\n5. **Add stuck and fairness guards** (see Gotchas) before tuning numbers.\n6. **Verify with runnable checks**, not just by watching:\n   - A* admissibility: on 50 random grids, the path cost from A* equals Dijkstra's (`h = 0`)\n     cost. Any mismatch means the heuristic or step costs are wrong.\n   - State flicker: log transitions with timestamps during a scripted run; more than about 2\n     transitions per second for one agent means missing hysteresis.\n   - Stuck: run agents through the level headless and fail if any makes less than 0.5 units of\n     progress toward its waypoint in 2 s.\n   Then watch it with the path, current state and sight cone drawn on screen.\n\n## Gotchas\n\n**FSM**\n- **The initial state's `enter()` never runs** when the agent assigns `current = Patrol.new()`\n  without calling it. Route the first state through the same `change_state()` as every other.\n- **Changing state from inside `enter()`/`exit()`** re-enters the machine and runs exits twice.\n  Queue the next state and apply it after `update()` returns.\n- **Threshold flicker.** Chase at 10 m and give up at 10 m, and the agent toggles every frame\n  at the boundary. Use separate enter and exit thresholds (chase at 10, give up at 14) and a\n  minimum time in state of about 0.3-0.5 s.\n\n**Perception**\n- **Check cheap to expensive:** squared distance, then the view cone (`dot(forward, dir) >\n  cos(half_angle)`), then one raycast. Only survivors pay for the ray; stagger rays across frames.\n- **One ray to the target's origin** fails behind low cover (origin at the feet) or passes through\n  a gap at the waist. Cast to two or three points (head, chest) and accept any hit.\n- **Omniscient AI feels like cheating.** Chase the last-known position, then search, instead of\n  reading the player's live position after sight is lost. Delay the first reaction by roughly\n  0.2-0.5 s, or fill an awareness meter faster at close range, so players can react.\n\n**Steering**\n- **Weighted sums cancel.** Seek plus avoid pointing opposite ways sums to zero and the agent\n  freezes at the wall. Use priority truncation: apply avoidance first and spend the remaining\n  force budget on lower behaviors.\n- **Waypoint radius smaller than one tick of travel** (`speed * dt`) makes agents overshoot and\n  orbit the point. Advance when within `max(radius, speed * dt)`.\n- **Separation over every pair** is O(n²); bucket agents in a spatial hash with cells about the\n  neighbor radius.\n- **Steering and an engine nav agent both moving the body** jitter. Let the agent compute the\n  path and feed its desired velocity into your steering (Godot: `NavigationAgent2D/3D`\n  `velocity` and `velocity_computed` when avoidance is on; Unity: see `unity-navmesh`).\n\n**Pathfinding**\n- **Inadmissible heuristic** returns fast but longer paths: octile assumes diagonal steps cost\n  √2; if diagonals cost 1 use Chebyshev; terrain weights below 1 break every grid heuristic.\n- **Diagonal corner cutting** through wall corners: only allow a diagonal when both orthogonal\n  neighbors are open. Godot `AStarGrid2D` defaults to `DIAGONAL_MODE_ALWAYS`, which cuts\n  corners; set `DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES` (or `NEVER` for 4-way with Manhattan).\n- **Godot `AStarGrid2D.update()` clears every solid point and weight.** Call it after setting\n  `region`/`cell_size`/`offset`, then mark walls. `jumping_enabled` ignores weight scales.\n- **Unreachable goal floods the whole map.** Label connected regions with a flood fill once and\n  reject cross-region requests, or cap node expansions per search.\n- **Repathing every frame.** Repath when the target moves more than a cell (or 1-2 m), or every\n  0.25-0.5 s, staggered, with a per-frame budget of searches. Many agents to one goal: one flow\n  field (Dijkstra from the goal) instead of A* per agent.\n- **Stuck forever.** If progress toward the next waypoint stalls for about 2 s, repath; after two\n  failed repaths, change state (give up, teleport off-screen, or pick a new goal).\n\n## References\n\n- `references/pathfinding.md`: read when writing A* or a grid adapter by hand, choosing a\n  heuristic, or deciding between hand-rolled A*, `AStarGrid2D` and an engine navmesh.\n- `references/fsm-perception-steering.md`: read when implementing a hierarchical FSM, a\n  sight/hearing sensor or priority-truncated steering.\n\n## Related skills\n\n- `ai-behavior-trees-utility-ai`: BT and utility runtimes once the model is chosen.\n- `unity-navmesh`, `unreal-behavior-trees`: engine navigation and AI assets.\n- `physics-tuning`: agent radius, movement and collision response.\n- `procedural-gen`: the level graph the AI navigates.\n\n## Version notes\n\nLast verified: 2026-11-11.\n\n- Godot 4.7 `AStarGrid2D`: default `diagonal_mode` is `DIAGONAL_MODE_ALWAYS`, `update()` clears\n  point data, and `jumping_enabled` disables weight scaling\n  (https://docs.godotengine.org/en/4.7/classes/class_astargrid2d.html).\n- Godot 4.7 `NavigationAgent2D`: `avoidance_enabled`, `velocity`, `velocity_computed`\n  (https://docs.godotengine.org/en/4.7/classes/class_navigationagent2d.html).\n",
+      "card": {
+        "title_zh": "游戏AI架构设计",
+        "purpose_zh": "设计引擎无关的敌人与NPC AI：选择FSM、行为树、效用或GOAP决策模型，并构建感知、转向与A*寻路，诊断卡住、抖动、穿墙等常见问题。",
+        "does": [
+          "按状态数量与共享出口等情形选择FSM、分层FSM、行为树、效用评分或GOAP决策模型",
+          "设计感知层：按定时器把目标、最后已知位置、可见性等事实写入黑板",
+          "构建转向行为，用优先级截断避免加权求和相互抵消",
+          "实现或调试网格与图上的A*寻路、流场，并缓存路径",
+          "加入卡住与公平性保护，如重寻路、状态切换、反应延迟",
+          "用可运行检查验证：A*代价对比Dijkstra、状态抖动日志、无头卡住检测"
+        ],
+        "inputs": [
+          "项目引擎与现有AI代码",
+          "导航数据（navmesh、AStarGrid2D、瓦片网格）",
+          "敌人当前寻找玩家的方式",
+          "关卡与代理参数（速度、半径、视野角度等）"
+        ],
+        "outputs": [
+          "分层AI架构方案（感知→决策→寻路→转向→动画）",
+          "决策模型选型建议",
+          "感知、转向、寻路的具体实现与调试建议",
+          "可运行的验证检查方法"
+        ],
+        "scenarios": [
+          "为敌人或NPC选择决策模型，或重构已混乱的状态逻辑",
+          "构建或调试FSM、感知、转向、网格或图上的A*、流场",
+          "诊断代理卡住、来回振荡、反应过快或穿墙看见玩家",
+          "为巡逻与追击行为设计寻路与转向",
+          "为多代理同一目标优化寻路开销"
+        ],
+        "prerequisites": [
+          "需先阅读项目：引擎、现有AI代码、导航方式与当前寻敌逻辑",
+          "行为树与效用运行时需配合ai-behavior-trees-utility-ai技能",
+          "Unreal AI资产与Unity NavMesh分别属于其他技能范围"
+        ],
+        "limits": [
+          "不覆盖行为树与效用运行时实现",
+          "不覆盖Unreal BehaviorTree、EQS、StateTree",
+          "不覆盖Unity NavMeshSurface与NavMeshAgent",
+          "移动与碰撞手感属于physics-tuning技能",
+          "GOAP仅在行为树无法表达时使用，因计划难以调试"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "游戏",
+          "后端",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Designs engine-neutral enemy and NPC AI: picks FSM, behavior tree, utility or GOAP, and builds perception, steering and A* pathfinding."
+          },
+          {
+            "field": "does",
+            "quote": "One sensor per agent writes `target`, `last_known_pos`, `can_see`, `heard_at` to a Blackboard on a timer (5-10 Hz)."
+          },
+          {
+            "field": "does",
+            "quote": "**Pick the model** from the table and keep transitions inside states (or a table), not in scattered `if state == ...` checks."
+          },
+          {
+            "field": "does",
+            "quote": "**Path on the coarsest graph that works** (waypoints or a nav grid beats a dense pixel grid), cache the path, and follow the next waypoint with steering."
+          },
+          {
+            "field": "does",
+            "quote": "**Add stuck and fairness guards** (see Gotchas) before tuning numbers."
+          },
+          {
+            "field": "does",
+            "quote": "A* admissibility: on 50 random grids, the path cost from A* equals Dijkstra's (`h = 0`) cost."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Read the project first.** Engine, existing AI code, navigation (navmesh, `AStarGrid2D`, a tile grid), and how enemies find the player today. Extend what exists."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`ai-behavior-trees-utility-ai`: BT and utility runtimes once the model is chosen."
+          },
+          {
+            "field": "limits",
+            "quote": "Movement and collision feel go to `physics-tuning`."
+          },
+          {
+            "field": "limits",
+            "quote": "GOAP; only if a BT cannot express it, because plans are hard to debug"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Diagnose agents that get stuck, oscillate, react unfairly fast or see through walls."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Build or debug an FSM, perception, steering, A* on a grid or graph, or a flow field."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Many agents to one goal: one flow field (Dijkstra from the goal) instead of A* per agent."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/disciplines/game-feel/SKILL.md",
+      "blob_sha": "821eacd2946f4baa7dbe87b77ed2daa58fe9fe2f",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/game-feel/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "game-feel",
+        "description": "Adds engine-neutral juice to a working mechanic: trauma-based screen shake, hit-stop, eased tweens, squash and stretch, and knockback. Use when the game feels flat, weightless or not punchy, or hits and jumps should feel satisfying. Not for coyote time (`platformer`), input buffering (`input-systems`), camera follow (`camera-systems`) or HUD layout (`game-ui-ux`)."
+      },
+      "excerpt": "---\nname: game-feel\ndescription: >\n  Adds engine-neutral juice to a working mechanic: trauma-based screen shake, hit-stop, eased\n  tweens, squash and stretch, and knockback. Use when the game feels flat, weightless or not\n  punchy, or hits and jumps should feel satisfying. Not for coyote time (`platformer`), input\n  buffering (`input-systems`), camera follow (`camera-systems`) or HUD layout (`game-ui-ux`).\n---\n\n# Game feel (juice)\n\nFeedback sells an action: several small, brief, exaggerated responses fired together on one\nevent. This skill adds that layer on top of a working mechanic. It never changes the\nsimulation, so shake moves the camera and hit-stop scales time; neither moves bodies or stalls\ngameplay logic.\n\n## When to use\n\n- A hit, jump, landing, dash, pickup, death or button press works but feels weak.\n- Adding or tuning shake, hit-stop, easing, squash and stretch, flash, knockback, number pops.\n- Deciding how much juice is enough, and adding reduce-shake and reduce-flash options.\n\n**Not this skill:** jump controller math (`platformer`), generic input buffering and rebinding\n(`input-systems`), camera follow, deadzones and look-ahead (`camera-systems`, which exposes the\noffset this skill writes), mixing and ducking (`audio-design`), shader dissolves\n(`shader-programming`), tween and particle node APIs (`godot-animation`, `unity-animation`).\n\n## Workflow\n\n1. **Find the event hooks.** Juice attaches to discrete events (`hit`, `landed`, `picked_up`,\n   `died`). If the mechanic emits none, add signals or C# events first; never poll for them.\n2. **Assign each event a tier** (table below), then fire that tier's bundle from one\n   `feedback(tier, pos)` call so the whole game stays proportional.\n3. **Start with 2-3 channels per event** (sound, particles, shake), play, and add channels\n   until the event reads. Hit-stop and shake are the strongest and most abused; keep them for\n   impacts.\n4. **Ease everything that moves.** Overshoot (`back`) for pops, ease-out for settling,\n   ease-in only for anticipation.\n5. **Decide what runs during hit-stop.** Time scale slows timers, tweens and `_process`/`Update`\n   delta. Shake decay and UI tweens should usually use real time; the frozen pose should not.\n6. **Ship accessibility toggles**: shake strength 0-100 %, reduce flashing, reduce camera motion.\n7. **Verify with a headless check, then by eye.** Fire the event twice 30 ms apart and assert\n   time scale is back to 1.0 after the longer stop, trauma reaches 0 within `1 / decay`\n   seconds, and every scale tween ends at exactly its rest value. Then ask the user to play it\n   and report whether the hit reads, whether anything feels nauseating and whether input still\n   registers during the freeze.\n\n## Tiers\n\n| Tier | Trauma | Hit-stop | Particles | Extra | Example events |\n|------|:------:|:--------:|:---------:|-------|----------------|\n| small | 0.10-0.20 | none | 0-4 | tick SFX | footstep, coin, UI hover |\n| medium | 0.30-0.50 | 0.04-0.06 s | 6-12 | flash | normal hit, landing, pickup |\n| large | 0.70-1.00 | 0.10-0.15 s | 20-40 | flash, zoom, number | crit, boss hit, death, explosion |\n\n## Patterns\n\n### 1. Screen shake from decaying trauma\n\n```gdscript\n# Godot 4.7 Camera2D script. Shake = trauma^2, so light hits barely move and heavy hits punch.\n# Writes the camera OFFSET (visual only). Uses real time so the shake keeps decaying during\n# hit-stop instead of freezing the camera off-centre.\n# Camera2D.ignore_rotation defaults to true; set it false or the roll does nothing.\nextends Camera2D\n@export var decay := 1.2          # trauma lost per real second\n@export var max_offset := Vector2(12, 8)\n@export var max_roll := 0.1       # radians\n@export var strength := 1.0       # player setting, 0..1\nvar trauma := 0.0\nvar _t := 0.0\n\nfunc add_trauma(amount: float) -> void:\n    trauma = clampf(trauma + amount, 0.0, 1.0)   # hits add; they don't reset\n\nfunc _process(dt: float) -> void:\n    if trauma <= 0.0:\n        return\n    var real_dt := dt / maxf(Engine.time_scale, 0.0001)\n    trauma = maxf(trauma - decay * real_dt, 0.0)\n    var shake := trauma * trauma * strength\n    _t += real_dt * 30.0\n    # Summed sines at unrelated rates: smooth, never a per-frame random buzz.\n    offset = Vector2(max_offset.x * shake * sin(_t * 1.7), max_offset.y * shake * sin(_t * 2.3))\n    rotation = max_roll * shake * sin(_t * 1.1)\n    if trauma == 0.0:\n        offset = Vector2.ZERO\n        rotation = 0.0\n```\n\nUnity: drive `CinemachineBasicMultiChannelPerlin` `AmplitudeGain`/`FrequencyGain` from\n`trauma * trauma`, decaying with `Time.unscaledDeltaTime`; for one-off hits use a\n`CinemachineImpulseSource` on the hitter and a `CinemachineImpulseListener` on the camera.\n\n### 2. Hit-stop that survives overlapping hits\n\n```gdscript\n# Godot 4.7. Slow time, restore after a REAL-TIME delay; only the newest call restores.\nvar _hit_stop_id := 0\n\nfunc hit_stop(duration := 0.08, slow := 0.05) -> void:\n    _hit_stop_id += 1\n    var my_id := _hit_stop_id\n    Engine.time_scale = slow\n    # 4th arg ignore_time_scale=true: the timer still fires while the game is slowed.\n    await get_tree().create_timer(duration, true, false, true).timeout\n    if my_id == _hit_stop_id:       # a newer hit-stop owns the restore\n        Engine.time_scale = 1.0\n```\n\n```csharp\n// Unity. WaitForSecondsRealtime ignores Time.timeScale; WaitForSeconds never finishes at 0.\nint _hitStopId;\nIEnumerator HitStop(float duration = 0.08f, float slow = 0.05f) {\n    int myId = ++_hitStopId;\n    Time.timeScale = slow;\n    yield return new WaitForSecondsRealtime(duration);\n    if (myId == _hitStopId) Time.timeScale = 1f;\n}\n```\n\n### 3. Squash, stretch and overshoot\n\n```gdscript\n# Godot 4.7. Keep area roughly constant: stretch one axis, squash the other, spring back.\nfunc pop(node: Node2D) -> void:\n    node.scale = Vector2(1.3, 0.7)\n    var tw := node.create_tween()\n    tw.tween_property(node, \"scale\", Vector2.ONE, 0.18) \\\n      .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)   # overshoots past 1, settles\n```\n\nKill or reuse the previous tween on the same property (`if _tw: _tw.kill()`) when the event can\nretrigger, or two tweens fight and the node ends at the wrong scale.\n\n## Gotchas\n\n- **Shaking the body instead of the camera** desyncs collision and aim. Shake the camera offset\n  or a visual-only pivot.\n- **Random offset every frame** buzzes like static. Use noise or summed sines under a decaying\n  trauma value.\n- **Hit-stop never ends**: Unity `WaitForSeconds` or a Godot timer without `ignore_time_scale`\n  does not advance at time scale 0, and barely at 0.05. Wait in real time.\n- **Overlapping hit-stops** (two hits 30 ms apart) let the first timer restore time during the\n  second freeze. Only the newest call restores.\n- **Shake freezes off-centre during hit-stop** when it decays with scaled delta. Decay with real\n  time (Godot `dt / Engine.time_scale`, Unity `Time.unscaledDeltaTime`).\n- **UI and menu tweens crawl during hit-stop.** Godot `Tween.set_ignore_time_scale(true)`; Unity\n  coroutines with `Time.unscaledDeltaTime`.\n- **Time scale does not slow audio** in Godot or Unity, so a long freeze plays the impact sound\n  over a frozen picture. Keep stops short or lower `AudioServer.playback_speed_scale` too.\n- **Hit-stop on every frame of a held or multi-hit attack** locks the game. One per impact, and\n  skip it on hits that land during an active stop.\n- **Juice that never returns to rest** (scale drift, shake that does not decay) stops reading as\n  feedback. Snap to the rest value at the end of every effect.\n- **Over-juicing routine actions** causes nausea and hides real impacts. Footsteps get the small\n  tier or nothing.\n- **Feedback that blocks input.** Long freezes and uncancellable animations feel like lag; keep\n  freezes under about 0.15 s and buffer input through them.\n- **Flashing past the photosensitivity limit.** Large bright flashes must stay at or under three\n  per second (WCAG 2.3.1), and a reduce-flashing option should replace",
+      "card": {
+        "title_zh": "游戏手感增强",
+        "purpose_zh": "为已能运行的机制叠加引擎无关的反馈层：基于创伤值的屏幕震动、命中停顿、缓动补间、挤压拉伸与击退，让打击、跳跃、落地等事件更有分量；不改变模拟逻辑。",
+        "does": [
+          "按事件分级（小/中/大）触发反馈包，统一由 feedback(tier, pos) 调用",
+          "用衰减创伤值驱动相机偏移与滚转的屏幕震动",
+          "实现可承受重叠命中的命中停顿（真实时间恢复）",
+          "为移动对象添加缓动、过冲、挤压拉伸与回弹",
+          "提供震动强度、减弱闪烁、减弱相机运动等无障碍开关",
+          "用无头检查验证时间缩放恢复、创伤归零与缩放回到静止值"
+        ],
+        "inputs": [
+          "游戏中的离散事件钩子（hit、landed、picked_up、died 等信号或 C# 事件）",
+          "事件分级表（创伤值、命中停顿时长、粒子数量）",
+          "玩家无障碍设置（震动强度 0-100%、减弱闪烁、减弱相机运动）"
+        ],
+        "outputs": [
+          "相机震动偏移与滚转（仅视觉）",
+          "时间缩放变化实现的命中停顿",
+          "缩放、闪烁、击退、数字弹出、粒子等反馈效果",
+          "无头检查断言结果与人工试玩反馈"
+        ],
+        "scenarios": [
+          "打击、跳跃、落地、冲刺、拾取、死亡或按键已可用但感觉无力",
+          "添加或调校震动、命中停顿、缓动、挤压拉伸、闪烁、击退、数字弹出",
+          "决定多少“汁水”足够，并加入减弱震动与减弱闪烁选项"
+        ],
+        "prerequisites": [
+          "机制已能运行并发出离散事件；若无则先添加信号或 C# 事件，不得轮询",
+          "Godot 4.7 或 Unity 6.3 LTS（含 Cinemachine 3.1）等引擎环境"
+        ],
+        "limits": [
+          "不改变模拟：震动只移动相机，命中停顿只缩放时间，不移动刚体或阻塞游戏逻辑",
+          "不负责跳跃控制器数学、输入缓冲与重绑定、相机跟随、音频混音、着色器溶解、补间与粒子节点 API",
+          "命中停顿应短于约 0.15 秒并缓冲输入，否则像卡顿",
+          "大幅亮闪须不超过每秒三次（WCAG 2.3.1）",
+          "时间缩放不减速音频，长停顿会出现画面冻结而声音继续"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "游戏",
+          "前端",
+          "设计/UI"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Adds engine-neutral juice to a working mechanic: trauma-based screen shake, hit-stop, eased tweens, squash and stretch, and knockback."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "This skill adds that layer on top of a working mechanic. It never changes the simulation, so shake moves the camera and hit-stop scales time; neither moves bodies or stalls gameplay logic."
+          },
+          {
+            "field": "does",
+            "quote": "Screen shake from decaying trauma"
+          },
+          {
+            "field": "does",
+            "quote": "Hit-stop that survives overlapping hits"
+          },
+          {
+            "field": "does",
+            "quote": "Squash, stretch and overshoot"
+          },
+          {
+            "field": "does",
+            "quote": "Verify with a headless check, then by eye."
+          },
+          {
+            "field": "scenarios",
+            "quote": "A hit, jump, landing, dash, pickup, death or button press works but feels weak."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Adding or tuning shake, hit-stop, easing, squash and stretch, flash, knockback, number pops."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Deciding how much juice is enough, and adding reduce-shake and reduce-flash options."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the mechanic emits none, add signals or C# events first; never poll for them."
+          },
+          {
+            "field": "limits",
+            "quote": "It never changes the simulation, so shake moves the camera and hit-stop scales time; neither moves bodies or stalls gameplay logic."
+          },
+          {
+            "field": "limits",
+            "quote": "Not for coyote time (`platformer`), input buffering (`input-systems`), camera follow (`camera-systems`) or HUD layout (`game-ui-ux`)."
+          },
+          {
+            "field": "limits",
+            "quote": "Long freezes and uncancellable animations feel like lag; keep freezes under about 0.15 s and buffer input through them."
+          },
+          {
+            "field": "limits",
+            "quote": "Large bright flashes must stay at or under three per second (WCAG 2.3.1)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/disciplines/game-ui-ux/SKILL.md",
+      "blob_sha": "f17857e60afd18f6de0f0a5c77bc00361b07c27f",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/game-ui-ux/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "game-ui-ux",
+        "description": "Engine-neutral design rules for game HUDs and menus: anchors and containers, scaling, safe areas, gamepad focus, HUDs driven by events instead of polling, and accessibility minimums. Use for menus, health bars or inventory screens that break on ultrawide or phones. Pair with `godot-ui-control` or `roblox-ui`. Not for button juice (`game-feel`) or rebinding (`input-systems`)."
+      },
+      "excerpt": "---\nname: game-ui-ux\ndescription: >\n  Engine-neutral design rules for game HUDs and menus: anchors and containers, scaling, safe\n  areas, gamepad focus, HUDs driven by events instead of polling, and accessibility minimums. Use\n  for menus, health bars or inventory screens that break on ultrawide or phones. Pair with\n  `godot-ui-control` or `roblox-ui`. Not for button juice (`game-feel`) or rebinding\n  (`input-systems`).\n---\n\n# Game UI/UX\n\nMake every HUD and menu work on a phone, an ultrawide monitor and a TV, with a mouse or only a\ngamepad. This skill decides layout, scaling, focus, screen flow and how UI listens to game\nstate; the engine UI skill supplies nodes, components and styling.\n\n## When to use\n\n- Building a HUD, a menu, an inventory or shop screen, or any overlay.\n- Fixing UI that breaks at other resolutions, ignores safe areas, strands a gamepad user, or\n  polls game state every frame.\n- Structuring screen flow (title, game, pause, settings, confirm) as a stack.\n\n**Not this skill:** widget APIs and themes (`godot-ui-control`, `roblox-ui`, Unity UGUI or UI\nToolkit through the Unity skills), visual juice (`game-feel`), conversation flow and choice\nlogic (`dialogue-systems`), rebinding screens' input logic (`input-systems`), UI art and icons\n(`create-game-assets`).\n\n## Workflow\n\n1. **Inspect the project's UI first**: stretch or CanvasScaler settings, existing theme, fonts,\n   the screen-switching code, and which input devices the game targets.\n2. **Lay out with anchors and containers.** Anchor to edges, corners or centre; let rows,\n   columns and grids place children. A hard-coded `(x, y)` is correct at one resolution only.\n3. **Set one scaling policy for the whole UI**: a reference resolution (usually 1920x1080) that\n   scales to fit, plus an aspect rule: `expand` and anchor HUD corners outward (default), or\n   letterbox when the design truly needs a fixed frame.\n4. **Inset critical UI to the safe area** (health, timers, prompts); decorative art may bleed.\n   Reapply on resize and orientation change.\n5. **Make every screen gamepad-navigable**: one control focused on open, neighbours fixed where\n   the engine guesses wrong, a focus style distinct from hover, focus trapped inside modals.\n6. **Model screens as a stack.** Push for overlays, pop for back; only the top screen takes input,\n   and the screen below gets its focus back.\n7. **Drive the HUD from events.** Subscribe to `health_changed`, `score_changed`; set the initial\n   value once on connect, because signals do not replay.\n8. **Verify with a runnable check, then on screens.**\n   - Headless focus check: a script that opens each screen in turn and fails if\n     `get_viewport().gui_get_focus_owner()` (Godot) or\n     `EventSystem.current.currentSelectedGameObject` (Unity) is null.\n   - Size sweep: launch at 1280x720, 2560x1080 and 1080x2340 (Godot: `--resolution WxH`; needs a\n     display or `xvfb-run`, because the headless renderer draws nothing) and save a viewport\n     screenshot at each. Inspect them for clipped or overlapping elements.\n   - Ask the user to unplug the mouse, play through every menu with a gamepad and report any\n     screen where nothing is selected or focus escapes.\n\n## Patterns\n\n### 1. Anchors and containers\n\n```gdscript\n# Godot 4.7. Anchor the score to a corner; an HBoxContainer spaces the hearts.\nfunc _ready() -> void:\n    $Score.set_anchors_preset(Control.PRESET_TOP_LEFT)\n    for i in lives:\n        $Hearts.add_child(make_heart())\n```\n\nUnity UGUI: anchor the `RectTransform` to the corner and use a `HorizontalLayoutGroup`; set the\npivot to the same corner, or the element grows in every direction when its size changes.\n\n### 2. Scaling settings\n\n```text\nGodot 4.7  project.godot [display]:\n  window/stretch/mode=\"canvas_items\"   window/stretch/aspect=\"expand\"\n  window/size/viewport_width=1920      window/size/viewport_height=1080\nUnity 6.3  CanvasScaler: Scale With Screen Size, Reference Resolution 1920x1080,\n  Match Width Or Height = 0.5 (1.0 if the layout must never clip vertically)\nUnity 6.3  UI Toolkit: the same three settings live on the PanelSettings asset\n```\n\n### 3. Safe-area inset\n\n```gdscript\n# Godot 4.7. Only Android and iOS report a real safe area; elsewhere the margins come out ~0.\nfunc _apply_safe_area() -> void:\n    var safe := Rect2(DisplayServer.get_display_safe_area())           # screen pixels\n    var win := Rect2(Rect2i(DisplayServer.window_get_position(), DisplayServer.window_get_size()))\n    var inner := safe.intersection(win)\n    var to_ui := get_viewport_rect().size / win.size    # window pixels -> UI units under stretch\n    $Margin.add_theme_constant_override(\"margin_left\", int((inner.position.x - win.position.x) * to_ui.x))\n    $Margin.add_theme_constant_override(\"margin_top\", int((inner.position.y - win.position.y) * to_ui.y))\n    $Margin.add_theme_constant_override(\"margin_right\", int((win.end.x - inner.end.x) * to_ui.x))\n    $Margin.add_theme_constant_override(\"margin_bottom\", int((win.end.y - inner.end.y) * to_ui.y))\n```\n\nUnity: read `Screen.safeArea` and set a panel's `anchorMin`/`anchorMax` to its corners divided\nby `Screen.width`/`Screen.height`; recompute when the rect changes, not every frame.\n\n### 4. Focus on open\n\n```gdscript\n# Godot 4.7. Focus something on open; fix neighbours only where the automatic guess is wrong.\nfunc _on_screen_shown() -> void:\n    $PlayButton.grab_focus()\n    $PlayButton.focus_neighbor_bottom = $SettingsButton.get_path()\n    $SettingsButton.focus_neighbor_top = $PlayButton.get_path()\n```\n\nUnity UGUI: `EventSystem.current.SetSelectedGameObject(playButton)` in `OnEnable`, with\n`Navigation` set to Automatic or Explicit. UI Toolkit: call `Focus()` on the first element.\n\n### 5. Event-driven HUD\n\n```gdscript\n# RIGHT: HUD reacts to a signal; it updates only when health actually changes.\nfunc _ready() -> void:\n    player.health_changed.connect(_on_health_changed)     # emitted by gameplay\n    _on_health_changed(player.hp, player.max_hp)           # signals do not replay initial state\nfunc _on_health_changed(current: int, max_health: int) -> void:\n    # ratio maps 0..1 to the bar's configured range (default value range is 0..100).\n    $HealthBar.ratio = clampf(float(current) / max_health, 0.0, 1.0) if max_health > 0 else 0.0\n# WRONG: func _process(dt): $HealthBar.value = player.hp / player.max_hp  # polls every frame,\n# couples UI to the player's internals, and runs work even when nothing changed.\n```\n\n## Gotchas\n\n- **Nothing focused on open** leaves a gamepad player stuck on the first menu. Every screen\n  focuses one control when shown, and again when a screen above it closes.\n- **Focus escapes a modal.** Showing a dialog and focusing its button does not stop neighbour\n  search from reaching buttons behind it. Disable focus and mouse on the screen below (Godot\n  4.5+: `focus_behavior_recursive` and `mouse_behavior_recursive`).\n- **`set_process_input(false)` does not disable a Godot menu**: buttons receive GUI input, not\n  `_input`. Use the recursive focus and mouse behaviours above.\n- **Unity UGUI ignores the gamepad, or throws on start,** after switching Active Input Handling to\n  the Input System: the scene still has a `StandaloneInputModule`. Replace it with\n  `InputSystemUIInputModule`. UI Toolkit reads the project-wide UI actions and needs no module.\n- **Pixel-art UI at a fractional scale** shimmers and blurs. Godot: set\n  `window/stretch/scale_mode=\"integer\"`; Unity: pick a reference resolution that divides the\n  target displays evenly and use a pixel-perfect canvas.\n- **Text too small on a TV.** Default text should be at least 26 px at 1080p on console and TV\n  and 18 px at 1080p on PC, scalable to 200 % without losing content.\n- **Colour as the only signal** (red equals danger) fails for colour-blind players. Add an icon,\n  shape or label. Text that carries gameplay information needs at least 4.5:1 contrast.\n- **Hard-coded English sized to fit** overflows in German (often about 30 % longer). Use string\n  tabl",
+      "card": null
+    },
+    {
+      "skill_path": "skills/disciplines/input-systems/SKILL.md",
+      "blob_sha": "06f41674a3469e24a39d83c4aa689671f42c3b65",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/input-systems/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "input-systems",
+        "description": "Engine-neutral input architecture with Godot InputMap code: named actions, stick deadzones, buffered presses and rebinding with conflict checks. Use for controller support or a rebind menu, or a drifting stick, WASD on AZERTY, or a dropped press. Not for coyote time (`platformer`) or Unity and Unreal input assets (`unity-input-system`, `unreal-enhanced-input`)."
+      },
+      "excerpt": "---\nname: input-systems\ndescription: >\n  Engine-neutral input architecture with Godot InputMap code: named actions, stick deadzones,\n  buffered presses and rebinding with conflict checks. Use for controller support or a rebind\n  menu, or a drifting stick, WASD on AZERTY, or a dropped press. Not for coyote time\n  (`platformer`) or Unity and Unreal input assets (`unity-input-system`, `unreal-enhanced-input`).\n---\n\n# Input systems\n\nGameplay reads named **actions** (`jump`, `attack`, `move`); bindings from keys, buttons and\ntouch to those actions are data. Rebinding, multi-device support and most input accessibility\nfall out of that one indirection. This skill is the engine-neutral architecture with Godot 4.7\ncode. For the engine's own input assets use `unity-input-system` or `unreal-enhanced-input`;\nGodot's `InputMap` is covered here.\n\n## When to use\n\n- Designing an input layer: actions, per-device bindings, device detection and prompts.\n- Stick handling: deadzones, response curves, sensitivity.\n- Buffering discrete presses (attack during recovery, dodge, combo links, menu confirm).\n- A rebinding screen with conflict handling, saved bindings and reset to defaults.\n- Accessible controls: full remap, toggle vs hold, no required chords, adjustable windows.\n\n**Not this skill:** coyote time, jump buffering and variable jump height belong to\n`platformer`, which owns the jump controller. Hit-stop and other juice that interact with\nbuffers are `game-feel`. Writing the bindings file is `save-systems`. Menu focus and\nnavigation rules are `game-ui-ux`.\n\n## Core workflow\n\n1. **Inventory before editing.** List the existing actions (Godot: the `[input]` section of\n   `project.godot`; Unity: the `.inputactions` file; Unreal: `IA_`/`IMC_` assets) and grep\n   gameplay code for raw key reads (`is_key_pressed`, `KEY_`, `Input.GetKey`). Raw reads are\n   the first thing to replace.\n2. **Name actions by intent**, not by key, and give each one a keyboard and a gamepad binding.\n   Touch routes through the same actions.\n3. **Match the read to the action.** Edge (pressed this frame or tick) for discrete actions,\n   held or axis for continuous ones.\n4. **Filter analog input** with a radial deadzone and a separate response curve.\n5. **Buffer discrete presses** that arrive a little before they are legal, measured in game\n   time and consumed when they fire.\n6. **Rebinding:** capture the next input, bind the physical key, reject or swap conflicts,\n   save, and offer reset to defaults. Keep a way back to the pause menu that cannot be unbound.\n7. **Check it yourself, then ask for the device test** (see \"Check it\" below).\n\n## Patterns\n\n### 1. Actions over raw keys; edge vs held\n\n```gdscript\nif Input.is_action_just_pressed(\"jump\"):      # edge: true on the press frame or tick only\n    try_jump()\nvar dir := Input.get_vector(\"move_left\", \"move_right\", \"move_up\", \"move_down\")\n# get_vector applies a radial deadzone, rescales past it and caps length at 1,\n# so diagonals are not faster. Use get_axis for a single axis.\n# WRONG: Input.is_key_pressed(KEY_SPACE): unrebindable, keyboard-only, and a held\n# check, so jump re-fires every frame.\n```\n\nEngine equivalents: Unity Input System `InputAction` and action maps; Unreal Enhanced Input\nActions plus Mapping Contexts.\n\n### 2. Analog deadzone and sensitivity\n\n```gdscript\n# Raw sticks never rest at exactly zero. Apply a RADIAL deadzone (on the vector\n# length), not per-axis, so diagonals aren't clipped into the axes.\nfunc apply_deadzone(stick: Vector2, dead := 0.2, curve := 1.0) -> Vector2:\n    # dead == 1 cannot be rescaled; report invalid settings before stopping movement.\n    if not (dead >= 0.0 and dead < 1.0 and curve > 0.0):\n        push_error(\"apply_deadzone requires 0 <= dead < 1 and curve > 0.\")\n        return Vector2.ZERO\n    var mag := stick.length()\n    if mag <= dead:\n        return Vector2.ZERO                      # inside deadzone -> no movement\n    # Rescale so motion ramps from 0 at the edge of the deadzone, not from `dead`.\n    var scaled := minf((mag - dead) / (1.0 - dead), 1.0)  # some pads report > 1 on diagonals\n    return stick / mag * pow(scaled, curve)      # curve > 1 = finer aim near center\n# WRONG: clamping each axis separately — it carves a square hole and snaps to axes.\n```\n\nKeep the response curve (exponent) separate from sensitivity (a gain on the result, usually a\ncamera turn rate) and expose both in settings. Invalid settings report an error and return zero\nmovement. Godot's `get_vector` already does this deadzone and rescale, using the average of the\nfour actions' deadzones (0.2 per action by default) unless you pass one.\n\n### 3. Action buffer for discrete presses\n\n```gdscript\n# action_buffer.gd: remember discrete presses briefly so an early press still fires.\nextends RefCounted\n\nvar window := 0.15                        # seconds; 0.1-0.2 suits attacks and dodges\nvar _pressed_at := {}                     # action -> game time of its latest press\n\nfunc press(action: StringName, now: float) -> void:\n    _pressed_at[action] = now\n\nfunc consume(action: StringName, now: float) -> bool:\n    if not _pressed_at.has(action) or now - _pressed_at[action] > window:\n        return false\n    _pressed_at.erase(action)             # one press fires one action\n    return true\n\nfunc clear() -> void:                     # on death, pause, cutscene, scene change\n    _pressed_at.clear()\n```\n\nFeed it from the input read (`if Input.is_action_just_pressed(\"attack\"): buffer.press(&\"attack\",\nclock)`) and call `consume` where the action becomes legal, such as the first frame after attack\nrecovery. `clock` is game time you advance in `_physics_process`, so the window freezes during\npause and hit-stop. When two buffered actions become legal on the same tick, choose by a fixed\npriority, not by dictionary order. Jump buffering and coyote time use the same idea but belong to\n`platformer`.\n\n### 4. Rebinding with conflict detection\n\n```gdscript\n# Godot 4.7. Capture the next physical input, reject conflicts, then persist.\nvar _waiting_for: StringName = &\"\"               # set by the \"press a key for Jump\" button\n\nfunc _unhandled_input(event: InputEvent) -> void:\n    if _waiting_for != &\"\" and _is_bindable(event):\n        get_viewport().set_input_as_handled()\n        if not rebind(_waiting_for, event):\n            show_conflict_warning(event)         # offer swap or cancel\n        _waiting_for = &\"\"\n\nfunc _is_bindable(e: InputEvent) -> bool:\n    if e is InputEventKey or e is InputEventJoypadButton or e is InputEventMouseButton:\n        return e.pressed and not e.is_echo()     # ignore releases and key repeat\n    return e is InputEventJoypadMotion and absf(e.axis_value) > 0.5  # ignore stick noise\n\nfunc rebind(action: StringName, captured: InputEvent) -> bool:\n    var event := _to_binding(captured)\n    for other in InputMap.get_actions():\n        if other != action and not String(other).begins_with(\"ui_\") \\\n                and InputMap.action_has_event(other, event):\n            return false                         # already used -> let UI warn/swap\n    for old in InputMap.action_get_events(action):\n        if old.get_class() == event.get_class():  # replace only this device kind's binding\n            InputMap.action_erase_event(action, old)\n    InputMap.action_add_event(action, event)\n    save_bindings()                              # persist (see save-systems)\n    return true\n\nfunc _to_binding(e: InputEvent) -> InputEvent:\n    if e is InputEventKey:                       # bind the physical key, not the layout's letter\n        var k := InputEventKey.new()\n        k.physical_keycode = e.physical_keycode\n        return k\n    var b := e.duplicate() as InputEvent\n    b.device = -1                                # all devices: a pad binding must not stick to pad 0\n    if b is InputEventJoypadMotion:\n        b.axis_value = signf(b.axis_value)       # keep the direction only\n    return b\n```\n\nKeyboard bindings use `physical_keycode` with `keycode` left ",
+      "card": null
+    },
+    {
+      "skill_path": "skills/disciplines/level-design/SKILL.md",
+      "blob_sha": "1dcab88bfed9a7aeb0bc7afa672b1e0c394261bb",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/level-design/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "level-design",
+        "description": "Engine-neutral level design with Godot checks: player metrics from the real controller, key and ability gating with a soft-lock check, and pacing. Use when laying out a level or metroidvania gates, or players get lost or a key sits behind its own door. Not for generation (`procedural-gen`), painting tiles (`godot-tilemap`, `unity-tilemap-2d`) or jump tuning (`platformer`)."
+      },
+      "excerpt": "---\nname: level-design\ndescription: >\n  Engine-neutral level design with Godot checks: player metrics from the real controller, key and\n  ability gating with a soft-lock check, and pacing. Use when laying out a level or metroidvania\n  gates, or players get lost or a key sits behind its own door. Not for generation\n  (`procedural-gen`), painting tiles (`godot-tilemap`, `unity-tilemap-2d`) or jump tuning\n  (`platformer`).\n---\n\n# Level design\n\nA level is a sequence of intended experiences delivered through space. The order that works:\nmeasure the character, block out with primitives, check reachability and pacing, get playtest\nreports, then dress. This skill is engine-neutral with Godot 4.7 checks. Painting the grid is\n`godot-tilemap` or `unity-tilemap-2d`; generating layouts is `procedural-gen`.\n\n## When to use\n\n- Planning a level's structure: critical path, optional branches, gating order, encounters, and\n  where a mechanic is taught versus tested.\n- Building a blockout and checking that every required jump and gate is possible.\n- Reviewing a level that confuses, bores or soft-locks players.\n\n**Not this skill:** layout generators and dungeon algorithms (`procedural-gen`), jump and\nmovement tuning (`platformer`, the engine movement skill), enemy behaviour in the space\n(`game-ai`), camera framing (`camera-systems`).\n\n## Core workflow\n\n1. **Measure the metrics from the game, not from memory.** Read the movement constants from the\n   player script, then run the jump measurement (Pattern 1) to get the real apex, reach and\n   airtime. Size every gap, ledge and corridor in those units.\n2. **Block out the whole level** with untextured primitives at true scale: Godot `CSGBox3D` and\n   friends with `use_collision` on, Unity ProBuilder (`com.unity.probuilder`), Unreal Modeling\n   Mode, or a plain grey tileset in 2D. CSG is for prototyping only; bake it with\n   `bake_static_mesh()` and `bake_collision_shape()` before shipping.\n3. **Write the room graph** (rooms, exits, what each exit needs, what each room grants) and the\n   beat list next to the level. Both are small data files the checks below read.\n4. **Lay the critical path, then the golden path** (the route most players will take), then\n   optional branches that rejoin it.\n5. **Pace and teach.** Intensity rises in a sawtooth with a rest before each spike. Each\n   mechanic appears first where failure is cheap, then under pressure.\n6. **Gate with intent** using keys, abilities and one-way drops. Guide with light, leading\n   lines and landmarks rather than walls.\n7. **Run the checks** (see \"Check it\"), fix the blockout, and only then ask the user for a\n   playtest with specific questions.\n8. **Dress last**, and re-run the checks after any geometry change.\n\n## Patterns\n\n### 1. Measure the real jump (headless)\n\n```gdscript\n# tools/measure_jump.gd: godot --headless --path . --script res://tools/measure_jump.gd\n# Runs the real player scene on flat ground with run + jump held and prints the reach.\nextends SceneTree\n\nconst PLAYER := \"res://player.tscn\"            # the game's player scene\nconst RUN := &\"move_right\"\nconst JUMP := &\"jump\"\n\nfunc _initialize() -> void:\n    var ground := StaticBody2D.new()\n    var shape := CollisionShape2D.new()\n    shape.shape = WorldBoundaryShape2D.new()     # infinite floor at y = 0, normal up\n    ground.add_child(shape)\n    root.add_child(ground)\n    var player: CharacterBody2D = load(PLAYER).instantiate()\n    player.position = Vector2(0, -64)\n    root.add_child(player)\n    for i in 30:                                 # let the player land and settle\n        await physics_frame\n    Input.action_press(RUN)\n    for i in 30:                                 # reach full run speed\n        await physics_frame\n    var start := player.position\n    Input.action_press(JUMP)\n    var apex := 0.0\n    var ticks := 0\n    var airborne := false\n    while ticks < 600:\n        await physics_frame\n        ticks += 1\n        apex = maxf(apex, start.y - player.position.y)\n        if not player.is_on_floor():\n            airborne = true\n        elif airborne:\n            break                                # landed back on the same height\n    Input.action_release(JUMP)\n    Input.action_release(RUN)\n    var dt := 1.0 / Engine.physics_ticks_per_second\n    print(\"JUMP apex=%.1f distance=%.1f airtime=%.3fs\" % [apex, player.position.x - start.x, ticks * dt])\n    quit(0 if airborne else 1)\n```\n\nHolding jump measures the full jump; release it after one tick to measure the short hop if the\ncontroller has variable height. The formulas `h = v² / 2g` and `d = run_speed * 2v / g` are\nonly the ideal arc: a controller with `RUN_SPEED` 240, `JUMP_VELOCITY` 420 and gravity 980 gives\n90 px and 206 px on paper and measured 93.6 px apex and 212 px reach here, because the fixed\nstep integrates in whole ticks. Fall gravity, air acceleration, collider width and landing\nhigher all change the number again. Size required gaps at about 0.7 of the measured reach and\nkeep gaps near 0.95 for optional challenges. For 3D, swap in `StaticBody3D`,\n`WorldBoundaryShape3D` and `CharacterBody3D`.\n\n### 2. Pacing as data, with a check\n\n```gdscript\n# Author the level as beats with an intended intensity (0..1), then check the curve.\nconst BEATS := [\n    { \"room\": \"entry\",      \"type\": \"teach\",   \"intensity\": 0.1 },\n    { \"room\": \"hall_1\",     \"type\": \"combat\",  \"intensity\": 0.5 },\n    { \"room\": \"vista\",      \"type\": \"rest\",    \"intensity\": 0.1 },  # breather + reward\n    { \"room\": \"gauntlet\",   \"type\": \"combat\",  \"intensity\": 0.8 },\n    { \"room\": \"save_room\",  \"type\": \"rest\",    \"intensity\": 0.2 },  # before the boss\n    { \"room\": \"boss\",       \"type\": \"climax\",  \"intensity\": 1.0 },\n]\n\n# Returns the pacing problems in a beat list; empty means it passes.\nfunc pacing_problems(beats: Array, high := 0.7, max_high_run := 2) -> PackedStringArray:\n    var problems := PackedStringArray()\n    var run := 0\n    for i in beats.size():\n        var beat: Dictionary = beats[i]\n        run = run + 1 if beat[\"intensity\"] >= high else 0\n        if run > max_high_run:\n            problems.append(\"%s: %d high-intensity beats in a row\" % [beat[\"room\"], run])\n        if beat[\"type\"] == \"climax\" and (i == 0 or beats[i - 1][\"type\"] != \"rest\"):\n            problems.append(\"%s: no rest beat right before the climax\" % beat[\"room\"])\n    if not beats.is_empty() and beats[0][\"type\"] != \"teach\":\n        problems.append(\"%s: the level does not open with a teach beat\" % beats[0][\"room\"])\n    return problems\n```\n\nThe thresholds are a starting point for the user's game. Drive spawn density and music\nintensity from the same table so the built level matches the plan.\n\n### 3. Gating and the critical path (a small graph)\n\n```gdscript\n# Model the level as rooms + gated connections. Validate that the goal is\n# reachable with the keys/abilities the player can actually obtain in order.\nconst ROOMS := {\n    \"entry\":   { \"exits\": [ { \"to\": \"hall_1\" } ] },\n    \"hall_1\":  { \"exits\": [ { \"to\": \"vista\", \"needs\": \"double_jump\" },\n                            { \"to\": \"side_room\" } ] },           # optional branch\n    \"side_room\": { \"exits\": [ { \"to\": \"hall_1\" } ], \"grants\": \"double_jump\" },\n    \"vista\":   { \"exits\": [ { \"to\": \"boss\", \"needs\": \"red_key\" } ] },\n}\n\n# Search (room, held keys) states: keys from mutually exclusive one-way branches\n# must not be combined. Keys are never consumed and doors never re-lock; model\n# consumable keys as counts and persistent door changes as additional state.\n# States grow exponentially with distinct keys; fine for hand-built room graphs.\nfunc goal_reachable(rooms: Dictionary, start: String, goal: String) -> bool:\n    var pending: Array[Dictionary] = [{\"room\": start, \"keys\": {}}]\n    var visited := {}                             # \"room|sorted keys\" -> true\n    while not pending.is_empty():\n        var state: Dictionary = pending.pop_back()\n        var room: String = state[\"room\"]\n        var have: Dictionary = state[\"keys\"].duplicate()\n        var info: Dictio",
+      "card": {
+        "title_zh": "关卡设计校验",
+        "purpose_zh": "以引擎无关方式规划关卡结构，并用 Godot 4.7 脚本实测角色跳跃指标、检查钥匙与能力门控的软锁风险以及节奏曲线。",
+        "does": [
+          "从真实玩家控制器实测跳跃顶点、距离与滞空时间，用于确定间隙和平台尺寸",
+          "用无贴图基础几何体搭建整关 blockout，并先验证再美化",
+          "编写房间图与节拍表，检查目标可达性与单向掉落是否造成软锁",
+          "用节拍强度数据检查节奏问题，如连续高强度或高潮前无休息",
+          "按关键路径、黄金路径、可选分支的顺序布局，并安排机制教学与考验",
+          "要求用户提供具体试玩反馈，并据此修正 blockout"
+        ],
+        "inputs": [
+          "玩家场景与移动常量（如 RUN_SPEED、JUMP_VELOCITY、重力）",
+          "房间图数据：房间、出口、出口所需钥匙或能力、房间给予的钥匙或能力",
+          "节拍表数据：房间、类型（teach/combat/rest/climax）、强度 0..1",
+          "用户试玩报告（迷路点、反复失败的跳跃、枯燥房间、通关时长）"
+        ],
+        "outputs": [
+          "实测跳跃指标输出（apex、distance、airtime）",
+          "可达性检查结果（true/false），用于发现软锁",
+          "节奏问题列表（PackedStringArray），空表示通过",
+          "修正后的 blockout 与关卡结构建议"
+        ],
+        "scenarios": [
+          "规划关卡关键路径、可选分支与门控顺序",
+          "搭建 blockout 并验证每个必需跳跃与门是否可通过",
+          "审查让玩家困惑、无聊或软锁的关卡",
+          "为新机制安排先教学后考验的节奏",
+          "在移动参数变更后重新核对间隙尺寸"
+        ],
+        "prerequisites": [
+          "Godot 4.7 环境（脚本示例使用 GDScript 与 headless 运行）",
+          "游戏中存在可实例化的玩家场景 player.tscn",
+          "已编写房间图与节拍表数据文件供检查脚本读取"
+        ],
+        "limits": [
+          "不负责程序化生成布局（属 procedural-gen）",
+          "不负责绘制瓦片（属 godot-tilemap、unity-tilemap-2d）",
+          "不负责跳跃与移动手感调参（属 platformer）",
+          "不负责敌人行为与相机取景",
+          "无法直接观察玩家，只能依赖用户试玩报告",
+          "状态搜索随不同钥匙数量指数增长，仅适合手工房间图",
+          "CSG 仅用于原型，发布前需烘焙静态网格与碰撞"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "游戏",
+          "产品规划",
+          "测试"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Engine-neutral level design with Godot checks: player metrics from the real controller, key and ability gating with a soft-lock check, and pacing."
+          },
+          {
+            "field": "does",
+            "quote": "Read the movement constants from the player script, then run the jump measurement (Pattern 1) to get the real apex, reach and airtime."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "This skill is engine-neutral with Godot 4.7 checks."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "const PLAYER := \"res://player.tscn\"            # the game's player scene"
+          },
+          {
+            "field": "limits",
+            "quote": "States grow exponentially with distinct keys; fine for hand-built room graphs."
+          },
+          {
+            "field": "limits",
+            "quote": "CSG is for prototyping only; bake it with `bake_static_mesh()` and `bake_collision_shape()` before shipping."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "# tools/measure_jump.gd: godot --headless --path . --script res://tools/measure_jump.gd"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Both are small data files the checks below read."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/disciplines/performance-optimization/SKILL.md",
+      "blob_sha": "b3df7d779bb92e47e433451c0cf3d73eba0d7f09",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/performance-optimization/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "performance-optimization",
+        "description": "Finds and fixes game frame-rate problems by measurement in Godot, Unity, Unreal or Roblox: CPU- vs GPU-bound, then the biggest fix (draw calls, pooling, GC spikes). Use for low FPS, stutter, a first-use hitch, or requests to optimize or profile. Not for build size (`unity-build-size`), physics jitter (`physics-tuning`) or network lag (`roblox-networking`, `godot-multiplayer`)."
+      },
+      "excerpt": "---\nname: performance-optimization\ndescription: >\n  Finds and fixes game frame-rate problems by measurement in Godot, Unity, Unreal or Roblox: CPU-\n  vs GPU-bound, then the biggest fix (draw calls, pooling, GC spikes). Use for low FPS, stutter, a\n  first-use hitch, or requests to optimize or profile. Not for build size (`unity-build-size`),\n  physics jitter (`physics-tuning`) or network lag (`roblox-networking`, `godot-multiplayer`).\n---\n\n# Performance optimization\n\nThe loop: **set a budget, measure, find the one bottleneck, fix it, measure again, report the\nnumbers.** Guesses usually target the wrong system, so nothing changes until a profiler or a\nframe-time capture says where the time goes. This skill is the cross-engine method and the\nfixes that recur; each engine's profiler is listed below and in the reference.\n\n## When to use\n\n- The frame rate is low or uneven, or a target (60 FPS desktop, 30 or 60 on mobile) is missed.\n- Hitches: first-time effects, loading mid-game, periodic GC pauses, big fights.\n- Choosing what to optimize, setting budgets, or adding a performance check to CI.\n\n**Not this skill:** physics stability (`physics-tuning`), install or download size\n(`unity-build-size`), network latency (`roblox-networking`, `godot-multiplayer`), shader maths\n(`shader-programming`).\n\n## Core workflow\n\n1. **Turn the complaint into a number.** Target FPS gives the budget: 60 FPS is 16.67 ms, 30 is\n   33.3 ms, 120 is 8.33 ms. Find a repeatable worst-case scene and save it (a test level, a\n   recorded input, a fixed seed).\n2. **Uncap before measuring.** VSync and frame caps hide headroom: a 4 ms frame and a 15 ms\n   frame both show 60 FPS. Godot `--disable-vsync` (and `--max-fps 0`); Unity\n   `QualitySettings.vSyncCount = 0` with `Application.targetFrameRate = -1` on desktop; Unreal\n   `r.VSync 0` and `t.MaxFPS 0`. Then read frame time in ms, not FPS.\n3. **Profile a release-like build on target hardware.** Editor and debug builds add overhead\n   and skip compiler optimization; use a Godot release export, a Unity Development build with\n   the profiler attached, or an Unreal Development or Test build.\n4. **Split CPU from GPU.** Compare main-thread, render-thread and GPU time. The side closest to\n   the frame time is the bottleneck; fixing the other side changes nothing.\n5. **Fix the single biggest cost**, preferring doing less work (cache, partition space, run less\n   often) over polishing a hot line. Then apply the matching fix below.\n6. **Re-measure the same scene on the same machine**, three runs each, and keep or revert on\n   the numbers.\n7. **Set budgets** per subsystem and per asset so the fix stays fixed, and add the frame-time\n   check to CI where the engine allows it.\n8. **Report** the scene, hardware, build type, before and after (average and p95 or p99 frame\n   time), the bottleneck and the fix. Say what was measured headless or in the editor and what\n   still needs the user's device.\n\n## Patterns\n\n### 1. Frame budget split\n\n```text\n@60 FPS = 16.67 ms. The slower of CPU frame and GPU frame sets the frame rate.\nExample sub-budgets: gameplay/scripts ~5 ms · physics ~3 ms · render submit ~4 ms · UI ~2 ms · slack.\nMobile: keep 20-30% headroom so the game survives thermal throttling.\n```\n\n### 2. Where each engine reports the split\n\n```text\nGodot 4.7     : Debugger > Profiler (script and physics), Visual Profiler (CPU vs GPU render time\n                per pass), Monitors (FPS, draw calls, memory, pipeline compilations).\n                Performance.get_monitor(TIME_PROCESS) is the worst frame of the last second in\n                SECONDS, refreshed once a second; time frames yourself for per-frame spikes.\nUnity 6.3 LTS : Profiler window + Frame Debugger. ProfilerRecorder on \"CPU Main Thread Frame Time\"\n                and \"GPU Frame Time\" (release players need Frame Timing Stats in Player Settings).\nUnreal 5.8    : stat unit (Frame / Game / Draw / RHIT / GPU), stat scenerendering (draw calls),\n                Unreal Insights; `csvprofile frames=600` writes a CSV capture you can read.\nRoblox        : MicroProfiler (Ctrl+F6 in Studio and the desktop client; mobile via its web UI).\n# Game and Draw are CPU threads; GPU is the graphics card. Whichever is nearest Frame wins.\n```\n\n**Roblox:** profile on a mid-range phone, because a capped desktop hides the problem. With\nStudio Assistant, Roblox's built-in `rbx-perf-profiling` (reads MicroProfiler captures) and\n`rbx-scene-analysis` (rendering cost, memory, leaked instances) give real data; use\n`roblox-studio-workflow` to run checks in Studio, `roblox-physics` for assembly and simulation\ncost, and `roblox-networking` when \"lag\" means network delay rather than frame time.\n\n### 3. Headless CPU frame-time check (Godot)\n\n```gdscript\n# tools/frame_stats.gd: CPU frame time of one scene, headless (no GPU work is measured).\n# godot --headless --path . --script res://tools/frame_stats.gd -- res://levels/worst.tscn 600 16.6\nextends SceneTree\n\nfunc _initialize() -> void:\n    var args := OS.get_cmdline_user_args()\n    var scene_path := args[0] if args.size() > 0 else \"res://main.tscn\"\n    var frames := int(args[1]) if args.size() > 1 else 600\n    var budget_ms := float(args[2]) if args.size() > 2 else 16.6\n    OS.low_processor_usage_mode_sleep_usec = 0          # headless otherwise sleeps ~6.9 ms a frame\n    root.add_child(load(scene_path).instantiate())\n    for i in 60:                                       # skip loading and first-use spikes\n        await process_frame\n    var ms := PackedFloat64Array()\n    var last := Time.get_ticks_usec()\n    for i in frames:\n        await process_frame\n        var now := Time.get_ticks_usec()\n        ms.append((now - last) / 1000.0)               # whole frame: scripts, physics, engine\n        last = now\n    ms.sort()\n    var avg := 0.0\n    for v in ms:\n        avg += v / ms.size()\n    var p95 := ms[int(ms.size() * 0.95)]\n    var p99 := ms[int(ms.size() * 0.99)]\n    var over := ms.size() - ms.bsearch(budget_ms, false)\n    print(\"FRAME avg=%.2fms p95=%.2fms p99=%.2fms max=%.2fms over_budget=%d/%d\"\n            % [avg, p95, p99, ms[-1], over, ms.size()])\n    quit(1 if p95 > budget_ms else 0)\n```\n\nIt exits 1 when p95 exceeds the budget, so it can gate CI for script and physics cost. Headless\nmode has no renderer, so it says nothing about GPU time or draw calls; for those, ask the user to\nrun the game with `--disable-vsync --print-fps` or open the Visual Profiler and report the CPU and\nGPU ms for the same scene. A shared or busy machine adds noise, so compare runs on one machine.\n\n### 4. Object pooling (stop allocating and freeing in hot loops)\n\n```gdscript\nvar _pool: Array[Node2D] = []                     # Node3D for 3D; both have `visible`\nfunc acquire() -> Node2D:\n    var n: Node2D = _pool.pop_back() if not _pool.is_empty() else bullet_scene.instantiate()\n    n.set_process(true); n.visible = true\n    return n\nfunc release(n: Node2D) -> void:\n    n.set_process(false); n.visible = false       # disable + hide; don't free\n    _pool.append(n)\n# Pre-warm at load. Also reset velocity, timers and signal connections on release.\n```\n\n### 5. Cut draw calls and state changes\n\n```text\n- Atlas textures and share materials so sprites and meshes batch.\n- Identical meshes: GPU instancing (Unity; under URP/HDRP the SRP Batcher or GPU Resident Drawer\n  takes over), MultiMesh/MultiMeshInstance (Godot), Instanced Static Mesh (Unreal).\n- Static geometry: static batching or baking. Bake lighting that does not move.\n- Overdraw: fewer large overlapping transparent and particle layers.\n- Fill-rate bound: lower render resolution or scale (2x pixel ratio is 4x the pixels).\nMeasure draw calls and GPU ms before and after; both should drop.\n```\n\n### 6. Kill per-frame allocations (GC spikes are periodic hitches)\n\n```csharp\n// Unity 6.3 LTS. Steady state should be 0 B \"GC Allocated In Frame\".\nvoid Update() {\n    _hits = Physics.RaycastNonAlloc(ray, _hitBuffer);   // reuse a preallocated array\n    for (int i = 0",
+      "card": {
+        "title_zh": "游戏性能优化",
+        "purpose_zh": "通过测量定位并修复 Godot、Unity、Unreal、Roblox 游戏的帧率问题：先判断 CPU 还是 GPU 受限，再处理最大瓶颈（绘制调用、对象池、GC 卡顿）。",
+        "does": [
+          "把帧率抱怨转成毫秒预算，并建立可复现的最差场景",
+          "解除 VSync 与帧率上限后，在接近发布的构建上测量帧时间",
+          "对比主线程、渲染线程与 GPU 时间，判断瓶颈在哪一侧",
+          "修复单一最大开销：对象池、批处理与实例化、减少每帧分配",
+          "同一场景同机复测三次，按数据决定保留或回退",
+          "设定子系统与资源预算，并在可行时把帧时间检查接入 CI"
+        ],
+        "inputs": [
+          "目标帧率与最差场景（测试关卡、录制输入、固定种子）",
+          "目标硬件与构建类型（发布导出、Development 构建等）",
+          "各引擎的 Profiler 数据：CPU/GPU 帧时间、绘制调用、内存",
+          "用户设备上的实测帧时间（含长时间会话前后对比）"
+        ],
+        "outputs": [
+          "瓶颈判定（CPU 或 GPU）与对应修复",
+          "优化前后平均与 p95/p99 帧时间对比报告",
+          "各子系统与资源的帧预算",
+          "可选的 CI 帧时间门禁（Godot 无头脚本 p95 超预算时退出码 1）"
+        ],
+        "scenarios": [
+          "帧率低或不稳定，未达到 60/30 FPS 目标",
+          "首次特效、加载、周期性 GC 或大混战造成卡顿",
+          "决定优化什么、设定预算或给 CI 加性能检查",
+          "手机长时间运行后因过热降频掉帧"
+        ],
+        "prerequisites": [
+          "使用发布级或 Development 构建，而非编辑器或 Debug 构建",
+          "测量前关闭 VSync 与帧率上限",
+          "在目标硬件上测量，Roblox 建议用中端手机",
+          "同一台机器上对比多次运行结果"
+        ],
+        "limits": [
+          "不处理物理稳定性、安装包体积、网络延迟与着色器数学",
+          "Godot 无头脚本只测 CPU 帧时间，不含 GPU 时间与绘制调用",
+          "编辑器与 Deep Profile 数据会失真，不能作为结果",
+          "共享或繁忙机器会引入噪声"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "游戏",
+          "数据分析",
+          "自动化",
+          "测试"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Finds and fixes game frame-rate problems by measurement in Godot, Unity, Unreal or Roblox: CPU- vs GPU-bound, then the biggest fix (draw calls, pooling, GC spikes)."
+          },
+          {
+            "field": "does",
+            "quote": "The loop: **set a budget, measure, find the one bottleneck, fix it, measure again, report the numbers.**"
+          },
+          {
+            "field": "does",
+            "quote": "**Uncap before measuring.** VSync and frame caps hide headroom"
+          },
+          {
+            "field": "does",
+            "quote": "**Split CPU from GPU.** Compare main-thread, render-thread and GPU time."
+          },
+          {
+            "field": "does",
+            "quote": "**Fix the single biggest cost**, preferring doing less work (cache, partition space, run less often) over polishing a hot line."
+          },
+          {
+            "field": "does",
+            "quote": "**Re-measure the same scene on the same machine**, three runs each, and keep or revert on the numbers."
+          },
+          {
+            "field": "does",
+            "quote": "It exits 1 when p95 exceeds the budget, so it can gate CI for script and physics cost."
+          },
+          {
+            "field": "inputs",
+            "quote": "Find a repeatable worst-case scene and save it (a test level, a recorded input, a fixed seed)."
+          },
+          {
+            "field": "outputs",
+            "quote": "**Report** the scene, hardware, build type, before and after (average and p95 or p99 frame time), the bottleneck and the fix."
+          },
+          {
+            "field": "scenarios",
+            "quote": "The frame rate is low or uneven, or a target (60 FPS desktop, 30 or 60 on mobile) is missed."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Hitches: first-time effects, loading mid-game, periodic GC pauses, big fights."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Profile a release-like build on target hardware.** Editor and debug builds add overhead and skip compiler optimization"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Roblox:** profile on a mid-range phone, because a capped desktop hides the problem."
+          },
+          {
+            "field": "limits",
+            "quote": "Headless mode has no renderer, so it says nothing about GPU time or draw calls"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "godot --headless --path . --script res://tools/frame_stats.gd -- res://levels/worst.tscn 600 16.6"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`csvprofile frames=600` writes a CSV capture you can read."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/disciplines/physics-tuning/SKILL.md",
+      "blob_sha": "eda06d1db68a3bc2e381080118505cf712cfacb1",
+      "source_url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/blob/c6ca6c41c839b68319ffc08430b99ab768debc32/skills/disciplines/physics-tuning/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "physics-tuning",
+        "description": "Engine-neutral physics tuning with Godot checks: fixed timestep and interpolation, CCD against tunnelling, damping, solver iterations and collision layer matrices. Use when bodies jitter, fast objects pass through walls or physics feels floaty or wrong. Not for engine physics APIs (`godot-physics`, `unity-physics`, `roblox-physics`, `phaser-arcade-physics`) or jump feel (`platformer`)."
+      },
+      "excerpt": "---\nname: physics-tuning\ndescription: >\n  Engine-neutral physics tuning with Godot checks: fixed timestep and interpolation, CCD against\n  tunnelling, damping, solver iterations and collision layer matrices. Use when bodies jitter,\n  fast objects pass through walls or physics feels floaty or wrong. Not for engine physics APIs\n  (`godot-physics`, `unity-physics`, `roblox-physics`, `phaser-arcade-physics`) or jump feel\n  (`platformer`).\n---\n\n# Physics tuning\n\nMost \"bad physics\" is a mismatch between the fixed-rate simulation and the variable-rate render\nloop, or untuned CCD, mass, damping and layer settings. This skill owns those engine-neutral\ndecisions and the checks that prove them. The engine's bodies, callbacks and settings come from\n`godot-physics`, `unity-physics` or `roblox-physics`; load both when tuning inside an engine.\n\n## When to use\n\n- Motion jitters, bodies tunnel through walls, stacks explode, joints shake, or speed depends on\n  frame rate.\n- Deciding what runs in the fixed step and what in the render frame, and how to interpolate.\n- Tuning gravity, mass, damping, restitution, solver iterations, sleeping and the layer matrix.\n\n**Not this skill:** engine API (`godot-physics`, `unity-physics`, `roblox-physics`), character\ncontroller code (`godot-2d-movement`), jump arcs and forgiveness windows (`platformer`), camera\nsmoothing (`camera-systems`), CPU cost of the simulation (`performance-optimization`).\n\n## Core workflow\n\n1. **Read the current settings first**: tick rate, max steps per frame, interpolation, physics\n   engine (Godot `[physics]` in `project.godot`; Unity `ProjectSettings/TimeManager.asset` and\n   `DynamicsManager.asset`). Change one knob at a time.\n2. **Simulate in the fixed step.** Forces, velocities and collision reads go in\n   `_physics_process` / `FixedUpdate` and use that step's `dt`.\n3. **Interpolate rendering** between ticks with the engine's built-in option before\n   hand-rolling it.\n4. **Stop tunnelling**: keep `speed / tick_rate` below the thinnest wall, or enable CCD on the\n   small fast bodies, or use a ray or shape cast for bullets.\n5. **Tune the body, not the scene**: mass for relative weight, damping for drag, gravity scale\n   per object, bounce and friction in a physics material.\n6. **Stabilize stacks and joints** with modest mass ratios, more solver iterations and sleeping.\n7. **Plan the layer matrix** as a named table: what each layer is, and what it scans.\n8. **Run the checks** below, then ask the user to judge feel with specific questions.\n\n## Patterns\n\n### 1. Fixed step for simulation, interpolation for display\n\n```gdscript\nfunc _physics_process(dt):                  # Unity: FixedUpdate()\n    velocity += gravity * dt                # integrate with the FIXED dt\n    move_and_slide()\n# WRONG: forces or movement in _process/Update with the frame dt: speed and collisions then\n# depend on frame rate.\n```\n\nTurn on the built-in interpolation: Godot `physics/common/physics_interpolation = true` (off by\ndefault; it covers 2D and 3D nodes), Unity `Rigidbody.interpolation = Interpolate` on the player\nand the bodies the camera follows. Hand-roll (`Engine.get_physics_interpolation_fraction()`,\nlerp previous to current) only for something the engine does not cover, and never both on one\nnode.\n\n### 2. Tunnelling: CCD and a speed cap\n\n```gdscript\nbody.continuous_cd = true                    # RigidBody3D: a bool\nbody2d.continuous_cd = RigidBody2D.CCD_MODE_CAST_RAY   # RigidBody2D: an enum; see Gotchas\n# Unity: CollisionDetectionMode.ContinuousSpeculative (cheap, covers dynamic bodies) or\n# ContinuousDynamic (fast vs fast). Plain Continuous only sweeps against static colliders.\nconst MAX_SPEED := 40.0\nif velocity.length() > MAX_SPEED:\n    velocity = velocity.normalized() * MAX_SPEED\n# Rule of thumb: speed / ticks_per_second < thinnest wall, or CCD, or a ray cast.\n```\n\n### 3. Body tuning\n\n```gdscript\nbody.mass = 2.0               # relative weight in collisions; does not change fall speed\nbody.linear_damp = 0.5        # drag (Unity 6: linearDamping, formerly drag)\nbody.gravity_scale = 1.5      # per-object gravity (Unity: Rigidbody2D.gravityScale)\nvar material := PhysicsMaterial.new()\nmaterial.bounce = 0.2         # restitution 0..1 (Unity: PhysicsMaterial.bounciness)\nmaterial.friction = 0.8\nbody.physics_material_override = material\n```\n\n### 4. Collision layer matrix as data\n\n```gdscript\n# A body is ON its layers and SCANS its mask. Name the bits once and build masks from names.\nconst LAYER := { \"world\": 1 << 0, \"player\": 1 << 1, \"enemy\": 1 << 2, \"pickup\": 1 << 3 }\nplayer.collision_layer = LAYER.player\nplayer.collision_mask  = LAYER.world | LAYER.enemy\npickup.collision_layer = LAYER.pickup\npickup.collision_mask  = LAYER.player        # the pickup only reacts to the player\n```\n\nWrite the same table into the engine's layer names (Godot `[layer_names]` in `project.godot`;\nUnity's Physics collision matrix) so the editor and code agree.\n\n### 5. Tunnel test (headless, exits 1 on failure)\n\n```gdscript\n# tools/tunnel_test.gd: godot --headless --path . --script res://tools/tunnel_test.gd\n# Fires a small fast body at a thin wall; exits 1 if it ends up on the far side.\nextends SceneTree\n\nconst SPEED := 3000.0                          # px/s: the fastest body in the game\nconst WALL := 4.0                              # px: the thinnest wall it must not cross\nconst RADIUS := 4.0                            # px: that body's collision radius\nconst MODE := RigidBody2D.CCD_MODE_CAST_RAY    # the CCD mode the game uses\n\nfunc _initialize() -> void:\n    var wall := StaticBody2D.new()\n    var wall_shape := CollisionShape2D.new()\n    wall_shape.shape = RectangleShape2D.new()\n    wall_shape.shape.size = Vector2(WALL, 400)\n    wall.add_child(wall_shape)\n    wall.position = Vector2(500, 0)\n    root.add_child(wall)\n    var body := RigidBody2D.new()\n    var shape := CollisionShape2D.new()\n    shape.shape = CircleShape2D.new()\n    shape.shape.radius = RADIUS\n    body.add_child(shape)\n    body.gravity_scale = 0.0\n    body.continuous_cd = MODE\n    body.position = Vector2(23, 0)             # not a multiple of the step distance\n    body.linear_velocity = Vector2(SPEED, 0)\n    root.add_child(body)\n    for i in 60:\n        await physics_frame\n    var crossed := body.position.x > wall.position.x\n    print(\"TUNNEL mode=%d x=%.1f %s\" % [MODE, body.position.x, \"FAIL: crossed\" if crossed else \"ok\"])\n    quit(1 if crossed else 0)\n```\n\nSet the constants to the game's fastest body and thinnest wall. For 3D, use `RigidBody3D` with\n`continuous_cd = true`, `BoxShape3D` and `SphereShape3D`; that passed here on both GodotPhysics3D\nand Jolt.\n\n### 6. Frame-rate independence probe\n\n```gdscript\n# tools/rate_probe.gd: print a node's position after 2 s of game time. Run at two frame rates:\n#   godot --headless --path . --fixed-fps 30  --script res://tools/rate_probe.gd -- res://main.tscn Player\n#   godot --headless --path . --fixed-fps 144 --script res://tools/rate_probe.gd -- res://main.tscn Player\nextends SceneTree\n\nfunc _initialize() -> void:\n    var args := OS.get_cmdline_user_args()\n    var scene: Node = load(args[0]).instantiate()\n    root.add_child(scene)\n    var target: Node = scene.get_node(args[1]) if args.size() > 1 else scene\n    for i in Engine.physics_ticks_per_second * 2:  # 2 s of simulated time at any frame rate\n        await physics_frame\n    print(\"RATE position=%s\" % [target.position])\n    quit(0)\n```\n\nMovement done in the physics step prints the same position at both rates. A falling body moved\nin `_process` landed about 23 px apart after 2 s at 30 and 144 FPS in a test here, while the\nsame code in `_physics_process` matched to the last digit. Any difference means simulation code\nis reading the frame `dt`.\n\n## Check it\n\n1. Run the tunnel test with the game's fastest body and thinnest wall; it must print `ok`.\n2. Run the rate probe at `--fixed-fps 30` and `--fixed-fps 144` on the player or a thrown body;\n   the positions must match.\n3. Grep for forces",
+      "card": {
+        "title_zh": "物理调参",
+        "purpose_zh": "面向引擎无关的物理手感调参，处理抖动、穿透、堆叠爆炸与帧率依赖问题，并给出Godot可运行的穿透测试与帧率无关性探针来验证设置。",
+        "does": [
+          "先读取当前tick率、每帧最大步数、插值与物理引擎设置，一次只改一个参数",
+          "把力、速度与碰撞读取放进固定步（_physics_process/FixedUpdate），渲染用内置插值",
+          "用速度上限、CCD或射线/形状投射防止高速物体穿墙",
+          "按物体调质量、阻尼、重力缩放、弹性与摩擦材质",
+          "用适中质量比、更多求解迭代与休眠稳定堆叠和关节",
+          "用命名表规划碰撞层与掩码矩阵，并写入引擎层名"
+        ],
+        "inputs": [
+          "游戏当前物理设置（tick率、最大步数、插值、物理引擎）",
+          "游戏中最快物体的速度与最薄墙的厚度",
+          "碰撞层与掩码的规划表",
+          "用户对抖动、穿透、漂浮或沉重手感的反馈"
+        ],
+        "outputs": [
+          "调参后的固定步、插值、CCD、阻尼、质量与层矩阵设置",
+          "穿透测试脚本输出（ok 或 FAIL: crossed）",
+          "帧率无关性探针在30与144 FPS下的位置对比",
+          "给用户的低帧率与高帧率试玩验证问题"
+        ],
+        "scenarios": [
+          "物体运动抖动或速度随帧率变化",
+          "高速物体穿过薄墙",
+          "堆叠箱子爆炸或关节抖动",
+          "物理手感漂浮或过重需要调参",
+          "规划碰撞层与掩码矩阵"
+        ],
+        "prerequisites": [
+          "在引擎内调参时需同时加载对应引擎物理技能（godot-physics、unity-physics或roblox-physics）",
+          "运行穿透测试与帧率探针需要Godot无头模式（--headless）"
+        ],
+        "limits": [
+          "不涉及引擎物理API本身，需配合引擎物理技能",
+          "不覆盖角色控制器代码、跳跃弧线与宽容窗口、相机平滑、模拟CPU开销",
+          "穿透测试与CCD模式结论仅在Godot 4.7.2无头环境验证",
+          "手感好坏由用户判断，技能只负责数值与检查"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "游戏",
+          "测试",
+          "后端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Engine-neutral physics tuning with Godot checks: fixed timestep and interpolation, CCD against tunnelling, damping, solver iterations and collision layer matrices."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Most \"bad physics\" is a mismatch between the fixed-rate simulation and the variable-rate render loop, or untuned CCD, mass, damping and layer settings."
+          },
+          {
+            "field": "does",
+            "quote": "**Simulate in the fixed step.** Forces, velocities and collision reads go in `_physics_process` / `FixedUpdate` and use that step's `dt`."
+          },
+          {
+            "field": "does",
+            "quote": "**Stop tunnelling**: keep `speed / tick_rate` below the thinnest wall, or enable CCD on the small fast bodies, or use a ray or shape cast for bullets."
+          },
+          {
+            "field": "does",
+            "quote": "**Tune the body, not the scene**: mass for relative weight, damping for drag, gravity scale per object, bounce and friction in a physics material."
+          },
+          {
+            "field": "does",
+            "quote": "**Stabilize stacks and joints** with modest mass ratios, more solver iterations and sleeping."
+          },
+          {
+            "field": "does",
+            "quote": "**Plan the layer matrix** as a named table: what each layer is, and what it scans."
+          },
+          {
+            "field": "does",
+            "quote": "**Read the current settings first**: tick rate, max steps per frame, interpolation, physics engine"
+          },
+          {
+            "field": "inputs",
+            "quote": "Set the constants to the game's fastest body and thinnest wall."
+          },
+          {
+            "field": "outputs",
+            "quote": "Run the tunnel test with the game's fastest body and thinnest wall; it must print `ok`."
+          },
+          {
+            "field": "outputs",
+            "quote": "Run the rate probe at `--fixed-fps 30` and `--fixed-fps 144` on the player or a thrown body; the positions must match."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Motion jitters, bodies tunnel through walls, stacks explode, joints shake, or speed depends on frame rate."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The engine's bodies, callbacks and settings come from `godot-physics`, `unity-physics` or `roblox-physics`; load both when tuning inside an engine."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "# tools/tunnel_test.gd: godot --headless --path . --script res://tools/tunnel_test.gd"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "godot --headless --path . --fixed-fps 30  --script res://tools/rate_probe.gd -- res://main.tscn Player"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,491 @@
+{
+  "schema": 1,
+  "repo": "expo/exact",
+  "tree_sha": "6e2eb3e865e8b9b06b96e940051ffe9d9ad85a52",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": ".claude/skills/llp-adopt/SKILL.md",
+      "blob_sha": "a8dbf8d86163ead038efe4da2274dbb6cc0d897e",
+      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-adopt/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "llp-adopt",
+        "description": "Bring LLP to a repository and keep its installed skills current — the single entry point for \"set up LLP here\" and \"update the LLP skills\". Scaffold mode (fresh structure), retrofit mode (survey the codebase, draft a provenance-tagged root LLP, propose an adoption plan), install step (copy skills from a tagged release with a receipt), and update mode (verified, diff-approved skill updates)."
+      },
+      "excerpt": "---\nname: llp-adopt\ndescription: Bring LLP to a repository and keep its installed skills current — the single entry point for \"set up LLP here\" and \"update the LLP skills\". Scaffold mode (fresh structure), retrofit mode (survey the codebase, draft a provenance-tagged root LLP, propose an adoption plan), install step (copy skills from a tagged release with a receipt), and update mode (verified, diff-approved skill updates).\nsource: ccheever/llp@v0.5.2\n---\n\n# llp-adopt\n\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0001-adopting-llp.guide.md — the workflow this automates -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0010.000-skill-installation-and-updates.spec.md — install/update design, receipts, trust model -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#provenance-for-generated-rationale — tagging rules for generated docs -->\n\nOne entry point for \"add LLP to this project\" and \"update the LLP skills\". Invoke as `/llp-adopt` (auto-detect scaffold/retrofit), `--mode scaffold` / `--mode retrofit`, or `/llp-adopt update`.\n\n## Trigger\n\n\"Set up / bring LLP to this repo,\" for any repository state; \"update the LLP skills,\" in any repo with installed skills.\n\n## Invariants — adoption\n\n- MUST extend an existing `llp/` tree if one exists — never start a second setup layer.\n- MUST write only new files and clearly-marked managed blocks; existing user prose is never overwritten without showing a diff and asking. Reruns MUST be idempotent (no duplicate files or blocks).\n- MUST keep every generated document `Draft` and provenance-tagged: claims are `[observed]` (say where), `[confirmed]` (named human + date), or `[inferred]` — and `[inferred]` claims never survive into a document proposed for promotion.\n- MUST propose `@ref` annotations and apply them only after approval — no mass annotation, and none on volatile early code.\n- MUST NOT create a batch of speculative LLPs in either mode; establish orientation and the loop, then hand off.\n- When a tool expects `CLAUDE.md`, symlink it to `AGENTS.md` when safe rather than maintaining divergent copies.\n\n## Invariants — install and update (LLP 0010.000)\n\n- MUST install only from a tagged release (the tag's tree is the release), as copies never symlinks, and write a receipt beside the installation: origin, tag, resolved commit, profile flags (core; `review-plus`; `delivery`, which also records the repo's delivery policy in repo-local config), and a per-file content hash. The receipt — not `source:` frontmatter — is the trust root for updates.\n- MUST confirm before writing user/global skill directories (they affect every repo for that user); project-local may proceed more freely.\n- Update MUST three-way-check each file against the receipt hash. Any mismatch is a local fork: abort the coupled update, never clobber, and offer discard (restore managed copy) or detach (file leaves the managed set permanently; receipt records it; later updates ignore it and note upstream changes without applying).\n- Update MUST present the full changeset for the installed profile *as defined at the target tag* as one diff, revalidate the approved state immediately before mutation, and be recoverable to either endpoint (the receipt write is the commit point). Runs are single-flight per installation.\n- If upstream is unreachable, a tag moved or vanished, or content can't be verified against the resolved commit: report exactly that and write nothing. Cannot-verify never degrades to guess.\n\n## Workflow\n\n> **Recipe (advisory)** — *Adoption:* inspect first (existing `llp/`? agent files? how much code?): little to mine → **scaffold**; substantial history → **retrofit**. Both share the spine: `llp/` with its `current/` and `foundation/` overlay directories, root LLP 0000 (`Explainer`, `**Role:** Root`, `Draft` — linked into `current/`; it enters `foundation/` when the author makes it `Active`), the `AGENTS.md` managed block. Retrofit adds: survey, draft root LLP, propose 2–5 subsystem LLPs, layered annotation plan (LLP 0001). *Install:* offer after the managed blocks; default profile core, flags opt-in. *Update:* fetch the tag's tree (shallow clone or archive; git required), diff, approve, apply as a staged set with prior bytes retained until the receipt lands; rollback is `git revert` where the installation is committed, the backups otherwise. *Releasing (this repo):* bump `source:` pins and pinned URLs → commit → tag → push tag — a skill-file change is not installable until tagged.\n\n## Artifact\n\nScaffold: `llp/` with `current/` (holding the link to the new root) and an empty `foundation/`, an LLP 0000 skeleton, the managed blocks. Retrofit: those plus a survey summary, `Draft` provenance-tagged document(s), and a proposed adoption plan. Install/update: pinned skill copies, the receipt, and (with the `delivery` flag) the repo policy file.\n\n## Hand-offs\n\n- Corpus exists → daily work starts with `llp-orient`; author follow-on docs with `llp-create`.\n- Ratify generated drafts with `llp-review` where stakes warrant; keep healthy with `llp-maintain` — whose audit notes stale pins and hands back to `/llp-adopt update`.\n",
+      "card": {
+        "title_zh": "LLP 接入与技能更新",
+        "purpose_zh": "把 LLP 引入仓库并保持已安装技能为最新：单一入口处理“在此设置 LLP”和“更新 LLP 技能”，含脚手架、改造、安装与更新四种模式。",
+        "does": [
+          "自动检测或按参数选择脚手架模式（新建结构）或改造模式（调研代码库、起草带来源标记的根 LLP、提出采纳计划）",
+          "从带标签的发布版本复制技能并写入回执（来源、标签、提交、配置标志、逐文件哈希）",
+          "以回执哈希做三方校验更新技能，遇本地分叉则中止、不覆盖，并提供丢弃或脱离选项",
+          "将目标标签下已安装配置的完整变更集作为单个 diff 呈现，批准后分阶段应用并可回滚",
+          "只写新文件和明确标记的托管块，重跑保持幂等，不覆盖用户原文",
+          "在安全时把 CLAUDE.md 符号链接到 AGENTS.md，而非维护两份分叉副本"
+        ],
+        "inputs": [
+          "目标仓库（任意状态）",
+          "模式参数：--mode scaffold / --mode retrofit / update",
+          "安装配置标志：core、review-plus、delivery",
+          "带标签的发布版本（tag）"
+        ],
+        "outputs": [
+          "llp/ 目录，含 current/ 与 foundation/ 覆盖目录",
+          "根 LLP 0000 骨架（Explainer、Role: Root、Draft）",
+          "AGENTS.md 托管块",
+          "改造模式下的调研摘要、带来源标记的草稿文档与采纳计划",
+          "固定版本的技能副本与安装回执",
+          "delivery 标志下的仓库策略文件"
+        ],
+        "scenarios": [
+          "为已有大量历史的仓库引入 LLP 并起草根文档",
+          "为几乎无历史的新仓库搭建 LLP 脚手架",
+          "更新仓库中已安装的 LLP 技能",
+          "审计发现固定版本过期后重新接入更新"
+        ],
+        "prerequisites": [
+          "更新需 git（浅克隆或归档获取标签树）",
+          "安装仅从带标签的发布版本进行",
+          "写入用户级或全局技能目录前需确认"
+        ],
+        "limits": [
+          "不创建一批推测性 LLP，只建立定位与循环后交接",
+          "不对易变的早期代码做批量 @ref 标注，且需批准后才应用",
+          "上游不可达、标签移动或消失、内容无法对解析提交验证时，只如实报告且不写入",
+          "无法验证绝不降级为猜测",
+          "每次安装的更新为单飞运行",
+          "技能文件改动在打标签前不可安装"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "自动化",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Bring LLP to a repository and keep its installed skills current — the single entry point for \"set up LLP here\" and \"update the LLP skills\"."
+          },
+          {
+            "field": "does",
+            "quote": "Update MUST three-way-check each file against the receipt hash. Any mismatch is a local fork: abort the coupled update, never clobber, and offer discard (restore managed copy) or detach"
+          },
+          {
+            "field": "does",
+            "quote": "MUST write only new files and clearly-marked managed blocks; existing user prose is never overwritten without showing a diff and asking. Reruns MUST be idempotent (no duplicate files or blocks)."
+          },
+          {
+            "field": "does",
+            "quote": "When a tool expects `CLAUDE.md`, symlink it to `AGENTS.md` when safe rather than maintaining divergent copies."
+          },
+          {
+            "field": "inputs",
+            "quote": "Invoke as `/llp-adopt` (auto-detect scaffold/retrofit), `--mode scaffold` / `--mode retrofit`, or `/llp-adopt update`."
+          },
+          {
+            "field": "scenarios",
+            "quote": "\"Set up / bring LLP to this repo,\" for any repository state; \"update the LLP skills,\" in any repo with installed skills."
+          },
+          {
+            "field": "scenarios",
+            "quote": "little to mine → **scaffold**; substantial history → **retrofit**"
+          },
+          {
+            "field": "scenarios",
+            "quote": "keep healthy with `llp-maintain` — whose audit notes stale pins and hands back to `/llp-adopt update`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "fetch the tag's tree (shallow clone or archive; git required)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "MUST confirm before writing user/global skill directories (they affect every repo for that user); project-local may proceed more freely."
+          },
+          {
+            "field": "limits",
+            "quote": "MUST NOT create a batch of speculative LLPs in either mode; establish orientation and the loop, then hand off."
+          },
+          {
+            "field": "limits",
+            "quote": "MUST propose `@ref` annotations and apply them only after approval — no mass annotation, and none on volatile early code."
+          },
+          {
+            "field": "limits",
+            "quote": "If upstream is unreachable, a tag moved or vanished, or content can't be verified against the resolved commit: report exactly that and write nothing. Cannot-verify never degrades to guess."
+          },
+          {
+            "field": "limits",
+            "quote": "Runs are single-flight per installation."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".claude/skills/llp-create/SKILL.md",
+      "blob_sha": "848de5a93517e27d8f4e6ba1b703c56b8cdd0130",
+      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-create/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "llp-create",
+        "description": "Create a new LLP document with the next available number (top-level NNNN or a dotted sub-LLP under a parent), the NNNN-slug.type.md filename convention, and a scaffolded metadata header, linked into llp/current/ — or extend an existing LLP when one already covers the topic."
+      },
+      "excerpt": "---\nname: llp-create\ndescription: Create a new LLP document with the next available number (top-level NNNN or a dotted sub-LLP under a parent), the NNNN-slug.type.md filename convention, and a scaffolded metadata header, linked into llp/current/ — or extend an existing LLP when one already covers the topic.\nsource: ccheever/llp@v0.5.2\n---\n\n# llp-create\n\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#1-llp-documents — numbering, metadata, types, statuses -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0008-distributed-agent-skills.rfc.md#the-skills--core-five-plus-flags — skill contract -->\n\nAuthor one LLP in a corpus that already exists. Handles numbering, filename, and the metadata scaffold so the author can focus on content.\n\nInvoke as `/llp-create <title>`, `/llp-create --under NNNN <title>` for a sub-LLP, or bare and the skill asks.\n\n## Trigger\n\n\"Capture this decision\" / \"write an LLP for this\" — during or after a design conversation.\n\n## Invariants\n\n- MUST check for a covering document first: `Grep` the `**Systems:**` and `**Related:**` headers across `llp/` and propose *extending* an existing LLP over creating a new one when the topic is already covered.\n- MUST derive the next number as `max(ever allocated) + 1` — top-level `NNNN`, or for a sub-LLP of `P`: `P.` + `max(ever allocated children of P) + 1` as three digits (`000` if none) — where \"ever allocated\" scans all of `llp/` recursively (excluding `current/`, `foundation/`, `reviews/`) **and** history for deleted documents (`git log --all --diff-filter=D --name-only -- llp`). Numbers are never reused, never invented, and a parent must already exist.\n- MUST name the file `NNNN(.NNN)*-slug.type.md` with the lowercased type matching the header's `**Type:**`, put the full dotted number in the title, and start every new LLP as `Draft`.\n- MUST link the new document into `llp/current/` with a relative symlink (`mkdir -p llp/current && ln -s ../<file> llp/current/<file>`; on a checkout without symlink support, a regular file containing `../<file>` is equivalent) — new work is in the working set by definition (LLP 0000 [Current and foundation](https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#current-and-foundation)).\n- MUST propose a sub-LLP, not a new top-level number, when the document refines, specifies, or plans an existing LLP (spec for an RFC → `NNNN.000-….spec.md`). Never re-parent by renaming.\n- MUST NOT overwrite an existing file — if the name collides, stop and ask.\n- MUST NOT silently pick a document type when the choice is ambiguous — propose one and confirm.\n\n## Workflow\n\n> **Recipe (advisory)** — next top-level number: `{ find llp -name '[0-9]*.md' -not -path 'llp/reviews/*' -not -path 'llp/current/*' -not -path 'llp/foundation/*'; git log --all --diff-filter=D --name-only --format= -- llp; } | grep -oE '(^|/)[0-9]{4}' | grep -oE '[0-9]{4}' | sort -n | tail -1` (+1); next child of `0011`: same pipeline with `0011\\.[0-9]{3}` (+1, or `000`). Slug: lowercase, non-alphanumerics → `-`, collapse repeats, keep it under ~6 words. Type cues: proposal → `rfc`; requirements → `spec`; settled choice → `decision`; steps → `plan`; teaching → `explainer`; always/never → `principles`; how-to → `guide`; bug → `issue`; findings → `research`. Scaffold sections: Summary · Motivation · Design · Open questions (Decisions use Context/Options/Decision/Consequences; Research uses Findings/Confidence).\n\n## Artifact\n\nA new `Draft` LLP with a complete metadata header (`Type`, `Status`, `Systems`, `Author`, `Date`; `Related:` where relevant) — plus an offer to draft the body from the current conversation. Confirm the assigned number and path back to the user.\n\n## Hand-offs\n\n- No corpus to add the document to → `llp-adopt`.\n- The document is foundational or contentious → `llp-review`, scaled to stakes (LLP 0005).\n",
+      "card": null
+    },
+    {
+      "skill_path": ".claude/skills/llp-maintain/SKILL.md",
+      "blob_sha": "9e3203df7bdd02ed284388f7973712308e80545d",
+      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-maintain/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "llp-maintain",
+        "description": "Keep an LLP corpus in sync with its code. Detects code/doc drift, validates @ref annotations interactively, checks provenance tags, and proposes reconciliations, ref repairs, status changes, and overlay changes. Modes — pre-pr, audit, reconcile, retire-proposal, curate (the promote → archive → realign pass). Proposes; never applies."
+      },
+      "excerpt": "---\nname: llp-maintain\ndescription: \"Keep an LLP corpus in sync with its code. Detects code/doc drift, validates @ref annotations interactively, checks provenance tags, and proposes reconciliations, ref repairs, status changes, and overlay changes. Modes — pre-pr, audit, reconcile, retire-proposal, curate (the promote → archive → realign pass). Proposes; never applies.\"\nsource: ccheever/llp@v0.5.2\n---\n\n# llp-maintain\n\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0004-design-principles.principles.md — co-evolution and living documents, the model this operationalizes -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#6-validation-ref-check — the deterministic subset lives in ref-check, not here -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0011.000-curation-pass.guide.md — the curate intent follows this procedure -->\n\nThe upkeep engine. Living documents rot into misleading guidance unless code and docs co-evolve; this skill finds the drift and **proposes** fixes. The propose-only line is what lets one skill cover four maintenance moments without becoming a mega-skill.\n\nInvoke as `/llp-maintain --intent <pre-pr | audit | reconcile | retire-proposal | curate>` (each has a sensible default scope).\n\n## Trigger\n\nBefore opening a PR (`pre-pr`, the common case); periodically or on suspicion (`audit`); after a pull or against a branch (`reconcile`); \"this doc looks done/stale\" (`retire-proposal`); after design work lands, before a release, or on cadence (`curate`).\n\n## Invariants\n\n- MUST propose, never apply: no edit, ref repair, or status change without sign-off. Output is a reviewable checklist or diff, never a mass rewrite.\n- MUST NOT classify untagged rationale claims silently — flag them for the author to mark `[observed]`/`[confirmed]`/`[inferred]`.\n- `curate` MUST run its three verbs in order — promote, archive, realign — and MUST realign the code only against `llp/foundation/`, never against the whole corpus. Promotion proposals MUST apply LLP 0000's admission test (design recreatable from the set; set-level; too-small fails), not importance.\n- MUST NOT claim to be a CI gate. The deterministic, merge-blocking checks are `ref-check`'s job; this skill is the interactive, judgment-bearing complement.\n\n## Checks\n\nFor `@ref`s in scope: **broken** target/anchor (error — list the anchors that *do* exist); **tombstoned/superseded** target (warning, note the replacement); **stale gloss** (hint); **orphaned** annotation whose attached construct is gone (warning). For provenance-tagged docs: `[inferred]` in `Accepted`/`Active` (error); `[observed]` without a stated location, or `[confirmed]` without name+date (flag for the author). For installed skills: a `source:` pin that lags upstream releases (note, when network allows). Beyond the mechanical: code whose behavior no longer matches the section it references; new files implementing a documented LLP with no `@ref`; LLP sections the diff contradicts.\n\n## Modes\n\n| Intent | Default scope | Artifact |\n|---|---|---|\n| `pre-pr` | working tree | co-evolution checklist (\"update doc or code\" / \"repair ref\" / \"consider annotating\") + proposed status changes, **not applied** |\n| `audit` | corpus | findings list: drift, broken refs, stale statuses |\n| `reconcile` | diff range / branch | per-doc reconciliation proposals (or \"the code drifted, not the doc\") |\n| `retire-proposal` | one named doc | a drafted `Superseded`/`Tombstoned` proposal with rationale (a status change in the header — files never move) |\n| `curate` | overlays + foundation vs. code | the PROMOTE / ARCHIVE / REALIGN checklist of LLP 0011.000: links to add or remove, folds, status fixes, and code changes foundation now demands |\n\n## Hand-offs\n\n- A reconciliation that is really a new design decision → `llp-review`.\n- Broken refs surfaced by `llp-orient` land here for repair proposals.\n- A stale `source:` pin noted by `audit` → `/llp-adopt update` applies the update after an approved diff (this skill never applies).\n- Deterministic CI enforcement → `ref-check`.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".claude/skills/llp-orient/SKILL.md",
+      "blob_sha": "8384ea53a2717116350a1e3774955f2938e2cea7",
+      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-orient/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "llp-orient",
+        "description": "Before editing a subsystem, file, or starting a task, assemble the governing LLP context — read the root LLP, follow the @ref annotations on the code in scope, and find the LLPs covering the relevant systems. Produces a compact context pack of the constraints a change must respect. Read-only."
+      },
+      "excerpt": "---\nname: llp-orient\ndescription: Before editing a subsystem, file, or starting a task, assemble the governing LLP context — read the root LLP, follow the @ref annotations on the code in scope, and find the LLPs covering the relevant systems. Produces a compact context pack of the constraints a change must respect. Read-only.\nsource: ccheever/llp@v0.5.2\n---\n\n# llp-orient\n\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0008-distributed-agent-skills.rfc.md#the-skills--core-five-plus-flags — skill contract -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#2-reference-syntax — the grammar this reads -->\n\nLoad the design rationale governing the area you're about to touch, before touching it. This is the consumption side of LLP — orienting first is what turns `@ref` from a possibility into a habit.\n\nInvoke as `/llp-orient <path-or-task>` (file, directory, subsystem, or task description). With no argument, use the current change scope (`git diff --name-only`).\n\n## Trigger\n\nStart of a coding task that touches an area with documented design. The orient-first *rule* lives in the repo's always-loaded `AGENTS.md`; this skill is the detailed form that rule routes to for non-trivial work — don't rely on ambient description-match alone.\n\n## Invariants\n\n- MUST be read-only: never edit code or LLP documents.\n- MUST scope to the task: pull the constraints that bind this change, not a corpus summary.\n- MUST cite, not restate: reference policy as `LLP NNNN#anchor` rather than paraphrasing sections.\n- MUST NOT invent constraints. If something isn't documented, say so.\n- MUST NOT guess the rationale behind a broken `@ref` — report it and hand off to `llp-maintain`.\n\n## Workflow\n\n> **Recipe (advisory)** — read `llp/foundation/` first (the kernel; the root LLP is there once `Active` — on a fresh adoption it is still `Draft` and sits in `current/`), then skim `llp/current/` (the declared working set); both hold relative links — symlinks, or small files containing the relative path — so `ls` answers and either form resolves. Then the root LLP's systems vocabulary. `Grep '@ref'` over the files in scope and `Read` each target — these are the highest-signal context. `Grep` the `**Systems:**` headers across `llp/` for LLPs governing the subsystems touched; read the governing ones (Spec, Decision, Principles, relevant RFCs). Follow `Related:` and nearby `@ref` targets one hop out; stop there unless something is clearly load-bearing. Stale-pin nudge (skip offline): read the installed tag from the skills receipt (or a `source:` pin), compare `git ls-remote --tags <origin>` — if upstream is newer, say so in one line (\"skills at v0.3.0, upstream v0.5.2 — run /llp-adopt update\") and move on; never update from here.\n\n## Artifact\n\nA context pack with these sections, faster to read than the documents it points at:\n\n- **Scope** — files / subsystems queried\n- **Governing LLPs** — numbered list, one-line gloss each; mark which are in `foundation/` and which are in `current/` (in-flight — its guidance may still move)\n- **Active constraints** — bullets, each citing `LLP NNNN#anchor`\n- **Relevant rationale** — the *why*, same citation form\n- **Open questions / risks** for this area\n- **Likely doc updates** if the change lands\n- **Hand-off** — one of `none | llp-adopt | llp-create | llp-review | llp-maintain`\n\n## Hand-offs\n\n- No corpus (`llp/` missing or stub) → `llp-adopt`.\n- The task needs a decision no LLP covers → `llp-create` (or `llp-review` if proposal-shaped).\n- An `@ref` target or anchor doesn't resolve → `llp-maintain`.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".claude/skills/llp-review/SKILL.md",
+      "blob_sha": "95e1d1e198d1abd1efa005a7332ea2ee92673c1a",
+      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-review/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "llp-review",
+        "description": "Run the LLP 0005 review loop for an LLP document — orchestrate reviews from other model families, write one provenance-tracked artifact per review actually received under llp/reviews/, and never fabricate a review or accept on the author's behalf. Review intensity scales with stakes; the author decides when it's enough."
+      },
+      "excerpt": "---\nname: llp-review\ndescription: Run the LLP 0005 review loop for an LLP document — orchestrate reviews from other model families, write one provenance-tracked artifact per review actually received under llp/reviews/, and never fabricate a review or accept on the author's behalf. Review intensity scales with stakes; the author decides when it's enough.\nsource: ccheever/llp@v0.5.2\n---\n\n# llp-review\n\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#review-honesty — the rules this enforces -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0005-rfc-process.guide.md#review-artifacts — artifact + provenance header format -->\n\nReview an LLP the way LLP 0005 prescribes: as much critical review as the stakes warrant, captured honestly. Different model families catch different blind spots, so a single session cannot stand in for a multi-family loop — this skill makes the honest path the only path.\n\nInvoke as `/llp-review <number | slug | filename>`. Bare: list `Draft`/`Review` LLPs and ask.\n\n## Trigger\n\nA document enters `Review` (the author's opt-in to a formal loop), or review is explicitly requested. Otherwise *offer* review scaled to stakes (LLP 0005 §How much review to buy) — don't impose it.\n\n## Invariants\n\n- MUST NOT fabricate a review, record one that wasn't actually provided, or mark a loop complete by intent.\n- MUST NOT count the session that authored the draft as an independent reviewer — if this session wrote the document, say so and gather reviews elsewhere.\n- MUST NOT change `**Status:**` or accept/reject — propose transitions; the author decides.\n- MUST write one artifact per review actually received: `llp/reviews/NNNN-slug.<family>.md`, opening with the LLP 0005 provenance header (family · provider/runtime · date · redacted? · method). Re-reviews by the same family get a dated section, never an overwrite.\n- MUST NOT send content to an external provider without an explicit human action; redact secrets by default.\n\n## Workflow\n\n> **Recipe (advisory)** — locate and read the document fully. If this session can act as one independent family reviewer (and didn't author the draft), write that review using the LLP 0005 standard prompt. For each further input the author wants — pasted manual review, sub-agent on a different family, CLI runner — prepare the prompt and **stop until it is actually provided**. Structure each review body: overall assessment · strengths (cite sections) · concerns (with severity and what would resolve each) · suggestions · open questions · recommended next step.\n\n## Artifact\n\nReview files under `llp/reviews/` with provenance headers, plus a summary of the feedback and a *proposed* next step (revise and stay `Draft` / gather another family / ready for the author to accept).\n\n## Hand-offs\n\n- Feedback that amounts to a new design direction → a fresh LLP via `llp-create`.\n- The author applies status changes; this skill never does.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".claude/skills/llp-super-refine/SKILL.md",
+      "blob_sha": "bcfbb37cae52e75452ab2e3ee9906bf393723774",
+      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/.claude/skills/llp-super-refine/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "llp-super-refine",
+        "description": "Author-invoked dual-family refine loop for one or more Draft/Review LLPs — each round, two fresh mutually-blind reviews from different model families, orchestrator revision, verdict-lined artifacts — until both families mark the same revision READY, a delta round finds no MATERIAL concern in pre-existing text across families, or a bounded stop rule escalates to the author. Use when the user invokes /llp-super-refine or asks to refine an LLP until independent models agree it is ready."
+      },
+      "excerpt": "---\nname: llp-super-refine\ndescription: Author-invoked dual-family refine loop for one or more Draft/Review LLPs — each round, two fresh mutually-blind reviews from different model families, orchestrator revision, verdict-lined artifacts — until both families mark the same revision READY, a delta round finds no MATERIAL concern in pre-existing text across families, or a bounded stop rule escalates to the author. Use when the user invokes /llp-super-refine or asks to refine an LLP until independent models agree it is ready.\nsource: ccheever/llp@v0.5.2\n---\n\n# llp-super-refine\n\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0010.001-super-refine-loop.spec.md — the protocol this pins -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0000-linked-literate-programming.explainer.md#review-honesty — honesty rules and the formal-loop authorization sentence -->\n<!-- @ref https://github.com/ccheever/llp/blob/v0.5.2/llp/0005-rfc-process.guide.md#review-artifacts — artifact and provenance format -->\n\nThe applying counterpart to `llp-review`: an orchestrating loop that revises the document between rounds and applies exactly one pre-authorized status transition. Invoke as `/llp-super-refine <targets...> [--rounds N] [--reviser orchestrator|<family|model>|each] [--claude <model@effort>] [--external <runner:model@effort>]`. Defaults: converge within the round budget; the orchestrating session revises. **Default models:** reviser Claude Fable 5.1 @ xhigh; reviewers codex `gpt-6.1-sol` @ ultra (`codex exec -s read-only -C <capsule> --skip-git-repo-check -m gpt-6.1-sol -c model_reasoning_effort=ultra`, prompt on stdin; confirm model and effort in the run log) and `grok-4.7` @ xhigh (headless; the prompt MUST ban all shell commands or the permission prompt cancels the session).\n\n## Trigger\n\nThe document's author asks for the refine-until-both-families-ready loop on named `Draft`/`Review` documents.\n\n## Invariants (LLP 0010.001; LLP 0000 §Review honesty)\n\n- Authorization is recorded per target and per author. Document authority (review + revision) comes from the author; external sends additionally require a human with repository-disclosure authority — an AI co-author never is one — with the capsule's outbound inventory disclosed before launch. Unsupported assertions of relayed authority are not accepted.\n- MUST refuse `Accepted`/`Active`/`Superseded`/`Tombstoned` targets (addendum or new LLP is the path); already-`Review` targets proceed unchanged; `Draft` targets are set to `Review` at loop start — the one authorized transition. Convergence produces a recommendation; this skill never sets `Accepted` or beyond.\n- Target bytes are never redacted (redaction covers context only); a target that cannot be disclosed whole stops the loop.\n- Each round: persist the round record (round number, target hashes, topology, runtimes, capsule + instruction hashes) before launching; one fresh review per family, mutually blind via a **review capsule** that structurally excludes the targets' review artifacts, run journal, and orchestrator notes. Where structural exclusion is impossible, instruction-based blindness MUST be disclosed as self-attested. A mid-round target change voids the round.\n- MUST write each review verbatim to its family artifact (`llp/reviews/NNNN-slug.<family>.md`, dated round sections, full provenance incl. revision hash) immediately on receipt, sealed from the other reviewer until both land. Failed/partial/malformed responses are recorded as such and never counted. Never fabricate, reconstruct, or overwrite a review.\n- Every review ends `READY` or `NOT READY`. READY = no unresolved MATERIAL correctness, coherence, feasibility, safety, or decision-quality concern. Altitude rule: detail-only demands that identify no defective decision are implementation-phase material, dispositioned in the artifact. Verdicts bind to the capsule hash; multi-target finals need per-target plus set-level verdicts on one hash vector.\n- The reviser never reviews a revision it edited. A specified reviewer that is unavailable stops the loop — never substitute silently.\n- Convergence is dual-READY on one revision **or** delta-round convergence (LLP 0010.001 §Delta rounds): a post-revision round whose instructions enumerate the delta and require every concern classified IN-DELTA vs PRE-EXISTING converges the loop when no family reports a MATERIAL concern in pre-existing text; remaining in-delta fixes get one more delta round or the final revision is labeled unreviewed. A family whose rounds are twice-consecutively **convergence-clean** — every remaining concern altitude-dispositionable detail or prior-delta churn, no defective decision identified — MAY be closed out via a **detail-horizon stop**: a normal terminal, not an escalation, with the family's NOT READY verdict recorded verbatim, a complete disposition ledger (never summarize a concern away), and the convergence claim scoped to say which family was cut off; MATERIAL defective-decision dissent still escalates. A round MAY run under a declared **lens** (e.g. implementer: draft a named contract from the document alone, log divergence decision points; UNDERDETERMINED = NOT READY) — recorded in provenance, all round invariants intact.\n- The final report and close-out notes MUST state which revision hash the final verdicts bind to and whether later unreviewed revisions exist.\n- **Scope freeze + punch-list delta rounds (LLP 0010.001 §Scope freeze) — the default late-loop phase for decidable documents.** For `Type: Spec` targets, after the round-2 revision the document's normative surface is **frozen** by default (other revision-bearing types: at the author's authorization; never automatic for Principles/Explainers/Decisions/philosophical RFCs): subsequent revisions make corrections and restorations only, and any demand for new normative closure is **recorded as an obligation** (open-issue box or test obligation), never folded as new prose; the document carries a dated freeze declaration. Post-freeze rounds are **punch-list delta rounds**: the revision produces, per family, a punch list mapping that family's own findings to checkable dispositions (`FOLDED at §N` / `REFUTED` + evidence / `RECORDED-AS-OBLIGATION at §N`); each reviewer receives the full document (context), the revision's unified diff, and its **own family's punch list only** (cross-family blindness preserved). Review scope: verify the dispositions; review the diff; outside findings admissible only as disposition errors or diff-created MATERIAL contradictions; new-closure demands are non-blocking obligations. READY = punch list correctly dispositioned + diff sound, modulo recorded obligations. From round 2 on, revisions classify each external finding (persistent / new-on-new-content / bar-inflation); the tallies go in the freeze-transition or terminal report so the choice between freeze, detail-horizon stop, and escalation rests on measured evidence.\n- Bounds: round budget (default 3/document), launch cap (2× budget per family per target, voids included), growth budget (~20% net over the entering revision; post-freeze, growth is corrections plus the mandatory checkable changelog only). Terminal escalations to the author, with every disposition enumerated: budget/cap exhaustion, material cross-family contradiction, sustained asymmetry (one family READY on two consecutive revisions, the other NOT READY on both), growth-budget exhaustion with open MATERIAL concerns. Each proposes stay-`Review` or revert-`Draft`; the author applies — and may instead authorize extension rounds under the scope-freeze + delta protocol above. Fundamental-redesign feedback stops the loop for author authorization.\n\n## Workflow\n\n> **Recipe (advisory)** — read targets and governing LLPs fully; partition multi-target sets into clusters by coupling (`Related:`, cross-references, shared `Systems:`) and pick a topology per cluster — independent loops (loosely coupled; one sub-orchestrator each",
+      "card": null
+    },
+    {
+      "skill_path": "skills/orchestrate/SKILL.md",
+      "blob_sha": "717af9f82bfc7c5fc6dc05baae93947d3874c7d5",
+      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/skills/orchestrate/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "orchestrate",
+        "description": "Run a multi-lane program to completion across the machine fleet — route coding to codex, reviews to two blind model families, supervise on a 20-minute judgment tick, and report milestone/percent/ETA with a program total. Use when the user hands over a body of work and wants it driven rather than discussed."
+      },
+      "excerpt": "---\nname: orchestrate\ndescription: Run a multi-lane program to completion across the machine fleet — route coding to codex, reviews to two blind model families, supervise on a 20-minute judgment tick, and report milestone/percent/ETA with a program total. Use when the user hands over a body of work and wants it driven rather than discussed.\n---\n\n# orchestrate\n\nDrive a body of work to done. You own sequencing, dispatch, and judgment. The user owns\nscope and the decisions you are not confident about.\n\n## Trigger\n\n\"Orchestrate this,\" \"supervise this work,\" \"run this program,\" or any handoff of a\nmulti-part body of work where the user expects progress rather than a plan.\n\n## Posture\n\nDecide autonomously and keep moving. The user is not a queue you block on. When you hit a\nfork you can resolve from the code, the brief, or a sensible default, resolve it and log\nit. Blocking questions are for decisions where proceeding under any assumption would be\nunsafe or would waste the work if wrong.\n\n## Model routing\n\n| Work | Model |\n|---|---|\n| Implementation | codex `gpt-6.1-sol` high / xhigh / ultra |\n| Code review | **both** `grok-4.7` **and** codex `gpt-6.1-sol` xhigh |\n| Hard directional decisions, RFC/LLP refinement | **the panel** — see the `panel` skill; it replaces super-refine |\n| Everything else | your call |\n\nCodex: `codex exec -m gpt-6.1-sol -c model_reasoning_effort=<effort>`, prompt on stdin;\n`-s read-only` for reviews.\n\nReviews are **mutually blind**: two families, neither shown the other's findings, both on\nthe same revision. Agreement across families is signal; a finding only one family raises\nis a hypothesis to check, not a defect to fix.\n\nScope every reviewer prompt: **one reviewer, no spawning, no clones, no remote commands.**\nA reviewer with bypass permissions will otherwise clone the repo and start running suites\non a machine you did not assign it.\n\nChunk work small for xhigh — it dies under load, and a lane that dies mid-task costs more\nthan two lanes that finish.\n\n## Fleet routing\n\n**Probe load before dispatching.** The control plane saturating while the fleet sits idle\nis the default failure, not an edge case. Check load, memory, disk, and running jobs on a\ntarget before sending work — online is not the same as idle or qualified.\n\nAssign **a specific box per lane in the brief**, not \"use the fleet.\" Use warm\npre-provisioned worktrees; never clone fresh. Record every PID you launch and kill only\nthose — never by name or pattern, on any machine, ever.\n\nEvery wait must be harness-tracked (a background task whose exit re-invokes you, or a\nbounded foreground loop). A detached watcher is killed silently and the lane strands.\n\n## The 20-minute tick\n\nEvery 20 minutes until the program is done, check in. **This tick is for judgment, not\npolling** — harness-tracked work already re-invokes you when it finishes. The question the\ntick answers is *\"is this approach still right?\"*, not *\"is it done yet?\"*\n\nReport exactly this, in text:\n\n```\nPROGRAM: <name>                                     <N>% · ETA <duration>\n\n  <milestone>            <N>% · ETA <duration> · <one line>\n  <milestone>            <N>% · ETA <duration> · <one line>\n  ...\n\nDECIDED WITHOUT ASKING\n  <decision> — <why, one line>\n\nNEEDS YOU\n  <the questions list, per the protocol below>\n```\n\n**Percent must be countable.** It is *N of M concrete checkable items*, and the check-in\nsays what M is. A percentage derived from feeling is worse than no percentage, because it\nnever moves and nobody can tell.\n\n**Report ETA movement, not just ETA.** `ETA 40m (was 20m, second slip)` is the useful\nform. A milestone that has been twenty minutes away for two hours is the single most\nimportant thing on the page, and a bare current estimate hides it perfectly.\n\n## Questions protocol\n\nWhen you genuinely need the user, put every open question in **one plain-text list**. No\nmultiple-choice UI, no one-at-a-time. For each:\n\n1. **ELI11** — what the choice is, in language that assumes no context on this codebase.\n2. **Your recommendation.**\n3. **Your confidence, as a number.**\n\n**Above ~80% confidence, just decide.** Do not ask. But log it under `DECIDED WITHOUT\nASKING` in the next check-in, with the reason — an autonomous decision nobody can see is\nnot autonomy, it is a surprise. The user gets a veto without paying for a round trip.\n\nBatch questions to the tick. Interrupting between ticks is for a hard block only.\n\n## Escalate the approach, not the task\n\nStop and rethink — do not grind — when any of these fire:\n\n- A milestone reports the same percent on two consecutive ticks.\n- An ETA slips twice.\n- A lane has produced no commit in 40 minutes.\n- A fix loop has run three rounds. Three is the limit; then descope, change approach, or\n  ask.\n- A check surfaces one defect per run. That is a broken instrument, not a stream of bugs —\n  fix the instrument to report everything at once before running it a fourth time.\n\n## Invariants\n\n- Never `git stash` — the stash stack is global across worktrees and will apply another\n  lane's work into yours. Use a temporary commit.\n- Two independent implementations plus a diff beat either one's test suite. Worth it when\n  a piece is subtle and central.\n- When a reviewer's finding count barely moves between rounds, stop delegating the\n  diagnosis and do it yourself.\n- Verify by running the thing, never by grepping for it or type-checking it. A syntax\n  check passes on code that cannot run.\n",
+      "card": {
+        "title_zh": "多线程序编排监督",
+        "purpose_zh": "把一批多部分工作交给代理自主推进到完成：负责排序、分派与判断，按20分钟节拍汇报里程碑、可计数百分比与ETA变化，仅在真正需要时批量提问。",
+        "does": [
+          "自主决策并记录未询问的决定，仅在不确定或存在安全风险时阻塞提问",
+          "按工作类型路由模型：实现交给codex，代码审查由两个模型家族互盲并行",
+          "分派前探测目标机器负载、内存、磁盘与运行任务，为每条线指定具体机器",
+          "每20分钟做一次判断性检查，按固定文本格式汇报程序与里程碑进度、ETA变化",
+          "按可计数条目计算百分比，并报告ETA的滑动情况",
+          "触发升级条件时停止硬推，改为重新评估方法、缩减范围或提问"
+        ],
+        "inputs": [
+          "用户交付的一批多部分工作及其范围",
+          "工作简报与代码库上下文",
+          "目标机器与预热工作树信息",
+          "审查者提示词范围约束"
+        ],
+        "outputs": [
+          "固定格式的进度汇报文本（PROGRAM、里程碑、DECIDED WITHOUT ASKING、NEEDS YOU）",
+          "可计数的完成百分比与ETA变化",
+          "批量开放问题清单（含ELI11说明、建议与置信度）",
+          "自主决策日志"
+        ],
+        "scenarios": [
+          "用户希望工作被驱动推进而非只得到计划",
+          "多部分工作需跨多台机器分派与监督",
+          "需要定期判断方法是否仍然正确并汇报进度"
+        ],
+        "prerequisites": [
+          "可用的codex执行环境与指定模型",
+          "可访问的目标机器集群与预热工作树",
+          "能追踪等待的后台任务机制"
+        ],
+        "limits": [
+          "审查者提示词须限定为单审查者、不派生、不克隆、不执行远程命令",
+          "xhigh负载下易失败，需把工作切小",
+          "同一里程碑连续两次百分比不变、ETA两次滑动、某线40分钟无提交、修复循环三轮即须升级",
+          "不得使用git stash，改用临时提交",
+          "不得按名称或模式杀进程，只杀自己记录的PID",
+          "验证须实际运行，不能靠grep或类型检查"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "自动化",
+          "代码审查",
+          "运维部署",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Drive a body of work to done. You own sequencing, dispatch, and judgment."
+          },
+          {
+            "field": "does",
+            "quote": "Decide autonomously and keep moving. The user is not a queue you block on."
+          },
+          {
+            "field": "does",
+            "quote": "| Implementation | codex `gpt-6.1-sol` high / xhigh / ultra |"
+          },
+          {
+            "field": "does",
+            "quote": "Reviews are **mutually blind**: two families, neither shown the other's findings, both on the same revision."
+          },
+          {
+            "field": "does",
+            "quote": "**Probe load before dispatching.**"
+          },
+          {
+            "field": "does",
+            "quote": "Every 20 minutes until the program is done, check in."
+          },
+          {
+            "field": "does",
+            "quote": "**Percent must be countable.** It is *N of M concrete checkable items*"
+          },
+          {
+            "field": "does",
+            "quote": "Stop and rethink — do not grind — when any of these fire:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Codex: `codex exec -m gpt-6.1-sol -c model_reasoning_effort=<effort>`, prompt on stdin;"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use warm pre-provisioned worktrees; never clone fresh."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Every wait must be harness-tracked (a background task whose exit re-invokes you, or a bounded foreground loop)."
+          },
+          {
+            "field": "limits",
+            "quote": "Scope every reviewer prompt: **one reviewer, no spawning, no clones, no remote commands.**"
+          },
+          {
+            "field": "limits",
+            "quote": "Chunk work small for xhigh — it dies under load"
+          },
+          {
+            "field": "limits",
+            "quote": "Never `git stash` — the stash stack is global across worktrees and will apply another lane's work into yours."
+          },
+          {
+            "field": "limits",
+            "quote": "Record every PID you launch and kill only those — never by name or pattern, on any machine, ever."
+          },
+          {
+            "field": "limits",
+            "quote": "Verify by running the thing, never by grepping for it or type-checking it."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Codex: `codex exec -m gpt-6.1-sol -c model_reasoning_effort=<effort>`, prompt on stdin;"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/panel/SKILL.md",
+      "blob_sha": "517935d304dd9516aeb47409293c8f9c8cab3719",
+      "source_url": "https://github.com/expo/exact/blob/2e3d283b4e63227e769f801841312a751bff11e7/skills/panel/SKILL.md",
+      "fetched_at": "2026-11-13T10:45:31.701Z",
+      "generated_at": "2026-11-13T10:45:31.701Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "panel",
+        "description": "Take a hard directional decision, or an RFC/LLP that needs refining, to the panel — four frontier models from different families, mutually blind, one pass (two at most), asked only about fundamental and directional issues. Use instead of llp-super-refine in almost every case. Use when the user says \"take it to the panel,\" \"ask the panel,\" or when a fork in direction is too consequential to decide alone."
+      },
+      "excerpt": "---\nname: panel\ndescription: Take a hard directional decision, or an RFC/LLP that needs refining, to the panel — four frontier models from different families, mutually blind, one pass (two at most), asked only about fundamental and directional issues. Use instead of llp-super-refine in almost every case. Use when the user says \"take it to the panel,\" \"ask the panel,\" or when a fork in direction is too consequential to decide alone.\n---\n\n# panel\n\nFour models from different families, asked the same question, blind to each other. You go\nto the panel to get the **direction** right — not to finish the design.\n\n## Who sits on it\n\n| Seat | Command |\n|---|---|\n| Astra, max | `codex exec -m gpt-6-astra -c model_reasoning_effort=\"max\" \"<prompt>\"` |\n| Fable, xhigh | `claude -p --model claude-fable-5-1 --effort xhigh \"<prompt>\"` |\n| Grok 4.7, xhigh | `grok -p \"<prompt>\" -m grok-4.7 --effort xhigh` |\n| Muse Wonder Full, xhigh | `muse exec --model muse-wonder-full --effort xhigh --trust-workspace \"<prompt>\"` |\n\nMuse sits **if available**. If it fails to start, the panel is three and the report says so —\ndo not stall the decision waiting on a seat. The other three are required; if one is down,\nsay which and ask whether to proceed short.\n\nRun all seats in parallel, as harness-tracked background tasks, on the same revision of the\nsame text. No seat sees another's answer.\n\n## When to go\n\n- **A hard decision about direction.** Two architectures, a build-vs-buy, whether to change\n  course mid-program. The kind of fork where being wrong wastes the work built on top of it.\n- **Refining an RFC or LLP.** One pass before implementation starts.\n\nNot for code review — that is orchestrate's two-family review, on a diff. Not for anything\nyou would decide above ~80% confidence on your own.\n\n**The panel replaces `llp-super-refine` in almost every case.** Super-refine iterates until\ntwo families agree a document is ready, which spends rounds polishing details that are\ncheaper to settle in code. Reserve it for planning a genuinely complex system where a\nfoundational error would be ruinous and impossible to see until late — and say why when\nyou reach for it.\n\n## What to ask\n\n**Foundational, directional, structural issues only.** Is this the right problem? The right\napproach? Is there a load-bearing assumption that is wrong, a simpler shape that does the\nsame job, a constraint that kills it? Those are what the panel is for.\n\nNitpicks are explicitly out of scope. Naming, edge cases, API details, missing error paths —\nthey get worked out during implementation, where they are concrete and easier to judge.\nResolving them in prose first is effort spent twice.\n\nEvery seat gets the same prompt, scoped like this:\n\n```\nYou are one reviewer on a panel. Do not spawn agents, clone anything, run remote\ncommands, or edit files. Read only.\n\n<the document, or the decision with its context and the options>\n\nReport only fundamental issues: wrong problem, wrong approach, a load-bearing\nassumption that does not hold, a materially simpler design, a constraint that\nbreaks it. At most five, most serious first. For each: the issue, why it is\nfundamental, and what you would do instead.\n\nDo not report nitpicks, naming, edge cases, or details that implementation will\nsurface. If you have no fundamental concerns, say so — that is a useful answer.\nFor a decision: state which option you would choose and your confidence as a\nnumber.\n```\n\n## Passes\n\n**One pass by default.** Run a second only when the first changed the direction — the\nrevised direction deserves a look of its own. Never a third: if two passes have not\nconverged, the disagreement is the finding, and it goes to the user.\n\n## Reading the results\n\n- **Agreement across families is signal.** Three seats raising the same fundamental issue\n  is close to a fact.\n- **A concern only one seat raises is a hypothesis.** Check it yourself before acting on it.\n- **A split on direction is not a vote to count.** Bring it to the user with each side's\n  strongest argument.\n- Anything a seat raises that is below the bar goes on a list for implementation, not into\n  another round.\n\nFor an LLP, record each review actually received the way `llp-review` does — one\nprovenance-tracked artifact per seat, never fabricated, never summarized into one.\n\n## Report\n\n```\nPANEL: <question or document>        <seats that sat> · pass <N>\n\nDIRECTION     <what the panel converged on, or \"split\">\nAGREED        <fundamental issues raised by two or more seats>\nSINGLE-SEAT   <issues one seat raised — checked: held up / did not>\nSPLIT         <where seats disagreed on direction, each side's best argument>\nDEFERRED      <below-the-bar items, left for implementation>\nNEXT          <revise and implement / second pass / needs you>\n```\n\nThen move. The point of the panel is to start implementation pointed the right way, not\nto start it later.\n",
+      "card": {
+        "title_zh": "多模型方向评审团",
+        "purpose_zh": "把重大方向决策或待完善的 RFC/LLP 交给四个不同家族的模型并行盲审，只问根本性与方向性问题，默认一轮，最多两轮，输出收敛方向与分歧报告。",
+        "does": [
+          "并行调用四个不同家族的模型席位，对同一版本文本提出同一问题，彼此不可见",
+          "仅收集根本性问题：错误的问题、错误的方法、不成立的承重假设、更简单的设计、致命约束",
+          "默认一轮，仅当第一轮改变方向时才跑第二轮，绝不跑第三轮",
+          "按跨家族一致、单席位假设、方向分歧、低于门槛项分类解读结果",
+          "为 LLP 按 llp-review 方式为每个席位记录可溯源评审产物",
+          "按固定模板输出 PANEL 报告并给出下一步"
+        ],
+        "inputs": [
+          "一个方向性决策及其背景与选项，或一份 RFC/LLP 文档",
+          "用户指令如 take it to the panel / ask the panel"
+        ],
+        "outputs": [
+          "PANEL 报告：DIRECTION、AGREED、SINGLE-SEAT、SPLIT、DEFERRED、NEXT",
+          "每个席位实际收到的评审产物（针对 LLP）"
+        ],
+        "scenarios": [
+          "在两种架构、自建与采购、中途改道等重大方向分叉上做决策",
+          "实现开始前对 RFC 或 LLP 做一轮精炼评审",
+          "方向错误代价高昂、不宜独自以约 80% 以下置信度决定时"
+        ],
+        "prerequisites": [
+          "四个席位命令可用：codex exec、claude -p、grok -p、muse exec",
+          "Muse 席位可选，其余三个必需；缺席位需说明并询问是否继续",
+          "所有席位在同一版本文本上并行运行，作为 harness 跟踪的后台任务"
+        ],
+        "limits": [
+          "不用于代码审查，代码审查属于 orchestrate 的双家族 diff 评审",
+          "不处理命名、边界情况、API 细节、缺失错误路径等琐碎问题",
+          "最多两轮；两轮未收敛则分歧本身即为结论，交还用户",
+          "单席位提出的关切只是假设，需自行核实",
+          "Muse 不可用时评审团为三席，报告需注明"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "产品规划",
+          "调研",
+          "文档",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Four models from different families, asked the same question, blind to each other. You go to the panel to get the **direction** right — not to finish the design."
+          },
+          {
+            "field": "does",
+            "quote": "Run all seats in parallel, as harness-tracked background tasks, on the same revision of the same text. No seat sees another's answer."
+          },
+          {
+            "field": "does",
+            "quote": "**Foundational, directional, structural issues only.** Is this the right problem? The right approach?"
+          },
+          {
+            "field": "does",
+            "quote": "**One pass by default.** Run a second only when the first changed the direction — the revised direction deserves a look of its own. Never a third"
+          },
+          {
+            "field": "does",
+            "quote": "**Agreement across families is signal.** Three seats raising the same fundamental issue is close to a fact."
+          },
+          {
+            "field": "does",
+            "quote": "For an LLP, record each review actually received the way `llp-review` does — one provenance-tracked artifact per seat, never fabricated, never summarized into one."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "| Astra, max | `codex exec -m gpt-6-astra -c model_reasoning_effort=\"max\" \"<prompt>\"` |"
+          },
+          {
+            "field": "limits",
+            "quote": "Not for code review — that is orchestrate's two-family review, on a diff."
+          },
+          {
+            "field": "limits",
+            "quote": "Nitpicks are explicitly out of scope. Naming, edge cases, API details, missing error paths"
+          },
+          {
+            "field": "limits",
+            "quote": "Never a third: if two passes have not converged, the disagreement is the finding, and it goes to the user."
+          },
+          {
+            "field": "limits",
+            "quote": "**A concern only one seat raises is a hypothesis.** Check it yourself before acting on it."
+          },
+          {
+            "field": "scenarios",
+            "quote": "**A hard decision about direction.** Two architectures, a build-vs-buy, whether to change course mid-program."
+          },
+          {
+            "field": "scenarios",
+            "quote": "**Refining an RFC or LLP.** One pass before implementation starts."
+          },
+          {
+            "field": "outputs",
+            "quote": "PANEL: <question or document>        <seats that sat> · pass <N>"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Do not spawn agents, clone anything, run remote commands, or edit files. Read only."
+          }
+        ]
+      }
+    }
+  ]
+}
