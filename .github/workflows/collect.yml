@@ -1,5 +1,5 @@
 # Inactive template: copy to .github/workflows/collect.yml in a dedicated DATA repository.
-# Copy collector.mjs, collector.test.mjs, dynamic.mjs, dynamic.test.mjs and verify-feed.mjs to its root.
+# Deploy this template with the collector, summary, history, verifier and Skill card modules and their tests.
 name: Collect Skill rankings
 on:
   schedule:
@@ -7,6 +7,10 @@ on:
     - cron: '17 2 * * *' # 10:17: retry only if no post-08:00 report exists.
   workflow_dispatch:
     inputs:
+      cards_only:
+        description: 'Continue the Skill card backfill from existing reports'
+        type: boolean
+        default: false
       scheduled_check:
         description: 'External scheduled check: skip if the post-08:00 report already succeeded'
         type: boolean
@@ -19,8 +23,11 @@ concurrency:
   cancel-in-progress: false
 jobs:
   collect:
+    if: inputs.cards_only != true
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    outputs:
+      collected: ${{ steps.freshness.outputs.collect }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,5 +87,39 @@ jobs:
           git add data/discovery-cache.json data/summary-cache.json data/rankings.json data/daily data/batches data/history
           if ! git diff --cached --quiet; then
             git commit -m 'Update observed Skill star snapshots'
+            git push
+          fi
+  cards:
+    needs: collect
+    if: |
+      !cancelled() && (inputs.cards_only == true ||
+      (needs.collect.result == 'success' && needs.collect.outputs.collected == 'true'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test skill-cards.test.mjs
+      - name: Build Skill cards
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUMMARY_API_KEY: ${{ secrets.SUMMARY_API_KEY }}
+          SUMMARY_BASE_URL: ${{ vars.SUMMARY_BASE_URL }}
+          SUMMARY_MODEL: ${{ vars.SUMMARY_MODEL }}
+          SUMMARY_API_STYLE: ${{ vars.SUMMARY_API_STYLE }}
+        run: node skill-cards.mjs data
+      - run: node verify-feed.mjs --cards-only data
+      - name: Save verified Skill cards
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/cards
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update verified Skill cards'
             git push
           fi
