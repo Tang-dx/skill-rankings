@@ -1,0 +1,427 @@
+{
+  "schema": 1,
+  "repo": "Vets-Who-Code/ai-era-job-kit",
+  "tree_sha": "baf46f41ea3e25751589abcf8770dc6b66919ebe",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/composite-scorer/SKILL.md",
+      "blob_sha": "2fc4f8788a6d095cdbeb4980293d9da4f215da20",
+      "source_url": "https://github.com/Vets-Who-Code/ai-era-job-kit/blob/53ba0dcf714728242791025b57ac32f1acd025b0/skills/composite-scorer/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "composite-scorer",
+        "description": "Step 5 of the scoring chain. Combines the resume, LinkedIn, GitHub and portfolio scores into a plain total (the scores added together, out of 100 for each surface scored) and two scores, a machine read (ATS and AI screeners) and a human read (recruiter, hiring manager, engineers), plus a resume gate, with the points left on each surface and the sync check beside them. Use after steps 1 to 4, or when someone asks for their overall score, a scorecard, or which surface to fix first."
+      },
+      "excerpt": "---\nname: composite-scorer\ndescription: \"Step 5 of the scoring chain. Combines the resume, LinkedIn, GitHub and portfolio scores into a plain total (the scores added together, out of 100 for each surface scored) and two scores, a machine read (ATS and AI screeners) and a human read (recruiter, hiring manager, engineers), plus a resume gate, with the points left on each surface and the sync check beside them. Use after steps 1 to 4, or when someone asks for their overall score, a scorecard, or which surface to fix first.\"\n---\n\n# Composite scorer: two scores and a gate (step 5 of 7)\n\n`$KIT` is two folders up from this skill's base directory.\n\n## Run it\n`python3 $KIT/scripts/scorecard.py composite --resume resume-score.json --linkedin linkedin-score.json --github github-score.json --portfolio portfolio-score.json --sync sync.md [--screen screen.json ...] --json composite.json --md composite.md`\n\n## The two reads\n| Read | Who | Resume | LinkedIn | GitHub | Portfolio | Why |\n|---|---|---|---|---|---|---|\n| Machine | ATS and AI screeners | 40 | 35 | 15 | 10 | They read text literally: titles, keywords, dates, structure, match to the posting. They can't judge a running app or a design. |\n| Human | Recruiter, hiring manager, engineers | 20 | 15 | 30 | 35 | People skim for proof: a live demo, real impact, a clear story, recent commits. |\n\n**Resume gate (default 70):** a resume that scores under 70 on its own text (`text_score`, before GitHub or LinkedIn back anything), or that fails the parse gate, is flagged whatever either total says. A weak resume means no human ever sees the GitHub or the portfolio.\n\n**Screen Grades:** pass each posting's `screen.json` (`screen_grade.py grade --out`) with `--screen`. They're the one score modeled on vendor documents and they're per posting, so they're reported beside the two reads with no weight. A C or D is flagged.\n\n- These weights and the gate are a VWC design judgment (Nov 6 2026), not research and not any employer's. Say so when you report them. Change them with `--machine-weights resume=40,linkedin=35,github=15,portfolio=10`, `--human-weights portfolio=35,github=30,resume=20,linkedin=15` and `--gate 70`.\n- The LinkedIn and GitHub share of the machine read rests on a chat-only claim (`$KIT/references/ats-research.md`): no vendor documents which systems score them. The report says so; say it too.\n- A portfolio score without the checklist pass is automated checks only. The report says so; run step 4's `--checklist` before leaning on the human read.\n- A surface not run is left out of both reads and the rest are reweighted; the report marks the scores partial.\n- The sync check sits beside the scores, not inside them.\n- Before either read, the resume is rescored with the GitHub and LinkedIn `skill_evidence`: a skill is proven only when a resume bullet with a number names it and recent GitHub work or LinkedIn shows it. So the resume score here can be higher than step 1's.\n\n## Report\nLead with the gate: passed or flagged, and why. Then the machine read and the human read, and the one surface with the most points left. Then go to step 6 (`improvement-plan`).\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/github-scorer/SKILL.md",
+      "blob_sha": "3fd461cc81ae897478f90b0104ba55b14b11c129",
+      "source_url": "https://github.com/Vets-Who-Code/ai-era-job-kit/blob/53ba0dcf714728242791025b57ac32f1acd025b0/skills/github-scorer/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "github-scorer",
+        "description": "Step 3 of the scoring chain. Scores a public GitHub profile with the keyless GitHub REST API: bio, website, profile README, recent activity, and each pinned repo's README, decisions, live demo, tests, CI, license and topics, plus whether the pins prove the lane's top skills and match the portfolio. Use when someone asks to score or improve their GitHub, pick pins, write a profile or repo README, or make GitHub recruiter ready."
+      },
+      "excerpt": "---\nname: github-scorer\ndescription: \"Step 3 of the scoring chain. Scores a public GitHub profile with the keyless GitHub REST API: bio, website, profile README, recent activity, and each pinned repo's README, decisions, live demo, tests, CI, license and topics, plus whether the pins prove the lane's top skills and match the portfolio. Use when someone asks to score or improve their GitHub, pick pins, write a profile or repo README, or make GitHub recruiter ready.\"\n---\n\n# GitHub scorer (step 3 of 7)\n\n`$KIT` is two folders up from this skill's base directory. GitHub is how you show you exist: it should say what the portfolio says, in code. Rankers read it alongside the resume (`$KIT/references/ats-research.md`).\n\n## Run it\n`python3 $KIT/scripts/github_score.py --user <handle> --repos <pinned,repos> --market resume-score.json --portfolio <repo>/portfolio.json --json github-score.json --md github-score.md`\n- Pass the pinned repos: the REST API doesn't list pins, so without `--repos` it reads the six most recently pushed and says so.\n- No token, no account: 60 requests an hour per IP address (a shared network shares it), about 20 a run. If GitHub can't be reached it stops (exit 3); say so. On a rate-limit stop, wait an hour or `export GITHUB_TOKEN=$(gh auth token)` and rerun.\n- Report the score and the top six fixes. The weights are a VWC rubric; GitHub publishes no hiring score.\n- The JSON also carries `skill_evidence`: each lane skill a pinned repo pushed in the last year shows. AI screeners score activity against the posting (Jerome, Nov 8 2026), so step 1 and the composite use it: a resume skill is proven only when GitHub or LinkedIn backs it.\n\n## What good looks like (the fixes point here)\n- **Pins:** only manicured repos, fully built and working, each with a live demo (or a video demo when cost or security rules one out). Unpin tutorials, unfinished work and unchanged forks. There's no fixed number.\n- **Profile README** (`<handle>/<handle>`), from `$KIT/templates/github-profile-readme.md`: one line on what they build, three artifacts with outcomes and live links, links to portfolio and LinkedIn. Skip vanity stat cards.\n- **Repo READMEs**, in order: the problem, why it matters, how it works (diagram, key decisions, tests, CI, evals), live link, how to run it, what's next. Every claim links to the code that implements it.\n- **Hygiene:** description, website, topics, license, CI workflow. If a secret was ever committed, rotate it first.\n\n## Jerome's playbook\nSkill-Proof Matrix: production > shipped project > significant contribution > deployed personal project > course or cert (weak alone) > tutorial. \"Don't claim what you can't prove.\"\n\n## Never\nNever fabricate contributions or activity. Give them the files and the fix list; they commit and push.\n",
+      "card": {
+        "title_zh": "GitHub 评分器",
+        "purpose_zh": "用无密钥 GitHub REST API 给公开 GitHub 主页打分，评估简介、主页 README、近期活动及各置顶仓库的 README、决策、演示、测试、CI、许可证与主题，并输出分数与修复清单。",
+        "does": [
+          "调用脚本按用户名与置顶仓库列表抓取公开 GitHub 数据并评分",
+          "检查简介、网站、主页 README、近期活动与各置顶仓库的 README、决策、在线演示、测试、CI、许可证和主题",
+          "判断置顶仓库是否证明该方向的核心技能并与作品集一致",
+          "输出 JSON 与 Markdown 评分报告，含分数和最多六条修复建议",
+          "在 JSON 中给出 skill_evidence，记录置顶仓库近一年体现的技能",
+          "未提供置顶仓库时读取最近推送的六个仓库并注明"
+        ],
+        "inputs": [
+          "GitHub 用户名（--user）",
+          "置顶仓库列表（--repos，逗号分隔）",
+          "简历评分 JSON（--market）",
+          "作品集 JSON（--portfolio）",
+          "可选 GITHUB_TOKEN 环境变量"
+        ],
+        "outputs": [
+          "github-score.json 评分结果，含 skill_evidence",
+          "github-score.md 报告，含分数与最多六条修复建议"
+        ],
+        "scenarios": [
+          "用户要求给自己的 GitHub 打分或改进",
+          "用户想挑选置顶仓库",
+          "用户想撰写主页 README 或仓库 README",
+          "用户想让 GitHub 对招聘方更有吸引力"
+        ],
+        "prerequisites": [
+          "本机可运行 python3 脚本",
+          "能访问 GitHub REST API",
+          "未设令牌时受每 IP 每小时 60 次请求限制，每次运行约 20 次"
+        ],
+        "limits": [
+          "GitHub REST API 不返回置顶仓库，需手动传入，否则只读最近推送的六个",
+          "无令牌时每小时 60 次请求，共享网络共用额度，超限需等一小时或设置令牌",
+          "无法访问 GitHub 时脚本以退出码 3 停止",
+          "评分为 VWC 自定权重，GitHub 并无官方招聘评分",
+          "不代为提交或推送，只给文件与修复清单"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "代码审查",
+          "文档",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Scores a public GitHub profile with the keyless GitHub REST API: bio, website, profile README, recent activity, and each pinned repo's README, decisions, live demo, tests, CI, license and topics"
+          },
+          {
+            "field": "does",
+            "quote": "python3 $KIT/scripts/github_score.py --user <handle> --repos <pinned,repos> --market resume-score.json --portfolio <repo>/portfolio.json --json github-score.json --md github-score.md"
+          },
+          {
+            "field": "does",
+            "quote": "Report the score and the top six fixes."
+          },
+          {
+            "field": "does",
+            "quote": "The JSON also carries `skill_evidence`: each lane skill a pinned repo pushed in the last year shows."
+          },
+          {
+            "field": "does",
+            "quote": "Pass the pinned repos: the REST API doesn't list pins, so without `--repos` it reads the six most recently pushed and says so."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "No token, no account: 60 requests an hour per IP address (a shared network shares it), about 20 a run."
+          },
+          {
+            "field": "limits",
+            "quote": "If GitHub can't be reached it stops (exit 3); say so."
+          },
+          {
+            "field": "limits",
+            "quote": "On a rate-limit stop, wait an hour or `export GITHUB_TOKEN=$(gh auth token)` and rerun."
+          },
+          {
+            "field": "limits",
+            "quote": "The weights are a VWC rubric; GitHub publishes no hiring score."
+          },
+          {
+            "field": "limits",
+            "quote": "Never fabricate contributions or activity. Give them the files and the fix list; they commit and push."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when someone asks to score or improve their GitHub, pick pins, write a profile or repo README, or make GitHub recruiter ready."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/improvement-plan/SKILL.md",
+      "blob_sha": "25d5780f75448022a06af64d9ff7f0891200888b",
+      "source_url": "https://github.com/Vets-Who-Code/ai-era-job-kit/blob/53ba0dcf714728242791025b57ac32f1acd025b0/skills/improvement-plan/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "improvement-plan",
+        "description": "Step 6 of the scoring chain. Turns the two scores into the steps needed to improve each section, biggest gain first: every failed check's fix by weight, the resume's top lift skills, and the sync mismatches, each pointed at the skill that fixes it. Use after the composite score, or when someone asks what to fix first or how to raise their score."
+      },
+      "excerpt": "---\nname: improvement-plan\ndescription: \"Step 6 of the scoring chain. Turns the two scores into the steps needed to improve each section, biggest gain first: every failed check's fix by weight, the resume's top lift skills, and the sync mismatches, each pointed at the skill that fixes it. Use after the composite score, or when someone asks what to fix first or how to raise their score.\"\n---\n\n# Improvement plan (step 6 of 7)\n\n`$KIT` is two folders up from this skill's base directory.\n\n## Run it\n`python3 $KIT/scripts/scorecard.py plan --composite composite.json --md plan.md`\n\nA flagged resume gate goes first, whatever the other gaps, because a weak resume means no human sees the rest. Then surfaces are ranked by points left (weight x the gap to 100), averaged over the machine read and the human read. Each lists its failed checks, highest weight first, with the fix the scorer wrote.\n\n## Turn it into work (portfolio first, always)\n1. **Fix at the source.** A missing skill, number or project goes into `portfolio.json` and `brag/entries` first. Then the surfaces are regenerated from it.\n2. **Resume:** prove the top lift skills in Experience or Projects bullets with numbers. Step 7 (`resume-rebuilder`) does the rebuild.\n3. **LinkedIn:** rewrite the fields the plan names (headline, skills, About, Featured, Experience), matching the record. See `linkedin-scorer`.\n4. **GitHub:** pins, profile README, repo READMEs, hygiene. See `github-scorer`.\n5. **Portfolio:** artifact pages, live links, the checklist sections that failed. See `portfolio-scorer`.\n6. **Sync:** clear every mismatch so all four surfaces tell one story.\nGive them the exact text or files to change. They publish and push.\n\n## Rules\nNever invent a number or a skill to close a gap. A skill they can't prove becomes something to build, not something to claim.\n",
+      "card": {
+        "title_zh": "改进计划生成",
+        "purpose_zh": "把两项评分结果转成各板块的改进步骤，按收益从大到小排序，列出失败检查项的修复方式、简历最需提升的技能及同步不一致项。",
+        "does": [
+          "运行 scorecard.py plan 命令，读取 composite.json 生成 plan.md 改进计划",
+          "优先处理被标记的简历门槛问题",
+          "按剩余分数（权重乘以与100的差距）对各项表面排序，并列出失败检查项及评分器给出的修复方式",
+          "给出简历、LinkedIn、GitHub、作品集四个表面的具体修改指引",
+          "要求先补 portfolio.json 和 brag/entries 源数据，再重新生成各表面",
+          "要求清除所有同步不一致，使四个表面讲述同一故事"
+        ],
+        "inputs": [
+          "composite.json（综合评分结果）",
+          "portfolio.json 与 brag/entries 源数据"
+        ],
+        "outputs": [
+          "plan.md 改进计划文件"
+        ],
+        "scenarios": [
+          "综合评分完成后制定改进计划",
+          "用户询问应先改什么或如何提高分数"
+        ],
+        "prerequisites": [
+          "已获得两项评分并生成 composite.json",
+          "环境中可用 python3",
+          "$KIT 位于本技能基础目录上两级"
+        ],
+        "limits": [
+          "不得编造数字或技能来填补差距",
+          "无法证明的技能只能作为待建设项，不能声称拥有",
+          "仅覆盖简历、LinkedIn、GitHub、作品集四个表面",
+          "简历重建由第7步 resume-rebuilder 完成，本步不执行"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "文档",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Turns the two scores into the steps needed to improve each section, biggest gain first"
+          },
+          {
+            "field": "does",
+            "quote": "`python3 $KIT/scripts/scorecard.py plan --composite composite.json --md plan.md`"
+          },
+          {
+            "field": "does",
+            "quote": "A flagged resume gate goes first, whatever the other gaps"
+          },
+          {
+            "field": "does",
+            "quote": "Then surfaces are ranked by points left (weight x the gap to 100), averaged over the machine read and the human read."
+          },
+          {
+            "field": "does",
+            "quote": "A missing skill, number or project goes into `portfolio.json` and `brag/entries` first. Then the surfaces are regenerated from it."
+          },
+          {
+            "field": "does",
+            "quote": "**Sync:** clear every mismatch so all four surfaces tell one story."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`$KIT` is two folders up from this skill's base directory."
+          },
+          {
+            "field": "limits",
+            "quote": "Never invent a number or a skill to close a gap. A skill they can't prove becomes something to build, not something to claim."
+          },
+          {
+            "field": "limits",
+            "quote": "Step 7 (`resume-rebuilder`) does the rebuild."
+          },
+          {
+            "field": "outputs",
+            "quote": "--md plan.md"
+          },
+          {
+            "field": "inputs",
+            "quote": "--composite composite.json"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/linkedin-scorer/SKILL.md",
+      "blob_sha": "fdd8742caa2770c05bcd064487b75a7156fe84ae",
+      "source_url": "https://github.com/Vets-Who-Code/ai-era-job-kit/blob/53ba0dcf714728242791025b57ac32f1acd025b0/skills/linkedin-scorer/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "linkedin-scorer",
+        "description": "Step 2 of the scoring chain. Scores a LinkedIn profile (pasted text or LinkedIn's Save to PDF) against the same lane as the resume and against the portfolio record: headline, location, Open to Work, skills coverage, Featured, About, Experience and resume consistency. Use when someone asks to score, fix or check their LinkedIn, write a headline or About, or get found by recruiters."
+      },
+      "excerpt": "---\nname: linkedin-scorer\ndescription: \"Step 2 of the scoring chain. Scores a LinkedIn profile (pasted text or LinkedIn's Save to PDF) against the same lane as the resume and against the portfolio record: headline, location, Open to Work, skills coverage, Featured, About, Experience and resume consistency. Use when someone asks to score, fix or check their LinkedIn, write a headline or About, or get found by recruiters.\"\n---\n\n# LinkedIn scorer (step 2 of 7)\n\n`$KIT` is two folders up from this skill's base directory. This skill never logs in to LinkedIn or scrapes it.\n\n## Why LinkedIn is scored\n- Recruiters search with filters (skills, job title, location, open to work) and LinkedIn standardizes titles and skills [vendor: LinkedIn, see `$KIT/references/sources.md`]. Each field is a filter you match or miss.\n- LinkedIn is for evidence, not applying. Recruiters compare it to the resume, and a mismatch is a red flag [Jerome, Feb 3 2026]. Rankers read it alongside the resume (`$KIT/references/ats-research.md`).\n- It mirrors the portfolio record. If something isn't in `portfolio.json`, add it there first.\n- The JSON carries `skill_evidence`: lane skills shown in Experience, Projects or Featured (not the Skills list). Step 1 and the composite use it to confirm a resume skill as proven.\n\n## Run it\n1. Paste the profile into a copy of `$KIT/templates/linkedin-profile.txt` (or save the profile as PDF from LinkedIn: More, then Save to PDF; needs `pdftotext`).\n   The PDF leaves out Featured and Open to Work and lists only the top skills, so those three checks are skipped and the report says so. For a full score, use the pasted template.\n2. `python3 $KIT/scripts/linkedin_score.py --profile linkedin.txt --market resume-score.json --portfolio <repo>/portfolio.json --resume <file> --json linkedin-score.json --md linkedin-score.md`\n   (No step 1 file? `--onet <code>` pulls O*NET live.)\n3. Report the score and the top five fixes, highest weight first. The weights are a VWC rubric; LinkedIn publishes no ranking.\n\n## What good looks like (the fixes point here)\n| Field | Rule |\n|---|---|\n| Headline | Target role + stack + one differentiator, in the posting's words |\n| Location | The metro you're targeting, same as the resume |\n| Open to Work | The exact titles you apply to (recruiters only, if employed) |\n| Skills | Only skills a portfolio artifact proves, named the market's way |\n| Featured | Flagship case study, the live app, one piece of writing |\n| About | Three first-person paragraphs: what you build and for whom; proof with numbers; what you want next |\n| Experience | The resume's strongest bullets, same titles, orgs and dates |\n\n## Jerome's playbook\n- Apply elsewhere, follow up here: apply on the company's site, then follow up through a LinkedIn connection.\n- Post evidence, not branding: each artifact becomes a few posts (the problem, a decision, a bug and fix, a result). Draft them; they publish.\n\n## Never\nNever invent metrics, endorsements or experience, and never post for them.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/portfolio-scorer/SKILL.md",
+      "blob_sha": "b074ef6f69b88d8ce226eb1ce01f7d1ea29b68db",
+      "source_url": "https://github.com/Vets-Who-Code/ai-era-job-kit/blob/53ba0dcf714728242791025b57ac32f1acd025b0/skills/portfolio-scorer/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "portfolio-scorer",
+        "description": "Step 4 of the scoring chain. Scores a portfolio site: the automated checks a script can verify (title, description, HTTPS, mobile, alt text, contact, artifact pages, live links), then the judgment pass against the Vets Who Code Portfolio Checklist, with a ranked fix list. Use when someone asks to score, review or check their portfolio or personal site, or asks \"is my portfolio ready to share\"."
+      },
+      "excerpt": "---\nname: portfolio-scorer\ndescription: \"Step 4 of the scoring chain. Scores a portfolio site: the automated checks a script can verify (title, description, HTTPS, mobile, alt text, contact, artifact pages, live links), then the judgment pass against the Vets Who Code Portfolio Checklist, with a ranked fix list. Use when someone asks to score, review or check their portfolio or personal site, or asks \\\"is my portfolio ready to share\\\".\"\n---\n\n# Portfolio scorer (step 4 of 7)\n\n`$KIT` is two folders up from this skill's base directory. The portfolio is the base of the whole job search and the single source of truth: every resume line, LinkedIn field and GitHub pin points back to it.\n\n## Run it\n1. Automated pass (leave `--github` off in the chain; step 3 scores GitHub):\n   `python3 $KIT/scripts/portfolio_audit.py --url <site> --portfolio <repo>/portfolio.json --json portfolio-score.json`\n   It reads the home page and up to five project pages as raw HTML, checks each deployed artifact in `portfolio.json` is on the site, and loads each live link. If the site is drawn by JavaScript it says so and leaves out the checks it couldn't make; cover those in the judgment pass.\n2. Judgment pass: open the Vets Who Code Portfolio Checklist (https://vetswhocode.io/portfolio-checklist) and read each section's items on the page itself, not from memory. \"The portfolio is a sales site.\" \"You have 8 seconds.\"\n   Write each item you checked to `checklist.json` as `{\"section\", \"item\", \"pass\": true|false, \"quote\": \"<what you saw on the page>\"}`, then rerun the script with `--checklist checklist.json` so the judgment is in the score. Every item needs a quote, pass or miss; the script refuses one without.\n3. Signal match: `python3 $KIT/scripts/sync_check.py --portfolio <repo>/portfolio.json --resume <file> --linkedin <file> --github <handle> --md sync.md`. Step 5 reports it beside the score.\n4. Report the automated score, each checklist section as passed out of checked (quote what you saw for each miss), and the top five fixes, highest leverage first. Don't call it ready until it clears the checklist's Quality Bar.\n\n## Jerome's playbook\n- Grade each claimed skill by its best evidence (Skill-Proof Matrix).\n- Ship before you certify.\n- Artifacts teams want now: spec work, test harnesses, LLM evals, and the \"why\" written into issues and pull requests.\n- The Brag Database lives in the portfolio (`brag/entries`); Friday Setup feeds it.\n\n## Tone and rules\nLead with what works, then the fixes. Quote what you saw; never guess at pages you couldn't load. For a hiring-manager read that isn't anchored on yours, use the `dev-team-reviewer` agent.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/resume-rebuilder/SKILL.md",
+      "blob_sha": "b745fbe22844f88289d841fe62948bf96ccfb61d",
+      "source_url": "https://github.com/Vets-Who-Code/ai-era-job-kit/blob/53ba0dcf714728242791025b57ac32f1acd025b0/skills/resume-rebuilder/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "resume-rebuilder",
+        "description": "Step 7 of the scoring chain. Rebuilds the resume to the VWC spec as a projection of the portfolio (portfolio.json and curated brag entries), ordered by the resume score's lift list, with [ask: ...] for anything missing; then lints it, runs the defend-every-line check, and rescores. Use when someone asks to write, rewrite, tailor, fix or split a resume, make one for a specific role, or after the improvement plan."
+      },
+      "excerpt": "---\nname: resume-rebuilder\ndescription: \"Step 7 of the scoring chain. Rebuilds the resume to the VWC spec as a projection of the portfolio (portfolio.json and curated brag entries), ordered by the resume score's lift list, with [ask: ...] for anything missing; then lints it, runs the defend-every-line check, and rescores. Use when someone asks to write, rewrite, tailor, fix or split a resume, make one for a specific role, or after the improvement plan.\"\n---\n\n# Resume rebuilder (step 7 of 7)\n\n`$KIT` is two folders up from this skill's base directory. The portfolio is the source of truth: `portfolio.json` plus the curated Brag Database in `brag/entries/`. The resume is a projection of it, one targeted version per kind of role. Most people need one or two.\n\n## Run it\n1. **Draft from the record:**\n   `python3 $KIT/scripts/resume_rebuild.py --portfolio <repo>/portfolio.json --brag <repo>/brag/entries --market resume-score.json [--role \"<title>\"] --out ~/resumes/<name>-<role>-resume.txt --md rebuild.md`\n   Bullets that prove high-lift skills go first. Missing facts come out as `[ask: ...]`. Lane skills with no evidence in the portfolio are listed as \"prove it first\" and never added.\n2. **Fill every [ask: ...] with them**, one at a time. Never guess a number.\n3. **Tighten each bullet:** strong verb, what they built or changed, the skill named exactly as the market names it, and a number. A bullet with a number that names the skill is proven (1.0) once a pinned repo pushed in the last year or LinkedIn Experience shows the same skill; otherwise it's applied (0.7). A Skills-list mention is listed (0.4).\n4. **Lint against the spec:** `python3 $KIT/scripts/resume_rebuild.py --check <file>` (works on .pdf, .docx, .txt).\n5. **Defend every line** (below). Cut anything they can't defend.\n6. **Rescore:** `resume_score.py` for the lane and `screen_grade.py` for the posting, before and after. Then `sync_check.py` so the resume agrees with the portfolio, LinkedIn and GitHub. If a resume line isn't in the portfolio, add it there first or cut it.\n7. Save as PDF in their resume folder, outside any git repo (the script refuses one), and check the PDF's extracted text reads cleanly.\n\n## The spec\n- Single column; standard headings Experience, Projects, Skills, Education; no tables, text boxes, icons or images. [HES; what breaks the parser, `$KIT/references/ats-research.md`]\n- Email and phone as plain text in the top lines, never in a header or footer.\n- No pronouns, no \"Responsible for\", no line that starts with a date, reverse chronological, no numbered sections, no references. [HES]\n- Experience length as \"5+\" or \"10+\" only; never more than \"10+\". [VWC]\n- Projects carry each artifact with its live link; they weigh most when work history is short.\n- Add an industries-served line when they have domain experience; recruiters filter on it.\n- Length follows evidence, going back about 10 years. Military service is translated into outcomes.\n- No hidden text, no keyword blocks outside Skills, no title inflation.\n\n## Defend every line\nEvery line is a potential interview question; each should hold up for about 90 seconds. For each bullet, skill and title ask: what exactly did you do, which artifact proves it, what decision did you make and why, what broke, what would you do differently. Grade each: **Defended** (clear answer and evidence; any number appears in it), **Thin** (clear answer, no evidence: add it to the portfolio or soften the line), **Cut** (can't explain it or trace the number). For lines they can't defend: remove, study until they can, or reframe at the level they worked. Build the story table and the story bank of 8 from `$KIT/templates/story-table.md`, and a Stack Defense Doc from `$KIT/templates/stack-defense.md` (for every skill: what is it, when would you use it, the tradeoffs, a common mistake). The `ai-interviewer` and `final-round-panel` agents press on the rebuilt resume.\n\n## Jerome's playbook\n- **Fracture, don't tailor:** one master record becomes a few role resumes. \"Same experience. Different signal. All true.\"\n- **Don't over-strip:** lead with the target role and keep the preferred skills the postings list.\n- **Signal strength:** \"Built production Python services handling 10K RPS\" beats \"Developed Python applications\", which beats \"Experience with Python\", which beats a Skills-list entry.\n- **Decode the posting first:** sort each skill into required, preferred or nice-to-have; 3+ mentions marks it critical; map each to evidence before writing.\n- **STAR-L bullets:** Situation, Task, Action, Result, and what they learned.\n\n## Never\nNever invent employers, titles, dates, metrics or skills. Respect NDAs: describe restricted clients generically.\n",
+      "card": {
+        "title_zh": "简历重建器",
+        "purpose_zh": "按VWC规范把作品集（portfolio.json与精选brag条目）投影成针对特定岗位的简历，按评分提升清单排序，缺失事实以[ask: ...]标出，再经规范检查、逐行可辩护检查与重新评分。",
+        "does": [
+          "从portfolio.json与brag/entries起草简历，按高提升技能排序要点，缺失事实输出[ask: ...]",
+          "对.pdf/.docx/.txt运行规范检查（单栏、标准标题、无表格图标等）",
+          "逐行可辩护检查：分级为Defended/Thin/Cut，并生成故事表与Stack Defense Doc",
+          "用resume_score.py与screen_grade.py前后重新评分，并用sync_check.py核对与作品集、LinkedIn、GitHub一致",
+          "按岗位拆分为多个版本，先解码招聘启事把技能分为必需/优先/加分",
+          "保存为PDF到简历文件夹（脚本拒绝git仓库内），并检查PDF提取文本可读"
+        ],
+        "inputs": [
+          "portfolio.json 作品集文件",
+          "brag/entries 精选Brag Database条目",
+          "resume-score.json 市场评分文件",
+          "可选 --role 目标岗位标题",
+          "待检查的简历文件（.pdf/.docx/.txt）",
+          "招聘启事（用于解码技能要求）"
+        ],
+        "outputs": [
+          "目标岗位简历文本文件（--out 路径）",
+          "rebuild.md 重建说明",
+          "规范检查结果",
+          "逐行可辩护分级与故事表、Stack Defense Doc",
+          "重新评分结果与同步检查结果",
+          "最终PDF简历"
+        ],
+        "scenarios": [
+          "要求撰写、重写、定制、修复或拆分简历时",
+          "为特定岗位制作简历时",
+          "在改进计划之后重建简历时"
+        ],
+        "prerequisites": [
+          "$KIT为技能基础目录上两级，含scripts与templates",
+          "需有portfolio.json与brag/entries作为事实来源",
+          "需Python3环境运行脚本",
+          "PDF需保存在git仓库之外的简历文件夹"
+        ],
+        "limits": [
+          "绝不虚构雇主、职位、日期、指标或技能",
+          "缺失事实须由本人逐条填写，不得猜测数字",
+          "作品集中无证据的技能列为prove it first，不写入简历",
+          "遵守NDA，受限客户须泛化描述",
+          "经验年限只写5+或10+，不超过10+",
+          "无法辩护的行须删除、学习或降级重述"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "文档",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Rebuilds the resume to the VWC spec as a projection of the portfolio (portfolio.json and curated brag entries), ordered by the resume score's lift list, with [ask: ...] for anything missing"
+          },
+          {
+            "field": "does",
+            "quote": "**Lint against the spec:** `python3 $KIT/scripts/resume_rebuild.py --check <file>` (works on .pdf, .docx, .txt)."
+          },
+          {
+            "field": "does",
+            "quote": "**Defend every line** (below). Cut anything they can't defend."
+          },
+          {
+            "field": "does",
+            "quote": "**Rescore:** `resume_score.py` for the lane and `screen_grade.py` for the posting, before and after. Then `sync_check.py` so the resume agrees with the portfolio, LinkedIn and GitHub."
+          },
+          {
+            "field": "does",
+            "quote": "Save as PDF in their resume folder, outside any git repo (the script refuses one), and check the PDF's extracted text reads cleanly."
+          },
+          {
+            "field": "does",
+            "quote": "**Decode the posting first:** sort each skill into required, preferred or nice-to-have; 3+ mentions marks it critical; map each to evidence before writing."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`$KIT` is two folders up from this skill's base directory. The portfolio is the source of truth: `portfolio.json` plus the curated Brag Database in `brag/entries/`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Save as PDF in their resume folder, outside any git repo (the script refuses one)"
+          },
+          {
+            "field": "limits",
+            "quote": "Never invent employers, titles, dates, metrics or skills. Respect NDAs: describe restricted clients generically."
+          },
+          {
+            "field": "limits",
+            "quote": "Lane skills with no evidence in the portfolio are listed as \"prove it first\" and never added."
+          },
+          {
+            "field": "limits",
+            "quote": "**Fill every [ask: ...] with them**, one at a time. Never guess a number."
+          },
+          {
+            "field": "limits",
+            "quote": "Experience length as \"5+\" or \"10+\" only; never more than \"10+\"."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when someone asks to write, rewrite, tailor, fix or split a resume, make one for a specific role, or after the improvement plan."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/resume-scorer/SKILL.md",
+      "blob_sha": "aaefefa529e84cb374d229101d68eb8a52879b4c",
+      "source_url": "https://github.com/Vets-Who-Code/ai-era-job-kit/blob/53ba0dcf714728242791025b57ac32f1acd025b0/skills/resume-scorer/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "resume-scorer",
+        "description": "Step 1 of the scoring chain. Scores a resume the way an ATS and its AI ranker read it: the parse gate first, then every in-demand skill for the lane graded proven, applied, listed, stale or none against live O*NET data (plus saved postings), with BLS outlook beside it; then, for one posting, the A to D Screen Grade. Use when someone asks to score, grade or check a resume, asks \"will this get past the ATS\" or \"why am I not getting callbacks\", or starts the scoring chain."
+      },
+      "excerpt": "---\nname: resume-scorer\ndescription: \"Step 1 of the scoring chain. Scores a resume the way an ATS and its AI ranker read it: the parse gate first, then every in-demand skill for the lane graded proven, applied, listed, stale or none against live O*NET data (plus saved postings), with BLS outlook beside it; then, for one posting, the A to D Screen Grade. Use when someone asks to score, grade or check a resume, asks \\\"will this get past the ATS\\\" or \\\"why am I not getting callbacks\\\", or starts the scoring chain.\"\n---\n\n# Resume scorer (step 1 of 7)\n\n`$KIT` is two folders up from this skill's base directory. Every ATS claim here comes from `$KIT/references/ats-research.md`, which traces each one to Jerome's chats or a vendor document. Say nothing about how an ATS works that isn't on that page.\n\n## How the screen works (teach it in this order)\n1. **Knockouts** run first: work authorization, sponsorship, minimum years, location, required certifications. Most fast rejections are knockouts and parse failures, not an AI judging content. Answer them deliberately.\n2. **Parsing** turns the file into fields. It is still the gate: test the file before tuning content. Tables, columns, text boxes, headers and footers, graphics, image PDFs and non-standard section names break it.\n3. **Search and filter.** The ATS is a database. Recruiters filter on keywords, years, location and education. Matching varies by vendor, so mirror the posting's exact phrasing where it's honest. State experience as 5+ or 10+.\n4. **AI ranking.** HiredScore grades A to D one qualification at a time; Greenhouse sorts Strong to Limited; Oracle rates 0 to 5. Weights are set per role and aren't public, so the kit invents none.\n5. **A human** reads what made it through. Satisfy the machine first, then the human.\nRankers also read LinkedIn and GitHub alongside the resume (steps 2 and 3). Old tricks (white text, keyword blocks, title inflation) now get flagged.\n\n## Run it\n1. **Lane score** (live O*NET; never from memory):\n   `python3 $KIT/scripts/resume_score.py --resume <file> --onet <code> [--postings <dir>] --json resume-score.json --md resume-score.md`\n   Find the code with `--role \"<job title>\"`. If the O*NET or BLS pull fails, the script stops (exit 3). Say so; don't fill in numbers.\n   The score counts the best 10 of the lane's skills, weighted by demand (`--need`), so 100 means the ten most-wanted are proven, not every skill the occupation uses. [VWC]\n2. **If the parse gate fails, stop there.** No score until the format is fixed: that's what the screener does. A missing email or phone doesn't block the score; it's listed as a fix.\n3. **Screen Grade for one posting** (every application):\n   `python3 $KIT/scripts/screen_grade.py split --greenhouse <board> --job <id> --out quals.json` (or `--lever`, `--ashby`, `--posting file.txt`)\n   Grade each basic (B1...) and preferred (P1...) qualification in `grades.json`: Met needs an exact resume quote and its section; no quote, no Met; React doesn't prove Vue. Then\n   `python3 $KIT/scripts/screen_grade.py grade --resume <file> --quals quals.json --grades grades.json --portfolio <repo>/portfolio.json --md screen.md`\n   A = every basic plus more than half of preferred (read it as \"A or B\"; the threshold isn't published), B = every basic, C = most basic, D = half or fewer.\n   Add `--out screen.json` so step 5 can report the grade. The script also refuses a quote that names none of the skills the qualification asks for.\n4. **Check the grading** (METHOD rule 5): have the `ats-screener` agent grade the same `quals.json` into its own `grades-2.json`, then `python3 $KIT/scripts/screen_grade.py agree --quals quals.json --grades grades.json grades-2.json`. Under 90% or a different letter: reread the rule for each qualification they differ on and regrade.\n\n## Report (five items max)\n- The score and the grade (\"62 / 100; B on this posting: 4 of 4 basic, 1 of 3 preferred\").\n- The top lift skills: each one's grade now and the points gained by proving it. Proven takes two things: a resume bullet with a number (a quantity, not the 3 in S3) that names the skill, and the same skill in a pinned repo pushed in the last year or in LinkedIn Experience, Projects or Featured. AI screeners read GitHub and LinkedIn too (`$KIT/references/ats-research.md`). Until steps 2 and 3 run, no skill is proven; pass their JSON with `--github` and `--linkedin`, or let the composite apply it.\n- Not Met qualifications the portfolio already proves.\n- Parse and format fixes, then chronology flags to be ready to explain (gaps, short roles).\n- Hand `resume-score.json` to steps 2 to 4 with `--market`, so every surface is scored against the same target.\n\n## Never\n- Never add hidden text or keyword blocks, and never claim a skill they can't defend in a final round.\n- Never call a score a hiring prediction. It mirrors documented screeners; employers configure their own.\n- Never keep a resume inside a git repo; the scripts refuse.\n",
+      "card": null
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "repo": "voyager-so/vork",
+  "tree_sha": "f14762ad8be0bd9601d37dbdc7e6a340ff117dcc",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/vork/SKILL.md",
+      "blob_sha": "e44569e398c095302a7f0e4f0c5ce88a728f021e",
+      "source_url": "https://github.com/voyager-so/vork/blob/5de38c2f81edd6d3c1c19bb1ed5bb90547856301/skills/vork/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "vork",
+        "description": "Author and render vork scene JSON, stills and animated videos; use std geometry builders and diagnose render refusals and warnings."
+      },
+      "excerpt": "---\nname: vork\ndescription: Author and render vork scene JSON, stills and animated videos; use std geometry builders and diagnose render refusals and warnings.\n---\n\n# vork\n\n## Install and discover\n\nUse the [official installation instructions](https://github.com/voyager-so/vork#install)\nfor the complete engine, Slang toolchain, libraries and SDKs; a lone copied executable\nis insufficient. JSON needs no Python or Node. Apple Silicon uses Metal; recent\nray-tracing NVIDIA GPUs use Vulkan. Linux video needs ffmpeg. Linux software Vulkan\nis an explicit, slow fallback: add `--gpu cpu` to setup/render, or set `VORK_GPU=cpu`.\n\n```sh\nvork --version\nvork setup --skip-warmup\nvork help\nvork init my-shot\ncd my-shot\n```\n\n`setup` without `--skip-warmup` also warms the starter's shaders; new programs compile\non first use. Keep stderr: compilation and frame progress can take time.\nThe generated scene.json renders immediately. Edit it or author plain JSON below.\nFor SDK authoring, read `vork help sdk`; use the SDK matching the executable,\nregenerate JSON after source edits, and keep generated buffer siblings with it.\n\n## Scene shape\n\nUnknown fields are errors. Omit defaults. Units: metres, seconds, radians, linear\nRec.709 RGB; lens/sensor dimensions are mm. Right-handed Y-up; cameras aim local -Z.\nNodes are a tree (`children`); resources are name-keyed maps, referenced by name or\ninline. Node variant fields are flat siblings of `type`. Names are globally unique.\n\nThis complete scene.json has an animated object, lit ground and camera:\n\n```json\n{\n  \"version\": 2,\n  \"nodes\": [\n    {\"name\":\"ball\",\"type\":\"mesh\",\"geometry\":{\"std\":\"sphere\",\"radius\":1},\n     \"materials\":[{\"inputs\":{\"base_color\":[0.12,0.35,0.65],\"specular_roughness\":0.3}}]},\n    {\"type\":\"mesh\",\"translation\":[0,-1,0],\"geometry\":{\"std\":\"grid\",\"size\":[10,10]}},\n    {\"type\":\"light\",\"shape\":\"rectangle\",\"translation\":[-3,5,4],\n     \"target\":[0,0,0],\"energy\":700,\"size\":4,\"color\":[1,0.92,0.8]},\n    {\"name\":\"camera\",\"type\":\"camera\",\"translation\":[3,2,5],\"target\":[0,0,0]}\n  ],\n  \"animation\":[{\"tracks\":[{\"path\":[\"nodes\",\"ball\",\"translation\"],\n    \"keys\":[[0,[-1,0,0]],[1.5,[1,0,0]],[3,[-1,0,0]]]}]}],\n  \"render\":{\"camera\":\"camera\",\"resolution\":[320,180],\"duration\":3,\"fps\":12}\n}\n```\n\nMaterials default to `std/openpbr`; inputs use names such as `base_color`,\n`base_metalness`, `specular_roughness`, `transmission_weight`, `emission_luminance`.\nA background RGB changes the backdrop, not illumination; add lights.\nMesh `Node.instances` accepts custom attribute columns in `instances.attributes`; bind a column to a material input with `{\"attribute\": name}` (see `vork help materials` and `vork help nodes --all`).\nCamera `target` may be a point or named node. To animate aim, animate a target node;\n`target` itself is structural. Rotation accepts a quaternion or `{\"euler\":[x,y,z]}`.\nAnimation paths use node names, not array indices; keys are seconds, hold endpoints,\nand default to LINEAR for numbers, STEP for strings/bools. Topology stays fixed.\n\nUse `{\"std\":\"NAME\",...options}` as geometry inline or in the geometry table:\nbox, sphere, grid, cylinder, cone, torus, capsule, revolve, rounded_box, extrude, text.\nDimensions and builder options differ: look them up with `vork help std --all`.\n`revolve.profile` contains [radius,height] pairs around +Y, with axis endpoints to\nclose the ends. Text requires an actual TTF/OTF file (`font`), not a family name;\n`size` is metres per font em. Font and asset paths resolve beside scene.json.\nStandalone geometry builders return `{buffers,geometry}` maps to merge, not a whole scene:\n\n```sh\nvork std sphere '{\"name\":\"ball\",\"radius\":1}'\n```\n\n`sky` returns environment/sun nodes and materials; `environment` preprocesses HDR\nlighting into a scene fragment and companion files. See `vork help lights --all`\nbefore using either; merge the returned tables/nodes, keep the generated files.\n\n## Check and render\n\n```sh\nvork check scene.json --profile std/previs\nvork render scene.json --profile std/previs --out still.png\nvork render scene.json --profile std/previs --out clip.mp4\n```\n\nFor the scene above: one PNG at t=0 and a 3-second, 36-frame MP4.\nUse `--at 1.5` for a still at seconds; `--frame-start 0 --frame-end 35` selects\ninclusive absolute frame indices. FPS changes output timing and frame count,\nnot key times. Set `render.duration` in the scene; it is not a `--set` option.\n\nQuality belongs to the render call, never scene content:\n\n| Profile | Use |\n| --- | --- |\n| std/previs | Framing/direct light; omits indirect light |\n| std/draft | Quick approximate GI; 4 samples |\n| std/final | Default delivery; approximate GI; 8 samples |\n| std/path | Full bounce transport for interiors/glass/caustics; 64 samples |\n\n`--set samples=64` overrides per-pixel budget (1..4096); it cannot restore paths a\nprofile omits. Draft/final/path normally denoise; `--set denoise=false` disables it.\nWithout a fast denoiser, fallback budgets may change: inspect installed settings on\nstderr and metadata. `--set resolution=640x360`, `--set fps=24`, `--set seed=42`\nare call overrides. Check with the intended profile before rendering it.\n\nOutput extension selects behavior: `.png` is one still; a directory is a whole PNG\nsequence; `frames/%06d.exr` is scene-linear multilayer EXR (also required for an EXR\nstill). PNG filename patterns are refused. MP4 requires opaque final alpha;\nMOV keeps alpha. Set `render.background` to `\"transparent\"` for transparent PNG/MOV.\nPNG/video use the display transform (default AgX); EXR stays scene-linear.\n\n## Refusals, warnings and help\n\n`check` loads assets, expands std, validates programs and animation without a GPU;\nit does not prove GPU memory, encoder availability or the resulting picture.\nExit codes: 0 success; 2 usage; 3 scene/program; 4 device/memory/encoder/setup;\n5 filesystem. Follow the diagnostic's field/path and suggested fix; do not silently\ndrop the requested effect. Nonzero can leave partial outputs. Require exit 0 and\nfresh `still.png.meta.json` / `clip.mp4.meta.json` (directory: `meta.json`).\nWarnings print on stderr and in metadata as `{code,requested,dropped}`: inspect\nwhat was omitted/substituted and tell the user. Inspect the actual image and video.\n\nStart at `vork help`; use `vork help TOPIC --all` for full fields,\n`vork help field render.duration` for an exact field. Useful topics: geometry,\nstd, materials, cameras, lights, animation, profiles, render, outputs, images,\nnodes (glTF assets), programs, errors, limits. Asset nodes use\n`{\"type\":\"asset\",\"file\":\"model.glb\"}`; keep relative textures/buffers/programs\nand licensed fonts with the scene when moving it.\n\nFive source examples to adapt (keep their companion assets; read preparation notes\nbefore rendering downloaded assets): [examples](https://github.com/voyager-so/vork/tree/main/examples)\n\n- `examples/first-scene.json`: std primitives, OpenPBR, area light, camera.\n- `examples/product-orbit.json`: camera/object animation and shared resources.\n- `examples/programs.json`: authored Slang materials and bindings.\n- `examples/compositor-bloom.json`: ordered compositor, intermediate images, white balance.\n- `examples/fog-interior.json`: interior lighting, world medium, external geometry buffers.\n",
+      "card": {
+        "title_zh": "vork 场景渲染",
+        "purpose_zh": "编写并渲染 vork 场景 JSON，生成静帧与动画视频，使用标准几何构建器，并诊断渲染拒绝与警告。",
+        "does": [
+          "编写和编辑 vork 场景 JSON，定义节点树、材质、灯光、相机与动画",
+          "用 std 几何构建器生成 box、sphere、grid、text 等几何并合并到场景",
+          "用 check 校验场景、资产与动画，用 render 输出 PNG 静帧、PNG 序列、EXR 或 MP4/MOV 视频",
+          "按 previs/draft/final/path 等质量档位渲染，并通过 --set 覆盖采样、分辨率、帧率、种子",
+          "读取 stderr 与 meta.json 中的拒绝码和警告，定位被省略或替换的效果",
+          "通过 vork help 各主题查询字段、材质、灯光、输出等完整说明"
+        ],
+        "inputs": [
+          "scene.json 场景文件",
+          "命令行参数如 --profile、--out、--at、--frame-start/--frame-end、--set",
+          "字体 TTF/OTF 文件与 glTF 等资产文件",
+          "vork 可执行文件及官方安装的引擎、Slang 工具链、库与 SDK"
+        ],
+        "outputs": [
+          "PNG 静帧或 PNG 序列",
+          "场景线性多层 EXR 或 EXR 静帧",
+          "MP4 或 MOV 视频",
+          "still.png.meta.json、clip.mp4.meta.json 或目录下的 meta.json 元数据",
+          "stderr 上的编译与帧进度信息及警告"
+        ],
+        "scenarios": [
+          "为产品展示制作环绕动画视频",
+          "用标准几何体快速搭建预览静帧",
+          "为室内、玻璃、焦散场景做完整路径追踪渲染",
+          "编写自定义 Slang 材质与合成器效果",
+          "排查渲染被拒绝或效果被省略的原因"
+        ],
+        "prerequisites": [
+          "按官方安装说明安装完整引擎、Slang 工具链、库与 SDK，仅复制可执行文件不够",
+          "Apple Silicon 使用 Metal，较新光追 NVIDIA GPU 使用 Vulkan",
+          "Linux 输出视频需要 ffmpeg",
+          "Linux 软件 Vulkan 需加 --gpu cpu 或设置 VORK_GPU=cpu，且速度慢"
+        ],
+        "limits": [
+          "未知字段会报错，需省略默认值",
+          "check 不验证 GPU 内存、编码器可用性或最终画面",
+          "非零退出码可能留下部分输出",
+          "PNG 文件名模式会被拒绝，MP4 要求不透明最终 alpha",
+          "动画拓扑固定，target 本身是结构性字段不能直接动画",
+          "文本几何需要实际 TTF/OTF 文件而非字体族名",
+          "render.duration 只能在场景中设置，不是 --set 选项"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "视频",
+          "图像",
+          "设计/UI",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Author and render vork scene JSON, stills and animated videos; use std geometry builders and diagnose render refusals and warnings."
+          },
+          {
+            "field": "does",
+            "quote": "vork render scene.json --profile std/previs --out still.png"
+          },
+          {
+            "field": "does",
+            "quote": "vork render scene.json --profile std/previs --out clip.mp4"
+          },
+          {
+            "field": "does",
+            "quote": "`check` loads assets, expands std, validates programs and animation without a GPU"
+          },
+          {
+            "field": "does",
+            "quote": "Use `{\"std\":\"NAME\",...options}` as geometry inline or in the geometry table"
+          },
+          {
+            "field": "does",
+            "quote": "Warnings print on stderr and in metadata as `{code,requested,dropped}`"
+          },
+          {
+            "field": "inputs",
+            "quote": "The generated scene.json renders immediately. Edit it or author plain JSON below."
+          },
+          {
+            "field": "inputs",
+            "quote": "Text requires an actual TTF/OTF file (`font`), not a family name"
+          },
+          {
+            "field": "outputs",
+            "quote": "Output extension selects behavior: `.png` is one still; a directory is a whole PNG sequence; `frames/%06d.exr` is scene-linear multilayer EXR"
+          },
+          {
+            "field": "outputs",
+            "quote": "Require exit 0 and fresh `still.png.meta.json` / `clip.mp4.meta.json` (directory: `meta.json`)."
+          },
+          {
+            "field": "scenarios",
+            "quote": "`examples/product-orbit.json`: camera/object animation and shared resources."
+          },
+          {
+            "field": "scenarios",
+            "quote": "`examples/fog-interior.json`: interior lighting, world medium, external geometry buffers."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use the [official installation instructions](https://github.com/voyager-so/vork#install) for the complete engine, Slang toolchain, libraries and SDKs; a lone copied executable is insufficient."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Linux video needs ffmpeg."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Linux software Vulkan is an explicit, slow fallback: add `--gpu cpu` to setup/render, or set `VORK_GPU=cpu`."
+          },
+          {
+            "field": "limits",
+            "quote": "Unknown fields are errors. Omit defaults."
+          },
+          {
+            "field": "limits",
+            "quote": "it does not prove GPU memory, encoder availability or the resulting picture."
+          },
+          {
+            "field": "limits",
+            "quote": "Nonzero can leave partial outputs."
+          }
+        ]
+      }
+    }
+  ]
+}

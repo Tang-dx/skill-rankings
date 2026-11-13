@@ -120,6 +120,897 @@
           }
         ]
       }
+    },
+    {
+      "skill_path": "skills/article-fetch/SKILL.md",
+      "blob_sha": "14ecbdf921ba97dd5c96a6b16b3c7c0fa5eae673",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/article-fetch/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "article-fetch",
+        "description": "文章抓取：把一篇文章转成干净的 Markdown（article.md，带标题、作者、平台、日期、链接的 front matter）。支持 X/Twitter 长文、帖子与线程（FxTwitter，不需要登录）、普通网页、微信公众号文章、本地 Markdown / 文本 / HTML 文件。article2media 的第一步，也可以单独用。Use when the user wants an article, X post or thread, web page or 公众号文章 fetched / saved / converted to Markdown (抓取文章、把这篇存成 markdown、提取正文、导出原文), or when another article2media skill needs the original text from a URL."
+      },
+      "excerpt": "---\nname: article-fetch\ndescription: 文章抓取：把一篇文章转成干净的 Markdown（article.md，带标题、作者、平台、日期、链接的 front matter）。支持 X/Twitter 长文、帖子与线程（FxTwitter，不需要登录）、普通网页、微信公众号文章、本地 Markdown / 文本 / HTML 文件。article2media 的第一步，也可以单独用。Use when the user wants an article, X post or thread, web page or 公众号文章 fetched / saved / converted to Markdown (抓取文章、把这篇存成 markdown、提取正文、导出原文), or when another article2media skill needs the original text from a URL.\nargument-hint: <url|文件> [--out 目录] [--no-proxy] [--title 标题] [--author 作者]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 文章抓取（article-fetch）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n把任意文章变成 `article.md`：后面所有能力（改写、翻译、长图、卡片、公众号、口播、白板、漫画）都从这份文件开始。视频不归这里管，用 `video-transcript`。\n\n参数：`$ARGUMENTS`\n\n## 1. 环境检查（本会话第一次）\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs\n```\n需要 Node 22+；网页和公众号要用到本机 Chrome。失败时把修复建议转告用户，然后停下。\n\n## 2. 抓取\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/fetch.mjs \"<url 或文件>\"            # 默认输出到 ./article2media-out/<slug>/\nnode ${CLAUDE_SKILL_DIR}/scripts/fetch.mjs \"<url>\" --out <目录>      # 指定目录\n```\n- **X / Twitter**：通过 FxTwitter 公开 API，长文、帖子、线程都支持，不需要登录。`x.com/i/article/…` 这种内部链接解析不了，请用户给发布文章的那条推文链接。\n- **普通网页**：依次尝试 r.jina.ai、defuddle.md，最后用本地 Chrome 提取。加 `--no-proxy` 不经过第三方服务。\n- **微信公众号**：直接用本地 Chrome 提取。\n- **本地文件**：Markdown / 文本直接读，HTML 用 Chrome 提取正文。`--title`、`--author` 可以补标题和作者。\n- **用户直接粘贴正文**：不用抓取，自己写 `./article2media-out/<简短英文 slug>/article.md`：front matter 写 `title`、`author`、`platform`、`date`，正文第一行 `# 标题`，其余原样粘贴，不改字。\n- 给的是视频链接、音视频或字幕文件时，脚本会拒绝并提示：改用 `video-transcript`。\n\n输出：`<目录>/article.md`、`meta.json`；终端打印一段 JSON（目录、标题、作者、平台、字数）。\n\n## 3. 检查\n**完整读一遍** `article.md`：\n- 正文明显不全（只有摘要、被登录墙截断、只抓到评论区）时，告诉用户，请对方粘贴正文；\n- 标了 `<!-- 未识别的内容块 -->` 的地方可能缺内容，交付时说明。\n- 脚本提示「⚠ 正文只有 N 字，主要内容可能在视频 / 图里」时（常见于图解帖、短视频帖）：X 帖子的视频写成了「封面图 + ▶ 视频链接」。先看图；视频用 ffmpeg 抽帧（第一帧常是带标注的完整图解）看画面。有配音的交给 `video-transcript`；只有画面文字的，把文字按原语言逐字整理进 `article.md`（放在对应的图 / 视频后面，用原文的分组做小标题），交付时说明哪些内容来自画面。\n\n## 4. 交付\n单独使用时：给出 `article.md` 的绝对路径、标题、作者、平台、字数，以及上面发现的缺漏。\n在组合里：把目录交给下一个能力（见 `../article2media/references/pipeline.md`）。\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/article-rewrite/SKILL.md",
+      "blob_sha": "42413266823644c2cc152a6564bda6d8bd79f720",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/article-rewrite/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "article-rewrite",
+        "description": "改写（总结）：把一篇文章读透、重组成一份和风格无关的结构化改写稿 content.json——核心主张、分页分节、每节的判断式标题、要点、金句、两张图表（柱状、流程、对比、结构等 20 多种）和数据面板，可选执行清单、核对数字、AI 插画；还能导出成一篇文章 rewrite.md（图表转成图片）。改写稿交给长图、卡片出图，rewrite.md 交给公众号排版。Use when the user wants an article summarized / restructured / 提炼 / 改写 / 整理成要点 for visual content, wants a 总结 before 长图、小红书卡片 or 公众号, or another article2media skill needs content.json; also when the user wants a structured summary article (总结稿) of a long post."
+      },
+      "excerpt": "---\nname: article-rewrite\ndescription: 改写（总结）：把一篇文章读透、重组成一份和风格无关的结构化改写稿 content.json——核心主张、分页分节、每节的判断式标题、要点、金句、两张图表（柱状、流程、对比、结构等 20 多种）和数据面板，可选执行清单、核对数字、AI 插画；还能导出成一篇文章 rewrite.md（图表转成图片）。改写稿交给长图、卡片出图，rewrite.md 交给公众号排版。Use when the user wants an article summarized / restructured / 提炼 / 改写 / 整理成要点 for visual content, wants a 总结 before 长图、小红书卡片 or 公众号, or another article2media skill needs content.json; also when the user wants a structured summary article (总结稿) of a long post.\nargument-hint: <article.md|目录> [--pages N] [--lang zh|en] [--verify] [--illustrate] [--style 主题名]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 改写（article-rewrite）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n把一篇文章**重组**成改写稿 `content.json`：你负责读懂、规划、改写、选图、核对数字；脚本负责校验。改写稿只写内容，不含颜色和字体，换风格不用重写。改写和总结是同一件事。\n\n参数：`$ARGUMENTS`\n\n| 产出 | 给谁用 |\n|---|---|\n| `content.json`（改写稿） | `long-image`（总结长图）、`image-cards`（总结卡片）、`explainer-video`（参考事实与结构） |\n| `rewrite.md` + `rewrite-assets/`（改写稿的文章形态，`export.mjs` 导出） | `wechat-layout`（公众号总结），也可以直接给人读 |\n\n## 输入\n\n`article.md`（原文、译文或逐字稿）。给的是链接或文件时，先用 `article-fetch`（视频用 `video-transcript`）取原文；调用方式和工作目录见 `../article2media/references/pipeline.md`。同一篇已有 `content.json` 时**不要重写**：只补新版式需要的字段。\n\n逐字稿是**口语**：去掉口头禅和重复，事实、数字、人名以视频为准；识别可能出错的专有名词对照 `transcript/segments.md` 判断，拿不准的交付时说明。来源写成「内容整理自 <作者> 的<平台>视频《标题》」。\n\n第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（校验和导出要用到 Node 22+、Chrome；`ai-illustration` 一行是出图能力）。\n\n## 1. 规划\n**完整读一遍** `article.md`，再读 `references/writing-guide.md`，然后确定：\n- 核心主张（一句话）；\n- 页数和每页的 `part`，按 `references/content-schema.md` 末尾的密度表定（`--pages` 可强制 1–4 页）；\n- 每节的标题、两张图的类型、面板类型；\n- 主题：用户没指定时，按 `../article2media/references/styles.md` 选一个，写进 `theme`。\n\n不需要先把大纲给用户确认，除非用户要求先看大纲。\n\n## 2. 核对数字（只在 `--verify` 或用户要求时）\n- 对文中 3–8 个关键数字或事实，用 WebSearch / WebFetch 查原始出处。\n- 在对应面板里写明结论，例如\"与 IAB 一致；2026 年为预测值\"\"未找到出处\"，面板标题写\"· 编者核对\"。\n- 没核对时，任何地方都不能出现\"核对\"字样。\n\n## 3. 写 content.json\n写之前**必须**读 `references/content-schema.md` 和 `references/figures.md`（每种图表、面板的完整写法见 `examples/gallery.json`；一篇 3,700 词长文的完整示例见 `examples/dan-koe.json`）。写到原文同目录的 `content.json`，然后校验：\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/check.mjs <目录>/content.json                 # 长图\nnode ${CLAUDE_SKILL_DIR}/scripts/check.mjs <目录>/content.json --ratio 3:4     # 还要出卡片时，同时检查卡片\n```\n- 要出卡片时，再读 `../image-cards/references/xhs-guide.md`，写上 `cover`、`xhs`，需要时给个别节加 `card` 提示。\n- 要出公众号总结时，再读 `../wechat-layout/references/wechat-guide.md`，写上 `wechat.title`、`wechat.digest`。\n- ✗ 必须修完。⚠ 提示**逐条处理到 0** 再出图：长度提示缩短文字；\"数字在原文里找不到\"改成原文数字或在 note 里注明；\"第一人称\"改成第三人称；\"数据面板偏少\"\"整页卡偏少\"\"原文配图一张没用\"按提示补上。只有确认提示不适用时才保留，并在交付时说明原因。\n- 校验会和同目录的 `article.md` 比对（数字来源、人称、配图），所以 content.json 要和 article.md 放在一起。\n- 改 content.json 用编辑工具或 `node` / `python` 脚本，不要用 `sed -i`：macOS 和 Linux 的写法不同，改不上也不报错。\n- 讲概念、机制的内容，按 writing-guide 第 6 节把具体情形、判别依据、关系和结果接起来。\n\n## 4. AI 插画（只在用户要插画或传了 `--illustrate` 时）\n1. 按 `figures.md` 的 illustration 一节写：`cover.illustration.prompt`（封面），再挑 1–2 个故事性强、缺数据的节，把其中一张图换成 `{\"type\": \"illustration\", \"prompt\": \"…\"}`。\n2. 生成：`node ${CLAUDE_SKILL_DIR}/scripts/illustrate.mjs <目录>/content.json`。脚本按 content.json 的主题选画风；之后换主题要画风一致，就加 `--theme 新主题` 再生成一次。\n3. 生成失败（没有出图能力、免费层没有图像额度等）时，把报错原话告诉用户，然后**去掉插画字段**照常继续。不要交付带\"插画待生成\"占位框的图。\n4. 打开生成的图看一眼：有没有画出文字、主体是否清楚、和主题搭不搭。不满意就改 prompt，加 `--force` 重新生成。\n\n## 5. 导出文章（公众号总结、或用户要一篇总结稿时）\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/export.mjs <目录>/content.json                 # → <目录>/rewrite.md + rewrite-assets/\nnode ${CLAUDE_SKILL_DIR}/scripts/export.mjs <目录>/content.json --theme quiet   # 图表按指定主题截图\n```\n- 图表截成图片，颜色跟主题走，主题写进 `rewrite.md` 的 front matter；公众号排版默认用同一个主题。换主题要重新导出。\n- 导出后会把 `rewrite.md` 解析回来校验；有 ✗ 说明 content.json 里有会被当成 Markdown 结构的文字，按提示改 content.json 后重导，**不要手改 rewrite.md**。\n\n## 6. 交付\n- 单独使用时：`content.json`（和 `rewrite.md`）的绝对路径、一行大纲（每页的 part）、主题和理由，以及：要出图用 `long-image` / `image-cards`，要发公众号用 `wechat-layout` 排 `rewrite.md`。\n- 在组合里：把目录交给下一个能力。\n- 需要用户留意的：未核对的数字、抓取不全的段落、编者补的节、插画用的服务商和张数。\n",
+      "card": {
+        "title_zh": "文章改写总结稿",
+        "purpose_zh": "把一篇文章读透并重组成与风格无关的结构化改写稿 content.json，含核心主张、分页分节、判断式标题、要点、金句、图表和数据面板，可导出为 rewrite.md 供公众号排版或直接阅读。",
+        "does": [
+          "完整阅读原文并规划核心主张、页数、分节标题、图表与面板类型",
+          "按 content-schema 和 figures 规范写出 content.json 并用 check.mjs 校验",
+          "可选核对 3–8 个关键数字或事实并在面板注明结论",
+          "可选生成 AI 插画并写入封面或指定节",
+          "用 export.mjs 导出 rewrite.md 和 rewrite-assets，图表转成图片",
+          "交付时说明未核对数字、抓取不全段落、插画服务商等需留意事项"
+        ],
+        "inputs": [
+          "article.md 原文、译文或逐字稿",
+          "参数：--pages N、--lang zh|en、--verify、--illustrate、--style 主题名",
+          "链接或文件（需先用 article-fetch 或 video-transcript 取原文）"
+        ],
+        "outputs": [
+          "content.json 改写稿",
+          "rewrite.md 与 rewrite-assets/ 目录",
+          "AI 插画图片（启用插画时）"
+        ],
+        "scenarios": [
+          "用户想把文章总结、提炼、改写成要点",
+          "为长图、小红书卡片、公众号总结准备结构化内容",
+          "另一 article2media 技能需要 content.json",
+          "用户想要一篇长文的结构化总结稿"
+        ],
+        "prerequisites": [
+          "Node 22+ 与 Chrome，首次使用先跑 doctor.mjs",
+          "写 content.json 前须读 content-schema.md 与 figures.md",
+          "出卡片需读 image-cards 的 xhs-guide.md，出公众号需读 wechat-guide.md",
+          "content.json 需与 article.md 放在同一目录以便校验比对"
+        ],
+        "limits": [
+          "改写稿只写内容，不含颜色和字体",
+          "同一篇已有 content.json 时不要重写，只补字段",
+          "未核对时任何地方不能出现核对字样",
+          "插画生成失败时去掉插画字段，不交付占位框",
+          "不要手改 rewrite.md，应改 content.json 后重导",
+          "改 content.json 不要用 sed -i"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "把一篇文章**重组**成改写稿 `content.json`：你负责读懂、规划、改写、选图、核对数字；脚本负责校验。"
+          },
+          {
+            "field": "does",
+            "quote": "写之前**必须**读 `references/content-schema.md` 和 `references/figures.md`"
+          },
+          {
+            "field": "does",
+            "quote": "对文中 3–8 个关键数字或事实，用 WebSearch / WebFetch 查原始出处。"
+          },
+          {
+            "field": "does",
+            "quote": "生成：`node ${CLAUDE_SKILL_DIR}/scripts/illustrate.mjs <目录>/content.json`"
+          },
+          {
+            "field": "does",
+            "quote": "`rewrite.md` + `rewrite-assets/`（改写稿的文章形态，`export.mjs` 导出）"
+          },
+          {
+            "field": "inputs",
+            "quote": "`article.md`（原文、译文或逐字稿）。给的是链接或文件时，先用 `article-fetch`（视频用 `video-transcript`）取原文"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: <article.md|目录> [--pages N] [--lang zh|en] [--verify] [--illustrate] [--style 主题名]"
+          },
+          {
+            "field": "outputs",
+            "quote": "| `content.json`（改写稿） | `long-image`（总结长图）、`image-cards`（总结卡片）、`explainer-video`（参考事实与结构） |"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（校验和导出要用到 Node 22+、Chrome；`ai-illustration` 一行是出图能力）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "校验会和同目录的 `article.md` 比对（数字来源、人称、配图），所以 content.json 要和 article.md 放在一起。"
+          },
+          {
+            "field": "limits",
+            "quote": "改写稿只写内容，不含颜色和字体，换风格不用重写。"
+          },
+          {
+            "field": "limits",
+            "quote": "同一篇已有 `content.json` 时**不要重写**：只补新版式需要的字段。"
+          },
+          {
+            "field": "limits",
+            "quote": "没核对时，任何地方都不能出现\"核对\"字样。"
+          },
+          {
+            "field": "limits",
+            "quote": "不要交付带\"插画待生成\"占位框的图。"
+          },
+          {
+            "field": "limits",
+            "quote": "按提示改 content.json 后重导，**不要手改 rewrite.md**。"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "对文中 3–8 个关键数字或事实，用 WebSearch / WebFetch 查原始出处。"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/article-translate/SKILL.md",
+      "blob_sha": "9ab1f1413f1ec017c224f2bbd943f930efd9c55e",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/article-translate/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "article-translate",
+        "description": "全文翻译：把一篇外文文章（多为英文 X 长文、网页、逐字稿）完整译成中文 article.zh.md——不删减、不总结、不改写结构，标题、段落、列表、引用、表格、图片与原文逐块对应，代码和链接原样保留；脚本检查块数和结构是否一致、有没有漏译、没翻译或丢了数字。译文可以直接交付，也可以接原文长图、原文卡片、公众号排版（外文搬运）。Use when the user wants an article translated in full (翻译这篇、全文翻译、译成中文、搬运外文文章、英文转中文发公众号/小红书), or when an article2media original-text layout gets a source in another language than the reader's."
+      },
+      "excerpt": "---\nname: article-translate\ndescription: 全文翻译：把一篇外文文章（多为英文 X 长文、网页、逐字稿）完整译成中文 article.zh.md——不删减、不总结、不改写结构，标题、段落、列表、引用、表格、图片与原文逐块对应，代码和链接原样保留；脚本检查块数和结构是否一致、有没有漏译、没翻译或丢了数字。译文可以直接交付，也可以接原文长图、原文卡片、公众号排版（外文搬运）。Use when the user wants an article translated in full (翻译这篇、全文翻译、译成中文、搬运外文文章、英文转中文发公众号/小红书), or when an article2media original-text layout gets a source in another language than the reader's.\nargument-hint: <article.md|目录> [--to zh|en]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 全文翻译（article-translate）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n把 `article.md` 译成 `article.zh.md`。这是**翻译**，不是改写：一句不删、一句不加，结构与原文逐块对应。要提炼、总结，用 `article-rewrite`。\n\n参数：`$ARGUMENTS`\n\n## 输入\n\n`article.md`。给的是链接、文件或视频时，先用 `article-fetch` / `video-transcript` 取原文（见 `../article2media/references/pipeline.md`）。默认译成简体中文；用户要别的语言时，文件名用对应代码（`article.en.md`），规则相同。\n\n## 1. 看清原文\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/translate.mjs stats <目录>/article.md\n```\n告诉你一共多少块（段落、标题、列表项、表格单元、图注……）、多少词。然后**完整读一遍**原文。\n\n## 2. 翻译\n读 `references/translate-guide.md`，然后写 `<目录>/article.zh.md`：\n- **front matter**：复制原文的全部字段；`title` 换成中文标题；加 `lang: \"zh\"`、`translated_from: \"article.md\"`、`source_title: \"<原标题>\"`。\n- **正文**：逐块翻译，块的种类和顺序不变——原文一段就是译文一段，一个列表项就是一个列表项，表格行列不变，`# 标题` 那行换成中文标题。\n- **原样保留**：代码块、图片 `![…](地址)`、链接地址、人名和品牌名的原文写法（可以首次出现时括注中文）。\n- 原文里粗体、斜体在哪，译文对应的词也加上。\n- 长文分几次写完没关系（先写前半，再用编辑追加），但不能为了省事概括。\n\n## 3. 检查\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/translate.mjs check <目录>/article.md <目录>/article.zh.md\n```\n- ✗（块数不一致、某块类型变了、代码或图片地址被改）必须修，直到 0 个错误。\n- ⚠ 逐条看：「像是没翻译」「比其他段短很多（可能漏译）」「数字没找到」。确实是名字、链接或把数字写成了汉字的，可以保留，交付时说明。\n\n## 4. 交付\n- 单独使用时：`article.zh.md` 的绝对路径、块数（\"42 / 42 块对应\"）、检查结果，以及你保留原文的专有名词。\n- 在组合里（外文搬运、原文卡片）：把 `article.zh.md` 交给下一个能力——它对排版来说就是\"原文\"，按一字不改的规则排。来源写明「译自 <作者> 的<平台>文章《原标题》」。\n- 翻译他人文章公开发布前，提醒用户确认授权。\n",
+      "card": {
+        "title_zh": "全文翻译",
+        "purpose_zh": "把外文文章完整译成中文 article.zh.md，不删减、不总结、不改结构，标题、段落、列表、引用、表格、图片与原文逐块对应，代码和链接原样保留，并用脚本检查块数与结构是否一致、有无漏译。",
+        "does": [
+          "读取原文统计块数与词数，并完整通读原文",
+          "逐块翻译正文，保持块的种类和顺序不变",
+          "复制 front matter 并加 lang、translated_from、source_title 字段",
+          "原样保留代码块、图片地址、链接地址、人名品牌名",
+          "用脚本检查块数、块类型、代码与图片地址是否一致",
+          "逐条查看未翻译、疑似漏译、数字缺失等警告并交付"
+        ],
+        "inputs": [
+          "article.md 原文文件或目录",
+          "可选目标语言参数 --to zh|en",
+          "链接、文件或视频需先经 article-fetch / video-transcript 取原文"
+        ],
+        "outputs": [
+          "article.zh.md 译文文件（其他语言用对应代码命名）",
+          "块数对应情况与检查结果",
+          "保留原文的专有名词说明"
+        ],
+        "scenarios": [
+          "用户要求翻译这篇、全文翻译、译成中文",
+          "搬运外文文章发公众号或小红书",
+          "article2media 原文长图或原文卡片遇到外文原文",
+          "把英文 X 长文、网页、逐字稿完整译成中文"
+        ],
+        "prerequisites": [
+          "已有 article.md 原文；若为链接、文件或视频需先用 article-fetch / video-transcript 获取",
+          "运行环境可执行 node 脚本",
+          "宿主未替换 ${CLAUDE_SKILL_DIR} 时需换成该目录绝对路径"
+        ],
+        "limits": [
+          "只做翻译，不做提炼、总结或改写，需要提炼请用 article-rewrite",
+          "检查脚本报错必须修到 0 个错误才能交付",
+          "警告项需逐条人工判断，名字、链接或汉字数字可保留并说明",
+          "翻译他人文章公开发布前需提醒用户确认授权"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "文档",
+          "自动化",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "把 `article.md` 译成 `article.zh.md`。这是**翻译**，不是改写：一句不删、一句不加，结构与原文逐块对应。"
+          },
+          {
+            "field": "does",
+            "quote": "逐块翻译，块的种类和顺序不变——原文一段就是译文一段，一个列表项就是一个列表项，表格行列不变"
+          },
+          {
+            "field": "does",
+            "quote": "**原样保留**：代码块、图片 `![…](地址)`、链接地址、人名和品牌名的原文写法（可以首次出现时括注中文）。"
+          },
+          {
+            "field": "does",
+            "quote": "node ${CLAUDE_SKILL_DIR}/scripts/translate.mjs check <目录>/article.md <目录>/article.zh.md"
+          },
+          {
+            "field": "does",
+            "quote": "✗（块数不一致、某块类型变了、代码或图片地址被改）必须修，直到 0 个错误。"
+          },
+          {
+            "field": "inputs",
+            "quote": "`article.md`。给的是链接、文件或视频时，先用 `article-fetch` / `video-transcript` 取原文"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: <article.md|目录> [--to zh|en]"
+          },
+          {
+            "field": "outputs",
+            "quote": "单独使用时：`article.zh.md` 的绝对路径、块数（\"42 / 42 块对应\"）、检查结果，以及你保留原文的专有名词。"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user wants an article translated in full (翻译这篇、全文翻译、译成中文、搬运外文文章、英文转中文发公众号/小红书)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行"
+          },
+          {
+            "field": "limits",
+            "quote": "要提炼、总结，用 `article-rewrite`。"
+          },
+          {
+            "field": "limits",
+            "quote": "翻译他人文章公开发布前，提醒用户确认授权。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "然后写 `<目录>/article.zh.md`"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/article2media/SKILL.md",
+      "blob_sha": "7ff0e08fb4cbaab9e79632c491888b21bbc18af5",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/article2media/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "article2media",
+        "description": "把文章或视频一键做成中文视觉内容的总入口：按推荐组合把 10 个可单独使用的能力串起来——文章抓取、视频转文字、改写（总结）、全文翻译、长图、卡片（小红书 3:4 / 4:5 / 1:1 / 9:16）、公众号排版、口播视频、白板论证、漫画。常用组合：原文→改写→长图（默认）、原文→改写→小红书卡片、原文→公众号排版、原文→总结→公众号、外文→翻译→公众号、原文长图 / 原文卡片（一字不改）、视频→逐字稿→改写→长图或卡片、一稿多发（长图 + 小红书 + 公众号）、文章→口播视频。输入：X/Twitter 长文与线程、网页、微信公众号、本地 Markdown、粘贴的正文；抖音、YouTube、B 站链接、本地视频/音频、.srt/.vtt。12 套主推主题，不指定时按内容选。Use when the user gives an article, URL, long post, video link or file and wants it turned into 总结图, 长图, 知识卡片, 小红书图文, 公众号排版, 口播视频, 原文排版, 白板, 漫画 — or wants sev"
+      },
+      "excerpt": "---\nname: article2media\ndescription: 把文章或视频一键做成中文视觉内容的总入口：按推荐组合把 10 个可单独使用的能力串起来——文章抓取、视频转文字、改写（总结）、全文翻译、长图、卡片（小红书 3:4 / 4:5 / 1:1 / 9:16）、公众号排版、口播视频、白板论证、漫画。常用组合：原文→改写→长图（默认）、原文→改写→小红书卡片、原文→公众号排版、原文→总结→公众号、外文→翻译→公众号、原文长图 / 原文卡片（一字不改）、视频→逐字稿→改写→长图或卡片、一稿多发（长图 + 小红书 + 公众号）、文章→口播视频。输入：X/Twitter 长文与线程、网页、微信公众号、本地 Markdown、粘贴的正文；抖音、YouTube、B 站链接、本地视频/音频、.srt/.vtt。12 套主推主题，不指定时按内容选。Use when the user gives an article, URL, long post, video link or file and wants it turned into 总结图, 长图, 知识卡片, 小红书图文, 公众号排版, 口播视频, 原文排版, 白板, 漫画 — or wants several of them, or names a combo (一键、组合、全套、一稿多发) — e.g. \"把这篇文章做成图/小红书/公众号/视频\", \"把这个抖音视频做成小红书\", \"翻译成中文发公众号\".\nargument-hint: <url|视频链接|文件|粘贴的正文> [组合名] [-f 原文|-w 白板|-c 漫画] [--ratio 3:4|4:5|1:1|9:16 或 小红书/IG] [公众号] [视频] [--style 主题名|all] [--illustrate] [--verify]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/engine/scripts/doctor.mjs), Bash(node ${CLAUDE_SKILL_DIR}/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../article-fetch/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../video-transcript/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../article-rewrite/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../article-translate/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../long-image/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../image-cards/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../wechat-layout/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../explainer-video/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../logic-whiteboard/scripts/*), Bash(node ${CLAUDE_SKILL_DIR}/../article-comic/scripts/*)\nversion: \"2.3.1\"\n---\n\n# article2media：推荐组合\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\narticle2media 由 10 个能力组成，**每个都是独立的 skill**，可以单独用，也可以按任意顺序组装。本 skill 是总入口：听懂用户要什么，选一个组合，依次调用各个能力，最后统一交付。本目录的 `engine/` 是所有能力共用的脚本、主题和版式。\n\n参数：`$ARGUMENTS`\n\n## 能力\n\n| skill | 能力 | 输入 → 产出 |\n|---|---|---|\n| `article-fetch` | 文章抓取 | X 长文 / 网页 / 公众号 / 本地文件 → `article.md` |\n| `video-transcript` | 视频转文字 | 抖音、YouTube、B 站、本地音视频、.srt/.vtt → `article.md`（逐字稿） |\n| `article-rewrite` | 改写（总结） | `article.md` → `content.json`（改写稿），可导出 `rewrite.md` |\n| `article-translate` | 全文翻译 | `article.md` → `article.zh.md`（不删减，逐块对应） |\n| `long-image` | 长图 | `content.json` → 总结长图；`article.md` → 原文长图 |\n| `image-cards` | 卡片 | `content.json` → 总结卡片；`article.md` → 原文卡片（3:4 / 4:5 / 1:1 / 9:16） |\n| `wechat-layout` | 公众号排版 | 文章（原文、译文或 `rewrite.md`）→ 可粘贴的图文 + 封面 |\n| `explainer-video` | 口播视频 | 文章（可参考 `content.json`）→ 1080×1920 竖屏讲解视频 |\n| `logic-whiteboard` | 白板论证 | `article.md` → 把推理摊成纵向主干的长图 |\n| `article-comic` | 漫画 | `article.md` → 黑白漫画 + 3:4 卡片（需要出图能力） |\n\n能力之间只通过工作目录里的文件交接；交接文件、\"原文还是改写\"的默认判断、怎么调用别的能力，都在 `references/pipeline.md`。**开始前先读它。**\n\n## 推荐组合\n\n| 组合 | 用户通常这么说 | 链路 |\n|---|---|---|\n| **总结长图**（默认） | 做成图、长图、总结图 | 取原文 → 改写 → 长图 |\n| **小红书总结** | 做成小红书、卡片、3:4、IG | 取原文 → 改写 → 卡片 |\n| **公众号排版** | 排成公众号、公众号排版 | 取原文 → 公众号排版 |\n| **公众号总结** | 总结成一篇公众号 | 取原文 → 改写 → 导出 `rewrite.md` → 公众号排版 |\n| **外文搬运** | 翻译成中文发公众号 | 取原文 → 翻译 → 公众号排版 |\n| **原文长图** | 原文排版、全文长图、一字不改、`-f` | 取原文 → 长图（原文） |\n| **原文卡片** | 全文做成小红书卡片、原文卡片 | 取原文 →（外文先翻译）→ 卡片（原文） |\n| **视频转图文** | 这个视频做成长图 / 小红书 | 视频转文字 → 改写 → 长图或卡片 |\n| **视频转文字** | 视频转文字、逐字稿 | 视频转文字（交付 `article.md`） |\n| **一稿多发** | 长图、小红书、公众号都要 | 取原文 → 改写一次 → 长图 + 卡片 + 公众号（`rewrite.md`） |\n| **文章转口播** | 做成视频、口播、视频号 | 取原文 → 口播视频 |\n| **白板 / 漫画** | 论证图、`-w`；漫画、四格、`-c` | 取原文 → 白板 / 漫画 |\n| **批量** | 一次给多个链接、\"这周这几篇都做成…\"、links.txt | `batch.mjs init` → 逐条按同一规格做 → 发布清单（见「批量」） |\n\n- **取原文**：文章用 `article-fetch`，视频用 `video-transcript`；用户直接粘贴正文时，自己写 `article.md`（见 pipeline.md 第 1 节）。\n- 用户可以点名组合（`/article2media 小红书总结 <链接>`），也可以自己组装（\"先翻译，再出原文卡片\"\"改写后只要 1:1\"），按用户说的顺序调用即可，表里没有的组合同样成立。\n- 用户没点名组合时，按 pipeline.md 第 2 节的默认表判断原文还是改写，再从上表挑最接近的组合。**输入和输出分开判断**：给视频只说明原文是视频，产出仍按用户说的定。\n- 以前的参数照样有效：`-f` = 原文长图，`-w` = 白板，`-c` = 漫画，`--ratio` / 平台名 = 卡片，\"公众号\" = 公众号排版，\"视频\" = 口播视频；`--style`、`--illustrate`、`--verify`、`--pages`、`--lang` 交给对应的能力。\n\n## 流程\n\n1. **环境检查**（本会话第一次）：`node ${CLAUDE_SKILL_DIR}/engine/scripts/doctor.mjs`。失败时把修复建议转告用户，然后停下。`local-fonts` 一行显示没装本地字体、而用户网络不稳定（出图报\"字体没有加载\"）时，建议他运行一次 `node ${CLAUDE_SKILL_DIR}/scripts/fonts.mjs`（约 65 MB，可加 `--mirror <主机>`）：这是下载，要用户同意再跑；之后出图不再联网加载字体。\n2. **定组合**：不需要先跟用户确认，除非 pipeline.md 第 2 节说要问。\n3. **依次调用能力**：按 pipeline.md 第 3 节调用每个 skill，照它的 SKILL.md 做完、检查通过（✗ 全部修完），再进入下一步。所有能力用同一个工作目录。\n4. **一份改写稿多处用**：一稿多发时只改写一次；同一篇已有 `content.json` 时不要重写，只补新版式需要的字段。\n5. **交付**：把每个能力的交付项合在一起说，按产物分组：\n   - 每个产物的绝对路径；\n   - 走了哪条组合（例如\"原文 → 改写 → 3:4 卡片\"）；\n   - 用了哪个主题（你选的就一句话说明理由），以及怎么换主题、换版式；\n   - 卡片贴出发帖文案，公众号贴出标题、摘要和封面路径；\n   - 需要用户留意的地方：未核对的数字、抓取不全的段落、识别可能出错的专有名词、翻译检查的提示。\n   - 产物是要发布的（卡片、长图、公众号、视频）时，最后加一句：\"发布后把链接和数据告诉我，我记下来\"（见「发布之后」）。\n\n## 批量\n\n用户一次给多个链接（或一个 links.txt）时用。规格整批固定，脚本管抓取、队列和状态，**改写和出图仍由你一条一条按各能力的 SKILL.md 做**。\n\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/batch.mjs init links.txt --name 本周 --spec \"cards:3:4,long,wechat\"   # 也可以直接写几个链接；--theme 整批固定主题\nnode ${CLAUDE_SKILL_DIR}/scripts/batch.mjs next 本周        # 下一条内容 + 确切的下一步（能直接跑的会给出命令）\nnode ${CLAUDE_SKILL_DIR}/scripts/batch.mjs status 本周      # 从磁盘重新计算状态，更新看板 queue.md\nnode ${CLAUDE_SKILL_DIR}/scripts/batch.mjs checklist 本周   # 给做完的每一条写发布清单 publish.md\n```\n\n1. **init**：`--spec` 按用户说的定（`cards[:比例]` 总结卡片、`long` 总结长图、`wechat` 公众号原文排版、`wechat-rewrite` 公众号总结、`full` 原文长图、`full-cards` 原文卡片、`video`、`whiteboard`、`comic`；没说就是 `long`）。已抓过的链接自动跳过（`--refetch` 重抓），视频链接记为\"待转写\"，不会让整批失败。用户说了自己打算几点发，才写 `--schedule \"xhs=周二 20:00\"`；不要替用户编发布时间。\n2. **循环**：运行 `next` → 照它说的做这一步（改写用 `article-rewrite`，出图用对应能力，检查的 ✗ 修完）→ 再运行 `next`。**一次只做一条内容**，做完一条再做下一条；主题没固定时每篇各自按 styles.md 选。\n3. **停下来问用户，不要自己决定**：`next` 末尾列出的\"等用户确认\"的条目——抓取失败（换链接、粘贴正文，或 `skip`）、正文偏短或疑似付费墙（看一眼 `article.md`，确认内容完整才 `confirm`，否则请用户粘贴正文）。其余条目照常做完，最后一起问，不要让一条坏链接卡住整批。\n4. **收尾**：`next` 显示\"能做的都做完了\"后运行 `checklist`，再运行 `status`，把看板（`article2media-out/batches/<批次>/queue.md`）的表格贴给用户：每条的产物路径、失败和跳过的原因、发布清单里的 ✗ / ⚠。\n\n## 发布之后\n\n- **发布清单**：单篇也可以出，`node ${CLAUDE_SKILL_DIR}/scripts/batch.mjs checklist <工作目录>` 写 `publish.md`：每个平台按顺序上传哪些文件、标题候选（`content.json` 的 `xhs.title` / `wechat.title` 加 `publish.titles` 里的备选）、正文、标签、封面，以及平台硬性限制的 ✓ / ✗（小红书标题 ≤ 20、正文 ≤ 1000、图 ≤ 18；公众号标题 ≤ 64、摘要 ≤ 120）。有 ✗ 先改 content.json 再出。\n- **记数据**：用户说\"发了\"或报数据时，记到这篇的工作目录里（`publish.json`）。发了什么（形式、主题、封面版式、张数、标题）脚本自己从产物里读，只有读错时才用 `--form / --theme / --cover / --title` 改；用户没给的数字不要填、不要估。\n  ```bash\n  node ${CLAUDE_SKILL_DIR}/scripts/stats.mjs add <工作目录> --platform xhs --url <链接> --views 1200 --likes 80 --saves 150 --comments 9 --shares 12 --follows 5\n  node ${CLAUDE_SKILL_DIR}/scripts/stats.mjs list <工作目录>\n  node ${CLAUDE_SKILL_DIR}/scripts/stats.mjs report            # 汇总 ./article2media-out 下所有记录，写 stats-report.md\n  ```\n  平台：`xhs` 小红书、`wechat` 公众号、`x`、`douyin` 抖音、`channels` 视频号、`weibo`、`other`。数据名各平台叫法不同：`--views` 阅读 / 曝光 / 播放，`--likes` 点赞，`--saves` 收藏，`--comments` 评论，`--shares` 转发 / 分享，`--follows` 涨粉。同一篇过几天再报数据，再运行一次 `add` 就多一次快照。\n- **看报告**：用户问\"哪种效果好\"时运行 `report`，把结论照实说：n < 5 的组报告里标着\"样本不足，仅供参考\"，转述时要带上这句，不要把两三条帖子的差别说成规律。选主题时怎么用这份报告，见 `references/styles.md` 的选择指南。\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/explainer-video/SKILL.md",
+      "blob_sha": "682201abfda6019360d75c39f6eb7f6ef735ca0d",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/explainer-video/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "explainer-video",
+        "description": "口播视频：把一篇文章做成 1080×1920 竖屏讲解视频——你当导演写分镜脚本 video.json（黄金 5 秒钩子、每镜一个意思、回收要点），脚本完成配音（本地 VoxCPM2 / edge-tts / 系统语音，6 款公开音色）、逐字对齐、数字滚动和清单逐条出现等动画、主题样式字幕、封面、混音和自动审片。输入是文章（原文、译文、逐字稿），已有改写稿 content.json 时参考它的事实和结构。可以单独用，也可以接在抓取、视频转文字、改写后面。Use when the user wants a 口播视频, 短视频, 讲解视频, 视频号 / 抖音竖屏视频, 文字转视频, text-to-video or \"把这篇文章做成视频\"."
+      },
+      "excerpt": "---\nname: explainer-video\ndescription: 口播视频：把一篇文章做成 1080×1920 竖屏讲解视频——你当导演写分镜脚本 video.json（黄金 5 秒钩子、每镜一个意思、回收要点），脚本完成配音（本地 VoxCPM2 / edge-tts / 系统语音，6 款公开音色）、逐字对齐、数字滚动和清单逐条出现等动画、主题样式字幕、封面、混音和自动审片。输入是文章（原文、译文、逐字稿），已有改写稿 content.json 时参考它的事实和结构。可以单独用，也可以接在抓取、视频转文字、改写后面。Use when the user wants a 口播视频, 短视频, 讲解视频, 视频号 / 抖音竖屏视频, 文字转视频, text-to-video or \"把这篇文章做成视频\".\nargument-hint: <article.md|目录|video.json> [--voice 音色] [--theme 主题名] [--no-images]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 口播视频（explainer-video）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n文章 → 竖屏讲解视频。**你是导演**：读懂内容、决定讲什么和怎么讲，写 `video.json`；脚本负责配音、对齐、动画、渲染、混音和审片。\n\n参数：`$ARGUMENTS`\n\n## 0. 输入\n- 文章 `article.md`（原文、译文、逐字稿）。给的是链接、文件或视频时，先用 `article-fetch` / `video-transcript` 取原文（见 `../article2media/references/pipeline.md`）。\n- 同目录已有 `content.json` 时，直接用它的事实、数字和结构，不必重新提炼。没有也不需要先改写：口播稿本身就是一种改写，由你在 video.json 里完成。\n- 外文原文直接写中文口播即可，不需要先全文翻译。\n\n## 1. 流程\n1. `node ${CLAUDE_SKILL_DIR}/scripts/video.mjs doctor` 看本机能力（配音、对齐、插画、ffmpeg），按 `references/video-guide.md` 第 1 节决定要不要问用户（通常不用问）。\n2. **完整读一遍**文章，再读 `references/video-guide.md`，写 `<目录>/video/video.json`：定调（受众、核心、开场策略）→ 封面 → 每镜口播和画面 → 选音色、选主题（按 `../article2media/references/styles.md`）。首句 ≤ 19 字、5 秒内说完；解说最忌急，说不完就删字，不加快语速。用户手里有原视频或音乐文件时，可以在镜头里放片段（`clip`）、垫背景音乐（`music`）、换转场（`transition`），见指南 2.7；都只用本地文件，不下载、不生成。\n3. `video.mjs check` 修完提示，再 `video.mjs make`（配音、可选插画、渲染、混音、审片一步完成；配音按句缓存，改口播只重配改动的句子）。\n4. 按指南第 4 节审片：看 `contact-sheet.jpg` 和检查项，改 `video.json` 重渲，最多 2 轮。\n5. 按指南第 5 节交付：视频、封面、镜头大纲、音色（公开 / 本机个人）、缺了哪些能力、发布前的 AI 声明提醒。\n\n音色：默认用随包公开音色（`video.mjs voices` 查看）。克隆自他人或平台的音色只能进本机个人音色库，不能放进 skill 的公开音色目录；用了本机个人音色时，提醒公开发布前确认授权。\n",
+      "card": {
+        "title_zh": "口播视频生成",
+        "purpose_zh": "把一篇文章做成1080×1920竖屏讲解视频：由用户当导演写分镜脚本video.json，脚本完成配音、逐字对齐、动画、字幕、封面、混音和自动审片。",
+        "does": [
+          "读取文章或已有content.json，指导写出video.json分镜脚本（含黄金5秒钩子、每镜一个意思）",
+          "用本地VoxCPM2、edge-tts或系统语音配音，支持6款公开音色，按句缓存只重配改动句",
+          "做逐字对齐、数字滚动、清单逐条出现等动画，生成主题样式字幕和封面",
+          "渲染、混音并自动审片，输出contact-sheet.jpg和检查项",
+          "用check和make命令校验并一步完成配音、可选插画、渲染、混音、审片",
+          "支持在镜头里放本地视频片段、垫背景音乐、换转场，只用本地文件不下载不生成"
+        ],
+        "inputs": [
+          "文章article.md（原文、译文或逐字稿）",
+          "文章链接、文件或视频（需先用article-fetch或video-transcript取原文）",
+          "同目录已有的content.json（参考其事实和结构）",
+          "用户编写的video/video.json分镜脚本",
+          "可选参数：--voice音色、--theme主题名、--no-images",
+          "用户本地视频片段或音乐文件"
+        ],
+        "outputs": [
+          "竖屏讲解视频",
+          "封面",
+          "镜头大纲",
+          "音色说明（公开或本机个人）",
+          "缺失能力清单",
+          "contact-sheet.jpg审片联系表",
+          "发布前的AI声明提醒"
+        ],
+        "scenarios": [
+          "把一篇文章做成口播短视频",
+          "制作视频号或抖音竖屏讲解视频",
+          "文字转视频",
+          "接在抓取、视频转文字、改写流程之后做视频",
+          "把已有改写稿content.json做成视频"
+        ],
+        "prerequisites": [
+          "运行node ${CLAUDE_SKILL_DIR}/scripts/video.mjs doctor查看本机配音、对齐、插画、ffmpeg能力",
+          "完整读一遍文章并读references/video-guide.md",
+          "写video/video.json分镜脚本",
+          "先跑video.mjs check修完提示再跑make"
+        ],
+        "limits": [
+          "首句需≤19字、5秒内说完，说不完就删字不加快语速",
+          "审片改video.json重渲最多2轮",
+          "克隆自他人或平台的音色只能进本机个人音色库，不能放进skill公开音色目录",
+          "用本机个人音色时需提醒公开发布前确认授权",
+          "片段、音乐、转场只用本地文件，不下载、不生成",
+          "宿主未替换${CLAUDE_SKILL_DIR}时需手动换成绝对路径"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "视频",
+          "写作",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "口播视频：把一篇文章做成 1080×1920 竖屏讲解视频——你当导演写分镜脚本 video.json（黄金 5 秒钩子、每镜一个意思、回收要点），脚本完成配音（本地 VoxCPM2 / edge-tts / 系统语音，6 款公开音色）、逐字对齐、数字滚动和清单逐条出现等动画、主题样式字幕、封面、混音和自动审片。"
+          },
+          {
+            "field": "does",
+            "quote": "`video.mjs check` 修完提示，再 `video.mjs make`（配音、可选插画、渲染、混音、审片一步完成；配音按句缓存，改口播只重配改动的句子）。"
+          },
+          {
+            "field": "does",
+            "quote": "用户手里有原视频或音乐文件时，可以在镜头里放片段（`clip`）、垫背景音乐（`music`）、换转场（`transition`），见指南 2.7；都只用本地文件，不下载、不生成。"
+          },
+          {
+            "field": "does",
+            "quote": "按指南第 4 节审片：看 `contact-sheet.jpg` 和检查项，改 `video.json` 重渲，最多 2 轮。"
+          },
+          {
+            "field": "inputs",
+            "quote": "文章 `article.md`（原文、译文、逐字稿）。给的是链接、文件或视频时，先用 `article-fetch` / `video-transcript` 取原文"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: <article.md|目录|video.json> [--voice 音色] [--theme 主题名] [--no-images]"
+          },
+          {
+            "field": "outputs",
+            "quote": "按指南第 5 节交付：视频、封面、镜头大纲、音色（公开 / 本机个人）、缺了哪些能力、发布前的 AI 声明提醒。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`node ${CLAUDE_SKILL_DIR}/scripts/video.mjs doctor` 看本机能力（配音、对齐、插画、ffmpeg），按 `references/video-guide.md` 第 1 节决定要不要问用户（通常不用问）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**完整读一遍**文章，再读 `references/video-guide.md`，写 `<目录>/video/video.json`"
+          },
+          {
+            "field": "limits",
+            "quote": "首句 ≤ 19 字、5 秒内说完；解说最忌急，说不完就删字，不加快语速。"
+          },
+          {
+            "field": "limits",
+            "quote": "克隆自他人或平台的音色只能进本机个人音色库，不能放进 skill 的公开音色目录；用了本机个人音色时，提醒公开发布前确认授权。"
+          },
+          {
+            "field": "limits",
+            "quote": "宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`node ${CLAUDE_SKILL_DIR}/scripts/video.mjs doctor` 看本机能力"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "写 `<目录>/video/video.json`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/image-cards/SKILL.md",
+      "blob_sha": "f23185887763f568784981db4f13227ee95bd646",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/image-cards/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "image-cards",
+        "description": "卡片：固定比例的图文卡片组——小红书 3:4（1080×1440）、Instagram 4:5、方图 1:1、竖屏 9:16，附总览图和发帖文案。两种输入：改写稿 content.json → 总结卡片（封面 + 每节一卡 + 清单 + 要点总结，12 套主推主题）；文章 article.md（原文、译文、逐字稿）→ 原文卡片（整篇按顺序分页成卡片，一字不改，逐块校验）。可以单独用，也可以接在抓取、改写、翻译后面。Use when the user wants 小红书图文, 轮播卡片, 知识卡片, 3:4 / 4:5 / 1:1 / 9:16 cards, Instagram carousel, 朋友圈方图, or 原文卡片 / 全文卡片 / 把全文做成小红书 — from an article or an existing content.json."
+      },
+      "excerpt": "---\nname: image-cards\ndescription: 卡片：固定比例的图文卡片组——小红书 3:4（1080×1440）、Instagram 4:5、方图 1:1、竖屏 9:16，附总览图和发帖文案。两种输入：改写稿 content.json → 总结卡片（封面 + 每节一卡 + 清单 + 要点总结，12 套主推主题）；文章 article.md（原文、译文、逐字稿）→ 原文卡片（整篇按顺序分页成卡片，一字不改，逐块校验）。可以单独用，也可以接在抓取、改写、翻译后面。Use when the user wants 小红书图文, 轮播卡片, 知识卡片, 3:4 / 4:5 / 1:1 / 9:16 cards, Instagram carousel, 朋友圈方图, or 原文卡片 / 全文卡片 / 把全文做成小红书 — from an article or an existing content.json.\nargument-hint: <content.json|article.md|目录> [--ratio 3:4|4:5|1:1|9:16 或 小红书/IG] [--covers] [--form quotes|onepage|qa] [--theme 主题名|a,b|all] [--out 目录]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 卡片（image-cards）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n| 输入 | 产出 |\n|---|---|\n| `content.json`（改写稿） | 总结卡片：`<目录>/<主题>-3x4/card-01.png …`、`overview.jpg`、`caption.md` |\n| `article.md`（原文、译文、逐字稿、`rewrite.md`） | 原文卡片：`<目录>/full-3x4/card-01.png …`、`overview.jpg`、`caption.md` |\n\n参数：`$ARGUMENTS`\n\n**比例怎么定**：用户提到小红书、RED、xhs、抖音图文、3:4 → `--ratio 3:4`（默认）；Instagram、IG、4:5 → `4:5`；方图、正方形、朋友圈、1:1 → `1:1`；竖屏、Stories、快拍、9:16 → `9:16`。\n\n## 0. 先确定输入\n- 已有 `content.json` → 总结卡片；用户只给了文章、又说\"原文 / 全文 / 一字不改\" → 原文卡片。\n- 给的是链接、文件、粘贴的正文或视频 → 先用 `article-fetch` / `video-transcript` 取原文。\n- 只有文章、用户没说原文还是总结 → 卡片默认**改写**：先用 `article-rewrite` 写 content.json（卡片专用字段按 `references/xhs-guide.md` 写）。原文是外文、又要原文卡片 → 先用 `article-translate`。\n- 判断规则、工作目录和调用其他能力的方式：`../article2media/references/pipeline.md`。\n\n第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（Node 22+、Chrome）。\n\n## 1. 总结卡片（content.json）\n读 `references/xhs-guide.md`：封面、每张卡只讲一件事、发帖文案（`cover`、`xhs`、`card` 字段）。\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/cards.mjs <目录>/content.json --ratio 3:4 --check   # 只校验：会出几张\nnode ${CLAUDE_SKILL_DIR}/scripts/cards.mjs <目录>/content.json --ratio 3:4           # 出图，一组大约 5 秒\nnode ${CLAUDE_SKILL_DIR}/scripts/cards.mjs <目录>/content.json --ratio 3:4 --theme brutal\nnode ${CLAUDE_SKILL_DIR}/scripts/cards.mjs <目录>/content.json --covers                # 只出封面的几个版本，供挑选或对比发布\nnode ${CLAUDE_SKILL_DIR}/scripts/cards.mjs <目录>/content.json --form onepage          # 轻量形态：onepage 一页看完 | quotes 金句图 | qa 问答卡\n```\n- **封面多版本、轻量形态、品牌包**（头像、品牌色、期号）：xhs-guide.md 第 2.5 节。用户说\"多出几个封面\"\"金句图\"\"一张图讲完\"\"问答形式\"\"加上我的头像 / 做成系列\"时用。\n- 主题：content.json 的 `theme`（可写成 `{\"long\": …, \"cards\": …}` 分开指定）；都没有时按 `../article2media/references/styles.md` 选。卡片场景的主题调整见 styles.md 第 3 步。\n- **检查（最多 2 轮：出图 → 发现问题 → 改 content.json 或参数 → 再出图，算一轮；只跑 check.mjs 不算）**：先看 `overview.jpg`，有问题再打开单张卡。✗ 必须修；报「内容超出」「已自动省略」「图只放大到 x 倍」时，按 xhs-guide.md 第 2 节的顺序处理（缩短 `card.text`、改 `split`、`skip` 次要的节）。**出图阶段最多 2 轮，到了就停**：剩下的 ⚠ 写进交付说明，不要为了让提示归零删掉面板、图或正文（内容比提示数要紧）。check.mjs 的内容提示仍然处理到 0。只改 content.json 再重渲，不手改 HTML。\n\n## 2. 原文卡片（article.md）\n读 `references/original-cards.md` 和 `../article2media/references/verbatim.md`。\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/cards.mjs <目录>/article.md --ratio 3:4\nnode ${CLAUDE_SKILL_DIR}/scripts/cards.mjs <目录>/article.md --ratio 3:4 --theme quiet   # 用主题的颜色与字体\n```\n全文校验未通过就是错误，不能靠目测放行。看 `overview.jpg` 检查断开的位置；张数超过上限时按 original-cards.md 处理，不删原文。\n\n## 3. 交付\n- 卡片目录、张数、每张的尺寸；`overview.jpg` 路径；\n- 把 `caption.md` 里的标题、正文和标签**直接贴在回复里**，方便复制（原文卡片要你补标签、必要时缩短标题）；\n- 总结卡片：用的主题和理由；换主题 `--theme 名称`、换比例 `--ratio 4:5` 都不用重写内容；\n- 原文卡片：原文块数与全文校验结果、生成图 0 张；\n- 需要用户留意的地方。\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/logic-whiteboard/SKILL.md",
+      "blob_sha": "bb47a8327c71953e6b52c76691d4976b6b529773",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/logic-whiteboard/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "logic-whiteboard",
+        "description": "白板论证：把一篇文章的推理过程摊成一条纵向主干的长图——问题在上，前提、证据、矛盾、转折、分支逐层往下，停在内容自身的收束处；每段原文都必须进入某一步或写明省略理由（论证账本 + 来源清单校验）。输入是文章（原文、译文、逐字稿）。可以单独用，也可以接在抓取、视频转文字、翻译后面。Use when the user wants a 白板, 论证图, 推理过程图, 思路图, argument map, \"把这篇的逻辑画出来\", or -w."
+      },
+      "excerpt": "---\nname: logic-whiteboard\ndescription: 白板论证：把一篇文章的推理过程摊成一条纵向主干的长图——问题在上，前提、证据、矛盾、转折、分支逐层往下，停在内容自身的收束处；每段原文都必须进入某一步或写明省略理由（论证账本 + 来源清单校验）。输入是文章（原文、译文、逐字稿）。可以单独用，也可以接在抓取、视频转文字、翻译后面。Use when the user wants a 白板, 论证图, 推理过程图, 思路图, argument map, \"把这篇的逻辑画出来\", or -w.\nargument-hint: <article.md|目录> [--theme 主题名]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 白板论证（logic-whiteboard）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n呈现作者**怎样一步步走到结论**，不是摘要：读者只看成品，也应能复述\"为什么下一步从上一步发生\"。\n\n参数：`$ARGUMENTS`\n\n## 0. 输入\n文章 `article.md`（原文、译文或逐字稿）。给的是链接、文件或视频时，先用 `article-fetch` / `video-transcript` 取原文（见 `../article2media/references/pipeline.md`）。不需要先改写。\n\n第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（Node 22+、Chrome）。\n\n## 1. 流程\n1. `node ${CLAUDE_SKILL_DIR}/scripts/whiteboard.mjs <目录>/article.md`：生成来源清单 `whiteboard-source.json`（每段一个编号和哈希）。\n2. **完整读一遍**文章，读 `references/mode-whiteboard.md`，写 `<目录>/whiteboard.json`（论证账本：每段原文必须进入某一步，或写明省略理由）。\n3. `whiteboard.mjs <目录>/whiteboard.json --check` 通过后，`whiteboard.mjs <目录>/whiteboard.json` 渲染 → `<目录>/whiteboard/whiteboard.png`。\n4. 讲概念、机制的内容，按 `../article-rewrite/references/writing-guide.md` 第 6 节把具体情形、判别依据、关系和结果接起来。\n\n## 2. 审片与交付\n- `whiteboard/review/` 里有覆盖全部高度的重叠切片，逐张看完再交付。\n- 报告：PNG 路径与像素尺寸、来源、步骤数、可见转折数、来源段落的去向（几段进入步骤、几段省略及理由）。制作范围、是否核对过，写在交付回复里，不写进图里。\n",
+      "card": {
+        "title_zh": "白板论证图",
+        "purpose_zh": "把一篇文章的推理过程摊成纵向长图：问题在上，前提、证据、矛盾、转折、分支逐层向下，停在内容自身收束处，并校验每段原文的去向。",
+        "does": [
+          "生成来源清单，为每段原文编号并计算哈希",
+          "要求完整读文章后编写论证账本 whiteboard.json，每段原文须进入某一步或写明省略理由",
+          "用 --check 校验账本通过后渲染出 whiteboard.png 长图",
+          "对概念、机制类内容按写作指南把情形、判别依据、关系与结果接起来",
+          "提供覆盖全部高度的重叠切片供逐张审片",
+          "交付时报告 PNG 路径与像素尺寸、来源、步骤数、可见转折数及段落去向"
+        ],
+        "inputs": [
+          "文章 article.md（原文、译文或逐字稿）",
+          "文章所在目录",
+          "可选 --theme 主题名",
+          "论证账本 whiteboard.json（由使用者编写）"
+        ],
+        "outputs": [
+          "whiteboard-source.json 来源清单",
+          "whiteboard.json 论证账本",
+          "whiteboard/whiteboard.png 纵向长图",
+          "whiteboard/review/ 下的重叠切片",
+          "交付报告：PNG 路径与像素尺寸、来源、步骤数、可见转折数、段落去向"
+        ],
+        "scenarios": [
+          "用户想把一篇文章的逻辑画出来",
+          "需要呈现作者一步步走到结论的推理过程而非摘要",
+          "为概念、机制类内容制作论证图",
+          "接在抓取、视频转文字或翻译之后处理文章"
+        ],
+        "prerequisites": [
+          "Node 22+ 与 Chrome，首次使用先运行 doctor.mjs 检查",
+          "输入为 article.md；若给的是链接、文件或视频，需先用 article-fetch / video-transcript 取原文",
+          "需阅读 references/mode-whiteboard.md 后手写 whiteboard.json"
+        ],
+        "limits": [
+          "只呈现论证结构，不做摘要",
+          "每段原文必须进入某一步或写明省略理由，否则校验不通过",
+          "制作范围与是否核对过只写在交付回复里，不写进图里",
+          "审片需逐张看完 review 目录中的全部切片再交付"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "文档",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "呈现作者**怎样一步步走到结论**，不是摘要：读者只看成品，也应能复述\"为什么下一步从上一步发生\"。"
+          },
+          {
+            "field": "does",
+            "quote": "`node ${CLAUDE_SKILL_DIR}/scripts/whiteboard.mjs <目录>/article.md`：生成来源清单 `whiteboard-source.json`（每段一个编号和哈希）。"
+          },
+          {
+            "field": "does",
+            "quote": "**完整读一遍**文章，读 `references/mode-whiteboard.md`，写 `<目录>/whiteboard.json`（论证账本：每段原文必须进入某一步，或写明省略理由）。"
+          },
+          {
+            "field": "does",
+            "quote": "`whiteboard.mjs <目录>/whiteboard.json --check` 通过后，`whiteboard.mjs <目录>/whiteboard.json` 渲染 → `<目录>/whiteboard/whiteboard.png`。"
+          },
+          {
+            "field": "does",
+            "quote": "讲概念、机制的内容，按 `../article-rewrite/references/writing-guide.md` 第 6 节把具体情形、判别依据、关系和结果接起来。"
+          },
+          {
+            "field": "does",
+            "quote": "`whiteboard/review/` 里有覆盖全部高度的重叠切片，逐张看完再交付。"
+          },
+          {
+            "field": "does",
+            "quote": "报告：PNG 路径与像素尺寸、来源、步骤数、可见转折数、来源段落的去向（几段进入步骤、几段省略及理由）。"
+          },
+          {
+            "field": "inputs",
+            "quote": "文章 `article.md`（原文、译文或逐字稿）。"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: <article.md|目录> [--theme 主题名]"
+          },
+          {
+            "field": "outputs",
+            "quote": "生成来源清单 `whiteboard-source.json`（每段一个编号和哈希）。"
+          },
+          {
+            "field": "outputs",
+            "quote": "渲染 → `<目录>/whiteboard/whiteboard.png`。"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user wants a 白板, 论证图, 推理过程图, 思路图, argument map, \"把这篇的逻辑画出来\", or -w."
+          },
+          {
+            "field": "scenarios",
+            "quote": "可以单独用，也可以接在抓取、视频转文字、翻译后面。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（Node 22+、Chrome）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "给的是链接、文件或视频时，先用 `article-fetch` / `video-transcript` 取原文（见 `../article2media/references/pipeline.md`）。"
+          },
+          {
+            "field": "limits",
+            "quote": "制作范围、是否核对过，写在交付回复里，不写进图里。"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`whiteboard.mjs <目录>/whiteboard.json --check` 通过后，`whiteboard.mjs <目录>/whiteboard.json` 渲染 → `<目录>/whiteboard/whiteboard.png`。"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/long-image/SKILL.md",
+      "blob_sha": "57da5650c87aed17bbe1f6528ce3c60c2a8d1ed9",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/long-image/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "long-image",
+        "description": "长图：两种输入，两种长图。改写稿 content.json → 1–4 张总结长图（手机宽度单栏，每节配图表和数据面板，附执行清单；--wide 出 1200 宽双栏杂志版；12 套主推主题）；文章 article.md（原文、译文、逐字稿）→ 一字不改的原文长图（逐块读回校验，超长自动分张）。可以单独用（已有 content.json 或文章），也可以接在抓取、改写、翻译后面。Use when the user wants a 长图, 总结图, 杂志长图, infographic pages, or 原文长图 / 全文长图 / 原文排版 / 一字不改 / -f from an article or an existing content.json; also to re-render a content.json in another theme (换主题、换风格)."
+      },
+      "excerpt": "---\nname: long-image\ndescription: 长图：两种输入，两种长图。改写稿 content.json → 1–4 张总结长图（手机宽度单栏，每节配图表和数据面板，附执行清单；--wide 出 1200 宽双栏杂志版；12 套主推主题）；文章 article.md（原文、译文、逐字稿）→ 一字不改的原文长图（逐块读回校验，超长自动分张）。可以单独用（已有 content.json 或文章），也可以接在抓取、改写、翻译后面。Use when the user wants a 长图, 总结图, 杂志长图, infographic pages, or 原文长图 / 全文长图 / 原文排版 / 一字不改 / -f from an article or an existing content.json; also to re-render a content.json in another theme (换主题、换风格).\nargument-hint: <content.json|article.md|目录> [--theme 主题名|a,b|all] [--wide] [--page 1,3] [--out 目录]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 长图（long-image）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n| 输入 | 产出 |\n|---|---|\n| `content.json`（改写稿） | 总结长图：默认手机版，单栏、1080 宽，手机上不用放大就能读；`--wide` 出 1200 宽的双栏杂志版（适合电脑上看、打印、做展示图）。`<目录>/<主题>/page-01.png …` |\n| `article.md`（原文、译文、逐字稿、`rewrite.md`） | 原文长图：一字不改，1080 宽，`<目录>/full/full.png`（过长时 `full-01.png …`） |\n\n参数：`$ARGUMENTS`\n\n## 0. 先确定输入\n- 已有 `content.json` → 总结长图；用户只给了文章、又说\"原文 / 全文 / 一字不改 / -f\" → 原文长图。\n- 给的是链接、文件、粘贴的正文或视频 → 先用 `article-fetch` / `video-transcript` 取原文。\n- 只有文章、用户没说原文还是总结 → 长图默认**改写**：先用 `article-rewrite` 写 content.json。原文是外文、又要原文长图 → 先用 `article-translate`。\n- 判断规则、工作目录和调用其他能力的方式：`../article2media/references/pipeline.md`。\n\n第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（Node 22+、Chrome）。\n\n## 1. 总结长图（content.json）\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/long.mjs <目录>/content.json                    # 主题取 content.json 的 theme\nnode ${CLAUDE_SKILL_DIR}/scripts/long.mjs <目录>/content.json --theme midnight   # 用户指定主题\nnode ${CLAUDE_SKILL_DIR}/scripts/long.mjs <目录>/content.json --wide             # 1200 宽双栏杂志版（文字在左、图在右）\nnode ${CLAUDE_SKILL_DIR}/scripts/long.mjs <目录>/content.json --theme all        # 全部主推主题，分目录输出\nnode ${CLAUDE_SKILL_DIR}/scripts/long.mjs --list                                 # 列出主题\n```\n- 每页输出 PNG 和同名 `.html`、`qa.json`，一页大约 4 秒。其他参数：`--page 1,3`、`--scale 2`、`--format jpeg --quality 90`、`--max-height 7600`（手机版默认 7600，宽版 4400）、`--brand brand.json`、`--out 目录`。\n- 默认出手机版：用户在微信、朋友圈、微博里看长图，双栏的字在手机上太小。用户说\"杂志版 / 宽版 / 双栏 / 电脑上看 / 要打印\"时加 `--wide`。手机版一页很高（常见 9000–13000 px）；超过 16000 px 时会自动降低输出倍数并提示，这时把这一页拆成两页。\n- content.json 没写主题、用户也没指定时，按 `../article2media/references/styles.md` 选一个，写进 content.json。\n- 有 AI 插画还没生成时会出占位框并提示：用 `article-rewrite` 的 `illustrate.mjs` 生成，生成不了就去掉插画字段。\n\n**检查与修正（最多 2 轮：出图 → 发现问题 → 改 content.json 或参数 → 再出图，算一轮；只跑 check.mjs 不算）**\n1. 版面检查：✗（图内溢出、文字截断、元素重叠、图片加载失败）必须修——缩短图内文字、减少项目，或换一种图；⚠「末行只剩一个字」给那句话增减两三个字；⚠「页面过高」删减内容或拆成两页。\n2. **亲眼看图**：用 Read 打开每张 PNG，看图能不能一眼看懂、图和图注是不是一回事、有没有哪节太空或太挤。\n3. 只改 `content.json`（字段写法见 `../article-rewrite/references/content-schema.md`、`figures.md`），然后重新渲染。不要手改 HTML。\n\n## 2. 原文长图（article.md）\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/long.mjs <目录>/article.md                  # 白底阅读面\nnode ${CLAUDE_SKILL_DIR}/scripts/long.mjs <目录>/article.md --theme quiet    # 用主题的颜色与字体\n```\n读 `references/original-long.md`（阅读面规格）和 `../article2media/references/verbatim.md`（允许与禁止、逐块校验）。全文校验未通过（改字、调序、漏块、重复）就是错误，按提示修，不能靠目测放行。看 `full/review/` 里的重叠切片，逐张看完再交付。\n\n## 3. 交付\n- 每张图的绝对路径（原文长图加像素尺寸）；\n- 总结长图：一行大纲（每页的 part）、用的主题（你选的就一句话说明理由）、怎么换：`--theme 名称`、`--theme all` 都不需要重写内容；要卡片用 `image-cards`，要公众号用 `wechat-layout`；\n- 原文长图：原文块数与全文校验结果（\"45 / 45 块逐字一致\"）、实际字体、分成了几张、生成图 0 张；\n- 需要用户留意的地方（未核对的数字、抓取不全的段落）。\n",
+      "card": {
+        "title_zh": "长图生成",
+        "purpose_zh": "把改写稿 content.json 渲染成总结长图，或把文章 article.md 渲染成一字不改的原文长图，支持主题、宽版、分页与逐块校验。",
+        "does": [
+          "把 content.json 渲染为手机版单栏总结长图，每页输出 PNG、HTML 和 qa.json",
+          "用 --wide 输出 1200 宽双栏杂志版，用 --theme 指定或批量切换主题",
+          "把 article.md 渲染为一字不改的原文长图，过长时自动分张",
+          "对原文长图做逐块读回校验，检查改字、调序、漏块、重复",
+          "做版面检查并提示溢出、截断、重叠、页面过高等问题，最多修正 2 轮",
+          "列出可用主题，并支持指定页码、输出倍数、格式、品牌和输出目录"
+        ],
+        "inputs": [
+          "content.json（改写稿）",
+          "article.md（原文、译文、逐字稿、rewrite.md）",
+          "命令行参数：--theme、--wide、--page、--out、--scale、--format、--quality、--max-height、--brand",
+          "可选 brand.json 品牌配置"
+        ],
+        "outputs": [
+          "总结长图 PNG（默认 1080 宽手机版，--wide 为 1200 宽双栏）",
+          "每页同名 .html 与 qa.json",
+          "原文长图 full/full.png 或 full-01.png 等分张图",
+          "full/review/ 下的重叠切片",
+          "主题列表（--list）"
+        ],
+        "scenarios": [
+          "把已有改写稿做成手机端可读的总结长图",
+          "把文章原文按原样排版成长图",
+          "换主题或换风格重新渲染 content.json",
+          "生成适合电脑查看、打印或展示的宽版杂志长图"
+        ],
+        "prerequisites": [
+          "Node 22+ 与 Chrome，首次使用先运行 scripts/doctor.mjs",
+          "原文长图需阅读 references/original-long.md 与 verbatim.md 规格",
+          "content.json 字段写法参考 content-schema.md 与 figures.md"
+        ],
+        "limits": [
+          "版面检查与修正最多 2 轮",
+          "手机版页面超过 16000 px 会自动降低输出倍数并提示，需拆页",
+          "原文长图全文校验未通过即为错误，不能靠目测放行",
+          "有 AI 插画未生成时只出占位框，需用 illustrate.mjs 生成或去掉插画字段",
+          "不要手改 HTML，只改 content.json 后重新渲染"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "图像",
+          "设计/UI",
+          "写作",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "长图：两种输入，两种长图。改写稿 content.json → 1–4 张总结长图（手机宽度单栏，每节配图表和数据面板，附执行清单；--wide 出 1200 宽双栏杂志版；12 套主推主题）；文章 article.md（原文、译文、逐字稿）→ 一字不改的原文长图（逐块读回校验，超长自动分张）。"
+          },
+          {
+            "field": "does",
+            "quote": "每页输出 PNG 和同名 `.html`、`qa.json`，一页大约 4 秒。"
+          },
+          {
+            "field": "does",
+            "quote": "原文长图：一字不改，1080 宽，`<目录>/full/full.png`（过长时 `full-01.png …`）"
+          },
+          {
+            "field": "does",
+            "quote": "全文校验未通过（改字、调序、漏块、重复）就是错误，按提示修，不能靠目测放行。"
+          },
+          {
+            "field": "does",
+            "quote": "**检查与修正（最多 2 轮：出图 → 发现问题 → 改 content.json 或参数 → 再出图，算一轮；只跑 check.mjs 不算）**"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: <content.json|article.md|目录> [--theme 主题名|a,b|all] [--wide] [--page 1,3] [--out 目录]"
+          },
+          {
+            "field": "outputs",
+            "quote": "`<目录>/<主题>/page-01.png …`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（Node 22+、Chrome）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "读 `references/original-long.md`（阅读面规格）和 `../article2media/references/verbatim.md`（允许与禁止、逐块校验）。"
+          },
+          {
+            "field": "limits",
+            "quote": "手机版一页很高（常见 9000–13000 px）；超过 16000 px 时会自动降低输出倍数并提示，这时把这一页拆成两页。"
+          },
+          {
+            "field": "limits",
+            "quote": "有 AI 插画还没生成时会出占位框并提示：用 `article-rewrite` 的 `illustrate.mjs` 生成，生成不了就去掉插画字段。"
+          },
+          {
+            "field": "limits",
+            "quote": "只改 `content.json`（字段写法见 `../article-rewrite/references/content-schema.md`、`figures.md`），然后重新渲染。不要手改 HTML。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`<目录>/<主题>/page-01.png …`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/video-transcript/SKILL.md",
+      "blob_sha": "8136468a49c13c5fb2078ddae9296d752c0d96a0",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/video-transcript/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "video-transcript",
+        "description": "视频转文字：把一条视频转成带时间轴的逐字稿文章（article.md + transcript/segments.md）。支持抖音（链接、短链、整段分享口令）、YouTube、B 站链接，本地视频 / 音频（mp4、mov、mp3、m4a、wav…），.srt / .vtt 字幕文件。文字来源依次是人工字幕、平台原语言自动字幕、本地 Whisper 识别；自动转简体、补标点、分段、专有名词提示与纠错。可以单独用，也是\"视频转图文 / 视频转小红书\"组合的第一步。Use when the user wants a video's subtitles, transcript or text (视频转文字、逐字稿、提取字幕、视频文案、听写这段录音), or gives a Douyin / YouTube / Bilibili link or a video/audio/subtitle file that another article2media skill should work from."
+      },
+      "excerpt": "---\nname: video-transcript\ndescription: 视频转文字：把一条视频转成带时间轴的逐字稿文章（article.md + transcript/segments.md）。支持抖音（链接、短链、整段分享口令）、YouTube、B 站链接，本地视频 / 音频（mp4、mov、mp3、m4a、wav…），.srt / .vtt 字幕文件。文字来源依次是人工字幕、平台原语言自动字幕、本地 Whisper 识别；自动转简体、补标点、分段、专有名词提示与纠错。可以单独用，也是\"视频转图文 / 视频转小红书\"组合的第一步。Use when the user wants a video's subtitles, transcript or text (视频转文字、逐字稿、提取字幕、视频文案、听写这段录音), or gives a Douyin / YouTube / Bilibili link or a video/audio/subtitle file that another article2media skill should work from.\nargument-hint: <视频链接|分享口令|音视频文件|.srt/.vtt> [--prompt \"人名 术语\"] [--terms 词表.txt] [--lang auto|zh|en] [--out 目录]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 视频转文字（video-transcript）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n把视频变成一篇**逐字稿文章** `article.md`：之后可以直接交付，也可以交给改写、翻译、长图、卡片、公众号排版等能力，流程和文章完全一样。文章链接不归这里管，用 `article-fetch`。\n\n参数：`$ARGUMENTS`\n\n## 1. 能力检查（本会话第一次）\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs\n```\n看 `video-input` 一行：有没有 yt-dlp（YouTube、B 站）、ffmpeg（转音频）、本地语音识别（没有字幕时）。缺了的告诉用户怎么装，**不要自己安装或下载**。只有 .srt / .vtt 时什么都不需要。\n\n## 2. 转写\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/transcribe.mjs \"<视频链接或文件>\"                      # → ./article2media-out/<平台>-<id>/\nnode ${CLAUDE_SKILL_DIR}/scripts/transcribe.mjs \"<链接>\" --prompt \"人名 术语\" --terms 词表.txt\nnode ${CLAUDE_SKILL_DIR}/scripts/transcribe.mjs ./talk.mp4 --title \"标题\" --author \"作者\"\n```\n- **文字来源**：人工字幕优先，其次平台的原语言自动字幕（不用机器翻译的字幕轨），都没有时本地 Whisper 识别。已有的逐字稿默认复用，`--force` 重来。\n- **专有名词**：先用 `--prompt \"人名 术语\"` 提示，再用 `--terms 词表.txt`（每行 `错词=>正词`）替换。\n- **平台要求浏览器 cookie 时**（YouTube 的机器人校验、抖音分享页不带数据）：先问用户能不能复用本机浏览器状态，同意后才加 `--cookies-from-browser chrome`；不同意就请用户把视频保存到本地，直接传文件。\n- 其他参数：`--lang` 识别语言、`--keep-video` 保留 MP4（截图用）、`--out` 指定目录。来源、清理、产出文件的细节见 `references/video-input.md`。\n\n## 3. 核对\n1. 完整读一遍 `article.md`，对照 `transcript/segments.md` 的上下文核对人名、作品名、术语。识别明显不对的，用 `--prompt` / `--terms` 重跑；拿不准的**不要猜**，交付时列出来。\n2. 逐字稿只补标点、分段，不改字。不要手工\"润色\"它——要整理成文章，是改写（`article-rewrite`）的事。\n\n## 4. 交付\n单独使用时：`article.md` 和 `transcript/segments.md` 的绝对路径、平台、时长、文字来源（人工字幕 / 自动字幕 / 本地识别）、段数与字数，以及拿不准的专有名词。\n在组合里：把目录交给下一个能力（见 `../article2media/references/pipeline.md`）。发布由逐字稿做成的图文或视频时，来源写成「内容整理自 <作者> 的<平台>视频《标题》」。\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/wechat-layout/SKILL.md",
+      "blob_sha": "7896f829c50f513c22454482357d3c95ac58363c",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/wechat-layout/SKILL.md",
+      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "generated_at": "2026-11-13T11:37:01.536Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "wechat-layout",
+        "description": "公众号排版：把一篇文章（Markdown）排成能直接粘贴进公众号编辑器的图文——内联样式、图片内嵌、12 套主推主题配色，附 2.35:1 头图、1:1 封面和发布信息（标题、摘要、步骤）；正文一字不改，逐块读回校验。只接受文章：原文（article.md）、译文（article.zh.md）或改写稿导出的文章（rewrite.md，即\"总结后发公众号\"）。可以单独用，也可以接在抓取、翻译、改写后面。Use when the user wants 公众号排版, 微信公众号文章排版, 推文排版, gzh, mp.weixin formatting, \"排成公众号/发公众号\", or to paste a Markdown article into the WeChat editor."
+      },
+      "excerpt": "---\nname: wechat-layout\ndescription: 公众号排版：把一篇文章（Markdown）排成能直接粘贴进公众号编辑器的图文——内联样式、图片内嵌、12 套主推主题配色，附 2.35:1 头图、1:1 封面和发布信息（标题、摘要、步骤）；正文一字不改，逐块读回校验。只接受文章：原文（article.md）、译文（article.zh.md）或改写稿导出的文章（rewrite.md，即\"总结后发公众号\"）。可以单独用，也可以接在抓取、翻译、改写后面。Use when the user wants 公众号排版, 微信公众号文章排版, 推文排版, gzh, mp.weixin formatting, \"排成公众号/发公众号\", or to paste a Markdown article into the WeChat editor.\nargument-hint: <article.md|rewrite.md|目录> [--theme 主题名] [--title 标题] [--digest 摘要] [--cover-title \"两行\\n标题\"] [--out 目录]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 公众号排版（wechat-layout）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n把一篇**文章**排成可粘贴的公众号图文。正文一字不改；改不改写、译不译，在排版之前决定。\n\n参数：`$ARGUMENTS`\n\n## 0. 先确定排哪篇文章\n\n| 情况 | 做法 |\n|---|---|\n| 给了 `.md` 文章，或说\"排版 / 原文\" | 直接排它 |\n| 给的是链接、文件、粘贴的正文或视频 | 先用 `article-fetch` / `video-transcript` 取原文 |\n| 说\"总结 / 提炼 / 改写后发公众号\" | 先用 `article-rewrite` 写 content.json（加 `wechat.title`、`wechat.digest`），再用它的 `export.mjs` 导出 `rewrite.md`，排 `rewrite.md` |\n| 原文是外文，读者是中文 | 先用 `article-translate` 出 `article.zh.md`，排译文 |\n| 只说\"发公众号\"，没说原文还是总结 | 默认**原文排版**；一篇别人的长文、结果差别又大时，问一句\"原文排版还是总结后再排\" |\n\n给的是 `content.json` 时脚本会拒绝：公众号排版只吃文章，先导出 `rewrite.md`。判断规则和工作目录见 `../article2media/references/pipeline.md`。\n\n第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（Node 22+、Chrome）。\n\n## 1. 排版\n```bash\nnode ${CLAUDE_SKILL_DIR}/scripts/wechat.mjs <目录>/article.md --check                # 只校验：解析、标题长度\nnode ${CLAUDE_SKILL_DIR}/scripts/wechat.mjs <目录>/article.md --theme quiet          # → <目录>/quiet-wechat/\nnode ${CLAUDE_SKILL_DIR}/scripts/wechat.mjs <目录>/rewrite.md                        # 主题默认用 rewrite.md 里记录的（图表按它截的图）\nnode ${CLAUDE_SKILL_DIR}/scripts/wechat.mjs <目录>/article.md --title \"公众号标题\" --digest \"摘要\" --cover-title \"两行\\n标题\"\n```\n- 主题：用户指定 > 文章 front matter 的 `theme` > 按 `../article2media/references/styles.md` 选（没选时是 editorial）。`rewrite.md` 的图表是按导出时的主题截的图，换主题要先重新导出。\n- 标题、摘要、封面标题的写法和限制见 `references/wechat-guide.md`。\n\n## 2. 检查（最多 2 轮：出图 → 发现问题 → 改 content.json 或参数 → 再出图，算一轮；只跑 check.mjs 不算）\n1. 版面检查：✗ 全文校验（逐块不一致）、图片没加载、标题超长、封面标题放不下，都必须修。正文问题改源头（article.md / content.json），不改 HTML。\n2. **亲眼看**：打开 `cover-2.35x1.png`、`cover-1x1.png`；用浏览器或截图看一遍 `article.html` 的手机宽度效果。\n\n## 3. 交付\n- `article.html` 的绝对路径，告诉用户：\"浏览器打开 → 点「复制到公众号」→ 在编辑器正文里粘贴\"；\n- 贴出标题、摘要，以及两张封面的路径（`wechat.md` 里有完整发布步骤）；\n- 排的是哪篇（原文 / 译文 / 改写稿）、全文校验结果（\"44 / 44 块逐字一致\"）、主题和理由；\n- 有图片没能下载、仍是外链的，提醒粘贴后检查。\n",
+      "card": {
+        "title_zh": "公众号排版",
+        "purpose_zh": "把一篇 Markdown 文章排成可直接粘贴进公众号编辑器的图文，含内联样式、图片内嵌、主题配色、头图封面与发布信息，正文一字不改并逐块校验。",
+        "does": [
+          "把 article.md、article.zh.md 或 rewrite.md 排成公众号图文 HTML",
+          "应用 12 套主推主题配色，主题可由用户指定或取自 front matter",
+          "生成 2.35:1 头图与 1:1 封面，并给出标题、摘要、发布步骤",
+          "逐块读回校验正文是否与原文逐字一致，检查图片加载与标题长度",
+          "用 --check 只做解析与标题长度校验",
+          "对链接、视频、外文或改写需求，提示先走抓取、翻译、改写流程"
+        ],
+        "inputs": [
+          "Markdown 文章文件（article.md / article.zh.md / rewrite.md）或目录",
+          "可选参数 --theme 主题名",
+          "可选参数 --title 标题、--digest 摘要、--cover-title 两行封面标题",
+          "可选参数 --out 输出目录"
+        ],
+        "outputs": [
+          "article.html（可复制到公众号的图文）",
+          "cover-2.35x1.png 与 cover-1x1.png 两张封面",
+          "wechat.md（含完整发布步骤）",
+          "全文校验结果与主题说明"
+        ],
+        "scenarios": [
+          "把已写好的 Markdown 文章排成公众号推文",
+          "把翻译稿或改写稿导出后排成公众号图文",
+          "需要统一主题配色与头图封面的公众号发布",
+          "粘贴进公众号编辑器前做正文一致性校验"
+        ],
+        "prerequisites": [
+          "Node 22+ 与 Chrome，首次使用先运行 doctor.mjs 检查",
+          "文章需为 Markdown 文章文件，content.json 会被拒绝，需先导出 rewrite.md"
+        ],
+        "limits": [
+          "只接受文章，不接受 content.json",
+          "正文一字不改，改写或翻译须在排版之前完成",
+          "rewrite.md 的图表按导出时主题截图，换主题需重新导出",
+          "检查最多 2 轮",
+          "图片未能下载仍为外链时需粘贴后人工检查"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "把一篇**文章**排成可粘贴的公众号图文。正文一字不改；改不改写、译不译，在排版之前决定。"
+          },
+          {
+            "field": "does",
+            "quote": "node ${CLAUDE_SKILL_DIR}/scripts/wechat.mjs <目录>/article.md --theme quiet          # → <目录>/quiet-wechat/"
+          },
+          {
+            "field": "does",
+            "quote": "主题：用户指定 > 文章 front matter 的 `theme` > 按 `../article2media/references/styles.md` 选（没选时是 editorial）。"
+          },
+          {
+            "field": "does",
+            "quote": "打开 `cover-2.35x1.png`、`cover-1x1.png`；用浏览器或截图看一遍 `article.html` 的手机宽度效果。"
+          },
+          {
+            "field": "does",
+            "quote": "✗ 全文校验（逐块不一致）、图片没加载、标题超长、封面标题放不下，都必须修。"
+          },
+          {
+            "field": "does",
+            "quote": "node ${CLAUDE_SKILL_DIR}/scripts/wechat.mjs <目录>/article.md --check                # 只校验：解析、标题长度"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: <article.md|rewrite.md|目录> [--theme 主题名] [--title 标题] [--digest 摘要] [--cover-title \"两行\\n标题\"] [--out 目录]"
+          },
+          {
+            "field": "outputs",
+            "quote": "- `article.html` 的绝对路径，告诉用户：\"浏览器打开 → 点「复制到公众号」→ 在编辑器正文里粘贴\"；"
+          },
+          {
+            "field": "outputs",
+            "quote": "- 贴出标题、摘要，以及两张封面的路径（`wechat.md` 里有完整发布步骤）；"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "第一次使用先跑 `node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs`（Node 22+、Chrome）。"
+          },
+          {
+            "field": "limits",
+            "quote": "给的是 `content.json` 时脚本会拒绝：公众号排版只吃文章，先导出 `rewrite.md`。"
+          },
+          {
+            "field": "limits",
+            "quote": "`rewrite.md` 的图表是按导出时的主题截的图，换主题要先重新导出。"
+          },
+          {
+            "field": "limits",
+            "quote": "## 2. 检查（最多 2 轮：出图 → 发现问题 → 改 content.json 或参数 → 再出图，算一轮；只跑 check.mjs 不算）"
+          },
+          {
+            "field": "limits",
+            "quote": "- 有图片没能下载、仍是外链的，提醒粘贴后检查。"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "node ${CLAUDE_SKILL_DIR}/scripts/wechat.mjs <目录>/rewrite.md                        # 主题默认用 rewrite.md 里记录的（图表按它截的图）"
+          }
+        ]
+      }
     }
   ]
 }
