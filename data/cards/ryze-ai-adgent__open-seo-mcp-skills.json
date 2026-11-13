@@ -1,0 +1,764 @@
+{
+  "schema": 1,
+  "repo": "Ryze-AI-Adgent/open-seo-mcp-skills",
+  "tree_sha": "111cf651f0f0422d19394a91b27d14b8daabaf43",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/ai-visibility/SKILL.md",
+      "blob_sha": "91b8826a2735e9de066993455c580dd609bfa541",
+      "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/ai-visibility/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ai-visibility",
+        "description": "Measure real AI-engine visibility — traffic from ChatGPT, Perplexity, Claude, Gemini and which pages they cite — from actual GA4 referral data, not prompt sampling. Use when asked \"AI visibility\", \"GEO/AEO check\", \"do LLMs cite us\", \"traffic from ChatGPT\", or \"how do we show up in AI search\"."
+      },
+      "excerpt": "---\nname: ai-visibility\ndescription: Measure real AI-engine visibility — traffic from ChatGPT, Perplexity, Claude, Gemini and which pages they cite — from actual GA4 referral data, not prompt sampling. Use when asked \"AI visibility\", \"GEO/AEO check\", \"do LLMs cite us\", \"traffic from ChatGPT\", or \"how do we show up in AI search\".\n---\n\n# AI Visibility\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nEvery \"AI visibility tracker\" samples prompts and guesses. GA4 records the actual clicks AI engines send. Measure the real thing first, then diagnose.\n\n## Workflow\n\n1. **Traffic by engine.** `google_analytics__getAiTrafficByEngine` — sessions per AI source (ChatGPT, Perplexity, Gemini, Claude, Copilot…), current vs previous period.\n2. **Trend.** `google_analytics__getAiTrafficDaily` — is AI traffic growing, and did anything spike (a spike = something started citing you; find it).\n3. **Cited pages.** `google_analytics__getAiLandingPages` — which URLs AI engines actually send people to. These are your proven-citable pages.\n4. **Referral detail.** `google_analytics__getAIReferrals` for source-level detail and conversions — is AI traffic converting better or worse than organic.\n5. **Diagnose the winners.** Read the top 2–3 cited pages (fetch them). Note the pattern: direct answers high on the page, stats/definitions, clean headings, schema. That pattern is the citation recipe for this site.\n6. **Find the misses.** Cross-reference with `google_search_console__runRawSearchAnalytics`: pages with strong organic queries but zero AI referrals — candidates to restructure toward the citation recipe from step 5.\n\n## Output\n\nVerdict (AI traffic share of organic, trend, top engine), then: engine table, cited-pages table with conversions, the citation recipe observed on winning pages, and a top-5 list of pages to restructure. Keep it concrete — name the pages and the exact change.\n\n## Fallback\n\nIf the GA4 AI-traffic tools aren't available in the workspace, build the same report with `google_analytics__runRawReport` filtered on `sessionSource` matching known AI referrers (chatgpt.com, perplexity.ai, gemini.google.com, claude.ai, copilot.microsoft.com).\n",
+      "card": {
+        "title_zh": "AI可见度分析",
+        "purpose_zh": "基于GA4真实推荐流量，衡量ChatGPT、Perplexity、Claude、Gemini等AI引擎带来的访问量及被引用页面，而非采样提示词猜测。",
+        "does": [
+          "按AI引擎统计会话量并对比当前与上一周期",
+          "查看AI流量每日趋势并定位突增",
+          "列出AI引擎实际引流的落地页",
+          "查看来源级推荐明细与转化情况",
+          "阅读高被引页面，归纳引用配方",
+          "结合搜索控制台数据找出有自然流量但无AI引用的页面"
+        ],
+        "inputs": [
+          "GA4数据（通过Ryze MCP连接器访问）",
+          "Google Search Console查询数据"
+        ],
+        "outputs": [
+          "结论：AI流量占自然流量比例、趋势、主要引擎",
+          "引擎流量表",
+          "被引用页面及转化表",
+          "高被引页面的引用配方",
+          "待重构页面Top5清单"
+        ],
+        "scenarios": [
+          "评估AI搜索可见度",
+          "GEO/AEO检查",
+          "判断LLM是否引用本站",
+          "分析来自ChatGPT的流量",
+          "制定页面重构优先级"
+        ],
+        "prerequisites": [
+          "需免费Ryze MCP连接器 https://connector.get-ryze.ai/mcp",
+          "Claude Code需执行 claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp",
+          "claude.ai/Desktop/Cursor需以同一URL添加自定义连接器"
+        ],
+        "limits": [
+          "依赖GA4与Search Console数据可用性",
+          "若GA4的AI流量工具不可用，需改用runRawReport按已知AI来源过滤",
+          "仅覆盖原文列出的AI来源域名"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "数据分析",
+          "调研",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Measure real AI-engine visibility — traffic from ChatGPT, Perplexity, Claude, Gemini and which pages they cite — from actual GA4 referral data, not prompt sampling."
+          },
+          {
+            "field": "does",
+            "quote": "`google_analytics__getAiTrafficByEngine` — sessions per AI source (ChatGPT, Perplexity, Gemini, Claude, Copilot…), current vs previous period."
+          },
+          {
+            "field": "does",
+            "quote": "`google_analytics__getAiTrafficDaily` — is AI traffic growing, and did anything spike"
+          },
+          {
+            "field": "does",
+            "quote": "`google_analytics__getAiLandingPages` — which URLs AI engines actually send people to."
+          },
+          {
+            "field": "does",
+            "quote": "`google_analytics__getAIReferrals` for source-level detail and conversions"
+          },
+          {
+            "field": "does",
+            "quote": "Read the top 2–3 cited pages (fetch them). Note the pattern"
+          },
+          {
+            "field": "does",
+            "quote": "Cross-reference with `google_search_console__runRawSearchAnalytics`: pages with strong organic queries but zero AI referrals"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          },
+          {
+            "field": "limits",
+            "quote": "If the GA4 AI-traffic tools aren't available in the workspace, build the same report with `google_analytics__runRawReport` filtered on `sessionSource` matching known AI referrers"
+          },
+          {
+            "field": "hosts",
+            "quote": "Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/backlink-check/SKILL.md",
+      "blob_sha": "4eefeb508443e0400987fcea03abe7c18d31eb67",
+      "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/backlink-check/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "backlink-check",
+        "description": "Backlink profile for any domain — referring domains, authority, anchors, new/lost links, and a side-by-side vs a competitor. Use when asked \"check my backlinks\", \"backlink profile of X\", \"who links to them\", or \"link gap vs competitor\"."
+      },
+      "excerpt": "---\nname: backlink-check\ndescription: Backlink profile for any domain — referring domains, authority, anchors, new/lost links, and a side-by-side vs a competitor. Use when asked \"check my backlinks\", \"backlink profile of X\", \"who links to them\", or \"link gap vs competitor\".\n---\n\n# Backlink Check\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\n## Workflow\n\n1. **Source.** Use the workspace's DataForSEO Backlinks tools (`native__get_provider_docs`, provider `dataforseo`, for exact request shapes): `summary` for the profile, `referring_domains` for the domain list, `anchors` for anchor distribution. If DataForSEO backlinks aren't exposed, fall back to a connected `ahrefs` or `semrush` provider; if neither, stop and say which connection is missing — never fabricate link counts.\n2. **Target profile.** Pull summary + top ~100 referring domains by rank for the user's domain: total backlinks, referring domains, dofollow share, authority distribution.\n3. **Competitor (if named).** Same pulls for the competitor. Compute the **link gap**: strong domains linking to them but not to the user — that's the outreach list.\n4. **Quality read.** Flag: spammy anchor patterns (exact-match commercial anchors at scale), link velocity spikes, a profile dominated by low-authority domains.\n5. **Traffic cross-check (own site only).** `google_analytics__runRawReport` — referral sessions by source; note which linking domains actually send visitors.\n\n## Output\n\nVerdict first (profile strength in one paragraph, and the gap vs the competitor if asked), then: profile summary table, top referring domains, anchor distribution, and — when a competitor was given — the link-gap outreach list (domain, authority, page linking to competitor). All third-party numbers labeled as index estimates.\n",
+      "card": {
+        "title_zh": "外链档案检查",
+        "purpose_zh": "查询任意域名的外链档案，包括引荐域名、权威度、锚文本分布、新增与丢失链接，并可与竞品做外链差距对比。",
+        "does": [
+          "拉取目标域名的外链摘要、排名前约100的引荐域名、锚文本分布",
+          "在指定竞品时做同样拉取，计算链接差距并生成外联清单",
+          "标记垃圾锚文本、链接增速异常、低权威域名占比过高等质量问题",
+          "仅对自有站点用Google Analytics交叉核对引荐流量来源",
+          "缺少可用数据源时停止并说明缺少哪个连接，不编造链接数"
+        ],
+        "inputs": [
+          "目标域名",
+          "竞品域名（可选）",
+          "已连接的DataForSEO、ahrefs或semrush数据源",
+          "自有站点的Google Analytics数据（可选，用于流量核对）"
+        ],
+        "outputs": [
+          "外链档案强弱结论段落及与竞品的差距结论",
+          "档案摘要表",
+          "主要引荐域名列表",
+          "锚文本分布",
+          "链接差距外联清单（域名、权威度、指向竞品的页面）"
+        ],
+        "scenarios": [
+          "检查我的外链",
+          "查询某域名的外链档案",
+          "查看谁链接到某网站",
+          "与竞品做外链差距对比"
+        ],
+        "prerequisites": [
+          "需连接免费的Ryze MCP连接器（https://connector.get-ryze.ai/mcp）",
+          "工作区需提供DataForSEO Backlinks工具，或退而使用已连接的ahrefs/semrush",
+          "Claude Code需执行claude mcp add命令添加该连接器"
+        ],
+        "limits": [
+          "第三方数据均标注为索引估算值",
+          "缺少DataForSEO且无ahrefs/semrush连接时应停止并说明缺失连接",
+          "流量交叉核对仅适用于自有站点"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "network",
+          "shell"
+        ],
+        "tags": [
+          "调研",
+          "数据分析",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Backlink profile for any domain — referring domains, authority, anchors, new/lost links, and a side-by-side vs a competitor."
+          },
+          {
+            "field": "does",
+            "quote": "Pull summary + top ~100 referring domains by rank for the user's domain: total backlinks, referring domains, dofollow share, authority distribution."
+          },
+          {
+            "field": "does",
+            "quote": "Same pulls for the competitor. Compute the **link gap**: strong domains linking to them but not to the user — that's the outreach list."
+          },
+          {
+            "field": "does",
+            "quote": "Flag: spammy anchor patterns (exact-match commercial anchors at scale), link velocity spikes, a profile dominated by low-authority domains."
+          },
+          {
+            "field": "does",
+            "quote": "`google_analytics__runRawReport` — referral sessions by source; note which linking domains actually send visitors."
+          },
+          {
+            "field": "does",
+            "quote": "if neither, stop and say which connection is missing — never fabricate link counts."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use the workspace's DataForSEO Backlinks tools (`native__get_provider_docs`, provider `dataforseo`, for exact request shapes)"
+          },
+          {
+            "field": "limits",
+            "quote": "All third-party numbers labeled as index estimates."
+          },
+          {
+            "field": "limits",
+            "quote": "If DataForSEO backlinks aren't exposed, fall back to a connected `ahrefs` or `semrush` provider"
+          },
+          {
+            "field": "limits",
+            "quote": "Traffic cross-check (own site only)."
+          },
+          {
+            "field": "hosts",
+            "quote": "claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when asked \"check my backlinks\", \"backlink profile of X\", \"who links to them\", or \"link gap vs competitor\"."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/competitor-gap/SKILL.md",
+      "blob_sha": "0c5965dd736a47c604b359900d1603bc42ea5adc",
+      "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/competitor-gap/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "competitor-gap",
+        "description": "Find keywords a competitor ranks for that the user's site doesn't — the content gap, prioritized by volume and winnability. Use when asked \"what does competitor.com rank for\", \"keyword gap vs X\", \"steal competitor keywords\", or \"why do they outrank us\"."
+      },
+      "excerpt": "---\nname: competitor-gap\ndescription: Find keywords a competitor ranks for that the user's site doesn't — the content gap, prioritized by volume and winnability. Use when asked \"what does competitor.com rank for\", \"keyword gap vs X\", \"steal competitor keywords\", or \"why do they outrank us\".\n---\n\n# Competitor Gap\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nTheir rankings are estimates (DataForSEO), yours are real (GSC). Diff them.\n\n## Workflow\n\n1. **Competitor's keywords.** Via the workspace's DataForSEO tools — Labs `ranked_keywords` for the competitor domain (request shape: `native__get_provider_docs`, provider `dataforseo`). Pull top ~500 by volume. If DataForSEO isn't exposed in this workspace, check for connected `ahrefs`/`semrush` providers and use their organic-keywords endpoint instead; if none, stop and say which connection is missing.\n2. **Competitor overview.** Labs `domain_rank_overview` — their estimated organic traffic and keyword count, for context.\n3. **Your keywords.** `google_search_console__runRawSearchAnalytics`, dimension `[\"query\"]`, last 90 days, high rowLimit — the full set of queries the user's site gets impressions for.\n4. **Diff into three buckets:**\n   - **Gap** — competitor ranks top 20, you have zero impressions → new content needed\n   - **Behind** — you both rank but they're ≥ 5 spots ahead → improve existing page\n   - **Ahead** — you outrank them (report briefly; it's the moat)\n5. **Prioritize** the Gap and Behind buckets by volume × relevance to the user's product. Drop branded competitor terms unless the user wants comparison pages — then list them separately as \"vs / alternative\" page candidates.\n\n## Output\n\nVerdict (how big the gap is, in keywords and estimated traffic), then: Gap table (keyword, their position, volume, suggested page), Behind table (keyword, their pos, your pos, your page, fix), and a top-10 action list. Note explicitly which numbers are estimates (theirs) vs real (yours).\n",
+      "card": {
+        "title_zh": "竞品关键词差距分析",
+        "purpose_zh": "对比竞品排名关键词与用户站点在GSC中的真实曝光，找出内容差距并按搜索量和可赢性排序，输出差距表与行动清单。",
+        "does": [
+          "通过DataForSEO拉取竞品域名排名关键词及域名概览",
+          "用GSC查询用户站点近90天有曝光的全部查询词",
+          "将关键词差异分为差距、落后、领先三类",
+          "按搜索量与产品相关性对差距和落后项排序",
+          "输出差距表、落后表与前十行动清单并标注估算与真实数据"
+        ],
+        "inputs": [
+          "竞品域名",
+          "用户站点GSC数据访问权限",
+          "Ryze MCP连接器及DataForSEO或ahrefs/semrush提供商",
+          "用户产品信息用于相关性判断"
+        ],
+        "outputs": [
+          "差距规模结论（关键词数与估算流量）",
+          "差距表：关键词、竞品排名、搜索量、建议页面",
+          "落后表：关键词、竞品排名、自身排名、页面、修复建议",
+          "前十行动清单",
+          "品牌词对比页候选列表"
+        ],
+        "scenarios": [
+          "询问竞品排名哪些关键词",
+          "做与某竞品的关键词差距分析",
+          "寻找可抢占的竞品关键词",
+          "分析为何竞品排名高于自己"
+        ],
+        "prerequisites": [
+          "需连接免费Ryze MCP连接器（https://connector.get-ryze.ai/mcp）",
+          "工作区需暴露DataForSEO工具，或已连接ahrefs/semrush提供商",
+          "需可访问Google Search Console数据"
+        ],
+        "limits": [
+          "竞品排名为DataForSEO估算值，非真实数据",
+          "若工作区无DataForSEO且无ahrefs/semrush连接则无法继续",
+          "默认仅拉取竞品按搜索量前约500个关键词",
+          "品牌竞品词默认剔除，除非用户需要对比页"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "调研",
+          "内容运营",
+          "数据分析"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Find keywords a competitor ranks for that the user's site doesn't — the content gap, prioritized by volume and winnability."
+          },
+          {
+            "field": "does",
+            "quote": "Via the workspace's DataForSEO tools — Labs `ranked_keywords` for the competitor domain"
+          },
+          {
+            "field": "does",
+            "quote": "`google_search_console__runRawSearchAnalytics`, dimension `[\"query\"]`, last 90 days, high rowLimit"
+          },
+          {
+            "field": "does",
+            "quote": "**Gap** — competitor ranks top 20, you have zero impressions → new content needed"
+          },
+          {
+            "field": "does",
+            "quote": "**Prioritize** the Gap and Behind buckets by volume × relevance to the user's product."
+          },
+          {
+            "field": "does",
+            "quote": "Verdict (how big the gap is, in keywords and estimated traffic), then: Gap table"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If DataForSEO isn't exposed in this workspace, check for connected `ahrefs`/`semrush` providers and use their organic-keywords endpoint instead; if none, stop and say which connection is missing."
+          },
+          {
+            "field": "limits",
+            "quote": "Their rankings are estimates (DataForSEO), yours are real (GSC). Diff them."
+          },
+          {
+            "field": "limits",
+            "quote": "Pull top ~500 by volume."
+          },
+          {
+            "field": "limits",
+            "quote": "Drop branded competitor terms unless the user wants comparison pages"
+          },
+          {
+            "field": "hosts",
+            "quote": "Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "add it as a custom connector with the same URL"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/content-brief/SKILL.md",
+      "blob_sha": "ad257abd7e908bf0b7e585433da3c95af8937177",
+      "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/content-brief/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "content-brief",
+        "description": "SERP-driven content brief for a target keyword — what ranks, what to cover, headings, questions, internal links from your own data. Use when asked for a \"content brief\", \"outline to rank for X\", \"what should this article cover\", or before writing any SEO page."
+      },
+      "excerpt": "---\nname: content-brief\ndescription: SERP-driven content brief for a target keyword — what ranks, what to cover, headings, questions, internal links from your own data. Use when asked for a \"content brief\", \"outline to rank for X\", \"what should this article cover\", or before writing any SEO page.\n---\n\n# Content Brief\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nA brief grounded in the live SERP plus the site's own data — not a generic outline.\n\n## Workflow\n\n1. **The SERP.** If the workspace exposes DataForSEO SERP tools, pull the live Google top 10 for the target keyword (`native__get_provider_docs`, provider `dataforseo`, for the request shape) — titles, URLs, SERP features (featured snippet, PAA, video). If unavailable, fetch the top results via web search instead; the brief must be built from a real SERP either way.\n2. **Read the top 3.** Fetch and skim the top-ranking pages: their structure, depth, angle, what they all cover (table stakes) and what none cover (the opening).\n3. **Keyword set.** `google_ads__generateKeywordIdeas` seeded with the target — secondary keywords and question variants worth folding in, with volumes via `google_ads__generateKeywordHistoricalMetrics`.\n4. **Your existing foothold.** `google_search_console__runRawSearchAnalytics` filtered to the topic — queries the site already gets impressions for (work them into headings), and existing pages on adjacent topics (internal-link sources; also flag if one already half-covers this and should be expanded instead of a new page).\n5. **Assemble the brief:**\n   - Target keyword + secondaries with volumes\n   - Search intent and required format (guide/listicle/comparison/tool page), inferred from what actually ranks\n   - Proposed title + meta (write for the CTR, under 60/155 chars)\n   - H2/H3 outline with a one-line note per section on what it must say\n   - Questions to answer (PAA + question keywords)\n   - Table stakes vs the differentiating angle\n   - Internal links: 3–5 existing pages to link from, with anchors\n   - Target length: match the ranking median, don't pad\n\n## Output\n\nThe brief, ready to hand to a writer (or to write from directly). No preamble.\n",
+      "card": {
+        "title_zh": "内容简报生成",
+        "purpose_zh": "基于实时SERP与站点自有数据，为目标关键词生成可直接交给写手的内容简报，而非通用大纲。",
+        "does": [
+          "拉取目标关键词的Google实时前10结果及SERP特性",
+          "阅读并分析排名前三页面的结构、深度与角度",
+          "生成次要关键词与问题变体并获取搜索量",
+          "用Search Console数据找出站点已有曝光词与可内链页面",
+          "组装含标题、大纲、待答问题、内链与目标篇幅的简报"
+        ],
+        "inputs": [
+          "目标关键词",
+          "Ryze MCP连接器",
+          "DataForSEO SERP工具（可选）",
+          "Google Ads关键词工具",
+          "Google Search Console数据"
+        ],
+        "outputs": [
+          "可直接交给写手的内容简报",
+          "目标关键词与次要关键词及搜索量",
+          "标题与meta描述",
+          "H2/H3大纲及每节要点",
+          "待回答问题列表",
+          "内链建议与锚文本",
+          "目标篇幅"
+        ],
+        "scenarios": [
+          "用户要求内容简报",
+          "用户要求为某关键词排名的文章大纲",
+          "用户询问文章应覆盖哪些内容",
+          "撰写任何SEO页面前"
+        ],
+        "prerequisites": [
+          "需免费Ryze MCP连接器（https://connector.get-ryze.ai/mcp）",
+          "Claude Code需用claude mcp add命令添加该连接器",
+          "claude.ai/Desktop/Cursor需以自定义连接器方式添加同一URL"
+        ],
+        "limits": [
+          "若无DataForSEO SERP工具，需改用网页搜索获取结果",
+          "简报必须基于真实SERP构建",
+          "目标篇幅应匹配排名中位数，不应注水"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A brief grounded in the live SERP plus the site's own data — not a generic outline."
+          },
+          {
+            "field": "does",
+            "quote": "If the workspace exposes DataForSEO SERP tools, pull the live Google top 10 for the target keyword"
+          },
+          {
+            "field": "does",
+            "quote": "Fetch and skim the top-ranking pages: their structure, depth, angle, what they all cover (table stakes) and what none cover (the opening)."
+          },
+          {
+            "field": "does",
+            "quote": "`google_ads__generateKeywordIdeas` seeded with the target — secondary keywords and question variants worth folding in, with volumes via `google_ads__generateKeywordHistoricalMetrics`."
+          },
+          {
+            "field": "does",
+            "quote": "The brief, ready to hand to a writer (or to write from directly). No preamble."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          },
+          {
+            "field": "limits",
+            "quote": "If unavailable, fetch the top results via web search instead; the brief must be built from a real SERP either way."
+          },
+          {
+            "field": "limits",
+            "quote": "Target length: match the ranking median, don't pad"
+          },
+          {
+            "field": "hosts",
+            "quote": "Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/keyword-research/SKILL.md",
+      "blob_sha": "6547280bbcca237872f87c61b02018115fb77ed9",
+      "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/keyword-research/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "keyword-research",
+        "description": "Keyword research from a seed topic — ideas, real Google volume/CPC, intent, difficulty, clustered into a plan. Use when asked to \"find keywords\", \"keyword research for X\", \"what should I rank for\", or \"build a keyword plan\"."
+      },
+      "excerpt": "---\nname: keyword-research\ndescription: Keyword research from a seed topic — ideas, real Google volume/CPC, intent, difficulty, clustered into a plan. Use when asked to \"find keywords\", \"keyword research for X\", \"what should I rank for\", or \"build a keyword plan\".\n---\n\n# Keyword Research\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nSeed → ideas → metrics → clusters. Volumes come from Google Ads planner data (the source everyone else resells), enriched with DataForSEO intent/difficulty.\n\n## Workflow\n\n1. **Expand the seed.** `google_ads__generateKeywordIdeas` with the seed keyword(s) and/or the user's URL. Collect up to ~200 ideas.\n2. **Metrics.** `google_ads__generateKeywordHistoricalMetrics` on the candidate list — monthly volume, competition, CPC range, 12-month trend.\n3. **Intent + difficulty (optional enrich).** If the workspace exposes DataForSEO tools, call the Labs `keyword_overview` endpoint for the top ~50 (search intent, keyword difficulty, SERP features). Request shape: `native__get_provider_docs` provider `dataforseo`. Skip silently if unavailable — Google metrics alone are enough for a v1 plan.\n4. **What they already rank for.** `google_search_console__runRawSearchAnalytics` (dimension `query`, filtered to the topic) — mark keywords the site already has positions for; those are optimize-not-create.\n5. **Cluster.** Group by intent and topic into content clusters: pillar + supporting pages. For each cluster: target keyword, supporting keywords, total volume, intent, existing page (if any) or \"new page\".\n\n## Output\n\nOne table per cluster (keyword, volume, CPC, intent, current position if any), then a ranked plan: which clusters to attack first and why (volume × winnability — favor clusters where the site already has striking-distance positions). Plain language, no filler.\n\n## Rules\n\n- Never invent volumes. If a metrics call fails, show the keyword without numbers and say why.\n- CPC belongs in the output — it tells the user what the traffic is worth, and this doubles as an ads negative-keyword source.\n",
+      "card": {
+        "title_zh": "关键词调研规划",
+        "purpose_zh": "从种子主题出发，借助 Ryze MCP 连接器获取关键词创意、Google 真实搜索量、CPC、意图与难度，并聚类成内容规划。",
+        "does": [
+          "用种子词或用户网址扩展出最多约200个关键词创意",
+          "获取候选词月搜索量、竞争度、CPC区间与12个月趋势",
+          "可选调用 DataForSEO 补充搜索意图、关键词难度与SERP特征",
+          "用 Search Console 查询标记网站已有排名的关键词",
+          "按意图与主题聚类为支柱页加支撑页的内容集群",
+          "输出各集群表格及按搜索量乘可赢性排序的执行计划"
+        ],
+        "inputs": [
+          "种子关键词",
+          "用户网址（可选）",
+          "Search Console 查询数据",
+          "DataForSEO 工具（可选）"
+        ],
+        "outputs": [
+          "每个集群一张表：关键词、搜索量、CPC、意图、当前排名",
+          "排序后的内容集群执行计划及理由"
+        ],
+        "scenarios": [
+          "用户要求找关键词",
+          "为某主题做关键词调研",
+          "确定应争取排名的词",
+          "制定关键词规划"
+        ],
+        "prerequisites": [
+          "需配置免费 Ryze MCP 连接器 https://connector.get-ryze.ai/mcp",
+          "Claude Code 用 claude mcp add ryze --transport http 添加；claude.ai/Desktop/Cursor 作为自定义连接器添加同一 URL",
+          "可选：工作区提供 DataForSEO 工具以补充意图与难度"
+        ],
+        "limits": [
+          "搜索量来自 Google Ads 规划师数据",
+          "指标调用失败时不得编造搜索量，只列关键词并说明原因",
+          "DataForSEO 不可用时静默跳过，仅用 Google 指标做初版规划",
+          "扩展创意上限约200个，DataForSEO 仅处理前约50个"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "未说明"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "调研",
+          "内容运营",
+          "数据分析"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Keyword research from a seed topic — ideas, real Google volume/CPC, intent, difficulty, clustered into a plan."
+          },
+          {
+            "field": "does",
+            "quote": "`google_ads__generateKeywordIdeas` with the seed keyword(s) and/or the user's URL. Collect up to ~200 ideas."
+          },
+          {
+            "field": "does",
+            "quote": "`google_ads__generateKeywordHistoricalMetrics` on the candidate list — monthly volume, competition, CPC range, 12-month trend."
+          },
+          {
+            "field": "does",
+            "quote": "If the workspace exposes DataForSEO tools, call the Labs `keyword_overview` endpoint for the top ~50 (search intent, keyword difficulty, SERP features)."
+          },
+          {
+            "field": "does",
+            "quote": "`google_search_console__runRawSearchAnalytics` (dimension `query`, filtered to the topic) — mark keywords the site already has positions for"
+          },
+          {
+            "field": "does",
+            "quote": "Group by intent and topic into content clusters: pillar + supporting pages."
+          },
+          {
+            "field": "does",
+            "quote": "then a ranked plan: which clusters to attack first and why (volume × winnability"
+          },
+          {
+            "field": "inputs",
+            "quote": "with the seed keyword(s) and/or the user's URL"
+          },
+          {
+            "field": "outputs",
+            "quote": "One table per cluster (keyword, volume, CPC, intent, current position if any)"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when asked to \"find keywords\", \"keyword research for X\", \"what should I rank for\", or \"build a keyword plan\"."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          },
+          {
+            "field": "limits",
+            "quote": "Never invent volumes. If a metrics call fails, show the keyword without numbers and say why."
+          },
+          {
+            "field": "limits",
+            "quote": "Skip silently if unavailable — Google metrics alone are enough for a v1 plan."
+          },
+          {
+            "field": "limits",
+            "quote": "Volumes come from Google Ads planner data (the source everyone else resells), enriched with DataForSEO intent/difficulty."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`)."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/rank-tracking/SKILL.md",
+      "blob_sha": "0cfc58195ac39c011b3652e74b088b5ca10d19cb",
+      "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/rank-tracking/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "rank-tracking",
+        "description": "Rank tracking without a tracker subscription — position movers between any two periods from real Search Console data. Use when asked \"how are my rankings\", \"what moved this week/month\", \"track my keywords\", or \"did the update hit me\"."
+      },
+      "excerpt": "---\nname: rank-tracking\ndescription: Rank tracking without a tracker subscription — position movers between any two periods from real Search Console data. Use when asked \"how are my rankings\", \"what moved this week/month\", \"track my keywords\", or \"did the update hit me\".\n---\n\n# Rank Tracking\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nRank trackers estimate your position by scraping SERPs daily. Search Console records the position Google actually served you at. Use the real number.\n\n## Workflow\n\n1. **Property.** `google_search_console__listSites` → pick the user's domain.\n2. **Two windows.** Default: last 28 days vs previous 28. If the user names an event (\"since the March update\"), split around that date. GSC data lags ~2 days — never include today.\n3. **Pull both periods.** `google_search_console__runRawSearchAnalytics`, dimensions `[\"query\"]`, rowLimit high enough to cover the site (start 5000). Repeat with `[\"page\"]` for page-level movement.\n4. **Join and diff.** Match queries across periods, compute position delta, clicks delta, impressions delta.\n5. **Classify:**\n   - **Winners** — position improved ≥ 2 spots on queries with real impressions\n   - **Losers** — dropped ≥ 2 spots (sort by clicks lost, not by delta — a 4→7 drop on a money query beats a 40→80 crash on a nothing query)\n   - **New** — queries appearing only in the recent period\n   - **Lost** — queries that vanished\n6. **Spot-verify (optional).** For the 3–5 most important losers, if DataForSEO SERP tools are exposed in the workspace, pull the live SERP to see who took the spot. Skip if unavailable.\n\n## Output\n\nVerdict first (net up/down and the single biggest move), then four tables: Winners, Losers, New, Lost — query, positions before→after, clicks delta. If the user asked about a specific algorithm update, answer that question explicitly with the before/after evidence.\n\n## Recurring\n\nIf the user wants this weekly, suggest scheduling it (Claude Code scheduled tasks / a routine) rather than re-running by hand.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/seo-audit/SKILL.md",
+      "blob_sha": "7e272556da392769b4bcde39232beaad3f4baf99",
+      "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/seo-audit/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "seo-audit",
+        "description": "Full SEO audit of a site from its real Search Console + GA4 data — indexation health, CTR anomalies, decaying pages, striking-distance keywords, quick wins. Use when asked to \"audit my site\", \"SEO audit\", \"why is my organic traffic down\", or \"SEO health check\"."
+      },
+      "excerpt": "---\nname: seo-audit\ndescription: Full SEO audit of a site from its real Search Console + GA4 data — indexation health, CTR anomalies, decaying pages, striking-distance keywords, quick wins. Use when asked to \"audit my site\", \"SEO audit\", \"why is my organic traffic down\", or \"SEO health check\".\n---\n\n# SEO Audit\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nAudit the user's site using their own data via the Ryze MCP. No estimates — everything below comes from their actual GSC/GA4.\n\n## Workflow\n\n1. **Pick the property.** `google_search_console__listSites`. If several, use the one matching the user's domain; confirm only when ambiguous.\n2. **Indexation.** `google_search_console__getIndexationSummary` — indexed vs not-indexed counts and reasons. Flag anything unusual (large \"Crawled — currently not indexed\", spikes in excluded pages).\n3. **Performance baseline.** `google_search_console__runRawSearchAnalytics`: last 90 days vs previous 90, dimensions `query` and `page` (two calls each period). Compute clicks/impressions/CTR/position deltas.\n4. **Find the problems:**\n   - **Decaying pages** — pages whose clicks dropped >30% period-over-period\n   - **CTR anomalies** — queries with position ≤ 5 but CTR < 2% (title/meta problem)\n   - **Striking distance** — queries at position 8–20 with high impressions (one push from page 1)\n   - **Cannibalization** — same query, multiple ranking pages splitting clicks\n5. **Spot-check pages.** For the 3–5 worst pages, `google_search_console__inspectUrl` — canonical, indexing state, last crawl.\n6. **Cross-check traffic.** `google_analytics__runRawReport` — organic sessions + conversions by landing page, same periods. A page can hold rankings but lose revenue; call that out.\n7. **AI traffic.** `google_analytics__getAIReferrals` for the same window — note whether AI engines are becoming a meaningful channel for this site.\n\n## Output\n\nA report with: verdict up top (one paragraph, is the site healthy or not and the #1 issue), then sections — Indexation, Losers, Quick wins (striking distance + CTR fixes, ranked by impressions), Cannibalization — each with a table and the specific fix. End with a prioritized 5-item action list.\n\n## Fallbacks\n\nIf GSC isn't connected, say so and point to Ryze connector setup (https://help.get-ryze.ai/claude/connect) — do not substitute third-party estimates for the site's own data.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/seo-vs-ads/SKILL.md",
+      "blob_sha": "06417961058200c4630ef2ba5dd2ef407f03632e",
+      "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/seo-vs-ads/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "seo-vs-ads",
+        "description": "Find money leaking between search ads and SEO — queries you pay for while already ranking organically, and paid queries with no organic coverage. Use when asked \"am I paying for clicks I'd get free\", \"brand bidding waste\", \"SEO vs ads overlap\", or \"cut wasted ad spend with SEO\"."
+      },
+      "excerpt": "---\nname: seo-vs-ads\ndescription: Find money leaking between search ads and SEO — queries you pay for while already ranking organically, and paid queries with no organic coverage. Use when asked \"am I paying for clicks I'd get free\", \"brand bidding waste\", \"SEO vs ads overlap\", or \"cut wasted ad spend with SEO\".\n---\n\n# SEO vs Ads\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nThe report subscription tools can't do: it needs your ads account AND your Search Console together. Both are on the Ryze MCP.\n\n## Workflow\n\n1. **Paid search terms.** `google_ads__runRawGaql` on the default account — search terms report, last 90 days: term, impressions, clicks, cost, conversions. (GAQL shape via `native__get_provider_docs`, provider `google_ads`, if needed.)\n2. **Organic positions.** `google_search_console__runRawSearchAnalytics`, dimension `[\"query\"]`, same window.\n3. **Join on query** and bucket:\n   - **Double-paying** — organic position ≤ 3 AND paid spend on the same term. Especially brand terms with no competing advertisers (check top-of-page rate / competition). Sum the spend: that's the number for the headline.\n   - **Defensible** — organic ≤ 3 but competitors bid on the term (paid presence may be justified; say so honestly)\n   - **Paid-only winners** — terms converting in ads with no organic ranking → the SEO content roadmap, pre-validated by money\n   - **Organic-only converters** — strong organic queries with no ad coverage → scale candidates if ads team wants volume\n4. **Estimate savings.** For the double-paying bucket: spend × the organic click-capture you'd retain (be conservative, ~50–70% for position 1 brand terms; label it an estimate).\n\n## Output\n\nHeadline first: \"$X/quarter going to clicks you already rank #1 for.\" Then the four buckets as tables (term, cost, conversions, organic position), the savings estimate with its assumptions stated, and a short action list: exact negatives to add, exact pages to build.\n\n## Fallback\n\nIf only one of the two accounts is connected, run what's possible, and name the missing connection instead of guessing at the other half.\n",
+      "card": {
+        "title_zh": "SEO与广告重叠分析",
+        "purpose_zh": "对比付费搜索词与自然搜索排名，找出已自然排名靠前却仍在付费的词，以及有广告转化但无自然覆盖的词，估算可节省的广告花费。",
+        "does": [
+          "拉取近90天Google Ads搜索词报告，含展示、点击、花费、转化",
+          "拉取同期Search Console按query维度的自然排名数据",
+          "按查询词合并两源数据并分为四类：重复付费、可辩护、仅付费赢家、仅自然转化",
+          "对重复付费词按保守点击留存率估算可节省金额并标注为估算",
+          "输出四类明细表、节省估算及假设、建议添加的否定词与待建页面清单"
+        ],
+        "inputs": [
+          "Google Ads账户（默认账户）搜索词数据",
+          "Google Search Console自然搜索排名数据",
+          "近90天时间窗口",
+          "Ryze MCP连接器（同时接入两个账户）"
+        ],
+        "outputs": [
+          "标题结论：每季度X美元花在已排名第一的点击上",
+          "四类分桶表格（词、花费、转化、自然排名）",
+          "节省估算及所依据的假设",
+          "行动清单：具体否定词与具体待建页面"
+        ],
+        "scenarios": [
+          "判断是否在为本来免费就能获得的点击付费",
+          "品牌词竞价浪费排查",
+          "SEO与广告重叠度分析",
+          "用广告转化数据反推SEO内容路线图",
+          "削减浪费广告预算"
+        ],
+        "prerequisites": [
+          "需连接免费Ryze MCP连接器（https://connector.get-ryze.ai/mcp）",
+          "需同时接入广告账户与Search Console，仅接一个时只跑可得部分并说明缺失连接"
+        ],
+        "limits": [
+          "报告订阅工具无法完成，必须同时具备广告账户与Search Console数据",
+          "节省估算为保守估计（品牌词首位约50–70%点击留存），非精确值",
+          "仅覆盖近90天窗口",
+          "仅接入一个账户时无法完成完整对比"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "调研",
+          "数据分析",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Find money leaking between search ads and SEO — queries you pay for while already ranking organically, and paid queries with no organic coverage."
+          },
+          {
+            "field": "does",
+            "quote": "**Paid search terms.** `google_ads__runRawGaql` on the default account — search terms report, last 90 days: term, impressions, clicks, cost, conversions."
+          },
+          {
+            "field": "does",
+            "quote": "**Organic positions.** `google_search_console__runRawSearchAnalytics`, dimension `[\"query\"]`, same window."
+          },
+          {
+            "field": "does",
+            "quote": "**Join on query** and bucket:"
+          },
+          {
+            "field": "does",
+            "quote": "**Estimate savings.** For the double-paying bucket: spend × the organic click-capture you'd retain (be conservative, ~50–70% for position 1 brand terms; label it an estimate)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If only one of the two accounts is connected, run what's possible, and name the missing connection instead of guessing at the other half."
+          },
+          {
+            "field": "limits",
+            "quote": "The report subscription tools can't do: it needs your ads account AND your Search Console together."
+          },
+          {
+            "field": "hosts",
+            "quote": "claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          }
+        ]
+      }
+    }
+  ]
+}

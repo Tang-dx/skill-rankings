@@ -1,0 +1,591 @@
+{
+  "schema": 1,
+  "repo": "thedotmack/claude-mem",
+  "tree_sha": "f1ba77ab0e3c6ca12df42415707ed69a817f1d38",
+  "truncated_paths": 35,
+  "skills": [
+    {
+      "skill_path": ".claude/skills/community-sweep/SKILL.md",
+      "blob_sha": "fffed6110818bddaca2fa3b5fe0f6b0def1b9ae5",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/.claude/skills/community-sweep/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "community-sweep",
+        "description": "Land community pull requests as the contributor and answer community issues on thedotmack/claude-mem. Takes stock of every open PR (the owner's own included, except the ones the owner marked experimental) and community issue, triages each against the owner's merge philosophy and the cmem.ai hosted-service boundary, finishes somewhat-aligned PRs on the contributor's own branch, squash-merges so the contributor stays the commit author on main, thanks them by name, closes fixed issues with credit t"
+      },
+      "excerpt": "---\nname: community-sweep\ndescription: Land community pull requests as the contributor and answer community issues on thedotmack/claude-mem. Takes stock of every open PR (the owner's own included, except the ones the owner marked experimental) and community issue, triages each against the owner's merge philosophy and the cmem.ai hosted-service boundary, finishes somewhat-aligned PRs on the contributor's own branch, squash-merges so the contributor stays the commit author on main, thanks them by name, closes fixed issues with credit to reporter and fixer, keeps the private ledger and contributor roster current, and reports what it decided. Use when asked to \"go through the PRs\", \"merge contributor PRs\", \"help contributors with their PRs\", \"land the new community PRs\", \"triage new issues and PRs\", \"run the community sweep\", \"keep the momentum\", or \"grow the community\".\n---\n\n# Community Sweep\n\nGrow the claude-mem community by merging people in. Every valuable contribution lands **as the contributor**: their PR, their name as the commit author on `main`. A PR that is only partly right gets finished on their branch instead of rejected. Issues get the same treatment, so the person who reported a bug and the person who fixed it both hear about it, by name.\n\nThis is the protocol from the 2026-09-30 open-PR merge sweep, which took 257 open PRs to 46 and merged 143 contributor PRs from 87 authors with their authorship intact. It is written down so every new batch of PRs and issues gets handled the same way.\n\n## The owner's merge philosophy\n\n1. **Merge as many valuable contributions as possible.** This is looser than the Merge Clinic (#3372, `docs/merge-rubric.md`). Opt-in features are welcome, as are extensibility (providers, hosts, hooks, settings knobs) and anything that cuts token spend (bounding, batching, dedup, filtering).\n2. **Finish, don't reject.** If the intent is right but the fix is partial or buggy, finish it on the contributor's branch, or land only its additive piece (a trim). Either way the credit stays with them.\n3. **No band-aids, but no bleeding.** A fix walks the issue down to its root cause. A band-aid that stops active user harm ships only with a written post-plan: the root-cause follow-up, specified well enough to execute.\n4. **The contributor is the author.** A merge that puts the maintainer's name on someone else's work is a failed merge.\n5. **Respect the hosted-service boundary** (step 2). A PR may not change how cmem.ai cloud sync or the gateway's sign-in and trial path behave. You decide: trim or rework that part out and land the rest, or decline it with the reason.\n6. **Security and privacy regressions block a merge.** That covers secrets in logs, data sent to third parties, and injection.\n7. **Critical bug fixes ship now.** A PR that fixes a break users are hitting goes out right away, so nobody's service stays interrupted: sign-in or activation that errors, a worker that won't start, hooks that fail, capture or search that stops working, data loss. It lands first in the run and a patch release follows (step 3). It never waits for the owner, including when the broken path is cmem.ai sign-in, sync or the gateway. The boundary in step 2 covers changes to how those paths behave, not fixes that make them work again. On 2026-11-07 the owner was wrongly asked about #5455, which fixed Pro sign-in returning 500 on every install.\n8. **Nothing needs the owner.** The owner set this on 2026-11-07. Every PR and issue in a sweep gets decided and carried through by you: merge, close, release, X post. The report says what you decided and why. It never asks the owner a question or lists decisions for them.\n\nCount humans, not tools. A PR written with Claude, Codex, Cursor or Copilot is credited to the human who opened it. Bot PRs (PostHog, Copilot agent, Dependabot) land on merit, but they never go on the roster.\n\n## Private state: never commit, never upload\n\nRun state lives in the main checkout's gitignored `.scratch/`, so every worktree shares it:\n\n```bash\nMAIN_CHECKOUT=\"$(cd \"$(git rev-parse --git-common-dir)/..\" && pwd)\"\nSTATE=\"$MAIN_CHECKOUT/.scratch/community\"\nRUN_ID=\"CS-$(date -u +%F)\"; RUN=\"$STATE/runs/$RUN_ID\"; mkdir -p \"$RUN\"\n```\n\n| File | What it is |\n|---|---|\n| `$STATE/ledger.tsv` | One row per outcome. The last row for a number wins. It is the source of truth for what already happened; never redo a number it shows as done. |\n| `$STATE/ROSTER.md` | Every human with a merged PR or a co-author credit, kept for the owner's outreach. It holds emails, so never commit it, upload it, or quote it. |\n| `$RUN/` | This run's snapshots, triage reports, test baseline and `REPORT.md`. |\n\nTo append a ledger row (tab-separated; PR and issue numbers share one namespace):\n\n```bash\nprintf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$(date -u +%FT%TZ)\" <number> \"$RUN_ID\" <action> <merge_sha|-> <author> <coauthors|-> \"<one-line note>\" >> \"$STATE/ledger.tsv\"\n```\n\n- **Actions for PRs:** `merged`, `closed`, `blocked`, `skipped`; for the owner's PRs, also `experimental`, and `approved`, which the owner writes to take a PR out of experimental. Older runs also wrote `held`, and `approved` for owner sign-offs.\n- **Actions for issues:** `issue-closed`, `issue-answered`, `issue-routed`. Older runs also wrote `issue-held`.\n- **New ledger:** if `ledger.tsv` doesn't exist, create it with the header `ts pr phase action merge_sha pr_author coauthors note` (tab-separated).\n\n## 1. Take stock\n\n```bash\ngh pr list --repo thedotmack/claude-mem --state open --limit 500 --json number,title,author,isDraft,createdAt,updatedAt,mergeable,mergeStateStatus,maintainerCanModify,headRefName,headRepositoryOwner,baseRefName,additions,deletions > \"$RUN/open-prs.json\"\ngh issue list --repo thedotmack/claude-mem --state open --limit 500 --json number,title,author,createdAt,updatedAt,labels,comments > \"$RUN/open-issues.json\"\n```\n\nPut every open PR in exactly one bucket, using its last ledger row. Use the first bucket that matches:\n\n| Bucket | Rule | What to do |\n|---|---|---|\n| Experimental | the owner's PR, last row is `experimental` | Leave it alone. Report any new activity. |\n| Held | last row is `held` (written before 2026-11-07) | Triage it from scratch this run and settle it yourself, like a new PR. |\n| Approved | last row is `approved` (the owner took it out of experimental, or an older run recorded an owner sign-off) | Triage it from scratch this run, like a new PR. |\n| Blocked | last row is `blocked` | Re-triage only if the author pushed or replied after that row. |\n| Done | last row is `merged` or `closed` | It shouldn't be open, so find out why. |\n| New | no row | Triage it (step 2). |\n\nFor issues, skip the maintainer-authored ones: the `[plan-NN]` masters and the Merge Clinic. Triage every other open issue that:\n- has no ledger row, however old it is (a run that stopped early leaves these behind);\n- has `issue-held` as its last row (written before 2026-11-07): triage it from scratch this run, like a held PR;\n- was updated after its own last ledger row.\n\nOn a first run, that is all of them.\n\n**Test baseline.** Take it once per run, before landing anything. Use a clean `origin/main` worktree and the same Bun as CI (`bun-version: latest`), because an older local Bun can fail subprocess tests that CI passes. If local Bun is behind, run every suite in the run (baseline, per-PR and gate) as `npx -y bun@<latest> test …`. `npm view bun version` gives the latest version.\n\n```bash\nnpm install --no-audit --no-fund && npm run build\nenv -u CLAUDE_MEM_LLM_TIMEOUT_MS bun test tests > \"$RUN/baseline-suite.log\" 2>&1; echo \"suite exit $?\"\ngrep -E '^\\(fail\\)' \"$RUN/baseline-suite.log\" | sed -E 's/ \\[[0-9.]+m?s\\]$//' | sort -u > \"$RUN/baseline-failures.txt\"\ntail -n 40 \"$RUN/baseline-suite.log\" | grep -E '^ *[0-9]+ pass$|^ *[0-9]+ fail$|^Ran [0-9]+ tests across'\n```\n\nThe last command must print the suite's own summary: `N pass`, `N fail` and `Ran N tests across M files`, with M close to the number of test fi",
+      "card": {
+        "title_zh": "社区PR合并清扫",
+        "purpose_zh": "对 thedotmack/claude-mem 仓库的开放 PR 与 issue 做批量分诊，按维护者合并哲学与 cmem.ai 托管服务边界决定合并、返工、裁剪或关闭，并保持贡献者署名与致谢。",
+        "does": [
+          "盘点全部开放 PR 与 issue，按台账最后一行分桶",
+          "对每个新 PR 做只读分诊并给出唯一裁决",
+          "在贡献者分支上补完或裁剪后以贡献者身份 squash 合并",
+          "关闭已修复 issue 并致谢报告者与修复者",
+          "维护私有台账与贡献者名册并输出本轮报告",
+          "运行测试基线并优先发布关键 bug 修复"
+        ],
+        "inputs": [
+          "GitHub 仓库 thedotmack/claude-mem 的开放 PR 与 issue",
+          "私有台账 ledger.tsv 与贡献者名册 ROSTER.md",
+          "维护者合并哲学与托管服务边界规则",
+          "测试基线结果"
+        ],
+        "outputs": [
+          "PR 合并、关闭、返工或裁剪的结果",
+          "台账行与贡献者名册更新",
+          "本轮 REPORT.md 报告",
+          "关键修复的补丁发布"
+        ],
+        "scenarios": [
+          "被要求过一遍 PR 并合并贡献者 PR",
+          "分诊新 issue 与 PR",
+          "运行社区清扫保持势头",
+          "扩大社区参与"
+        ],
+        "prerequisites": [
+          "可访问 thedotmack/claude-mem 仓库的 gh 命令行环境",
+          "主检出目录下可写的 .scratch/community 状态目录",
+          "与 CI 一致的 Bun 版本用于测试基线"
+        ],
+        "limits": [
+          "仅针对 thedotmack/claude-mem 单一仓库",
+          "托管服务边界内的行为变更不得合并",
+          "安全与隐私回归阻断合并",
+          "机器人 PR 不计入贡献者名册",
+          "名册含邮箱，不得提交、上传或引用"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "自动化",
+          "运维部署",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Land community pull requests as the contributor and answer community issues on thedotmack/claude-mem."
+          },
+          {
+            "field": "does",
+            "quote": "finishes somewhat-aligned PRs on the contributor's own branch, squash-merges so the contributor stays the commit author on main, thanks them by name"
+          },
+          {
+            "field": "does",
+            "quote": "closes fixed issues with credit to reporter and fixer, keeps the private ledger and contributor roster current, and reports what it decided."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run state lives in the main checkout's gitignored `.scratch/`, so every worktree shares it"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use a clean `origin/main` worktree and the same Bun as CI (`bun-version: latest`)"
+          },
+          {
+            "field": "limits",
+            "quote": "A PR may not change how cmem.ai cloud sync or the gateway's sign-in and trial path behave."
+          },
+          {
+            "field": "limits",
+            "quote": "Security and privacy regressions block a merge."
+          },
+          {
+            "field": "limits",
+            "quote": "Bot PRs (PostHog, Copilot agent, Dependabot) land on merit, but they never go on the roster."
+          },
+          {
+            "field": "limits",
+            "quote": "It holds emails, so never commit it, upload it, or quote it."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$(date -u +%FT%TZ)\" <number> \"$RUN_ID\" <action> <merge_sha|-> <author> <coauthors|-> \"<one-line note>\" >> \"$STATE/ledger.tsv\""
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "claude-mem-cursor/skills/agent-cost-report/SKILL.md",
+      "blob_sha": "866f45d697b114897246013dcffb1506b6046e39",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/claude-mem-cursor/skills/agent-cost-report/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "Agent Cost Report",
+        "description": "Believable agent cost report for any period, default the last 7 full days PT, not counting today. Measured tokens from Claude Code transcripts priced at OpenRouter list prices (ESTIMATED), measured provider spend when a sanctioned source exists, note-taker cost separate, Timing-style HTML/PDF plus report.json, line-items.csv, evidence.json."
+      },
+      "excerpt": "---\nname: Agent Cost Report\ndescription: >-\n  Believable agent cost report for any period, default the last 7 full days PT, not counting today.\n  Measured tokens from Claude Code transcripts priced at OpenRouter list prices (ESTIMATED), measured\n  provider spend when a sanctioned source exists, note-taker cost separate, Timing-style HTML/PDF plus\n  report.json, line-items.csv, evidence.json.\nallowed-tools:\n  - Bash\n  - Read\n  - Write\n  - AskUserQuestion\n  - mcp__plugin_claude-mem_mcp-search__search\n  - mcp__plugin_claude-mem_mcp-search__timeline\n  - mcp__plugin_claude-mem_mcp-search__get_observations\n---\n\n# Agent Cost Report\n\n**Claude-Mem / Claude Code skill.** Runtime is the `scripts/` pipeline (transcripts → tokens → dollars → Timing-style report) plus a progressive Mem Search review pass that confirms the drafted labels. The Notion draft is SPEC history only — never the product, never the runtime, never the ship vehicle.\n\nResolve the absolute directory containing this `SKILL.md`; all helper paths are relative to that directory. `${CLAUDE_SKILL_DIR}` is the shortcut: `python3 \"${CLAUDE_SKILL_DIR}/scripts/acr.py\" …`. Python 3.9+ standard library only, with IANA timezone data for `America/Los_Angeles`; no pip installs. `tzdata` is the only exception to the no-pip-installs rule, and only when `acr.py` exits saying that timezone data is unavailable (stock Windows Python ships none): show the user the lines it printed and ask (AskUserQuestion) before installing it. On a yes, run the line for your shell (the plain quoted line in Bash or cmd, the `PowerShell:` line in PowerShell), then rerun the failed command. Setting `PYTHONTZPATH` instead needs no install. The look lives in `scripts/acr/render.py`, never here.\n\n## Purpose\n\nTurn Claude-Mem activity into a **manager-readable cost and failure report**.\n\nProduct idea: a reusable skill that searches Claude-Mem via Mem Search, reconstructs real units of work, assigns cost and failure categories, and renders a printable report.\n\n## Insight north star\n\nThe headline is dollars, to two decimals, labeled. The dollars come from Claude Code transcripts (exact per-reply token usage) priced at OpenRouter public list prices, so they are **ESTIMATED**. Measured provider spend appears only when a sanctioned source gives it. Directly under the dollars: what the mistakes cost, what shipped, and both on one time axis.\n\n## Questions the report must answer\n\n1. What work was completed?\n2. What did each outcome cost?\n3. What was wasted through looping, hedging, wrong turns, rework, or poor routing?\n4. Were any unauthorized actions attempted?\n5. What should the manager change next?\n\n**Primary unit = cost per completed outcome** (not cost per observation).\n\n## When to use\n\n- \"Agent cost report\" / \"cost per outcome\" / \"failure economics\" / \"was this session worth it\" / \"what did the agents cost this week\"\n- After a real Mem session dig when leadership needs outcome economics\n- Sample / ship packs that need self-contained HTML + JSON + CSV + evidence\n\nMemory dig mechanics: the claude-mem `mem-search` skill (progressive recall).\n\n## Default scope (ALWAYS)\n\n- Unless the user names a **specific session / range / project**, the window is the **last 7 full days in PT, not counting today**: `end` = the PT midnight that started today (exclusive), `start` = `end − 7 days`. The default window never contains a partial day (G3, Alex 2026-09-25).\n- Explicit windows: `--start YYYY-MM-DD --end YYYY-MM-DD` (PT calendar days, end exclusive). An explicit `--end` later than today marks the last day \"partial, generated HH:MM PT\".\n- One session: `--session <content_session_id>`. One project plus a period: `--project <name> --start … --end …` (worktrees of the project are included).\n- The report **Scope** strip shows the PT range, and Details list every session id in scope.\n\n## Progressive Mem Search (ALWAYS)\n\nFollow the claude-mem `mem-search` three layers. Keep spend light.\n\n1. **Search** — get an index of IDs (titles, types, token hints).\n2. **Timeline** — only around anchors you care about.\n3. **Observations** — `get_observations` for the filtered IDs you will cite as evidence.\n\nRecipe:\n\n1. Resolve scope (default: the last 7 full PT days).\n2. Search → collect IDs.\n3. Timeline for thin context only.\n4. Observations for intended / actual / outcome / waste / rework / blocked / unauthorized / status.\n5. Group into named work items + failure events.\n6. Calculate line-item costs.\n7. Render HTML + optional PDF (+ json/csv/evidence).\n8. Keep evidence IDs in the appendix — do not dump entire timelines into the main report.\n\nADHD process bullets:\n\n- Search first → pick IDs → timeline only if context is thin → fetch only needed obs.\n- Work-item titles are invented for managers (\"Restore search after Chroma crash-loop\"); observation titles stay evidence-only.\n- Evidence appendix lists obs IDs + short titles; main sections stay outcome-first.\n\nIn this skill the search pass is the **review step** (see Recipe step 4): the pipeline drafts categories and failure types from keywords (`label_source: keyword`); the orchestrator confirms or changes each line item's `category` and `failure_type` from its cited evidence IDs and applies the result with `review --apply`. Items left unreviewed keep the \"draft label\" mark and the footer counts them.\n\n## Work categories (ALWAYS)\n\n`Feature` · `Bug fix` · `Incident` · `Maintenance` · `Investigation` · `Experiment`\n\n## Failure / waste types (ALWAYS)\n\n`Looping` · `Hedging` · `Wrong turn` · `Rework` · `Regression` · `Premature completion` · `Unauthorized action` · `Suboptimal path` · `Duplicate work` · `Blocked work` · `Missed requirement` · `Unnecessary escalation` · `Context re-read` · `Model thrash` · `Fan-out waste` · `Recovery after miss`\n\n**Rework lock (ALWAYS):** Rework lives **only** under `failure_type` — never as a work category. Keep category as the intended job type; set `failure_type: Rework` when rework occurred.\n\nA line item can have a work category **and** a failure_type (e.g. Maintenance + Looping).\n\n## Cost model\n\nMeasured tokens come from Claude Code transcripts (`~/.claude/projects/**/*.jsonl`, assistant replies deduped on `(message.id, requestId)`); Codex transcripts are read the same way. Prices are OpenRouter public list prices per million tokens, fetched at run time and saved with the report.\n\n```\nagent_cost_i (per reply, micro-dollars) =\n      input × price.input + output × price.output\n    + cache_write_5m × price.cache_write + cache_write_1h × price.cache_write_1h\n    + cache_read × price.cache_read                    # cache_write_1h = listed rate, else 2 × input\n\nagent_estimated_usd        = Σ agent_cost_i over every reply in the window (matched or not)   # ESTIMATED, the headline\nextrapolated_unmeasured    = observer tokens of sessions with no transcript here × (measured $ per observer token)\n                           # EXTRAPOLATED (low confidence); \"all sessions measured\" when nothing remains\nobserver_note_taker_est    = note-taker (observer) tokens, deduped per reply, × its input list price\n                           # priced separately, never agent cost, never in the headline\nmistakes_estimated_usd     = Σ agent_cost_i over the same-session union of wasted turns, each turn once   # low figure\ncost_per_completed_outcome = Σ attributed $ for status ∈ {shipped, completed} / count(those work items)\nwaste_rate                 = Σ wasted_cost / Σ attributed $     recovery_share = Σ recovery_cost / Σ attributed $\n```\n\nLine items are sessions: `attributed_usd` = estimated (transcript on this box) or extrapolated (no transcript). `wasted_cost` and `recovery_cost` come from the behavior pass (below), one union set for the ribbon, the line items and the mistakes line. The upper bound (redo windows plus project-wide fallback) stays in Details.\n\n**Unauthorized blocked:** `direct_cost` $0, `risk_exposure` high, `action_status` blocked. Always keep risk_exposure non-dollar unless real cash/remediation is at ",
+      "card": null
+    },
+    {
+      "skill_path": "claude-mem-cursor/skills/install/SKILL.md",
+      "blob_sha": "d23088ec955aaa32344029346fdf5fc19a511132",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/claude-mem-cursor/skills/install/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "claude-mem-install",
+        "description": "Use this when setting up claude-mem on Cursor: local or remote worker, local host-login observer or remote cmem.ai inference."
+      },
+      "excerpt": "---\nname: claude-mem-install\ndescription: >-\n  Use this when setting up claude-mem on Cursor: local or remote worker,\n  local host-login observer or remote cmem.ai inference.\n---\n# Install claude-mem on Cursor\n\nIndependent of Grok Bot. Do not require the other IDE.\n\n## Local worker (default)\n\n```\nnpx claude-mem install --ide cursor\n```\n\nStarts the local worker. Hooks already ship with this plugin. MCP `claude-mem-local` talks to it.\n\nObserver:\n\n- Remote inference (typical): leave provider as openrouter / cmem.ai (`CLAUDE_MEM_OPENROUTER_BASE_URL=https://cmem.ai/api/inference/v1`)\n- Local host-login: `--provider host` (loopback shim; never bind the worker port — on macOS the worker is often 37777, so the shim uses 37778)\n\n## Remote worker\n\n```\nnpx claude-mem install --ide cursor --runtime server --server-url https://YOUR_HOST\n```\n\nSet plugin variable `CLAUDE_MEM_MCP_TOKEN` for `claude-mem-remote` (`https://cmem.ai/api/mcp` or your server).\n\nNever restart a healthy worker (RAM queue). No Claude CLI required for host/openrouter.\n",
+      "card": {
+        "title_zh": "Cursor 安装 claude-mem",
+        "purpose_zh": "说明如何在 Cursor 中安装并配置 claude-mem，包括本地 worker 与远程 worker 两种方式，以及远程推理和本地 host-login 两种观察者模式。",
+        "does": [
+          "给出在 Cursor 中安装 claude-mem 的命令",
+          "说明本地 worker 默认启动方式与 MCP 连接",
+          "说明观察者的远程推理与本地 host-login 两种配置",
+          "给出远程 worker 的安装命令与服务器地址参数",
+          "说明远程 MCP 需设置 CLAUDE_MEM_MCP_TOKEN 变量",
+          "提醒不要重启健康的 worker"
+        ],
+        "inputs": [
+          "IDE 选择参数 --ide cursor",
+          "运行时参数 --runtime server",
+          "服务器地址 --server-url",
+          "提供者参数 --provider host",
+          "环境变量 CLAUDE_MEM_OPENROUTER_BASE_URL",
+          "插件变量 CLAUDE_MEM_MCP_TOKEN"
+        ],
+        "outputs": [
+          "安装并启动的本地或远程 worker",
+          "可供 MCP 连接的 claude-mem-local 或 claude-mem-remote"
+        ],
+        "scenarios": [
+          "在 Cursor 中首次安装 claude-mem",
+          "配置远程推理服务端点",
+          "使用本地 host-login 观察者",
+          "连接自建远程 worker 服务器"
+        ],
+        "prerequisites": [
+          "可执行 npx 命令",
+          "使用远程 worker 时需准备服务器地址",
+          "使用远程 MCP 时需设置 CLAUDE_MEM_MCP_TOKEN"
+        ],
+        "limits": [
+          "不依赖 Grok Bot，也不需要其他 IDE",
+          "host/openrouter 模式不需要 Claude CLI",
+          "不要重启健康的 worker，因为存在 RAM 队列",
+          "macOS 上 worker 端口常为 37777，shim 使用 37778"
+        ],
+        "hosts": [
+          "cursor"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "needs_secret"
+        ],
+        "tags": [
+          "运维部署",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this when setting up claude-mem on Cursor: local or remote worker, local host-login observer or remote cmem.ai inference."
+          },
+          {
+            "field": "does",
+            "quote": "npx claude-mem install --ide cursor"
+          },
+          {
+            "field": "does",
+            "quote": "npx claude-mem install --ide cursor --runtime server --server-url https://YOUR_HOST"
+          },
+          {
+            "field": "does",
+            "quote": "Set plugin variable `CLAUDE_MEM_MCP_TOKEN` for `claude-mem-remote`"
+          },
+          {
+            "field": "does",
+            "quote": "Never restart a healthy worker (RAM queue)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Set plugin variable `CLAUDE_MEM_MCP_TOKEN` for `claude-mem-remote` (`https://cmem.ai/api/mcp` or your server)."
+          },
+          {
+            "field": "limits",
+            "quote": "No Claude CLI required for host/openrouter."
+          },
+          {
+            "field": "limits",
+            "quote": "never bind the worker port — on macOS the worker is often 37777, so the shim uses 37778"
+          },
+          {
+            "field": "hosts",
+            "quote": "# Install claude-mem on Cursor"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "claude-mem-cursor/skills/mem-search/SKILL.md",
+      "blob_sha": "d5dfea281d5f7a21ec6450ffcdecd088fb520ca9",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/claude-mem-cursor/skills/mem-search/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "mem-search",
+        "description": "Use this when the user asks to search memory, \"did we already solve this?\", \"how did we do X last time?\", or wants work from previous sessions."
+      },
+      "excerpt": "---\nname: mem-search\ndescription: >-\n  Use this when the user asks to search memory, \"did we already solve this?\",\n  \"how did we do X last time?\", or wants work from previous sessions.\n---\n# mem-search\n\nLayered workflow. Do not dump full observations until IDs are filtered, and do not reach for raw tool bodies until the summaries came up short.\n\n1. `search(query)` — index with IDs\n2. `timeline(anchor=ID)` — nearby context\n3. `get_observations(ids=[...])` — full details for those IDs only\n4. `get_tool_uses(ids=[...])` — the ORIGINAL `tool_input` / `tool_response` for specific tool calls. Last resort: these are unsummarized and can run to thousands of tokens each.\n\nStamp `platformSource` as `cursor` or `grok-bot` on writes for this host. When reading, do not drop the other host unless asked.\n\nIf MCP is missing, run the install skill first (`npx claude-mem install --ide <host>`).\n",
+      "card": null
+    },
+    {
+      "skill_path": "claude-mem-grok-bot/skills/agent-cost-report/SKILL.md",
+      "blob_sha": "866f45d697b114897246013dcffb1506b6046e39",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/claude-mem-grok-bot/skills/agent-cost-report/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "Agent Cost Report",
+        "description": "Believable agent cost report for any period, default the last 7 full days PT, not counting today. Measured tokens from Claude Code transcripts priced at OpenRouter list prices (ESTIMATED), measured provider spend when a sanctioned source exists, note-taker cost separate, Timing-style HTML/PDF plus report.json, line-items.csv, evidence.json."
+      },
+      "excerpt": "---\nname: Agent Cost Report\ndescription: >-\n  Believable agent cost report for any period, default the last 7 full days PT, not counting today.\n  Measured tokens from Claude Code transcripts priced at OpenRouter list prices (ESTIMATED), measured\n  provider spend when a sanctioned source exists, note-taker cost separate, Timing-style HTML/PDF plus\n  report.json, line-items.csv, evidence.json.\nallowed-tools:\n  - Bash\n  - Read\n  - Write\n  - AskUserQuestion\n  - mcp__plugin_claude-mem_mcp-search__search\n  - mcp__plugin_claude-mem_mcp-search__timeline\n  - mcp__plugin_claude-mem_mcp-search__get_observations\n---\n\n# Agent Cost Report\n\n**Claude-Mem / Claude Code skill.** Runtime is the `scripts/` pipeline (transcripts → tokens → dollars → Timing-style report) plus a progressive Mem Search review pass that confirms the drafted labels. The Notion draft is SPEC history only — never the product, never the runtime, never the ship vehicle.\n\nResolve the absolute directory containing this `SKILL.md`; all helper paths are relative to that directory. `${CLAUDE_SKILL_DIR}` is the shortcut: `python3 \"${CLAUDE_SKILL_DIR}/scripts/acr.py\" …`. Python 3.9+ standard library only, with IANA timezone data for `America/Los_Angeles`; no pip installs. `tzdata` is the only exception to the no-pip-installs rule, and only when `acr.py` exits saying that timezone data is unavailable (stock Windows Python ships none): show the user the lines it printed and ask (AskUserQuestion) before installing it. On a yes, run the line for your shell (the plain quoted line in Bash or cmd, the `PowerShell:` line in PowerShell), then rerun the failed command. Setting `PYTHONTZPATH` instead needs no install. The look lives in `scripts/acr/render.py`, never here.\n\n## Purpose\n\nTurn Claude-Mem activity into a **manager-readable cost and failure report**.\n\nProduct idea: a reusable skill that searches Claude-Mem via Mem Search, reconstructs real units of work, assigns cost and failure categories, and renders a printable report.\n\n## Insight north star\n\nThe headline is dollars, to two decimals, labeled. The dollars come from Claude Code transcripts (exact per-reply token usage) priced at OpenRouter public list prices, so they are **ESTIMATED**. Measured provider spend appears only when a sanctioned source gives it. Directly under the dollars: what the mistakes cost, what shipped, and both on one time axis.\n\n## Questions the report must answer\n\n1. What work was completed?\n2. What did each outcome cost?\n3. What was wasted through looping, hedging, wrong turns, rework, or poor routing?\n4. Were any unauthorized actions attempted?\n5. What should the manager change next?\n\n**Primary unit = cost per completed outcome** (not cost per observation).\n\n## When to use\n\n- \"Agent cost report\" / \"cost per outcome\" / \"failure economics\" / \"was this session worth it\" / \"what did the agents cost this week\"\n- After a real Mem session dig when leadership needs outcome economics\n- Sample / ship packs that need self-contained HTML + JSON + CSV + evidence\n\nMemory dig mechanics: the claude-mem `mem-search` skill (progressive recall).\n\n## Default scope (ALWAYS)\n\n- Unless the user names a **specific session / range / project**, the window is the **last 7 full days in PT, not counting today**: `end` = the PT midnight that started today (exclusive), `start` = `end − 7 days`. The default window never contains a partial day (G3, Alex 2026-09-25).\n- Explicit windows: `--start YYYY-MM-DD --end YYYY-MM-DD` (PT calendar days, end exclusive). An explicit `--end` later than today marks the last day \"partial, generated HH:MM PT\".\n- One session: `--session <content_session_id>`. One project plus a period: `--project <name> --start … --end …` (worktrees of the project are included).\n- The report **Scope** strip shows the PT range, and Details list every session id in scope.\n\n## Progressive Mem Search (ALWAYS)\n\nFollow the claude-mem `mem-search` three layers. Keep spend light.\n\n1. **Search** — get an index of IDs (titles, types, token hints).\n2. **Timeline** — only around anchors you care about.\n3. **Observations** — `get_observations` for the filtered IDs you will cite as evidence.\n\nRecipe:\n\n1. Resolve scope (default: the last 7 full PT days).\n2. Search → collect IDs.\n3. Timeline for thin context only.\n4. Observations for intended / actual / outcome / waste / rework / blocked / unauthorized / status.\n5. Group into named work items + failure events.\n6. Calculate line-item costs.\n7. Render HTML + optional PDF (+ json/csv/evidence).\n8. Keep evidence IDs in the appendix — do not dump entire timelines into the main report.\n\nADHD process bullets:\n\n- Search first → pick IDs → timeline only if context is thin → fetch only needed obs.\n- Work-item titles are invented for managers (\"Restore search after Chroma crash-loop\"); observation titles stay evidence-only.\n- Evidence appendix lists obs IDs + short titles; main sections stay outcome-first.\n\nIn this skill the search pass is the **review step** (see Recipe step 4): the pipeline drafts categories and failure types from keywords (`label_source: keyword`); the orchestrator confirms or changes each line item's `category` and `failure_type` from its cited evidence IDs and applies the result with `review --apply`. Items left unreviewed keep the \"draft label\" mark and the footer counts them.\n\n## Work categories (ALWAYS)\n\n`Feature` · `Bug fix` · `Incident` · `Maintenance` · `Investigation` · `Experiment`\n\n## Failure / waste types (ALWAYS)\n\n`Looping` · `Hedging` · `Wrong turn` · `Rework` · `Regression` · `Premature completion` · `Unauthorized action` · `Suboptimal path` · `Duplicate work` · `Blocked work` · `Missed requirement` · `Unnecessary escalation` · `Context re-read` · `Model thrash` · `Fan-out waste` · `Recovery after miss`\n\n**Rework lock (ALWAYS):** Rework lives **only** under `failure_type` — never as a work category. Keep category as the intended job type; set `failure_type: Rework` when rework occurred.\n\nA line item can have a work category **and** a failure_type (e.g. Maintenance + Looping).\n\n## Cost model\n\nMeasured tokens come from Claude Code transcripts (`~/.claude/projects/**/*.jsonl`, assistant replies deduped on `(message.id, requestId)`); Codex transcripts are read the same way. Prices are OpenRouter public list prices per million tokens, fetched at run time and saved with the report.\n\n```\nagent_cost_i (per reply, micro-dollars) =\n      input × price.input + output × price.output\n    + cache_write_5m × price.cache_write + cache_write_1h × price.cache_write_1h\n    + cache_read × price.cache_read                    # cache_write_1h = listed rate, else 2 × input\n\nagent_estimated_usd        = Σ agent_cost_i over every reply in the window (matched or not)   # ESTIMATED, the headline\nextrapolated_unmeasured    = observer tokens of sessions with no transcript here × (measured $ per observer token)\n                           # EXTRAPOLATED (low confidence); \"all sessions measured\" when nothing remains\nobserver_note_taker_est    = note-taker (observer) tokens, deduped per reply, × its input list price\n                           # priced separately, never agent cost, never in the headline\nmistakes_estimated_usd     = Σ agent_cost_i over the same-session union of wasted turns, each turn once   # low figure\ncost_per_completed_outcome = Σ attributed $ for status ∈ {shipped, completed} / count(those work items)\nwaste_rate                 = Σ wasted_cost / Σ attributed $     recovery_share = Σ recovery_cost / Σ attributed $\n```\n\nLine items are sessions: `attributed_usd` = estimated (transcript on this box) or extrapolated (no transcript). `wasted_cost` and `recovery_cost` come from the behavior pass (below), one union set for the ribbon, the line items and the mistakes line. The upper bound (redo windows plus project-wide fallback) stays in Details.\n\n**Unauthorized blocked:** `direct_cost` $0, `risk_exposure` high, `action_status` blocked. Always keep risk_exposure non-dollar unless real cash/remediation is at ",
+      "card": null
+    },
+    {
+      "skill_path": "claude-mem-grok-bot/skills/host-observer/SKILL.md",
+      "blob_sha": "bb5770c9357891745bc410a595342d3abf71fd56",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/claude-mem-grok-bot/skills/host-observer/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "host-observer",
+        "description": "Use this when fulfilling claude-mem observer jobs on Grok Bot: reply only skip_summary or one full observation XML, never prose."
+      },
+      "excerpt": "---\nname: host-observer\ndescription: >-\n  Use this when fulfilling claude-mem observer jobs on Grok Bot: reply only\n  skip_summary or one full observation XML, never prose.\n---\n# Host observer (Grok Bot)\n\nYou are the model inside claude-mem's generator loop (OpenRouter HTTP agent to the local shim).\n\nWrite only `outbox/{id}.txt` for inbox jobs, or return the XML as the chat-completions body.\n\n**Idle / init / no tool results:** `<skip_summary reason=\"noise\" />`\n\n**Finished searchable unit:** one `<observation>` with real title, 4–10 facts with paths, narrative. Types: bugfix, feature, refactor, change, discovery, decision. Never title with a tool name.\n\nProse is dropped (`outputClass=prose`). Do not mix skip_summary and observation. Do not POST `/api/memory/save` except last-resort.\n",
+      "card": {
+        "title_zh": "宿主观察者",
+        "purpose_zh": "用于在 Grok Bot 上完成 claude-mem 观察者任务：只回复 skip_summary 或一条完整的 observation XML，不输出散文。",
+        "does": [
+          "对空闲、初始化或无工具结果的情况返回 skip_summary 标记",
+          "对完成的可搜索单元输出一条 observation XML",
+          "observation 需含真实标题、4–10 条带路径的事实与叙述",
+          "observation 类型限于 bugfix、feature、refactor、change、discovery、decision",
+          "标题不得使用工具名",
+          "为 inbox 任务只写 outbox/{id}.txt，或以 chat-completions 响应体返回 XML"
+        ],
+        "inputs": [
+          "claude-mem 的 inbox 任务",
+          "工具结果（用于判断是否形成可搜索单元）"
+        ],
+        "outputs": [
+          "skip_summary 标记",
+          "一条 observation XML",
+          "outbox/{id}.txt 文件"
+        ],
+        "scenarios": [
+          "claude-mem 生成器循环中的观察者任务",
+          "判断当前上下文是否属于噪声并跳过总结",
+          "将完成的工作单元整理为结构化观察记录"
+        ],
+        "prerequisites": [
+          "运行于 claude-mem 的生成器循环中",
+          "通过 OpenRouter HTTP agent 连接本地 shim"
+        ],
+        "limits": [
+          "只允许输出 skip_summary 或一条 observation XML，散文会被丢弃",
+          "不得混用 skip_summary 与 observation",
+          "除最后手段外不得 POST /api/memory/save",
+          "标题不得使用工具名"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this when fulfilling claude-mem observer jobs on Grok Bot: reply only skip_summary or one full observation XML, never prose."
+          },
+          {
+            "field": "does",
+            "quote": "Write only `outbox/{id}.txt` for inbox jobs, or return the XML as the chat-completions body."
+          },
+          {
+            "field": "does",
+            "quote": "**Idle / init / no tool results:** `<skip_summary reason=\"noise\" />`"
+          },
+          {
+            "field": "does",
+            "quote": "**Finished searchable unit:** one `<observation>` with real title, 4–10 facts with paths, narrative."
+          },
+          {
+            "field": "does",
+            "quote": "Types: bugfix, feature, refactor, change, discovery, decision. Never title with a tool name."
+          },
+          {
+            "field": "does",
+            "quote": "Do not mix skip_summary and observation."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "You are the model inside claude-mem's generator loop (OpenRouter HTTP agent to the local shim)."
+          },
+          {
+            "field": "limits",
+            "quote": "Prose is dropped (`outputClass=prose`)."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not POST `/api/memory/save` except last-resort."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Do not POST `/api/memory/save` except last-resort."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Write only `outbox/{id}.txt` for inbox jobs"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "claude-mem-grok-bot/skills/install/SKILL.md",
+      "blob_sha": "ead8817f00a254e39999adb7869b0ee29b732f4a",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/claude-mem-grok-bot/skills/install/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "claude-mem-install",
+        "description": "Use this when setting up claude-mem on Grok Bot: local worker plus CMEM Pro observer (default), optional host-login observer, or remote cmem.ai. No Cursor required."
+      },
+      "excerpt": "---\nname: claude-mem-install\ndescription: >-\n  Use this when setting up claude-mem on Grok Bot: local worker plus CMEM Pro\n  observer (default), optional host-login observer, or remote cmem.ai. No Cursor\n  required.\n---\n# Install claude-mem on Grok Bot\n\nIndependent of Cursor. Grok Bot has no session-start / file-read / tool-use hooks.\n\n## Local worker + CMEM Pro observer (default)\n\n```\nnpx claude-mem install --ide grok-bot\n```\n\nDo **not** pass `--provider host` unless you want the loopback shim. With no `--provider`, this is the CMEM Pro path:\n\n- Worker on `127.0.0.1:<port>` (default `37700 + uid%100`). Do not restart if healthy.\n- Transcript watcher per Grok Bot agent (`platformSource=grok-bot`)\n- Observer via CMEM Pro: `CLAUDE_MEM_PROVIDER=openrouter`, `CLAUDE_MEM_OPENROUTER_BASE_URL=https://cmem.ai/api/inference/v1`, `CLAUDE_MEM_OPENROUTER_MODEL=cmem-observer`, API key from installer OAuth (`cm_pro` memory key)\n- Interactive installer pre-selects CMEM Pro\n- MCP `session_start_context` at the start of a real task\n- Live INDEX into `agents/<uuid>/memory/log/zz-claude-mem-inject.md` (disable with `CLAUDE_MEM_GROK_BOT_INJECT_ENABLED=false`)\n\nNo xAI key. No Claude CLI.\n\n## Optional: local host-login observer\n\nExplicit opt-in only. Not the user default.\n\n```\nnpx claude-mem install --ide grok-bot --provider host\n```\n\nLoopback OpenAI-compatible shim on a **free** loopback port (not the worker port). Idle replies are `<skip_summary />`; finished units are one `<observation>`. This Grok login fulfills inbox jobs (skill host-observer).\n\n## Remote worker / remote observer\n\nSet plugin variable `CLAUDE_MEM_MCP_TOKEN` and use MCP `claude-mem-remote`.\n\n```\nnpx claude-mem install --ide grok-bot --runtime server --server-url https://cmem.ai\n```\n",
+      "card": null
+    },
+    {
+      "skill_path": "claude-mem-grok-bot/skills/mem-search/SKILL.md",
+      "blob_sha": "89e5317771fb9283bae8e459aa87ce85efaf2560",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/claude-mem-grok-bot/skills/mem-search/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "mem-search",
+        "description": "Use this when the user asks to search memory, \"did we already solve this?\", \"how did we do X last time?\", or wants work from previous sessions."
+      },
+      "excerpt": "---\nname: mem-search\ndescription: >-\n  Use this when the user asks to search memory, \"did we already solve this?\",\n  \"how did we do X last time?\", or wants work from previous sessions.\n---\n# mem-search\n\nLayered workflow. Do not dump full observations until IDs are filtered, and do not reach for raw tool bodies until the summaries came up short.\n\n1. `search(query)` — index with IDs\n2. `timeline(anchor=ID)` — nearby context\n3. `get_observations(ids=[...])` — full details for those IDs only\n4. `get_tool_uses(ids=[...])` — the ORIGINAL `tool_input` / `tool_response` for specific tool calls. Last resort: these are unsummarized and can run to thousands of tokens each.\n\nThe worker also live-writes a growing ID INDEX to `agents/<this-seat-uuid>/memory/log/zz-claude-mem-inject.md` (host Memory mid-attach). Use those IDs with `get_observations`. Thin seat diaries are filled from newest house observations. Disable with `CLAUDE_MEM_GROK_BOT_INJECT_ENABLED=false`.\n\nStamp `platformSource` as `cursor` or `grok-bot` on writes for this host. When reading, do not drop the other host unless asked.\n\nIf MCP is missing, run the install skill first (`npx claude-mem install --ide <host>`).\n",
+      "card": null
+    },
+    {
+      "skill_path": "cowork/skills/agent-cost-report/SKILL.md",
+      "blob_sha": "866f45d697b114897246013dcffb1506b6046e39",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/cowork/skills/agent-cost-report/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "Agent Cost Report",
+        "description": "Believable agent cost report for any period, default the last 7 full days PT, not counting today. Measured tokens from Claude Code transcripts priced at OpenRouter list prices (ESTIMATED), measured provider spend when a sanctioned source exists, note-taker cost separate, Timing-style HTML/PDF plus report.json, line-items.csv, evidence.json."
+      },
+      "excerpt": "---\nname: Agent Cost Report\ndescription: >-\n  Believable agent cost report for any period, default the last 7 full days PT, not counting today.\n  Measured tokens from Claude Code transcripts priced at OpenRouter list prices (ESTIMATED), measured\n  provider spend when a sanctioned source exists, note-taker cost separate, Timing-style HTML/PDF plus\n  report.json, line-items.csv, evidence.json.\nallowed-tools:\n  - Bash\n  - Read\n  - Write\n  - AskUserQuestion\n  - mcp__plugin_claude-mem_mcp-search__search\n  - mcp__plugin_claude-mem_mcp-search__timeline\n  - mcp__plugin_claude-mem_mcp-search__get_observations\n---\n\n# Agent Cost Report\n\n**Claude-Mem / Claude Code skill.** Runtime is the `scripts/` pipeline (transcripts → tokens → dollars → Timing-style report) plus a progressive Mem Search review pass that confirms the drafted labels. The Notion draft is SPEC history only — never the product, never the runtime, never the ship vehicle.\n\nResolve the absolute directory containing this `SKILL.md`; all helper paths are relative to that directory. `${CLAUDE_SKILL_DIR}` is the shortcut: `python3 \"${CLAUDE_SKILL_DIR}/scripts/acr.py\" …`. Python 3.9+ standard library only, with IANA timezone data for `America/Los_Angeles`; no pip installs. `tzdata` is the only exception to the no-pip-installs rule, and only when `acr.py` exits saying that timezone data is unavailable (stock Windows Python ships none): show the user the lines it printed and ask (AskUserQuestion) before installing it. On a yes, run the line for your shell (the plain quoted line in Bash or cmd, the `PowerShell:` line in PowerShell), then rerun the failed command. Setting `PYTHONTZPATH` instead needs no install. The look lives in `scripts/acr/render.py`, never here.\n\n## Purpose\n\nTurn Claude-Mem activity into a **manager-readable cost and failure report**.\n\nProduct idea: a reusable skill that searches Claude-Mem via Mem Search, reconstructs real units of work, assigns cost and failure categories, and renders a printable report.\n\n## Insight north star\n\nThe headline is dollars, to two decimals, labeled. The dollars come from Claude Code transcripts (exact per-reply token usage) priced at OpenRouter public list prices, so they are **ESTIMATED**. Measured provider spend appears only when a sanctioned source gives it. Directly under the dollars: what the mistakes cost, what shipped, and both on one time axis.\n\n## Questions the report must answer\n\n1. What work was completed?\n2. What did each outcome cost?\n3. What was wasted through looping, hedging, wrong turns, rework, or poor routing?\n4. Were any unauthorized actions attempted?\n5. What should the manager change next?\n\n**Primary unit = cost per completed outcome** (not cost per observation).\n\n## When to use\n\n- \"Agent cost report\" / \"cost per outcome\" / \"failure economics\" / \"was this session worth it\" / \"what did the agents cost this week\"\n- After a real Mem session dig when leadership needs outcome economics\n- Sample / ship packs that need self-contained HTML + JSON + CSV + evidence\n\nMemory dig mechanics: the claude-mem `mem-search` skill (progressive recall).\n\n## Default scope (ALWAYS)\n\n- Unless the user names a **specific session / range / project**, the window is the **last 7 full days in PT, not counting today**: `end` = the PT midnight that started today (exclusive), `start` = `end − 7 days`. The default window never contains a partial day (G3, Alex 2026-09-25).\n- Explicit windows: `--start YYYY-MM-DD --end YYYY-MM-DD` (PT calendar days, end exclusive). An explicit `--end` later than today marks the last day \"partial, generated HH:MM PT\".\n- One session: `--session <content_session_id>`. One project plus a period: `--project <name> --start … --end …` (worktrees of the project are included).\n- The report **Scope** strip shows the PT range, and Details list every session id in scope.\n\n## Progressive Mem Search (ALWAYS)\n\nFollow the claude-mem `mem-search` three layers. Keep spend light.\n\n1. **Search** — get an index of IDs (titles, types, token hints).\n2. **Timeline** — only around anchors you care about.\n3. **Observations** — `get_observations` for the filtered IDs you will cite as evidence.\n\nRecipe:\n\n1. Resolve scope (default: the last 7 full PT days).\n2. Search → collect IDs.\n3. Timeline for thin context only.\n4. Observations for intended / actual / outcome / waste / rework / blocked / unauthorized / status.\n5. Group into named work items + failure events.\n6. Calculate line-item costs.\n7. Render HTML + optional PDF (+ json/csv/evidence).\n8. Keep evidence IDs in the appendix — do not dump entire timelines into the main report.\n\nADHD process bullets:\n\n- Search first → pick IDs → timeline only if context is thin → fetch only needed obs.\n- Work-item titles are invented for managers (\"Restore search after Chroma crash-loop\"); observation titles stay evidence-only.\n- Evidence appendix lists obs IDs + short titles; main sections stay outcome-first.\n\nIn this skill the search pass is the **review step** (see Recipe step 4): the pipeline drafts categories and failure types from keywords (`label_source: keyword`); the orchestrator confirms or changes each line item's `category` and `failure_type` from its cited evidence IDs and applies the result with `review --apply`. Items left unreviewed keep the \"draft label\" mark and the footer counts them.\n\n## Work categories (ALWAYS)\n\n`Feature` · `Bug fix` · `Incident` · `Maintenance` · `Investigation` · `Experiment`\n\n## Failure / waste types (ALWAYS)\n\n`Looping` · `Hedging` · `Wrong turn` · `Rework` · `Regression` · `Premature completion` · `Unauthorized action` · `Suboptimal path` · `Duplicate work` · `Blocked work` · `Missed requirement` · `Unnecessary escalation` · `Context re-read` · `Model thrash` · `Fan-out waste` · `Recovery after miss`\n\n**Rework lock (ALWAYS):** Rework lives **only** under `failure_type` — never as a work category. Keep category as the intended job type; set `failure_type: Rework` when rework occurred.\n\nA line item can have a work category **and** a failure_type (e.g. Maintenance + Looping).\n\n## Cost model\n\nMeasured tokens come from Claude Code transcripts (`~/.claude/projects/**/*.jsonl`, assistant replies deduped on `(message.id, requestId)`); Codex transcripts are read the same way. Prices are OpenRouter public list prices per million tokens, fetched at run time and saved with the report.\n\n```\nagent_cost_i (per reply, micro-dollars) =\n      input × price.input + output × price.output\n    + cache_write_5m × price.cache_write + cache_write_1h × price.cache_write_1h\n    + cache_read × price.cache_read                    # cache_write_1h = listed rate, else 2 × input\n\nagent_estimated_usd        = Σ agent_cost_i over every reply in the window (matched or not)   # ESTIMATED, the headline\nextrapolated_unmeasured    = observer tokens of sessions with no transcript here × (measured $ per observer token)\n                           # EXTRAPOLATED (low confidence); \"all sessions measured\" when nothing remains\nobserver_note_taker_est    = note-taker (observer) tokens, deduped per reply, × its input list price\n                           # priced separately, never agent cost, never in the headline\nmistakes_estimated_usd     = Σ agent_cost_i over the same-session union of wasted turns, each turn once   # low figure\ncost_per_completed_outcome = Σ attributed $ for status ∈ {shipped, completed} / count(those work items)\nwaste_rate                 = Σ wasted_cost / Σ attributed $     recovery_share = Σ recovery_cost / Σ attributed $\n```\n\nLine items are sessions: `attributed_usd` = estimated (transcript on this box) or extrapolated (no transcript). `wasted_cost` and `recovery_cost` come from the behavior pass (below), one union set for the ribbon, the line items and the mistakes line. The upper bound (redo windows plus project-wide fallback) stays in Details.\n\n**Unauthorized blocked:** `direct_cost` $0, `risk_exposure` high, `action_status` blocked. Always keep risk_exposure non-dollar unless real cash/remediation is at ",
+      "card": null
+    },
+    {
+      "skill_path": "cowork/skills/mem-search/SKILL.md",
+      "blob_sha": "6d2530d06bcc0df05cb28b36a2af14f504ccacea",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/cowork/skills/mem-search/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "mem-search",
+        "description": "This skill should be used when the user asks to \"search memory\", \"what do you remember about X\", \"check claude-mem\", \"mem search\", \"find past observations\", \"what did we do last session\", or wants prior-session context about a project, decision, file, or task. Searches the user's Claude-Mem (cmem.ai) memory."
+      },
+      "excerpt": "---\nname: mem-search\ndescription: >\n  This skill should be used when the user asks to \"search memory\", \"what do you\n  remember about X\", \"check claude-mem\", \"mem search\", \"find past observations\",\n  \"what did we do last session\", or wants prior-session context about a project,\n  decision, file, or task. Searches the user's Claude-Mem (cmem.ai) memory.\nmetadata:\n  version: \"0.1.0\"\n---\n\n# Claude-Mem Search\n\nSearch the user's persistent Claude-Mem memory on cmem.ai. Memory contains\ntimestamped observations synthesized from past sessions across all their\nagents (Claude Code, the Claude app, Codex, and others).\n\n## How to search\n\nRun the bundled CLI (no dependencies, uses the plugin's configured API key):\n\n```bash\nnode \"${CLAUDE_PLUGIN_ROOT}/scripts/cmem-hook.mjs\" search \"your query\" --limit 20\n```\n\n## Progressive search method\n\nFollow claude-mem's Index → Timeline → Transcript discipline — cheap passes\nfirst, expensive detail only for confirmed hits:\n\n1. **Index pass** — run 1–3 broad keyword searches (project names, file names,\n   error strings, feature names). Skim titles/summaries only.\n2. **Narrow pass** — re-search with the most specific terms found in step 1\n   (IDs, exact phrases) and a smaller `--limit`.\n3. **Answer** — synthesize from the observations returned. Quote timestamps\n   when the user asks \"when\".\n\nDo not dump raw search output at the user; extract the relevant observations\nand answer in plain language.\n\n## Diagnostics\n\nIf searches return nothing or error:\n\n```bash\nnode \"${CLAUDE_PLUGIN_ROOT}/scripts/cmem-hook.mjs\" status\n```\n\nReport the status output plainly: a MISSING api key means the plugin needs the\nuser's cmem.ai key added to its configuration; a 404 on `/api/hooks/context`\njust means the newer Pro endpoint isn't deployed — search still works via\n`/api/mcp`.\n\n## Notes\n\n- Some filters (date ranges, type) may be silently ignored by the cloud API\n  until MCP parity ships — prefer keyword narrowing over filter flags.\n- Never write secrets into search queries; queries are sent to cmem.ai.\n",
+      "card": null
+    },
+    {
+      "skill_path": "cowork/skills/mem-setup/SKILL.md",
+      "blob_sha": "830e2b401c4006f9466c955c5ec17f8991b2210a",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/cowork/skills/mem-setup/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "mem-setup",
+        "description": "This skill should be used when the user asks to \"set up claude-mem\", \"pair claude-mem\", \"connect cmem\", \"add my cmem key\", \"set up cloud sync in Cowork\" or in the Claude app, or provides cmem.ai Connect values (sync token, user id, SyncHub URL) for this plugin. Configures the CMEM Pro plugin credentials."
+      },
+      "excerpt": "---\nname: mem-setup\ndescription: >\n  This skill should be used when the user asks to \"set up claude-mem\", \"pair\n  claude-mem\", \"connect cmem\", \"add my cmem key\", \"set up cloud sync in\n  Cowork\" or in the Claude app, or provides cmem.ai Connect values (sync token,\n  user id, SyncHub URL) for this plugin. Configures the CMEM Pro plugin\n  credentials.\nmetadata:\n  version: \"0.1.0\"\n---\n\n# Claude-Mem Setup (Claude app pairing)\n\nConfigure this plugin with the user's own cmem.ai credentials so hooks can\ncapture and inject memory. Anyone can pair — credentials are per-user\nconfiguration, never hardcoded in plugin logic.\n\n## What to collect\n\nFrom **cmem.ai → Connect**, the user has three values:\n\n1. **sync token** (starts with `cm_`) — used as the bearer API key\n2. **user id** (UUID)\n3. **SyncHub URL** (`https://sync.cmem.ai`)\n\nIf the user pastes the whole Connect blurb, extract the three values from it.\nIf any are missing, ask for the sync token at minimum — the other two are\noptional.\n\n## Secret handling — non-negotiable\n\n- Never echo the token back in conversation, put it in a shell argv, or log it.\n- Move it only via file writes (Write/Edit tool) and file reads.\n\n## Steps\n\n1. Locate the installed plugin root (this skill's own plugin). Update its\n   `config.json`: set `apiKey` to the sync token, `userId`, and `syncHubUrl`.\n   Leave other settings unless the user asks (`inject` toggles). Project naming\n   is automatic (`cmem_work_*`) and is not configurable.\n2. Claude app containers are ephemeral: edits to the installed copy last only for\n   this session. To make pairing permanent, repackage — zip the plugin\n   directory as `<plugin-name>.plugin` and send it to the user to re-install\n   (the cowork-plugin skill's packaging flow). Tell the user this is why.\n3. If this machine also has a local claude-mem install (a `~/.claude-mem/`\n   directory exists), write the same values to\n   `~/.claude-mem/settings.json` with mode 0600 (`CLAUDE_MEM_CLOUD_SYNC_TOKEN`,\n   `CLAUDE_MEM_CLOUD_SYNC_USER_ID`, `CLAUDE_MEM_CLOUD_SYNC_HUB_URL` keys — the\n   same keys the local claude-mem cloud-sync pairing writes). This plugin's\n   hooks stay off wherever claude-mem is installed locally, so that pairing is\n   what carries this machine's work to cmem.ai. The worker reads those keys\n   only at startup: restart it and run the claude-mem cloud-sync skill's\n   Verify step, which must report `configured: true` and `hub.reachable: true`.\n   Don't report success before it does; if it never does, pair through that\n   skill's installer flow instead.\n4. Verify without exposing the secret:\n\n   ```bash\n   node \"${CLAUDE_PLUGIN_ROOT}/scripts/cmem-hook.mjs\" status\n   ```\n\n   Report the masked output. A `MISSING` key means the write didn't land;\n   a 404 on `/api/hooks/context` is expected until the Pro endpoints deploy\n   (search/injection still work via `/api/mcp`).\n\n## Alternate source\n\nEnv vars override everything and need no file edits: `CMEM_API_KEY`,\n`CMEM_USER_ID`, `CMEM_SYNC_HUB_URL`, `CMEM_API_BASE`.\n",
+      "card": null
+    },
+    {
+      "skill_path": "integrations/eve/template/.agents/skills/dashboard-chat-best-practices/SKILL.md",
+      "blob_sha": "dbb370e816d8cd7632ad6dd1e3279ae39d8eb740",
+      "source_url": "https://github.com/thedotmack/claude-mem/blob/0c488b54e761d7f6f4091b3a6e1958712f13b19d/integrations/eve/template/.agents/skills/dashboard-chat-best-practices/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "dashboard-chat-best-practices",
+        "description": "Apply dashboard-grade chat UX patterns in the Eve chat template. Use when changing Next.js Cache Components/PPR behavior, static shell layout, Suspense bootstrap boundaries, theme hydration, auth display hydration, signed-in/signed-out static shell behavior, optimistic messages, streaming row identity, composer/sidebar interactions, thinking/tool rendering, responsive styling, visual polish, or Vercel dashboard chat comparisons."
+      },
+      "excerpt": "---\nname: dashboard-chat-best-practices\ndescription: Apply dashboard-grade chat UX patterns in the Eve chat template. Use when changing Next.js Cache Components/PPR behavior, static shell layout, Suspense bootstrap boundaries, theme hydration, auth display hydration, signed-in/signed-out static shell behavior, optimistic messages, streaming row identity, composer/sidebar interactions, thinking/tool rendering, responsive styling, visual polish, or Vercel dashboard chat comparisons.\n---\n\n# Dashboard Chat Best Practices\n\n## Overview\n\nUse this skill to keep the template's web chat feeling like a polished dashboard surface: stable, quiet, fast to first paint, and predictable under streaming state.\n\n## Product Shape\n\n- Build the actual chat surface, not a marketing page. The first screen should be a usable composer, sidebar, or chat route.\n- Keep the aesthetic restrained and work-focused: dense but readable spacing, quiet borders, predictable controls, and minimal decoration.\n- Prefer existing shadcn/Tailwind primitives and local components over new abstractions.\n- Use icons for compact commands, with accessible labels/tooltips. Avoid explanatory in-app text for behavior that good controls can imply.\n\n## Cache Components And PPR Basics\n\n- Keep `cacheComponents: true` enabled in `next.config.ts`. Treat the chat route as a static shell with dynamic data streamed into Suspense boundaries.\n- Keep the shell cheap and deterministic. Do not make `app/(chat)/layout.tsx` wait on auth, database, chat history, or per-chat data before rendering the shell.\n- Pass cheap initial state into `AgentChatShell`: empty history, `initialNextCursor: null`, `viewer: null`, and `getInitialSetupStatus()`.\n- Load expensive or request-bound data inside hidden Suspense children: `ResolvedChatBootstrap` for setup/viewer/sidebar history and `ExistingChat` for active chat data.\n- Use sync components to hand resolved server data to the client shell. `AgentChatBootstrapSync` should update setup status, viewer, and history. `AgentChatRouteSync` should update the active chat for the current route.\n- Keep Suspense fallbacks `null` for these sync boundaries when the visible shell already has stable placeholders. Do not add loading panels that push the chat frame around.\n- Do not call `notFound()` until the dynamic boundary has enough real viewer/setup/chat data to prove the chat is inaccessible. The outer shell should still render while that decision is loading.\n- Keep root and session routes visually distinct but structurally compatible. The root page can center the composer; the session page can pin it near the bottom. Both should live inside the same shell.\n- Treat PPR/static shell work as a latency feature and a correctness feature. The goal is first paint without auth/database blocking, then precise data reconciliation after bootstrap.\n\n## Static Shell And Hydration\n\n- Preserve the shell-first strategy. `AgentChatShell` should paint the sidebar frame, top controls, and route body before auth, setup, or chat history finishes loading.\n- Keep bootstrap data out of the blocking route path. Use hidden Suspense sync components to hydrate setup status, viewer, sidebar history, and active chat data.\n- Preserve theme pre-hydration. Theme should be resolved before React paints so dark/light mode does not flash or mismatch.\n- Preserve auth display pre-hydration. The `eve_logged_in` cookie is a display hint only; the head script sets `data-eve-auth-display` so CSS can hide the wrong signed-in/signed-out branch before viewer data resolves.\n- Never treat the auth hint as authority. Server actions, chat loading, Eve auth, and rate limits must use the real Better Auth session.\n- Keep `suppressHydrationWarning` only where it protects known pre-hydration document mutations such as theme/auth display hints.\n\n## Same Route, Signed In Or Out\n\n- Render one shared route shell for signed-in and signed-out states. Do not fork the page into separate auth routes just to show different controls.\n- While bootstrap is loading, render both possible placeholders inside `AuthDisplayLoggedIn` and `AuthDisplayLoggedOut`; let the document dataset hide the wrong branch.\n- For signed-out users, show the Sign in affordance immediately. For signed-in users, show a neutral user-menu placeholder instead of flashing Sign in.\n- After bootstrap resolves, render from real `viewer` state: `viewer ? <UserMenu /> : <SidebarSignInButton />`.\n- When a signed-out user submits text, save the draft to `sessionStorage`, open the auth modal, and restore the draft after sign-in.\n\n## Optimistic Messaging And Row Identity\n\n- Show an optimistic user bubble immediately on send, but keep persisted Eve events as the source of truth.\n- Clear the optimistic user bubble only when the reduced event log contains the real latest user message.\n- Keep live chat state centralized where possible. Avoid rendering from multiple competing sources in the same frame.\n- Prefer stable row identities for streaming responses. A \"thinking\" or \"streaming reply\" row should become the assistant row without remounting into a different component path.\n- Use a separate thinking presence only when there is no meaningful assistant text yet or a turn is still finalizing. Fade it out rather than abruptly removing it.\n- Avoid letting final snapshot writes fight live state. During streaming, prefer the live source; after settle, reconcile with the canonical snapshot.\n\n## Composer And Sidebar\n\n- Keep `ChatComposer` controlled by the page: `value`, `onChange`, `onSubmit`, `disabled`, `disabledReason`, `isBusy`, and `isPreparing`.\n- Enter should submit. Shift+Enter should insert a newline. Disabled states should expose actionable tooltip text.\n- Busy state should show Stop. Preparing state should show a spinner. Empty or over-limit input should disable send without moving layout.\n- Root and session pages can place the composer differently, but they should share the same component and control contract.\n- Persist desktop sidebar open state in a cookie and write a pre-hydration document hint to avoid open-then-collapse flicker.\n- Keep sidebar history cursor-paginated and optimistic. Use `touchChat`, `removeChat`, and title updates for sidebar state; do not make sidebar state the transcript source of truth.\n- Keep mobile sidebar overlay behavior separate from desktop persistent state.\n\n## Message Rendering\n\n- Render user messages as compact right-aligned bubbles. Render assistant text as full-width left-aligned prose.\n- Use Streamdown for assistant markdown. Keep code blocks, lists, and inline code readable in both themes.\n- Group related dynamic tool parts into compact rows. Expand details only when there is useful input, output, error, or HITL control.\n- Render reasoning as a collapsible block. Label active reasoning as \"Thinking...\" and settled reasoning as \"Reasoning\".\n- Render connection authorization as a structured card, not prose embedded in assistant text.\n- Keep text inside controls and cards from overflowing at mobile widths. Prefer stable dimensions for buttons, tool rows, counters, and composer controls.\n\n## Styling Rules\n\n- Use the existing token system: `background`, `foreground`, `muted`, `border`, `card`, `accent`, and local opacity patterns.\n- Keep cards modest. Do not nest cards inside cards. Use cards for messages, modals, repeated items, or framed controls, not whole-page decoration.\n- Keep radius consistent with the template. Avoid large pill shapes unless the local component already uses them.\n- Avoid large decorative gradients, orbs, blobs, and marketing-style hero layouts in the chat app.\n- Use lucide icons when an icon exists. Add `aria-label` for icon-only buttons and tooltip text where meaning is not obvious.\n- Avoid layout shifts from loading, hover, or stream state. Reserve stable space for composer controls, sidebar rows, auth placeholders, and thinking/tool rows.\n\n## Verification\n\n- Run `pnpm typecheck` and `pnpm build` after UI or app-router changes.\n- M",
+      "card": {
+        "title_zh": "仪表盘聊天最佳实践",
+        "purpose_zh": "为 Eve 聊天模板提供仪表盘级聊天 UX 规范，涵盖 Next.js Cache Components/PPR、静态外壳、Suspense 引导边界、主题与登录态水合、乐观消息、流式行标识、输入框与侧边栏交互、消息渲染、样式与验证。",
+        "does": [
+          "规定聊天路由作为静态外壳，动态数据流入 Suspense 边界",
+          "要求主题与登录显示在水合前解析，避免闪烁",
+          "规范乐观用户消息与流式助手行的稳定标识",
+          "约束输入框与侧边栏的受控交互和状态持久化",
+          "规定消息、工具行、推理块的渲染与样式规则",
+          "要求改动后运行类型检查与构建并做视觉验证"
+        ],
+        "inputs": [
+          "Next.js 聊天模板代码（app/(chat)/layout.tsx、AgentChatShell 等）",
+          "next.config.ts 缓存配置",
+          "UI 或 app-router 改动"
+        ],
+        "outputs": [
+          "符合规范的聊天界面实现",
+          "验证结果（typecheck、build、截图或浏览器检查）"
+        ],
+        "scenarios": [
+          "修改 Next.js Cache Components/PPR 行为",
+          "调整静态外壳布局与 Suspense 引导边界",
+          "处理主题或登录显示水合闪烁",
+          "实现乐观消息与流式响应行",
+          "打磨输入框、侧边栏与响应式样式"
+        ],
+        "prerequisites": [
+          "项目使用 Next.js 并启用 cacheComponents: true",
+          "使用 shadcn/Tailwind 组件与 Better Auth 会话",
+          "具备 pnpm 环境"
+        ],
+        "limits": [
+          "仅针对 Eve 聊天模板，非通用聊天方案",
+          "登录 cookie 仅作显示提示，不能作为权限依据",
+          "验证需人工检查桌面与移动端视觉表现"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "前端",
+          "设计/UI",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this skill to keep the template's web chat feeling like a polished dashboard surface: stable, quiet, fast to first paint, and predictable under streaming state."
+          },
+          {
+            "field": "does",
+            "quote": "Keep `cacheComponents: true` enabled in `next.config.ts`. Treat the chat route as a static shell with dynamic data streamed into Suspense boundaries."
+          },
+          {
+            "field": "does",
+            "quote": "Preserve theme pre-hydration. Theme should be resolved before React paints so dark/light mode does not flash or mismatch."
+          },
+          {
+            "field": "does",
+            "quote": "Show an optimistic user bubble immediately on send, but keep persisted Eve events as the source of truth."
+          },
+          {
+            "field": "does",
+            "quote": "Keep `ChatComposer` controlled by the page: `value`, `onChange`, `onSubmit`, `disabled`, `disabledReason`, `isBusy`, and `isPreparing`."
+          },
+          {
+            "field": "does",
+            "quote": "Render user messages as compact right-aligned bubbles. Render assistant text as full-width left-aligned prose."
+          },
+          {
+            "field": "does",
+            "quote": "Run `pnpm typecheck` and `pnpm build` after UI or app-router changes."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Keep `cacheComponents: true` enabled in `next.config.ts`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Never treat the auth hint as authority. Server actions, chat loading, Eve auth, and rate limits must use the real Better Auth session."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run `pnpm typecheck` and `pnpm build` after UI or app-router changes."
+          },
+          {
+            "field": "limits",
+            "quote": "The `eve_logged_in` cookie is a display hint only; the head script sets `data-eve-auth-display` so CSS can hide the wrong signed-in/signed-out branch before viewer data resolves."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run `pnpm typecheck` and `pnpm build` after UI or app-router changes."
+          }
+        ]
+      }
+    }
+  ]
+}

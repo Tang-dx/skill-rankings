@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "repo": "threerocks/article2media",
+  "tree_sha": "7c21a036592ac064b7b59c8365800a15dd8ad303",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/article-comic/SKILL.md",
+      "blob_sha": "562866c4f57d9e7e6c8a82fcea424f6dd1e1f90b",
+      "source_url": "https://github.com/threerocks/article2media/blob/772d3402655d5223002d48713d9b8af3bc7fda99/skills/article-comic/SKILL.md",
+      "fetched_at": "2026-11-13T11:30:56.796Z",
+      "generated_at": "2026-11-13T11:30:56.796Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "article-comic",
+        "description": "漫画：把一篇文章讲的机制做成黑白漫画分镜——你写认知因果拍点和固定角色（comic.json），生成图负责角色、场景和动作，HTML 负责旁白、对白、音效字（图里不画字）；同时输出一张长漫画和一组小红书 3:4 卡片。需要出图能力（Codex CLI 登录，或 OpenAI / Gemini 付费 key）。输入是文章（原文、译文、逐字稿）。可以单独用，也可以接在抓取、视频转文字后面。Use when the user wants a 漫画, 连环画, 四格, 分镜, comic strip, \"把这篇做成漫画\", or -c."
+      },
+      "excerpt": "---\nname: article-comic\ndescription: 漫画：把一篇文章讲的机制做成黑白漫画分镜——你写认知因果拍点和固定角色（comic.json），生成图负责角色、场景和动作，HTML 负责旁白、对白、音效字（图里不画字）；同时输出一张长漫画和一组小红书 3:4 卡片。需要出图能力（Codex CLI 登录，或 OpenAI / Gemini 付费 key）。输入是文章（原文、译文、逐字稿）。可以单独用，也可以接在抓取、视频转文字后面。Use when the user wants a 漫画, 连环画, 四格, 分镜, comic strip, \"把这篇做成漫画\", or -c.\nargument-hint: <article.md|目录|comic.json> [--theme 主题名]\nallowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)\nversion: \"2.3.1\"\n---\n\n# 漫画（article-comic）\n\n> 路径约定：文中的 `${CLAUDE_SKILL_DIR}` 指本 SKILL.md 所在的目录。宿主没有替换这个变量时（命令里原样出现 `${CLAUDE_SKILL_DIR}`），把它换成这个目录的绝对路径再运行；`../<名字>/` 指同级的另一个 skill 目录。\n\n生成图让角色、场景、动作和结果可见；HTML 把文字写准确。同时输出长漫画和 3:4 卡片。\n\n参数：`$ARGUMENTS`\n\n## 0. 输入与能力\n- 文章 `article.md`（原文、译文或逐字稿）。给的是链接、文件或视频时，先用 `article-fetch` / `video-transcript` 取原文（见 `../article2media/references/pipeline.md`）。\n- **先确认有出图能力**：`node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs` 的 `ai-illustration` 一行。没有就告诉用户做不了漫画，建议改用长图（`long-image`）或白板（`logic-whiteboard`）。\n\n## 1. 流程\n1. **完整读一遍**文章，读 `references/mode-comic.md`，写 `<目录>/comic.json`（认知因果拍点 + 固定角色）。\n2. `node ${CLAUDE_SKILL_DIR}/scripts/comic.mjs check <目录>/comic.json`，修完提示。\n3. `node ${CLAUDE_SKILL_DIR}/scripts/comic.mjs make <目录>/comic.json`：出图（约 1–1.5 分钟一格，3 格并行）+ 排版。只改文字时用 `comic.mjs render`（分格已缓存）。\n4. 讲概念、机制的内容，按 `../article-rewrite/references/writing-guide.md` 第 6 节把具体情形、判别依据、关系和结果接起来。\n\n## 2. 审片与交付\n- `comic/review/` 里有覆盖全部高度的重叠切片，逐张看完；也看每一格生成图里有没有画出文字、角色是否一致。\n- 报告：PNG 路径与像素尺寸、来源、格数与因果链、生成图张数、用的出图服务；3:4 卡片目录。制作范围写在交付回复里，不写进图里。\n",
+      "card": {
+        "title_zh": "文章转黑白漫画",
+        "purpose_zh": "把一篇文章讲的机制做成黑白漫画分镜：写认知因果拍点和固定角色，生成图负责角色场景动作，HTML 负责旁白对白音效字，同时输出长漫画和 3:4 卡片。",
+        "does": [
+          "读取文章原文、译文或逐字稿，必要时先用抓取或视频转文字取原文",
+          "写 comic.json，包含认知因果拍点和固定角色",
+          "用 comic.mjs check 校验 comic.json 并修正提示",
+          "用 comic.mjs make 出图并排版，生成长漫画与 3:4 卡片",
+          "只改文字时用 comic.mjs render 重新排版，分格已缓存",
+          "审看 review 切片，检查生成图有无文字、角色是否一致"
+        ],
+        "inputs": [
+          "文章 article.md（原文、译文或逐字稿）",
+          "目录或 comic.json",
+          "可选 --theme 主题名"
+        ],
+        "outputs": [
+          "长漫画 PNG（含路径与像素尺寸）",
+          "小红书 3:4 卡片目录",
+          "comic.json 分镜脚本",
+          "comic/review/ 重叠切片"
+        ],
+        "scenarios": [
+          "把一篇讲机制的文章做成黑白漫画分镜",
+          "把文章做成连环画或四格漫画",
+          "把文章转成小红书 3:4 卡片",
+          "接在抓取或视频转文字之后做漫画"
+        ],
+        "prerequisites": [
+          "有出图能力：Codex CLI 登录，或 OpenAI / Gemini 付费 key",
+          "先运行 doctor.mjs 确认 ai-illustration 一行可用",
+          "宿主未替换 ${CLAUDE_SKILL_DIR} 时需换成该目录绝对路径"
+        ],
+        "limits": [
+          "没有出图能力就做不了漫画，建议改用长图或白板",
+          "出图约 1–1.5 分钟一格，3 格并行",
+          "制作范围写在交付回复里，不写进图里",
+          "生成图里不画字，文字由 HTML 排版"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "图像",
+          "写作",
+          "内容运营",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "漫画：把一篇文章讲的机制做成黑白漫画分镜——你写认知因果拍点和固定角色（comic.json），生成图负责角色、场景和动作，HTML 负责旁白、对白、音效字（图里不画字）；同时输出一张长漫画和一组小红书 3:4 卡片。"
+          },
+          {
+            "field": "does",
+            "quote": "`node ${CLAUDE_SKILL_DIR}/scripts/comic.mjs make <目录>/comic.json`：出图（约 1–1.5 分钟一格，3 格并行）+ 排版。只改文字时用 `comic.mjs render`（分格已缓存）。"
+          },
+          {
+            "field": "does",
+            "quote": "`node ${CLAUDE_SKILL_DIR}/scripts/comic.mjs check <目录>/comic.json`，修完提示。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**先确认有出图能力**：`node ${CLAUDE_SKILL_DIR}/scripts/doctor.mjs` 的 `ai-illustration` 一行。没有就告诉用户做不了漫画，建议改用长图（`long-image`）或白板（`logic-whiteboard`）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "需要出图能力（Codex CLI 登录，或 OpenAI / Gemini 付费 key）。"
+          },
+          {
+            "field": "limits",
+            "quote": "没有就告诉用户做不了漫画，建议改用长图（`long-image`）或白板（`logic-whiteboard`）。"
+          },
+          {
+            "field": "limits",
+            "quote": "制作范围写在交付回复里，不写进图里。"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Bash(node ${CLAUDE_SKILL_DIR}/scripts/*)"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: <article.md|目录|comic.json> [--theme 主题名]"
+          },
+          {
+            "field": "outputs",
+            "quote": "报告：PNG 路径与像素尺寸、来源、格数与因果链、生成图张数、用的出图服务；3:4 卡片目录。"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user wants a 漫画, 连环画, 四格, 分镜, comic strip, \"把这篇做成漫画\", or -c."
+          }
+        ]
+      }
+    }
+  ]
+}
