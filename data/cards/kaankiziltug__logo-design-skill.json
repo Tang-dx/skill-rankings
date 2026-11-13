@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "repo": "kaankiziltug/logo-design-skill",
+  "tree_sha": "3e29f9c8d22a55ee02e32970e908017d168cd18b",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/logo-design/SKILL.md",
+      "blob_sha": "6762d2849ef14ff35d579b4cb38dc9144a97febf",
+      "source_url": "https://github.com/kaankiziltug/logo-design-skill/blob/bbf31e521d765eb6d53242549bbee7c2e5bbd6bc/skills/logo-design/SKILL.md",
+      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "generated_at": "2026-11-13T11:05:47.756Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "logo-design",
+        "description": "Professional logo and brand-mark design, from brief to production files. Guides discovery and the design brief, concept generation, choosing a mark type (wordmark, monogram, letterform, pictorial, abstract, emblem, mascot, combination), building clean geometric SVG logos, optical refinement, colour and typography, testing (16 px, one-colour, reversed, shelf test), client presentation, delivery variants and brand guidelines. Includes a searchable library of 1,400+ real-world SVG logos classified "
+      },
+      "excerpt": "---\nname: logo-design\ndescription: Professional logo and brand-mark design, from brief to production files. Guides discovery and the design brief, concept generation, choosing a mark type (wordmark, monogram, letterform, pictorial, abstract, emblem, mascot, combination), building clean geometric SVG logos, optical refinement, colour and typography, testing (16 px, one-colour, reversed, shelf test), client presentation, delivery variants and brand guidelines. Includes a searchable library of 1,400+ real-world SVG logos classified by type, technique, geometry and industry, plus scripts that audit SVGs and generate test sheets, presentation boards and export variants. Use this skill whenever the user wants a logo, logotype, wordmark, monogram, brand mark, symbol, app icon or favicon designed, redesigned, refreshed, critiqued or compared; asks for logo ideas or concepts; needs a design brief, logo guidelines, lockups or an identity system; or mentions branding a new company, product, app or project — even if they don't say the word \"logo\".\n---\n\n# Logo Design\n\nYou are acting as a senior identity designer. A logo is an **identifier, not an explanation**: a simple, distinctive,\nrelevant mark that works at 16 px and on a building, in one colour, for decades. Your job is to find one clear idea,\nbuild it with craft, prove it works, and present it so it's judged on the right criteria.\n\nReply in the user's language. Keep the process visible but light: short explanations, real files, clear choices.\n\n## Pick the mode\n\n| The user wants… | Mode | Start with |\n|---|---|---|\n| A new logo | **Design** (full or fast track below) | Phase 1 |\n| Feedback on a logo | **Critique** | `references/critique.md` |\n| To modernise/replace a logo | **Redesign** | `references/redesign.md`, then Design phases |\n| Guidelines, sub-brands, patterns, motion | **System** | `references/identity-system.md` |\n| Favicon/app icon/variants from an existing mark | **Assets** | `scripts/export_variants.py` |\n\n**Fast track** (user wants results now, or gives little info): ask at most five questions in one message\n(`references/discovery-brief.md` §2), or skip questions entirely, state your assumptions, and go straight to three\nconcepts. You can always iterate after they react.\n\n**Concept checkpoint — show the logos before building anything else.** Every Design and Redesign run pauses after the\nconcepts are built and tested (Phase 6): show the user the concept overview image, one line per concept and your\nrecommendation, then *offer* the full logo kit and wait for their answer. Build the kit (Phase 7) only after they pick a\ndirection and say yes. The kit is most of the work and only makes sense for an approved direction; showing concepts\nfirst lets the user steer cheaply and keeps them in control. Skip the pause only when the user explicitly says not to\ncheck in (e.g. \"don't ask, just deliver everything\"). If the user can't reply at all, stop at the checkpoint anyway and\ndescribe what the kit would contain.\n\n## Tools in this skill\n\nAll scripts are dependency-free Python 3 and live in the `scripts/` folder next to this SKILL.md (in Claude Code\nthat is `${CLAUDE_SKILL_DIR}/scripts/`; in other agents, use the folder this skill was loaded from). Run them with\n`python3` and the full path, e.g.\n`python3 <skill-dir>/scripts/svg_audit.py logo.svg` (examples below write `scripts/…` for brevity).\nOn Windows, `python3` is often the Microsoft Store stub; use `python` (or `py -3`) in every command instead.\n\n| Script | Use it to |\n|---|---|\n| `concept_sheet.py` | One-image concept overview (large mark, lockup, true 64/32/16 px sizes, name, one-line idea, recommendation) — what you show at the checkpoint |\n| `search_library.py` | Find reference logos by `--type`, `--technique`, `--geometry`, `--subject`, `--industry`, `--color`, `--mood`…; `--summary` shows a category's conventions; `--format paths` gives files to read |\n| `svg_audit.py` | Check an SVG: live text, rasters, filters, colour count, gradients, strokes, near-miss angles, tiny details, centring, complexity vs. the library |\n| `preview_sheet.py` | HTML test sheet: size ladder, 16/32 px pixel test, backgrounds, one-colour, squint blur, mirror/rotate, favicon/app-icon/header/card contexts, side-by-side, shelf test vs. competitors |\n| `presentation_board.py` | Client presentation (brief, each concept with rationale + 6 **industry-specific** mockups — cup, packaging, payment card, README, terminal, signage…; comparison, recommendation) from a JSON spec (`templates/presentation-spec.example.json`); `--png-dir` exports every slide as PNG; `--list-mockups` |\n| `render_png.py` | Render SVG → transparent PNG at exact sizes (for looking at your work and for deliverables); screenshots HTML sheets/boards (Chrome); builds `favicon.ico`; `--which` lists renderers |\n| `export_variants.py` | Black, white, brand-mono, square, favicon and app-icon SVGs; `--png` sizes; `--web-icons` = favicon.ico + PNG icon set + webmanifest + `<head>` snippet; `--favicon-source` for a simplified small-size drawing |\n| `build_catalog.py` | Maintainers only: rebuild the library catalog |\n\n**Look at your work.** Drawing in SVG code is drawing blind. After writing or changing a logo, render it and look:\n`python3 scripts/render_png.py concept-a.svg concept-b.svg --out-dir renders --size 512`, then open the PNGs with\nyour image or file-reading tool and actually look at them (it\npicks the best available renderer — cairosvg, rsvg-convert, Inkscape, headless Chrome/Chromium, or macOS Quick Look).\nAvoid calling `qlmanage` directly: it crops non-square SVGs, shrinks files that set width/height, and has no\ntransparency. The HTML sheets can also be opened in a browser tool. If you truly cannot render, say so and keep the\ngeometry extra simple and explicit.\n\n## Design workflow\n\n### Phase 1 — Discovery → brief\nLearn: name (exact spelling), what they do, audience, 3–5 brand adjectives, competitors, constraints (colours, equity,\nwhere it must work), decision-maker. Write a short brief (template in `references/discovery-brief.md` §5) and list your\nassumptions. Adjectives are the most valuable input — they become visual cues.\n\n### Phase 2 — Research & strategy\n1. See what the category looks like, so you can avoid blending in:\n   `search_library.py --industry <closest> --summary` (and look at a few files). The library skews to tech; for\n   other sectors search by `--subject`/`--query` and lean on your own knowledge of the category.\n2. List the category's **clichés** explicitly (e.g. fintech: blue, upward arrows, shields, globes; coffee: beans,\n   steam, cups) — treat them as off-limits unless you give them a genuinely fresh form.\n3. **Word map** (`references/discovery-brief.md` §6): name, offering, adjectives, promise → nouns, metaphors,\n   opposites; circle the intersections.\n4. Choose candidate **mark types** with `references/mark-types.md` §12. Explore at least two different types.\n\n### Phase 3 — Concepts\n- Write **8–12 one-sentence concepts** spread across mark types. Each needs an ownable twist; a sentence that could\n  describe a competitor's logo is not a concept. (If you can't say it in one sentence, it won't read in a glance.)\n- Score them quickly (idea clarity, distinction, simplicity, relevance, small-size strength) and pick the **three\n  strongest and most different**. Briefly show the user the longlist only if it helps them steer.\n- Before building, search the library for the same subject/technique to make sure you're not recreating an existing\n  mark (`search_library.py --subject <thing>`), and study 3–5 exemplary files that use your technique to see how the\n  geometry is built.\n- Keep it lean: one-liners are cheap, builds are expensive. Build only the three; don't polish ideas you'll drop.\n\n### Phase 4 — Build in SVG (black first)\n- Describe the construction in words first (primitives, radii, angles, grid unit), then write the SVG\n  (`references/svg-construction.md`). Canvas `viewBox=\"0 0 256 ",
+      "card": {
+        "title_zh": "标志设计",
+        "purpose_zh": "以资深品牌识别设计师身份，从需求简报、概念生成、SVG 构建、光学精修、测试到客户提案与交付变体，完成标志与品牌标记设计。",
+        "does": [
+          "按设计、评审、重设计、系统、资产五种模式引导流程",
+          "生成8–12条概念并构建三个最强方向的黑白SVG",
+          "用脚本审计SVG、生成预览测试表与概念总览图",
+          "生成含行业化样机的客户提案板与导出变体",
+          "检索1400+真实SVG标志库作参考与同类对比",
+          "在概念检查点暂停，等用户确认后再构建完整套件"
+        ],
+        "inputs": [
+          "品牌名称、业务、受众、3–5个品牌形容词、竞品与约束",
+          "用户对概念的反馈与方向选择",
+          "现有标志文件（评审、重设计或资产导出时）",
+          "提案板JSON规格（presentation_board.py）"
+        ],
+        "outputs": [
+          "概念SVG文件与概念总览PNG",
+          "预览测试HTML与PNG渲染图",
+          "黑白、单色、方形、favicon、应用图标等导出变体",
+          "含行业样机的客户提案板",
+          "一页使用指南与品牌规范"
+        ],
+        "scenarios": [
+          "为新公司、产品或应用设计标志",
+          "对现有标志给出评审意见",
+          "现代化改造或替换旧标志",
+          "从已有标记导出favicon、应用图标与变体",
+          "制定品牌规范、子品牌与识别系统"
+        ],
+        "prerequisites": [
+          "Python 3环境（脚本无第三方依赖）",
+          "可用的SVG渲染器（cairosvg、rsvg-convert、Inkscape、无头Chrome或macOS Quick Look之一）",
+          "Windows上需用python或py -3代替python3"
+        ],
+        "limits": [
+          "库偏向科技行业，其他行业需靠自身知识补充",
+          "无法渲染时须说明并保持几何极简",
+          "完整套件仅在用户确认方向后构建",
+          "概念阶段最多构建三个方向"
+        ],
+        "hosts": [
+          "claude-code",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "设计/UI",
+          "图像",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "You are acting as a senior identity designer."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Professional logo and brand-mark design, from brief to production files."
+          },
+          {
+            "field": "does",
+            "quote": "Write **8–12 one-sentence concepts** spread across mark types."
+          },
+          {
+            "field": "does",
+            "quote": "Client presentation (brief, each concept with rationale + 6 **industry-specific** mockups"
+          },
+          {
+            "field": "does",
+            "quote": "Includes a searchable library of 1,400+ real-world SVG logos classified by type, technique, geometry and industry"
+          },
+          {
+            "field": "does",
+            "quote": "**Concept checkpoint — show the logos before building anything else.**"
+          },
+          {
+            "field": "inputs",
+            "quote": "Learn: name (exact spelling), what they do, audience, 3–5 brand adjectives, competitors, constraints"
+          },
+          {
+            "field": "outputs",
+            "quote": "Black, white, brand-mono, square, favicon and app-icon SVGs; `--png` sizes"
+          },
+          {
+            "field": "outputs",
+            "quote": "One-image concept overview (large mark, lockup, true 64/32/16 px sizes, name, one-line idea, recommendation)"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use this skill whenever the user wants a logo, logotype, wordmark, monogram, brand mark, symbol, app icon or favicon designed, redesigned, refreshed, critiqued or compared"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "All scripts are dependency-free Python 3 and live in the `scripts/` folder next to this SKILL.md"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "it picks the best available renderer — cairosvg, rsvg-convert, Inkscape, headless Chrome/Chromium, or macOS Quick Look"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "On Windows, `python3` is often the Microsoft Store stub; use `python` (or `py -3`) in every command instead."
+          },
+          {
+            "field": "limits",
+            "quote": "The library skews to tech; for other sectors search by `--subject`/`--query` and lean on your own knowledge of the category."
+          },
+          {
+            "field": "limits",
+            "quote": "If you truly cannot render, say so and keep the geometry extra simple and explicit."
+          },
+          {
+            "field": "limits",
+            "quote": "Build the kit (Phase 7) only after they pick a direction and say yes."
+          },
+          {
+            "field": "hosts",
+            "quote": "in Claude Code that is `${CLAUDE_SKILL_DIR}/scripts/`; in other agents, use the folder this skill was loaded from"
+          }
+        ]
+      }
+    }
+  ]
+}

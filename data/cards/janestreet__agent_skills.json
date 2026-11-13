@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "repo": "janestreet/agent_skills",
+  "tree_sha": "6dd590cb153ac1e0073914cb2e89029d9fdef04e",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "socratic-tutor/SKILL.md",
+      "blob_sha": "93bb7befeb73c41b4354175f9ef765547d4f3506",
+      "source_url": "https://github.com/janestreet/agent_skills/blob/7c6715c29548a3b39d4a9545c698ee4fd17a7213/socratic-tutor/SKILL.md",
+      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "generated_at": "2026-11-13T11:05:47.756Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "socratic-tutor",
+        "description": "Structured Socratic tutoring when the user explicitly asks to be taught, quizzed, or drilled to mastery on a topic: diagnostic placement, a skill map with levels 0-5, spaced review, and a final assessment. Trigger phrases: 'teach me', 'tutor me', 'quiz me', 'drill me', 'help me master'. Not for one-off 'explain X' or 'what is X' questions."
+      },
+      "excerpt": "---\nname: \"socratic-tutor\"\ndescription: \"Structured Socratic tutoring when the user explicitly asks to be taught, quizzed, or drilled to mastery on a topic: diagnostic placement, a skill map with levels 0-5, spaced review, and a final assessment. Trigger phrases: 'teach me', 'tutor me', 'quiz me', 'drill me', 'help me master'. Not for one-off 'explain X' or 'what is X' questions.\"\n---\n\n# Socratic Tutor\n\nAct as a personal tutor that takes the user from their current level to genuine\nmastery of a topic using the maieutic (Socratic) method: teach primarily by asking\nquestions that force the user to reason, predict, and explain — not by lecturing.\n\n## Guard: confirm intent before starting\n\nThis skill is for an ongoing teaching session, not for answering questions. If the\nuser asked a one-off question (\"explain X\", \"what is X\", \"how do I use X\"), answer it\nnormally and do not start the tutoring loop. If intent is ambiguous, ask one short\nquestion (\"Want a quick answer, or should I actually teach you this properly?\") before\nlaunching the diagnostic. A false start costs the user an unwanted quiz; a\nconfirmation costs one word.\n\n## Session start\n\n1. Break the topic into 4-10 concrete subskills (fewer for narrow topics). For broad\n   topics, make a two-level tree and pick the first branch to work on.\n2. Tell the user that you will start by asking a few questions, one at a time, to see\n   what they already know.\n3. Run a short diagnostic: 3-5 probing questions spanning easy to hard, to place the\n   user's starting level per subskill. Do not teach anything until the diagnostic is\n   done.\n4. Show the initial skill map (format below) and propose where to start. Let the user\n   override.\n\n\n## Skill map\n\nTrack each subskill at levels 0-5:\n\n    0 unaware . 1 heard of it . 2 can follow along . 3 can do with help\n    4 can do independently . 5 can teach it / handle edge cases\n\nRender the map as ASCII after every level change, and whenever the user asks for\nprogress:\n\n    Topic: <topic>                          overall: ######.... 58%\n    -----------------------------------------------------------------\n    subskill A            [########..]  4/5  * independent\n    subskill B            [######....]  3/5  <- current focus\n    subskill C            [##........]  1/5\n    -----------------------------------------------------------------\n\nUse solid/light block characters (U+2588 / U+2591) for the bars when rendering.\n\n## Teaching loop (repeat per subskill)\n\n- Ask ONE question at a time. End the message immediately after the question and wait\n  for the answer; do not add hints, example answers, or teaching content after it.\n- Prefer questions that make the user: predict an outcome, explain why, find the flaw\n  in a plausible-but-wrong claim, apply an idea to a new case, or connect two ideas.\n- When the user is wrong, do not give the answer. Ask a narrower question that exposes\n  the contradiction in their reasoning. Only explain directly after 2-3 failed\n  attempts, and then immediately re-test the same idea from a different angle.\n- When the user is right, occasionally play devil's advocate (\"are you sure? what\n  about X?\") — they should be able to defend correct answers under pressure.\n- Give short explanations (a few sentences) only to introduce genuinely new material\n  the user could not derive, then return to questioning.\n- Where tools are available and relevant, set practical exercises (e.g. \"write a\n  query that...\", \"predict what this code prints\") and check the user's actual\n  output rather than their description of it.\n\n## Evaluation rules — be strict\n\n- Levels are earned, not given. Raise a level only on demonstrated performance across\n  2+ independent checks, at least one of them unprompted recall (not immediately\n  after the user was told the answer).\n- A vague or partially-correct answer is not correct. Probe until you know whether\n  the user actually understands. Do not attribute to the user any insight they did\n  not actually express.\n- Interleave spaced review: periodically re-test earlier subskills without warning.\n  If the user fails a review, lower the level and revisit.\n- Level 5 requires the user to handle an edge case or adversarial question AND\n  explain the concept clearly enough that you would trust them to teach it.\n- Do not flatter. \"Not quite — why would X happen if Y were true?\" beats \"Great\n  try!\".\n\n## Mastery and completion\n\nThe course ends only when every subskill is at the target level (default 4/5; 5/5 if\nthe user asked for full mastery). Then run a final mixed assessment covering\neverything, with at least one question per subskill and one integrative problem. If\nthe user passes, show the final map and a summary of their weakest areas. If not,\nback to the loop.\n\n## Commands the user can use anytime\n\n- \"show progress\" — render the skill map\n- \"harder\" / \"easier\" — adjust difficulty\n- \"just tell me\" — override Socratic mode for the current question only\n- \"save state\" — emit a compact block (topic, skill map with levels, notes on\n  misconceptions and what has been covered) that can be pasted into a new session to\n  resume\n- \"resume from:\" — followed by a saved state block; restore it and continue where it\n  left off\n",
+      "card": {
+        "title_zh": "苏格拉底式导师",
+        "purpose_zh": "在用户明确要求被教、被测验或练到掌握某主题时，用提问式苏格拉底法进行结构化辅导：诊断定位、0-5级技能地图、间隔复习与最终评估。",
+        "does": [
+          "先确认用户是否真的要长期教学，而非一次性解释问题",
+          "把主题拆成4-10个子技能，必要时做两级树",
+          "用3-5个由易到难的问题做诊断，定位各子技能起始等级",
+          "每次只问一个问题，用预测、解释、找错等方式引导推理",
+          "按0-5级维护并渲染ASCII技能地图，定期无预警复习",
+          "全部子技能达标后做综合终评并总结薄弱点"
+        ],
+        "inputs": [
+          "用户明确的教学请求（如 teach me、quiz me、drill me）",
+          "主题名称",
+          "用户对诊断问题的回答",
+          "可选命令：show progress、harder、easier、just tell me、save state、resume from"
+        ],
+        "outputs": [
+          "诊断问题与逐题提问",
+          "ASCII技能地图与总体进度百分比",
+          "等级评定与间隔复习结果",
+          "最终综合评估及薄弱点总结",
+          "可粘贴到新会话的紧凑状态块"
+        ],
+        "scenarios": [
+          "用户要求系统学习某主题并练到掌握",
+          "用户要求被测验或反复训练某技能",
+          "需要跟踪多子技能学习进度的长期辅导",
+          "跨会话恢复此前辅导进度"
+        ],
+        "prerequisites": [
+          "用户明确表达被教学或测验的意图",
+          "主题可拆分为若干子技能"
+        ],
+        "limits": [
+          "不用于一次性 explain X 或 what is X 类问题",
+          "意图不明时须先问一句确认再启动诊断",
+          "等级需2次以上独立检验才提升，含一次无提示回忆",
+          "直接讲解仅在2-3次失败尝试后给出",
+          "5级需能处理边界或对抗性问题并清楚讲解",
+          "默认目标4/5，用户要求完全掌握时为5/5"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "学习辅导",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Act as a personal tutor that takes the user from their current level to genuine mastery of a topic using the maieutic (Socratic) method"
+          },
+          {
+            "field": "does",
+            "quote": "Break the topic into 4-10 concrete subskills (fewer for narrow topics)."
+          },
+          {
+            "field": "does",
+            "quote": "Run a short diagnostic: 3-5 probing questions spanning easy to hard, to place the user's starting level per subskill."
+          },
+          {
+            "field": "does",
+            "quote": "Ask ONE question at a time. End the message immediately after the question and wait for the answer"
+          },
+          {
+            "field": "does",
+            "quote": "Render the map as ASCII after every level change, and whenever the user asks for progress:"
+          },
+          {
+            "field": "does",
+            "quote": "Interleave spaced review: periodically re-test earlier subskills without warning."
+          },
+          {
+            "field": "does",
+            "quote": "Then run a final mixed assessment covering everything, with at least one question per subskill and one integrative problem."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "This skill is for an ongoing teaching session, not for answering questions."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If intent is ambiguous, ask one short question (\"Want a quick answer, or should I actually teach you this properly?\") before launching the diagnostic."
+          },
+          {
+            "field": "limits",
+            "quote": "Not for one-off 'explain X' or 'what is X' questions."
+          },
+          {
+            "field": "limits",
+            "quote": "Raise a level only on demonstrated performance across 2+ independent checks, at least one of them unprompted recall"
+          },
+          {
+            "field": "limits",
+            "quote": "Only explain directly after 2-3 failed attempts, and then immediately re-test the same idea from a different angle."
+          },
+          {
+            "field": "limits",
+            "quote": "Level 5 requires the user to handle an edge case or adversarial question AND explain the concept clearly enough that you would trust them to teach it."
+          },
+          {
+            "field": "limits",
+            "quote": "The course ends only when every subskill is at the target level (default 4/5; 5/5 if the user asked for full mastery)."
+          },
+          {
+            "field": "outputs",
+            "quote": "\"save state\" — emit a compact block (topic, skill map with levels, notes on misconceptions and what has been covered) that can be pasted into a new session to resume"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "repo": "Kemerd/claude-hardware-in-the-loop",
+  "tree_sha": "0bb9781c55b52252b051a7507b67b7a54f838c9c",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/hardware-in-the-loop/SKILL.md",
+      "blob_sha": "4260e14a46012fd718495ac33dd5a488ad31c6a6",
+      "source_url": "https://github.com/Kemerd/claude-hardware-in-the-loop/blob/e8ef234c4e63d6b13bb225430f5311f6ec60374a/skills/hardware-in-the-loop/SKILL.md",
+      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "generated_at": "2026-11-13T11:05:47.756Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hardware-in-the-loop",
+        "description": "Sets up and runs the agent-driven hardware-in-the-loop engineering method for a hardware project - generator-first KiCad boards with Freerouting and live part verification, parametric CadQuery CAD with plug-in parts and mass/CG tables, C firmware host-tested against a native C/C++ digital twin (models for rigid bodies, brushed and brushless motors, joints, thermal, batteries, sensors; scenarios over seeds; a C ABI) hosted in Unreal Engine 5.8.4+ or Isaac Sim, CUDA Monte Carlo sweeps, verified re"
+      },
+      "excerpt": "---\nname: hardware-in-the-loop\ndescription: Sets up and runs the agent-driven hardware-in-the-loop engineering method for a hardware project - generator-first KiCad boards with Freerouting and live part verification, parametric CadQuery CAD with plug-in parts and mass/CG tables, C firmware host-tested against a native C/C++ digital twin (models for rigid bodies, brushed and brushless motors, joints, thermal, batteries, sensors; scenarios over seeds; a C ABI) hosted in Unreal Engine 5.8.4+ or Isaac Sim, CUDA Monte Carlo sweeps, verified research citations, DECISIONS / QUESTIONS records, a PowerShell CI matrix with no-shortcut and portability audits, dev/main branching with merge locks, machine-safety slots, detached jobs, usage-limit handoffs and overnight sessions, in either single-session or swarm mode. Use when the user says \"hardware in the loop\", \"digital twin\", \"firmware in the loop\", \"set up a hardware project\", \"PCB/CAD/firmware swarm\", mentions simulating firmware in Unreal or Isaac Sim, asks to scaffold a hardware repo for agents, or wants agents to design boards, enclosures, firmware or a twin with gates.\n---\n\n# Hardware in the loop\n\nYou are setting up (or running) a hardware project where agents do the engineering and gates prove it. Read this\nwhole file before acting. This is a starting point the project grows into its own harness, not a finished\nproduct: adapt every template to the project, and say so to the owner when something here does not fit. The method is described in the repository's `docs/` (METHOD, PCB, CAD, FIRMWARE, SIM, SWARM,\nTOOLS, LESSONS); this file is the procedure.\n\n## 0. Say the cost first\n\nBefore anything else, tell the user, plainly:\n\n> Running this method with a swarm of agents is expensive. On the project it comes from, one swarm day burned 4-5\n> million tokens, mostly by waking lane agents that each carried 300-800k tokens of context. Three modes:\n> - **chain** (recommended): one long lead session (Fable or Opus) hands bounded cards to one or two subagents at a time\n>   (Opus or Sonnet), takes the reports, then goes on. The logs and trial and error stay out of the lead's context.\n> - **single**: one session, no subagents, cheapest on small projects.\n> - **swarm**: a lead plus parallel lanes, fastest wall-clock, by far the most expensive.\n> Which mode do you want? (recommended: chain)\n\nRecord the answer as `mode` (`chain`, `single` or `swarm`). A subagent or two on bounded cards is not a swarm: in `chain`\nmode that is the normal way to work. Do not run a lead with parallel lanes before the user chose swarm mode.\n\n## 1. Onboarding interview\n\nRun the interview in `references/interview.md` through the question dialog: batches of at most four questions, the\nrecommended default first in every question. When a question gets no answer, take the default and write\n\"default taken\" next to it. Cover: project goal and definition of done, goals in order, budget, quantities, default\nprinted material (carbon-fibre nylon / PETG / PLA / machined aluminium), fastening (heat-set inserts / thread-forming /\nthrough-bolts), enclosure (sealed / vented / open), mechanical clearance, PCB fab and assembly vendor, MCU family, main\nsupply and worst transient, board class and coating, simulation tiers (native twin / Isaac Sim / Unreal) and the GPU,\nmachine limits (CPU cap default 90 %, RAM kept free for the system default 4 GB, free-disk floor default 50 GB),\narchive location, the web CAD viewer (copy it into the project, default yes), usage tripwire (default 95 %), standing decisions.\n\nThen batch 6 (the build spec: environment, temperature range, IP rating and cooling, standards such as IPC class or\nMIL-STD-810H / 461G, wire such as SAE AS22759 \"Tefzel\", EMC, vibration, derating headroom) and batch 7 (how the\nowner likes to work: long sims detached in the background at below-normal priority or only overnight, engines only\nwhen they say, how results reach them, what happens to questions while they are away). Also ask:\n\n- the firmware language, recommending C (say why: the same core compiles for the board and the twin; Python stays\n  for tools, CAD and the Isaac harness);\n- the twin tiers, recommending native twin + Unreal 5.8.4+ when there is a GPU (Isaac Sim when the team knows it);\n- the storage layout, recommending the repo on an NVMe / SSD and `.archive` linked to the biggest disk;\n- whether the team already describes boards in a board-as-code tool (SKiDL, atopile, circuit-synth). If it does,\n  keep that tool for the netlist and put this method's gates after it (KiCad ERC / DRC, live part checks, the fab\n  set); if not, use the Python generator pipeline of the skeleton. Do not argue tools: the gates are the point.\n\nMaterials, fastening, enclosure sealing, clearance and the build spec are PROJECT DECISIONS: never pick them\nsilently; ask, recommend, record.\n\nWrite the answers to `answers.json` in the target repository's `.tmp/` (schema in `references/interview.md`).\nEvery answer and every default taken becomes a numbered row of `DECISIONS.md` (the scaffold writes the first ones).\n\n## 2. Generate the skeleton\n\n```\npython -I <skill>/scripts/scaffold.py --answers <repo>/.tmp/answers.json --dest <repo> [--with-examples] [--dry-run]\n```\n\nIt copies `templates/` (README_AGENT.md, PROJECT_STRUCTURE.md, REQUIREMENTS.md, README.md, CODING_RULES.md,\n`.gitignore`, `.gitattributes`, `windows/ci.ps1` + `windows/ci/` (groups `audit` and `pcb`), `windows/cad_viewer.ps1`, `tools/` (audit +\nportability with an empty tracked baseline and waiver file; `tools/cad_viewer/`, the web CAD viewer, unless the interview said no), `pcb/` (DESIGN_STANDARDS.md, `tools/kicad_env.py`,\n`tools/board_pipeline.py`, `tools/distributor_verify.py`, `tools/route_board.py` + `pf_route.py` + `astar.c`, the negotiated router), `cad/` (`cad_plugins.py`, `render.py`, `mass_cg_table.py`),\n`firmware/host_tests/hil_check.h`, `docs/bench/BENCH_REGISTER.md`, `docs/data/README.md`, `harness/swarm/` (AGENT_RULES,\nslot / detach / watch / merge lock / merge-to-dev / promote / WIP backup / handoff hook / status line scripts) and\n`.claude/settings.local.json` (status line + PostToolUse hook)), fills the template variables, writes\n`harness/swarm/machine.env` and `harness/swarm/PLAN.md` for the chosen mode. It never overwrites an existing file;\ncompare kept files by hand and merge what is useful. `--with-examples` adds the example board (a 2-layer 3.3 V LDO\nbreakout that runs every pipeline step) and the example enclosure builder with two plug-ins.\n\nIt also writes the digital twin (`sim/twin/`: models, plant, C ABI, runner, scenarios, CUDA sweep, tools), the\nfirmware core (`firmware/core/`), `sim/unreal/` when the tiers name Unreal, `sim/isaac/` when they name Isaac,\n`DECISIONS.md`, `QUESTIONS.md`, `CITATION.md`, `tools/check_citations.py`, `tools/archive_tmp.py`, `tools/hil_update.py`\nand the version stamp `harness/TEMPLATE_VERSION.json` (section 8c).\n\nThen fill the decision table in `pcb/DESIGN_STANDARDS.md` section 0 from the answers, and make the archive link\n(`mklink /J .archive \"<archive path>\"` on Windows, `ln -s <archive path> .archive` elsewhere; ask first).\n\n## 3. Tools\n\n```\npwsh -File <skill>/scripts/setup_tools.ps1 -ToolsRoot <a folder outside the user profile> [-VerifyOnly]\nbash <skill>/scripts/setup_tools.sh --tools-root <dir> [--verify-only]          # Linux\n```\n\nKiCad 10 (winget), Java 21 (winget), Freerouting 2.1.0 (pinned SHA-256), OSS CAD Suite 2026-10-24 (pinned SHA-256,\nonly for FPGA projects), a CadQuery venv. It writes `<ToolsRoot>/hil_tools.env` with `HIL_FREEROUTING_JAR`,\n`HIL_JAVA`, `HIL_KICAD_CLI`, `HIL_CQ_PYTHON`. Ask before installing anything machine-wide; run `-VerifyOnly` first and\nshow the user what is missing. Nothing goes into the user profile.\n\nFor the twin tiers: `pwsh -File <skill>/scripts/check_twin_tools.ps1` finds (never installs) CMake, a compiler,\nNinja, Python, Unreal Engine >= 5.8.4, an Isaac Sim Python, the NVIDIA driver and nvcc, with the install hint",
+      "card": {
+        "title_zh": "硬件在环工程方法",
+        "purpose_zh": "为硬件项目搭建并运行由智能体驱动的硬件在环工程方法：生成式 KiCad 电路板与自动布线、参数化 CAD、C 固件对原生数字孪生做主机测试，并配 CI 审计、决策记录与多模式协作流程。",
+        "does": [
+          "先说明成本并让用户选择 chain、single 或 swarm 运行模式",
+          "通过分批访谈收集项目目标、预算、材料、紧固、封装、板厂、MCU、仿真层级与机器限制等答案",
+          "用 scaffold.py 从模板生成仓库骨架，含 PCB、CAD、固件、孪生、CI 与协作脚本",
+          "用 setup_tools.ps1 或 setup_tools.sh 安装或校验 KiCad、Java、Freerouting、CadQuery 等工具",
+          "初始化 main 与 dev 分支并运行 audit 与 twin 的 CI 首轮检查",
+          "布置状态行、交接钩子、WIP 备份与机器槽位，并按所选模式执行工作计划"
+        ],
+        "inputs": [
+          "项目访谈答案（写入 .tmp/answers.json）",
+          "运行模式选择：chain、single 或 swarm",
+          "目标仓库路径与归档位置",
+          "工具根目录（用户配置目录之外）",
+          "构建规格：环境、温度、IP 等级、标准、EMC、振动等"
+        ],
+        "outputs": [
+          "仓库骨架：README_AGENT.md、PROJECT_STRUCTURE.md、REQUIREMENTS.md、CODING_RULES.md 等",
+          "pcb/、cad/、firmware/、sim/twin/、sim/unreal/、sim/isaac/、harness/swarm/ 等目录与脚本",
+          "DECISIONS.md、QUESTIONS.md、CITATION.md 与版本戳 harness/TEMPLATE_VERSION.json",
+          "hil_tools.env 工具环境变量文件",
+          "CI 报告与工作计划 PLAN.md"
+        ],
+        "scenarios": [
+          "用户说 hardware in the loop、digital twin 或 firmware in the loop",
+          "要求为智能体搭建硬件仓库骨架",
+          "希望智能体在门禁下设计电路板、外壳、固件或孪生",
+          "需要在 Unreal 或 Isaac Sim 中仿真固件",
+          "需要 PCB、CAD、固件多线并行的协作流程"
+        ],
+        "prerequisites": [
+          "先完整阅读 SKILL.md 再行动",
+          "运行访谈并记录答案与默认值",
+          "安装 KiCad 10、Java 21、Freerouting 2.1.0、CadQuery 等工具",
+          "孪生层级需 CMake、编译器、Ninja、Python、Unreal 5.8.4+ 或 Isaac Sim、NVIDIA 驱动与 nvcc",
+          "在已有历史的仓库运行 git 前需征得同意",
+          "机器级安装前需询问用户"
+        ],
+        "limits": [
+          "这是起点而非成品，模板需按项目调整",
+          "swarm 模式成本极高，一天可消耗 4-5 百万 token",
+          "脚手架不覆盖已有文件，需手工比对合并",
+          "check_twin_tools 只查找不安装工具",
+          "路由器卡住时应停止并人工查看与摆放",
+          "访谈中的材料、紧固、封装等属项目决策，不可静默选择"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "自动化",
+          "后端",
+          "产品规划",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Sets up and runs the agent-driven hardware-in-the-loop engineering method for a hardware project"
+          },
+          {
+            "field": "does",
+            "quote": "Record the answer as `mode` (`chain`, `single` or `swarm`)."
+          },
+          {
+            "field": "does",
+            "quote": "Run the interview in `references/interview.md` through the question dialog: batches of at most four questions"
+          },
+          {
+            "field": "does",
+            "quote": "python -I <skill>/scripts/scaffold.py --answers <repo>/.tmp/answers.json --dest <repo> [--with-examples] [--dry-run]"
+          },
+          {
+            "field": "does",
+            "quote": "pwsh -File <skill>/scripts/setup_tools.ps1 -ToolsRoot <a folder outside the user profile> [-VerifyOnly]"
+          },
+          {
+            "field": "inputs",
+            "quote": "Write the answers to `answers.json` in the target repository's `.tmp/` (schema in `references/interview.md`)."
+          },
+          {
+            "field": "outputs",
+            "quote": "It copies `templates/` (README_AGENT.md, PROJECT_STRUCTURE.md, REQUIREMENTS.md, README.md, CODING_RULES.md,"
+          },
+          {
+            "field": "outputs",
+            "quote": "It writes `<ToolsRoot>/hil_tools.env` with `HIL_FREEROUTING_JAR`,"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user says \"hardware in the loop\", \"digital twin\", \"firmware in the loop\", \"set up a hardware project\", \"PCB/CAD/firmware swarm\""
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read this whole file before acting."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Ask before installing anything machine-wide; run `-VerifyOnly` first and show the user what is missing."
+          },
+          {
+            "field": "limits",
+            "quote": "This is a starting point the project grows into its own harness, not a finished\nproduct"
+          },
+          {
+            "field": "limits",
+            "quote": "one swarm day burned 4-5\n> million tokens"
+          }
+        ]
+      }
+    }
+  ]
+}
