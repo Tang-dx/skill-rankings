@@ -399,7 +399,7 @@
       "skill_path": "skills/code-review-and-quality/SKILL.md",
       "blob_sha": "15ea44c93c61dcec705720342c1fd78755702f85",
       "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/code-review-and-quality/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -1022,18 +1022,110 @@
       "skill_path": "skills/documentation-and-adrs/SKILL.md",
       "blob_sha": "eff8fddc25d972bc0e3b367d23afa0705b7a87b5",
       "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/documentation-and-adrs/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "generated_at": "2026-11-13T11:43:07.027Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "documentation-and-adrs",
         "description": "Records decisions and documentation. Use when you need to document an architecture decision (ADR) or the reasoning behind a design choice, when changing public APIs, shipping features, or when you need to record context that future engineers and agents will need to understand the codebase."
       },
       "excerpt": "---\nname: documentation-and-adrs\ndescription: Records decisions and documentation. Use when you need to document an architecture decision (ADR) or the reasoning behind a design choice, when changing public APIs, shipping features, or when you need to record context that future engineers and agents will need to understand the codebase.\n---\n\n# Documentation and ADRs\n\n## Overview\n\nDocument decisions, not just code. The most valuable documentation captures the *why* — the context, constraints, and trade-offs that led to a decision. Code shows *what* was built; documentation explains *why it was built this way* and *what alternatives were considered*. This context is essential for future humans and agents working in the codebase.\n\n## When to Use\n\n- Making a significant architectural decision\n- Choosing between competing approaches\n- Adding or changing a public API\n- Shipping a feature that changes user-facing behavior\n- Onboarding new team members (or agents) to the project\n- When you find yourself explaining the same thing repeatedly\n\n**When NOT to use:** Don't document obvious code. Don't add comments that restate what the code already says. Don't write docs for throwaway prototypes.\n\n## Architecture Decision Records (ADRs)\n\nADRs capture the reasoning behind significant technical decisions. They're the highest-value documentation you can write.\n\n### When to Write an ADR\n\n- Choosing a framework, library, or major dependency\n- Designing a data model or database schema\n- Selecting an authentication strategy\n- Deciding on an API architecture (REST vs. GraphQL vs. tRPC)\n- Choosing between build tools, hosting platforms, or infrastructure\n- Any decision that would be expensive to reverse\n\n### Match the existing convention first\n\nBefore creating an ADR, inspect the available repository context for an established convention — existing ADRs, project instructions, and ADR-related configuration or tooling (e.g. an `.adr-dir` file). An established convention overrides the defaults below. Match:\n\n- **Location and format** — e.g. `docs/adr/*.md`, `Documentation/Decisions/*.rst`, a MADR layout, or an `adr-tools` setup. Match the existing directory, file extension, and markup (Markdown vs reStructuredText).\n- **Numbering and naming** — continue the existing sequence and filename pattern (`ADR-004-Title.rst`, `0004-title.md`, …); don't restart at 001 or introduce a second scheme.\n- **Section headings** — reuse the project's heading set rather than imposing this template's.\n\nIf the available evidence conflicts, surface the conflict rather than silently introducing another scheme. Only when no convention can be established do you apply the default below.\n\n### ADR Template\n\nStore ADRs in `docs/decisions/` with sequential numbering (unless the project already uses another location — see above):\n\n```markdown\n# ADR-001: Use PostgreSQL for primary database\n\n## Status\nProposed | Accepted | Superseded by ADR-XXX | Deprecated\n\n## Date\n2025-01-15\n\n## Context\nWe need a primary database for the task management application. Key requirements:\n- Relational data model (users, tasks, teams with relationships)\n- ACID transactions for task state changes\n- Support for full-text search on task content\n- Managed hosting available (for small team, limited ops capacity)\n\n## Decision\nUse PostgreSQL with Prisma ORM.\n\n## Alternatives Considered\n\n### MongoDB\n- Pros: Flexible schema, easy to start with\n- Cons: Our data is inherently relational; would need to manage relationships manually\n- Rejected: Relational data in a document store leads to complex joins or data duplication\n\n### SQLite\n- Pros: Zero configuration, embedded, fast for reads\n- Cons: Limited concurrent write support, no managed hosting for production\n- Rejected: Not suitable for multi-user web application in production\n\n### MySQL\n- Pros: Mature, widely supported\n- Cons: PostgreSQL has better JSON support, full-text search, and ecosystem tooling\n- Rejected: PostgreSQL is the better fit for our feature requirements\n\n## Consequences\n- Prisma provides type-safe database access and migration management\n- We can use PostgreSQL's full-text search instead of adding Elasticsearch\n- Team needs PostgreSQL knowledge (standard skill, low risk)\n- Hosting on managed service (Supabase, Neon, or RDS)\n```\n\n### ADR Lifecycle\n\n```\nPROPOSED → ACCEPTED → (SUPERSEDED or DEPRECATED)\n```\n\n- **Don't delete old ADRs.** They capture historical context.\n- When a decision changes, write a new ADR that references and supersedes the old one.\n\n## Inline Documentation\n\n### When to Comment\n\nComment the *why*, not the *what*:\n\n```typescript\n// BAD: Restates the code\n// Increment counter by 1\ncounter += 1;\n\n// GOOD: Explains non-obvious intent\n// Rate limit uses a fixed window that opens on the first request after the\n// previous one expires, not on a clock schedule. Known gap: a client can spend\n// the full limit just before a reset and again just after (2x in a moment)\nif (now - windowStart > WINDOW_SIZE_MS) {\n  counter = 0;\n  windowStart = now;\n}\n```\n\n### When NOT to Comment\n\n```typescript\n// Don't comment self-explanatory code\nfunction calculateTotal(items: CartItem[]): number {\n  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);\n}\n\n// Don't leave TODO comments for things you should just do now\n// TODO: add error handling  ← Just add it\n\n// Don't leave commented-out code\n// const oldImplementation = () => { ... }  ← Delete it, git has history\n```\n\n### Document Known Gotchas\n\n```typescript\n/**\n * IMPORTANT: This function must be called before the first render.\n * If called after hydration, it causes a flash of unstyled content\n * because the theme context isn't available during SSR.\n *\n * See ADR-003 for the full design rationale.\n */\nexport function initializeTheme(theme: Theme): void {\n  // ...\n}\n```\n\n## API Documentation\n\nFor public APIs (REST, GraphQL, library interfaces):\n\n### Inline with Types (Preferred for TypeScript)\n\n```typescript\n/**\n * Creates a new task.\n *\n * @param input - Task creation data (title required, description optional)\n * @returns The created task with server-generated ID and timestamps\n * @throws {ValidationError} If title is empty or exceeds 200 characters\n * @throws {AuthenticationError} If the user is not authenticated\n *\n * @example\n * const task = await createTask({ title: 'Buy groceries' });\n * console.log(task.id); // \"task_abc123\"\n */\nexport async function createTask(input: CreateTaskInput): Promise<Task> {\n  // ...\n}\n```\n\n### OpenAPI / Swagger for REST APIs\n\n```yaml\npaths:\n  /api/tasks:\n    post:\n      summary: Create a task\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: '#/components/schemas/CreateTaskInput'\n      responses:\n        '201':\n          description: Task created\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/Task'\n        '422':\n          description: Validation error\n```\n\n## README Structure\n\nEvery project should have a README that covers:\n\n```markdown\n# Project Name\n\nOne-paragraph description of what this project does.\n\n## Quick Start\n1. Clone the repo\n2. Install dependencies: `npm install`\n3. Set up environment: `cp .env.example .env`\n4. Run the dev server: `npm run dev`\n\n## Commands\n| Command | Description |\n|---------|-------------|\n| `npm run dev` | Start development server |\n| `npm test` | Run tests |\n| `npm run build` | Production build |\n| `npm run lint` | Run linter |\n\n## Architecture\nBrief overview of the project structure and key design decisions.\nLink to ADRs for details.\n\n## Contributing\nHow to contribute, coding standards, PR process.\n```\n\n## Changelog Maintenance\n\nFor shipped features:\n\n```markdown\n# Changelog\n\n## [1.2.0] - 2025-01-20\n### Added\n- Task sharing: users can share tasks with team members (#123)\n- Email notifications for task assignments (#124)\n\n### Fixed\n- Duplicate tasks appearing when rapidly clicking create button (#12",
-      "card": null
+      "card": {
+        "title_zh": "文档与架构决策记录",
+        "purpose_zh": "记录架构决策与设计理由，编写内联注释、API 文档、README 和变更日志，并审校文档措辞，让后续工程师和 AI 代理理解代码库的为什么。",
+        "does": [
+          "指导编写架构决策记录（ADR），包含状态、上下文、决策、备选方案与后果",
+          "要求先匹配仓库既有 ADR 约定（位置、编号、标题），无约定才用默认模板",
+          "区分该注释与不该注释的代码，强调解释为什么而非复述代码",
+          "提供 TypeScript 内联类型文档与 OpenAPI/Swagger 的 REST API 文档写法",
+          "给出 README 结构（快速开始、命令、架构、贡献）与变更日志维护格式",
+          "提供面向 AI 代理的文档建议（CLAUDE.md、规格文件、ADR、内联陷阱）及文档措辞审校步骤"
+        ],
+        "inputs": [
+          "架构决策的背景、约束与备选方案",
+          "现有仓库的 ADR 约定与配置（如 .adr-dir）",
+          "待文档化的代码、公共 API 或功能变更",
+          "README、变更日志等现有文档",
+          "项目术语与既有约定"
+        ],
+        "outputs": [
+          "ADR 文档（含状态、日期、上下文、决策、备选方案、后果）",
+          "内联注释与类型化 API 文档",
+          "OpenAPI/Swagger 规范片段",
+          "README 与变更日志内容",
+          "文档审校后的修订稿与核查清单结果"
+        ],
+        "scenarios": [
+          "做出重大架构决策或选择框架、数据库、认证策略时",
+          "新增或变更公共 API 时",
+          "发布改变用户可见行为的功能时",
+          "新成员或 AI 代理加入项目需要理解代码库时",
+          "同一件事被反复解释时"
+        ],
+        "prerequisites": [
+          "需要能访问仓库上下文以确认既有 ADR 约定",
+          "需要了解决策的背景、约束与被否决的备选方案",
+          "需要核对代码与决策上下文以验证文档中的事实"
+        ],
+        "limits": [
+          "不记录显而易见的代码，不为一次性原型写文档",
+          "不写复述代码的注释，不留注释掉的代码与长期 TODO",
+          "不得用编造的示例或更强的保证替代无依据的说法",
+          "措辞审校不得改变决策或其限制",
+          "原文未提供具体工具或自动化脚本"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "写作",
+          "后端",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Document decisions, not just code. The most valuable documentation captures the *why* — the context, constraints, and trade-offs that led to a decision."
+          },
+          {
+            "field": "does",
+            "quote": "ADRs capture the reasoning behind significant technical decisions. They're the highest-value documentation you can write."
+          },
+          {
+            "field": "does",
+            "quote": "Comment the *why*, not the *what*:"
+          },
+          {
+            "field": "does",
+            "quote": "For public APIs (REST, GraphQL, library interfaces):"
+          },
+          {
+            "field": "does",
+            "quote": "Every project should have a README that covers:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the available evidence conflicts, surface the conflict rather than silently introducing another scheme. Only when no convention can be established do you apply the default below."
+          },
+          {
+            "field": "limits",
+            "quote": "**When NOT to use:** Don't document obvious code. Don't add comments that restate what the code already says. Don't write docs for throwaway prototypes."
+          },
+          {
+            "field": "limits",
+            "quote": "- **Don't delete old ADRs.** They capture historical context."
+          },
+          {
+            "field": "limits",
+            "quote": "// Don't leave TODO comments for things you should just do now"
+          }
+        ]
+      }
     },
     {
       "skill_path": "skills/doubt-driven-development/SKILL.md",

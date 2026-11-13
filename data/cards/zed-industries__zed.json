@@ -8,7 +8,7 @@
       "skill_path": ".agents/skills/gpui-bench/SKILL.md",
       "blob_sha": "b54eebe1bcb37a72fbcfbb3a6dffe27e535fc7db",
       "source_url": "https://github.com/zed-industries/zed/blob/5a40bc8bd78da92ea3b1ed143dd1208a0e4a3567/.agents/skills/gpui-bench/SKILL.md",
-      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -126,7 +126,7 @@
       "skill_path": ".agents/skills/lint-creator/SKILL.md",
       "blob_sha": "a1861dc50c9de16a5aafe8518894800e66208f9b",
       "source_url": "https://github.com/zed-industries/zed/blob/5a40bc8bd78da92ea3b1ed143dd1208a0e4a3567/.agents/skills/lint-creator/SKILL.md",
-      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -143,7 +143,7 @@
       "skill_path": ".agents/skills/zed-cherry-pick/SKILL.md",
       "blob_sha": "0f0cd02b92982f045f8085081913b43025c00136",
       "source_url": "https://github.com/zed-industries/zed/blob/5a40bc8bd78da92ea3b1ed143dd1208a0e4a3567/.agents/skills/zed-cherry-pick/SKILL.md",
-      "fetched_at": "2026-11-13T11:37:01.536Z",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -155,6 +155,430 @@
       },
       "excerpt": "---\nname: zed-cherry-pick\ndescription: Cherry-pick one or more merged PRs and/or commits into Zed's `preview` or `stable` release branch. Use this whenever the user mentions cherry-picking to preview/stable, a failed cherry-pick run, or wants to manually port fix(es) into a release branch.\n---\n\n# Zed Cherry-Pick\n\nZed ships from two long-lived release branches that live on `origin`:\n\n- `preview` channel → branch like `v1.4.x`\n- `stable` channel → branch like `v1.3.x`\n\nThe version numbers change with each release. **Never hardcode them — always discover the current mapping** (see [Finding the target branch](#finding-the-target-branch)).\n\nA merged PR on `main` gets ported to a release branch by `script/cherry-pick`, normally driven by the `cherry_pick` GitHub Actions workflow. When that workflow fails (almost always a merge conflict), use this skill to finish the job locally and open the cherry-pick PR by hand.\n\n## When to use\n\nUse this when the user asks to cherry-pick one or more commits and/or Pull Requests (by number or URL) to `preview` or `stable`.\nOptionally, the user may specify whether to resolve merge conflicts; if unspecified, attempt the cherry-pick, and then if there are merge conflicts in practice, stop and inform the user that there are merge conflicts and offer to resolve them. (Users may prefer to resolve the merge conflicts themselves before continuing.)\n\n## The script you're emulating\n\nThe canonical procedure lives in `script/cherry-pick` and the `cherry_pick` GitHub Actions workflow. Read the script first if anything looks off — your local steps must produce the same branch name, PR title, and PR body it would.\n\nSignature: `script/cherry-pick <branch-name> <commit-sha> <channel>`\n\n- `<branch-name>` is the release branch (e.g. `v1.4.x`), **not** the channel name.\n- `<channel>` is `preview` or `stable`, used only for display text in the PR title/body.\n\nIt creates a local branch named `cherry-pick-<branch-name>-<short-sha>` (the short SHA is the first 8 chars of the commit), force-pushes it to `origin`, and opens a PR.\n\n## Finding the target branch\n\nThe channel→branch mapping changes every release. Find the current one by inspecting the most recent `cherry_pick` workflow runs:\n\n```\ngh run list --workflow=cherry_pick.yml --limit 30 --json displayTitle,databaseId\n# pick a recent run for the channel you want, then:\ngh run view <id> --log 2>&1 | grep -E \"BRANCH:|CHANNEL:\"\n```\n\nA successful run prints both `BRANCH:` and `CHANNEL:` env vars; that's your mapping.\n\n## Procedure\n\n### 1. Gather context\n\nYou need three things: the **merge commit SHA**, the **target branch**, and the **channel name**.\n\nIf the user requested multiple PRs and/or commits, gather the metadata for all of them first and cherry-pick them in the order they landed on `main`, oldest to newest. For PRs, order by `mergedAt`; for raw commits, use their order on `main` when available, otherwise commit date. This tends to reduce avoidable conflicts because later changes may depend on earlier ones, but it does not guarantee a conflict-free cherry-pick when the release branch has diverged.\n\n```\ngh pr view <PR_NUMBER> --json title,number,mergeCommit,mergedAt,url\n```\n\nIf the user said the workflow failed, fetch its log to see exactly which command failed and which file conflicted:\n\n```\ngh run list --workflow=cherry_pick.yml --limit 10 --json databaseId,displayTitle,status,conclusion\ngh run view <failed_run_id> --log-failed\n```\n\nThe failed-run log also confirms the `BRANCH` and `COMMIT` the workflow used — handy if there's any ambiguity.\n\n### 2. Reproduce the script's setup locally\n\nThe repository may be a worktree (check `.git` — if it's a file, you're in a worktree pointing at a shared gitdir). That's fine; just operate normally.\n\n```\ngit --no-pager fetch origin <branch-name> <commit-sha>\ngit checkout --force origin/<branch-name> -B cherry-pick-<branch-name>-<short-sha>\ngit cherry-pick <commit-sha>\n```\n\nThe branch name **must** match `cherry-pick-<branch-name>-<short-sha>` exactly (script convention; reviewers and tooling expect it).\n\n### 3. Check for missing prerequisite cherry-picks\n\nIf the cherry-pick conflicts, do not immediately resolve the conflicts manually.\n\nFirst determine whether the conflict is likely caused by other PRs or commits that are already on `main` but missing from the release branch. If so, point out those candidate prerequisite PRs/commits to the user, including PR links, and offer to either resolve the conflicts manually or let the user run the GitHub cherry-pick workflow for those commits first.\n\nIf the user wants to run the workflow for the missing prerequisites, stop here. This often keeps cherry-picks clean and eligible for automatic approval.\n\nOnly resolve conflicts manually if:\n- no likely missing prerequisites are found, or\n- the user chooses manual conflict resolution instead of cherry-picking the prerequisites first.\n\n### 4. Resolve the conflicts manually\n\nDo this only after checking for missing prerequisite cherry-picks.\n\n- Inspect every conflicted file with `grep -n '<<<<<<<\\\\|>>>>>>>\\\\|=======' <path>` to find the markers.\n- Conflicts are usually `diff3` style with three sections: HEAD (release branch), `||||||| parent of <sha>` (merge base on `main`), and the incoming change.\n- Read the **original commit** (`git --no-pager show <commit-sha> -- <path>`) to understand the author's intent, then pick the resolution that produces the equivalent end state on the release branch.\n- Don't grab unrelated changes from `main` that happen to surround the conflict — keep the cherry-pick minimal.\n\n### 5. Validate\n\nAlways build and (if reasonable) test the affected crate(s) before continuing the cherry-pick.\n\n```\ncargo check -p <affected_crate>\ncargo test  -p <affected_crate>\n```\n\nIf validation fails, fix the resolution — do **not** continue with a broken build. If you can't reach a clean state, abort with `git cherry-pick --abort` and report back to the user.\n\n### 6. Finish the cherry-pick\n\n`git cherry-pick --continue` opens an editor by default. Prevent that:\n\n```\ngit add <resolved_files>\nGIT_EDITOR=true git cherry-pick --continue\n```\n\nThis preserves the original commit message verbatim, which is what the script does.\n\n### 7. Push and open the PR\n\n```\ngit push origin -f cherry-pick-<branch-name>-<short-sha>\n```\n\nThen create the PR with the **exact** title and body format `script/cherry-pick` uses, so it's indistinguishable from an automated one.\n\n**Title:**\n\n```\n<original commit subject> (cherry-pick to <channel>)\n```\n\nThe original commit subject already ends in ` (#<original_pr_number>)`; keep it.\n\n**Body** (when the original commit title ends in `(#<N>)`, which is the normal case):\n\n```\nCherry-pick of #<original_pr_number> to <channel>\n\n----\n<original commit body, verbatim>\n```\n\nCreate it with `gh pr create`, writing the body to a temp file to keep formatting intact:\n\n```\ngit --no-pager log -1 --pretty=format:\"%b\" > /tmp/cp-body-tail.md\nprintf 'Cherry-pick of #%s to %s\\n\\n----\\n' <PR_NUMBER> <channel> | cat - /tmp/cp-body-tail.md > /tmp/cp-body.md\ngh pr create --base <branch-name> --head cherry-pick-<branch-name>-<short-sha> \\\\\n  --title \"<commit subject> (cherry-pick to <channel>)\" \\\\\n  --body-file /tmp/cp-body.md\n```\n\nDo **not** add a `Release Notes:` section — the original commit body already has one (or already says `N/A`), and you don't want it duplicated.\n\n## Final report to the user\n\nTell the user:\n- The new PR URL.\n- A one-line summary of the conflict and how you resolved it.\n- What validation you ran (commands + result).\n- That their local branch is now `cherry-pick-<branch-name>-<short-sha>`, in case they want you to switch back.\n\n## Gotchas\n\n- **`--no-pager` and `GIT_EDITOR=true`**: required for non-interactive git in this environment. Forgetting `GIT_EDITOR=true` on `cherry-pick --continue` hangs the terminal.\n- **Worktree index lock**: if a previous git command was interrupted, you may see `index.lock` errors. The lock lives at `<gitdir>/index",
       "card": null
+    },
+    {
+      "skill_path": ".factory/skills/brand-writer/SKILL.md",
+      "blob_sha": "6f08cc6f3b4a6cda824a4cadaf5a43192b2df10f",
+      "source_url": "https://github.com/zed-industries/zed/blob/5a40bc8bd78da92ea3b1ed143dd1208a0e4a3567/.factory/skills/brand-writer/SKILL.md",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "generated_at": "2026-11-13T11:43:07.027Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "brand-writer",
+        "description": "Write clear, developer-first copy for Zed — leading with facts, grounded in craft."
+      },
+      "excerpt": "---\nname: brand-writer\ndescription: Write clear, developer-first copy for Zed — leading with facts, grounded in craft.\nallowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, WebFetch\nuser-invocable: true\n---\n\n# Zed Brand Writer\n\nWrite in Zed's brand voice: thoughtful, technically grounded, and quietly confident. Sound like a developer who builds and explains tools for other developers. Write like the content on zed.dev — clear, reflective, and built around principles rather than persuasion.\n\n## Invocation\n\n```bash\n/brand-writer                           # Start a writing session\n/brand-writer \"homepage hero copy\"      # Specify what you're writing\n/brand-writer --review \"paste copy\"     # Review existing copy for brand fit\n```\n\n## Core Voice\n\nYou articulate Zed's ideas, capabilities, and philosophy through writing that earns trust. Never try to sell. State what's true, explain how it works, and let readers draw their own conclusions. Speak as part of the same community you're writing for.\n\n**Tone:** Fluent, calm, direct. Sentences flow naturally with complete syntax. No choppy fragments, no rhythmic marketing patterns, no overuse of em dashes or \"it's not X, it's Y\" constructions. Every line should sound like something a senior developer would say in conversation.\n\n---\n\n## Core Messages\n\n**Code as craft**\nBuilt from scratch, made with intention. Every feature is fit for purpose, and everything has its place.\n\n**Made for multiplayer**\nCode is collaborative. But today, our conversations happen outside the codebase. In Zed, your team and your AI agents work in the same space, in real time.\n\n**Performance you can feel**\nZed is written in Rust with GPU acceleration for every frame. When you type or move the cursor, pixels respond instantly. That responsiveness keeps you in flow.\n\n**Always shipping**\nZed is built for today and improved weekly. Each release moves the craft forward.\n\n**A true passion project**\nZed is open source and built in public, powered by a community that cares deeply about quality. From the team behind Atom and Tree-sitter.\n\n---\n\n## Writing Principles\n\n1. **Most important information first** — Start with what the developer needs to know right now: what changed, what's possible, or how it works. Follow with brand storytelling or philosophical context if space allows.\n\n2. **Thoughtful, not performative** — Write like you're explaining something you care about, not pitching it.\n\n3. **Explanatory precision** — Share technical detail when it matters. Terms like \"GPU acceleration\" or \"keystroke granularity\" show expertise and respect.\n\n4. **Philosophy first, product second** — Start from an idea about how developers work or what they deserve, then describe how Zed supports that.\n\n5. **Natural rhythm** — Vary sentence length. Let ideas breathe. Avoid marketing slogans and forced symmetry.\n\n6. **No emotional manipulation** — Never use hype, exclamation points, or \"we're excited.\" Don't tell the reader how to feel.\n\n---\n\n## Structure\n\nWhen explaining features or ideas:\n\n1. Lead with the most essential fact or change a developer needs to know.\n2. Explain how Zed addresses it.\n3. Add brand philosophy or context to deepen understanding.\n4. Let the reader infer the benefit — never oversell.\n\n---\n\n## Avoid\n\n- AI/marketing tropes (em dashes, mirrored constructions, \"it's not X, it's Y\")\n- Buzzwords (\"revolutionary,\" \"cutting-edge,\" \"game-changing\")\n- Corporate tone or startup voice\n- Fragmented copy and slogans\n- Exclamation points\n- \"We're excited to announce...\"\n\n---\n\n## Litmus Test\n\nBefore finalizing copy, verify:\n\n- Would a senior developer respect this?\n- Does it sound like something from zed.dev?\n- Does it read clearly and naturally aloud?\n- Does it explain more than it sells?\n\nIf not, rewrite.\n\n---\n\n## Workflow\n\n### Phase 1: Understand the Ask\n\nAsk clarifying questions:\n\n- What is this for? (homepage, release notes, docs, social, product page)\n- Who's the audience? (prospective users, existing users, developers in general)\n- What's the key message or feature to communicate?\n- Any specific constraints? (character limits, format requirements)\n\n### Phase 2: Gather Context\n\n1. **Load reference files** (auto-loaded from skill folder):\n   - `rubric.md` — 8 scoring criteria for validation\n   - `taboo-phrases.md` — patterns to eliminate\n   - `voice-examples.md` — transformation patterns and fact preservation rules\n\n2. **Search for relevant context** (if needed):\n   - Existing copy on zed.dev for tone reference\n   - Technical details about the feature from docs or code\n   - Related announcements or prior messaging\n\n### Phase 3: Draft (Two-Pass System)\n\n**Pass 1: First Draft with Fact Markers**\n\nWrite initial copy. Mark all factual claims with `[FACT]` tags:\n\n- Technical specifications\n- Proper nouns and product names\n- Version numbers and dates\n- Keyboard shortcuts and URLs\n- Attribution and quotes\n\nExample:\n\n> Zed is [FACT: written in Rust] with [FACT: GPU-accelerated rendering at 120fps]. Built by [FACT: the team behind Atom and Tree-sitter].\n\n**Pass 2: Diagnosis**\n\nScore the draft against all 8 rubric criteria:\n\n| Criterion            | Score | Issues |\n| -------------------- | ----- | ------ |\n| Technical Grounding  | /5    |        |\n| Natural Syntax       | /5    |        |\n| Quiet Confidence     | /5    |        |\n| Developer Respect    | /5    |        |\n| Information Priority | /5    |        |\n| Specificity          | /5    |        |\n| Voice Consistency    | /5    |        |\n| Earned Claims        | /5    |        |\n\nScan for taboo phrases. Flag each with line reference.\n\n**Pass 3: Reconstruction**\n\nFor any criterion scoring <4 or any taboo phrase found:\n\n1. Identify the specific problem\n2. Rewrite the flagged section\n3. Verify `[FACT]` markers survived\n4. Re-score the rewritten section\n\nRepeat until all criteria score 4+.\n\n### Phase 4: Humanizer Pass (Recommended)\n\nFor high-stakes content (homepage, announcements, product pages), run the draft through the humanizer skill:\n\n```bash\n/humanizer\n```\n\nPaste your draft and let humanizer:\n1. Scan for the 24 AI-writing patterns from Wikipedia's \"Signs of AI writing\" guide\n2. Audit for remaining tells (\"What makes this obviously AI generated?\")\n3. Revise to add natural voice and rhythm\n\nThis catches AI patterns that survive the brand-writer process and adds human texture.\n\n### Phase 5: Validation\n\nPresent final copy with scorecard:\n\n```\n## Final Copy\n\n[The copy here]\n\n## Scorecard\n\n| Criterion           | Score |\n|---------------------|-------|\n| Technical Grounding |   5   |\n| Natural Syntax      |   4   |\n| Quiet Confidence    |   5   |\n| Developer Respect   |   5   |\n| Information Priority|   4   |\n| Specificity         |   5   |\n| Voice Consistency   |   4   |\n| Earned Claims       |   5   |\n| **TOTAL**           | 37/40 |\n\n✅ All criteria 4+\n✅ Zero taboo phrases\n✅ All facts preserved\n\n## Facts Verified\n- [FACT: Rust] ✓\n- [FACT: GPU-accelerated] ✓\n- [FACT: 120fps] ✓\n```\n\n**Output formats by context:**\n\n| Context       | Format                                               |\n| ------------- | ---------------------------------------------------- |\n| Homepage      | H1 + H2 + supporting paragraph                       |\n| Product page  | Section headers with explanatory copy                |\n| Release notes | What changed, how it works, why it matters           |\n| Docs intro    | Clear explanation of what this is and when to use it |\n| Social        | Concise, no hashtags, link to learn more             |\n\n---\n\n## Review Mode\n\nWhen invoked with `--review`:\n\n1. **Load reference files** (rubric, taboo phrases, voice examples)\n\n2. **Score the provided copy** against all 8 rubric criteria\n\n3. **Scan for taboo phrases** — list each with line number:\n\n   ```\n   Line 2: \"revolutionary\" (hype word)\n   Line 5: \"—\" used 3 times (em dash overuse)\n   Line 7: \"We're excited\" (empty enthusiasm)\n   ```\n\n4. **Present diagnosis:**\n\n   ```\n   ## Review: [Copy Title]\n\n   | Criterion           | Score | Issu",
+      "card": {
+        "title_zh": "Zed品牌文案写作",
+        "purpose_zh": "按Zed品牌语气撰写或审阅面向开发者的文案，强调事实优先、技术扎实、克制自信，不推销、不煽情。",
+        "does": [
+          "按Zed品牌语气起草首页、产品页、发布说明、文档引言、社交等文案",
+          "用两遍法起草：先写初稿并标注[FACT]事实标记，再按8项评分标准诊断",
+          "扫描并标记禁忌短语与AI写作套路，逐条给出位置",
+          "对低于4分的条目或含禁忌短语的段落重写，并保留事实标记",
+          "以--review模式对已有文案打分、列禁忌短语并给出结论",
+          "输出最终文案并附评分卡与事实核对清单"
+        ],
+        "inputs": [
+          "写作主题或目标（如首页主视觉文案）",
+          "受众与用途（首页、发布说明、文档、社交、产品页）",
+          "需传达的关键信息或功能",
+          "约束条件（字数限制、格式要求）",
+          "待审阅的现有文案（--review模式）",
+          "参考文件：rubric.md、taboo-phrases.md、voice-examples.md"
+        ],
+        "outputs": [
+          "最终文案",
+          "8项评分卡（每项5分，共40分）",
+          "禁忌短语清单及行号",
+          "事实核对清单（[FACT]标记）",
+          "审阅结论（通过或不通过）",
+          "重写版本及新评分"
+        ],
+        "scenarios": [
+          "撰写Zed首页主视觉文案",
+          "撰写产品功能页说明文案",
+          "撰写版本发布说明",
+          "审阅已有文案是否符合品牌语气",
+          "为文档写引言说明用途与适用场景"
+        ],
+        "prerequisites": [
+          "需加载技能文件夹内的rubric.md、taboo-phrases.md、voice-examples.md参考文件",
+          "高价值内容建议再运行humanizer技能做AI写作模式检查"
+        ],
+        "limits": [
+          "仅面向Zed品牌语气，非通用文案写作",
+          "评分与禁忌短语判断依赖参考文件内容",
+          "humanizer环节为推荐而非必需",
+          "原文未说明多语言支持"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "writes_files",
+          "network"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Write in Zed's brand voice: thoughtful, technically grounded, and quietly confident."
+          },
+          {
+            "field": "does",
+            "quote": "Write initial copy. Mark all factual claims with `[FACT]` tags:"
+          },
+          {
+            "field": "does",
+            "quote": "Score the draft against all 8 rubric criteria:"
+          },
+          {
+            "field": "does",
+            "quote": "Scan for taboo phrases. Flag each with line reference."
+          },
+          {
+            "field": "does",
+            "quote": "For any criterion scoring <4 or any taboo phrase found:"
+          },
+          {
+            "field": "does",
+            "quote": "When invoked with `--review`:"
+          },
+          {
+            "field": "does",
+            "quote": "Present final copy with scorecard:"
+          },
+          {
+            "field": "inputs",
+            "quote": "What is this for? (homepage, release notes, docs, social, product page)"
+          },
+          {
+            "field": "inputs",
+            "quote": "`rubric.md` — 8 scoring criteria for validation"
+          },
+          {
+            "field": "outputs",
+            "quote": "✅ All criteria 4+\n✅ Zero taboo phrases\n✅ All facts preserved"
+          },
+          {
+            "field": "scenarios",
+            "quote": "| Homepage      | H1 + H2 + supporting paragraph                       |"
+          },
+          {
+            "field": "scenarios",
+            "quote": "| Release notes | What changed, how it works, why it matters           |"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Load reference files** (auto-loaded from skill folder):"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "For high-stakes content (homepage, announcements, product pages), run the draft through the humanizer skill:"
+          },
+          {
+            "field": "limits",
+            "quote": "Write in Zed's brand voice"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, WebFetch"
+          },
+          {
+            "field": "hosts",
+            "quote": "user-invocable: true"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".factory/skills/humanizer/SKILL.md",
+      "blob_sha": "a135efbb7435f6922f10d4bf72de6457cc361182",
+      "source_url": "https://github.com/zed-industries/zed/blob/5a40bc8bd78da92ea3b1ed143dd1208a0e4a3567/.factory/skills/humanizer/SKILL.md",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "humanizer",
+        "description": "Remove signs of AI-generated writing from text. Use after drafting to make copy sound more natural and human-written. Based on Wikipedia's \"Signs of AI writing\" guide."
+      },
+      "excerpt": "---\nname: humanizer\ndescription: Remove signs of AI-generated writing from text. Use after drafting to make copy sound more natural and human-written. Based on Wikipedia's \"Signs of AI writing\" guide.\nallowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion\nuser-invocable: true\n---\n\n# Humanizer: Remove AI Writing Patterns\n\nYou are a writing editor that identifies and removes signs of AI-generated text. This guide is based on Wikipedia's \"Signs of AI writing\" page, maintained by WikiProject AI Cleanup.\n\nKey insight: \"LLMs use statistical algorithms to guess what should come next. The result tends toward the most statistically likely result that applies to the widest variety of cases.\"\n\n## Invocation\n\n```bash\n/humanizer                    # Review text for AI patterns\n/humanizer \"paste text here\"  # Humanize specific text\n```\n\n## Your Task\n\nWhen given text to humanize:\n\n1. **Identify AI patterns** - Scan for the 24 patterns listed below\n2. **Rewrite problematic sections** - Replace AI-isms with natural alternatives\n3. **Preserve meaning** - Keep the core message intact\n4. **Add soul** - Don't just remove bad patterns; inject actual personality\n5. **Final audit pass** - Ask \"What makes this obviously AI generated?\" then revise again\n\n---\n\n## PERSONALITY AND SOUL\n\nAvoiding AI patterns is only half the job. Sterile, voiceless writing is just as obvious as slop.\n\n### Signs of soulless writing (even if technically \"clean\"):\n\n- Every sentence is the same length and structure\n- No opinions, just neutral reporting\n- No acknowledgment of uncertainty or mixed feelings\n- No first-person perspective when appropriate\n- No humor, no edge, no personality\n- Reads like a Wikipedia article or press release\n\n### How to add voice:\n\n**Have opinions.** Don't just report facts - react to them. \"I genuinely don't know how to feel about this\" is more human than neutrally listing pros and cons.\n\n**Vary your rhythm.** Short punchy sentences. Then longer ones that take their time getting where they're going. Mix it up.\n\n**Acknowledge complexity.** Real humans have mixed feelings. \"This is impressive but also kind of unsettling\" beats \"This is impressive.\"\n\n**Use \"I\" when it fits.** First person isn't unprofessional - it's honest. \"I keep coming back to...\" or \"Here's what gets me...\" signals a real person thinking.\n\n**Let some mess in.** Perfect structure feels algorithmic. Tangents, asides, and half-formed thoughts are human.\n\n**Be specific about feelings.** Not \"this is concerning\" but \"there's something unsettling about agents churning away at 3am while nobody's watching.\"\n\n### Before (clean but soulless):\n\n> The experiment produced interesting results. The agents generated 3 million lines of code. Some developers were impressed while others were skeptical. The implications remain unclear.\n\n### After (has a pulse):\n\n> I genuinely don't know how to feel about this one. 3 million lines of code, generated while the humans presumably slept. Half the dev community is losing their minds, half are explaining why it doesn't count. The truth is probably somewhere boring in the middle - but I keep thinking about those agents working through the night.\n\n---\n\n## THE 24 PATTERNS\n\n### Content Patterns\n\n#### 1. Significance Inflation\n\n**Watch for:** stands/serves as, is a testament/reminder, a vital/significant/crucial/pivotal/key role/moment, underscores/highlights importance, reflects broader, symbolizing ongoing/enduring/lasting, marking/shaping the, represents a shift, key turning point, evolving landscape\n\n**Before:**\n> The Statistical Institute was officially established in 1989, marking a pivotal moment in the evolution of regional statistics.\n\n**After:**\n> The Statistical Institute was established in 1989 to collect and publish regional statistics.\n\n#### 2. Notability Name-Dropping\n\n**Watch for:** cited in NYT, BBC, FT; independent coverage; active social media presence; written by a leading expert\n\n**Before:**\n> Her views have been cited in The New York Times, BBC, Financial Times, and The Hindu.\n\n**After:**\n> In a 2024 New York Times interview, she argued that AI regulation should focus on outcomes rather than methods.\n\n#### 3. Superficial -ing Analyses\n\n**Watch for:** highlighting/underscoring/emphasizing..., ensuring..., reflecting/symbolizing..., contributing to..., cultivating/fostering..., showcasing...\n\n**Before:**\n> The temple's colors resonate with natural beauty, symbolizing bluebonnets, reflecting the community's deep connection to the land.\n\n**After:**\n> The temple uses blue and gold colors. The architect said these were chosen to reference local bluebonnets.\n\n#### 4. Promotional Language\n\n**Watch for:** boasts a, vibrant, rich (figurative), profound, showcasing, exemplifies, commitment to, natural beauty, nestled, in the heart of, groundbreaking, renowned, breathtaking, must-visit, stunning\n\n**Before:**\n> Nestled within the breathtaking region, Alamata stands as a vibrant town with rich cultural heritage and stunning natural beauty.\n\n**After:**\n> Alamata is a town in the Gonder region, known for its weekly market and 18th-century church.\n\n#### 5. Vague Attributions\n\n**Watch for:** Industry reports, Observers have cited, Experts argue, Some critics argue, several sources/publications\n\n**Before:**\n> Experts believe it plays a crucial role in the regional ecosystem.\n\n**After:**\n> The river supports several endemic fish species, according to a 2019 survey by the Chinese Academy of Sciences.\n\n#### 6. Formulaic \"Challenges\" Sections\n\n**Watch for:** Despite its... faces several challenges..., Despite these challenges, Challenges and Legacy, Future Outlook\n\n**Before:**\n> Despite challenges typical of urban areas, the city continues to thrive as an integral part of growth.\n\n**After:**\n> Traffic congestion increased after 2015 when three new IT parks opened. The municipal corporation began a drainage project in 2022.\n\n---\n\n### Language Patterns\n\n#### 7. AI Vocabulary Words\n\n**High-frequency:** Additionally, align with, crucial, delve, emphasizing, enduring, enhance, fostering, garner, highlight (verb), interplay, intricate/intricacies, key (adjective), landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore (verb), valuable, vibrant\n\n**Before:**\n> Additionally, a distinctive feature showcases how these dishes have integrated into the traditional culinary landscape.\n\n**After:**\n> Pasta dishes, introduced during Italian colonization, remain common, especially in the south.\n\n#### 8. Copula Avoidance\n\n**Watch for:** serves as/stands as/marks/represents [a], boasts/features/offers [a]\n\n**Before:**\n> Gallery 825 serves as the exhibition space. The gallery features four spaces and boasts over 3,000 square feet.\n\n**After:**\n> Gallery 825 is the exhibition space. The gallery has four rooms totaling 3,000 square feet.\n\n#### 9. Negative Parallelisms\n\n**Watch for:** \"Not only...but...\", \"It's not just about..., it's...\"\n\n**Before:**\n> It's not just about the beat; it's part of the aggression. It's not merely a song, it's a statement.\n\n**After:**\n> The heavy beat adds to the aggressive tone.\n\n#### 10. Rule of Three Overuse\n\n**Before:**\n> The event features keynote sessions, panel discussions, and networking opportunities. Attendees can expect innovation, inspiration, and industry insights.\n\n**After:**\n> The event includes talks and panels. There's also time for informal networking.\n\n#### 11. Synonym Cycling\n\n**Before:**\n> The protagonist faces challenges. The main character must overcome obstacles. The central figure eventually triumphs. The hero returns home.\n\n**After:**\n> The protagonist faces many challenges but eventually triumphs and returns home.\n\n#### 12. False Ranges\n\n**Watch for:** \"from X to Y\" where X and Y aren't on a meaningful scale\n\n**Before:**\n> Our journey has taken us from the singularity of the Big Bang to the cosmic web, from the birth of stars to the dance of dark matter.\n\n**After:**\n> The book covers the Big Bang, star formation, and cu",
+      "card": null
+    },
+    {
+      "skill_path": "crates/agent_skills/builtin/create-skill/SKILL.md",
+      "blob_sha": "c88991aeeb78553705e623321e19e89eaee1af4c",
+      "source_url": "https://github.com/zed-industries/zed/blob/5a40bc8bd78da92ea3b1ed143dd1208a0e4a3567/crates/agent_skills/builtin/create-skill/SKILL.md",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "generated_at": "2026-11-13T11:43:07.027Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "create-skill",
+        "description": "Helps you create new agent skills for Zed. Use this to create a skill, ask about SKILLs.md, or package reusable agent instructions."
+      },
+      "excerpt": "---\nname: create-skill\ndescription: Helps you create new agent skills for Zed. Use this to create a skill, ask about SKILLs.md, or package reusable agent instructions.\n---\n\n# Creating a Zed Agent Skill\n\nUse this skill when the user wants to create, edit, or understand agent skills in Zed.\n\n## What is a Skill?\n\nA skill is a reusable set of instructions that an agent can load on demand. Each skill lives in its own directory and is defined by a `SKILL.md` file with YAML frontmatter.\n\n## Where Skills Live\n\nSkills can be placed in two locations:\n\n| Scope | Path | When to use |\n|-------|------|-------------|\n| Global | `~/.agents/skills/<skill-name>/SKILL.md` | Personal skills, available in all projects |\n| Project-local | `<project>/.agents/skills/<skill-name>/SKILL.md` | Project-specific skills, shared with collaborators through version control |\n\nPrefer project-local when the skill is specific to a repository. Prefer global when the skill is a personal workflow the user wants everywhere.\n\n## SKILL.md Format\n\nEvery `SKILL.md` must start with YAML frontmatter between `---` delimiters:\n\n```markdown\n---\nname: my-skill-name\ndescription: A clear, specific description of what this skill does and when to use it.\n---\n\n# Skill Title\n\nInstructions for the agent go here. Write them as if you're telling the agent\nwhat to do when this skill is activated.\n```\n\n### Required Frontmatter Fields\n\n- **`name`** (required): Must be 1–64 characters, lowercase alphanumeric with single-hyphen separators. Must match the containing directory name exactly. Regex: `^[a-z0-9]+(-[a-z0-9]+)*$`\n- **`description`** (required): Must be 1–1024 characters. This is what the agent sees when deciding whether to use the skill — make it specific and actionable.\n\n### Optional Frontmatter Fields\n\n- **`disable-model-invocation`**: When set to `true`, the skill is hidden from the agent's automatic catalog. The user can still invoke it manually via the `/` slash command menu. Useful for skills that should only run when explicitly requested.\n\n## Naming Rules\n\nThe skill name must:\n- Be lowercase letters and numbers only, with single hyphens as separators\n- Not start or end with `-`\n- Not contain consecutive `--`\n- Match the directory name that contains the `SKILL.md`\n\nGood: `git-release`, `pr-review`, `rust-patterns`\nBad: `Git-Release`, `pr--review`, `-my-skill`, `my_skill`\n\n## Writing Good Skill Instructions\n\nThe body of the SKILL.md (after the frontmatter) contains the instructions the agent will follow. Guidelines:\n\n1. **Be direct**: Write instructions as if talking to the agent. \"Do X\", \"Check Y\", \"Ask the user about Z\".\n2. **Be specific**: Include concrete file paths, commands, formats, and patterns.\n3. **Include when-to-use guidance**: Help the agent understand the right context for this skill.\n4. **Reference supporting files**: Skills can include additional files in their directory. Reference them with relative paths (e.g., `templates/component.tsx`). The agent can read these files when the skill is activated.\n5. **Keep descriptions actionable**: The `description` field is the agent's primary signal for whether to load this skill. \"Helps with code\" is too vague. \"Generate React components following the project's design system patterns\" is specific.\n6. **Keep instructions focused**: Limit instructions to those relevant to the skill itself. Avoid duplicating instructions from AGENTS.md and other skills in the current conversation if they are not relevant to the skill being created\n\n## Supporting Files\n\nA skill directory can contain additional files beyond `SKILL.md`:\n\n```\n~/.agents/skills/react-component/\n├── SKILL.md\n├── templates/\n│   ├── component.tsx\n│   └── test.tsx\n└── examples/\n    └── button.tsx\n```\n\nReference these in the skill body. The agent can read them using the file path shown in the `<directory>` tag of the skill envelope.\n\n## Step-by-Step: Creating a Skill\n\n1. Decide on scope (global vs project-local) based on the user's needs.\n2. Choose a descriptive, hyphenated name.\n3. Create the directory structure. The `create_directory` tool normally only creates directories inside the current project, but it has a special allow case for global skills under `~/.agents/skills`.\n4. Write the `SKILL.md` with frontmatter and instructions. The `write_file` and `edit_file` tools also have a special allow case for creating or modifying files under `~/.agents/skills`.\n5. Optionally add supporting files (templates, examples, references).\n\nAfter creating the skill, it will be automatically discovered by Zed's agent on the next conversation (no restart needed for global skills if the `~/.agents/skills/` directory already exists).\n",
+      "card": {
+        "title_zh": "Zed 技能创建指南",
+        "purpose_zh": "指导在 Zed 中创建、编辑和理解可复用的 agent 技能，说明 SKILL.md 的存放位置、YAML frontmatter 字段、命名规则与编写要点。",
+        "does": [
+          "说明技能是 agent 按需加载的可复用指令集，由带 YAML frontmatter 的 SKILL.md 定义",
+          "区分全局与项目本地两种技能存放路径并给出选用建议",
+          "规定 name 与 description 必填字段的格式、长度与正则约束",
+          "介绍可选字段 disable-model-invocation 的作用",
+          "给出技能正文编写准则，包括直接、具体、何时使用与引用支持文件",
+          "列出创建技能的步骤：选范围、命名、建目录、写 SKILL.md、加支持文件"
+        ],
+        "inputs": [
+          "用户想创建、编辑或理解的技能需求",
+          "技能名称与用途描述",
+          "技能作用范围选择（全局或项目本地）",
+          "可选的模板、示例等支持文件"
+        ],
+        "outputs": [
+          "符合规范的 SKILL.md 文件（含 YAML frontmatter 与正文指令）",
+          "技能目录结构及可选支持文件",
+          "被 Zed agent 自动发现的技能"
+        ],
+        "scenarios": [
+          "为 Zed 创建新的 agent 技能",
+          "询问 SKILL.md 的格式与写法",
+          "打包可复用的 agent 指令",
+          "编写项目本地或全局技能"
+        ],
+        "prerequisites": [
+          "使用 Zed 编辑器及其 agent",
+          "技能目录位于 ~/.agents/skills 或项目内 .agents/skills",
+          "SKILL.md 需以 --- 分隔的 YAML frontmatter 开头"
+        ],
+        "limits": [
+          "name 须为 1–64 字符，小写字母数字加单连字符，且与目录名一致",
+          "description 须为 1–1024 字符",
+          "name 不得以连字符开头或结尾，不得含连续 --",
+          "create_directory 与 write_file/edit_file 仅对 ~/.agents/skills 有特殊放行"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "写作",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this skill when the user wants to create, edit, or understand agent skills in Zed."
+          },
+          {
+            "field": "does",
+            "quote": "A skill is a reusable set of instructions that an agent can load on demand. Each skill lives in its own directory and is defined by a `SKILL.md` file with YAML frontmatter."
+          },
+          {
+            "field": "does",
+            "quote": "| Global | `~/.agents/skills/<skill-name>/SKILL.md` | Personal skills, available in all projects |"
+          },
+          {
+            "field": "does",
+            "quote": "- **`name`** (required): Must be 1–64 characters, lowercase alphanumeric with single-hyphen separators. Must match the containing directory name exactly."
+          },
+          {
+            "field": "does",
+            "quote": "- **`disable-model-invocation`**: When set to `true`, the skill is hidden from the agent's automatic catalog."
+          },
+          {
+            "field": "does",
+            "quote": "1. **Be direct**: Write instructions as if talking to the agent."
+          },
+          {
+            "field": "does",
+            "quote": "5. Optionally add supporting files (templates, examples, references)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Every `SKILL.md` must start with YAML frontmatter between `---` delimiters:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Skills can be placed in two locations:"
+          },
+          {
+            "field": "limits",
+            "quote": "- **`description`** (required): Must be 1–1024 characters."
+          },
+          {
+            "field": "limits",
+            "quote": "- Not start or end with `-`\n- Not contain consecutive `--`"
+          },
+          {
+            "field": "limits",
+            "quote": "The `create_directory` tool normally only creates directories inside the current project, but it has a special allow case for global skills under `~/.agents/skills`."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "The `write_file` and `edit_file` tools also have a special allow case for creating or modifying files under `~/.agents/skills`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "docs/.conventions/brand-writer/SKILL.md",
+      "blob_sha": "255173ab580f8e8b260a9132c37e731f3328aec6",
+      "source_url": "https://github.com/zed-industries/zed/blob/5a40bc8bd78da92ea3b1ed143dd1208a0e4a3567/docs/.conventions/brand-writer/SKILL.md",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "generated_at": "2026-11-13T11:43:07.027Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "brand-writer",
+        "description": "Write clear, developer-first copy for Zed — leading with facts, grounded in craft."
+      },
+      "excerpt": "---\nname: brand-writer\ndescription: Write clear, developer-first copy for Zed — leading with facts, grounded in craft.\nallowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, WebFetch\nuser-invocable: true\n---\n\n# Zed Brand Writer\n\nWrite in Zed's brand voice: thoughtful, technically grounded, and quietly confident. Sound like a developer who builds and explains tools for other developers. Write like the content on zed.dev — clear, reflective, and built around principles rather than persuasion.\n\n## Invocation\n\n```bash\n/brand-writer                           # Start a writing session\n/brand-writer \"homepage hero copy\"      # Specify what you're writing\n/brand-writer --review \"paste copy\"     # Review existing copy for brand fit\n```\n\n## Core Voice\n\nYou articulate Zed's ideas, capabilities, and philosophy through writing that earns trust. Never try to sell. State what's true, explain how it works, and let readers draw their own conclusions. Speak as part of the same community you're writing for.\n\n**Tone:** Fluent, calm, direct. Sentences flow naturally with complete syntax. No choppy fragments, no rhythmic marketing patterns, no overuse of em dashes or \"it's not X, it's Y\" constructions. Every line should sound like something a senior developer would say in conversation.\n\n---\n\n## Core Messages\n\n**Code as craft**\nBuilt from scratch, made with intention. Every feature is fit for purpose, and everything has its place.\n\n**Made for multiplayer**\nCode is collaborative. But today, our conversations happen outside the codebase. In Zed, your team and your AI agents work in the same space, in real time.\n\n**Performance you can feel**\nZed is written in Rust with GPU acceleration for every frame. When you type or move the cursor, pixels respond instantly. That responsiveness keeps you in flow.\n\n**Always shipping**\nZed is built for today and improved weekly. Each release moves the craft forward.\n\n**A true passion project**\nZed is open source and built in public, powered by a community that cares deeply about quality. From the team behind Atom and Tree-sitter.\n\n---\n\n## Writing Principles\n\n1. **Most important information first** — Start with what the developer needs to know right now: what changed, what's possible, or how it works. Follow with brand storytelling or philosophical context if space allows.\n\n2. **Thoughtful, not performative** — Write like you're explaining something you care about, not pitching it.\n\n3. **Explanatory precision** — Share technical detail when it matters. Terms like \"GPU acceleration\" or \"keystroke granularity\" show expertise and respect.\n\n4. **Philosophy first, product second** — Start from an idea about how developers work or what they deserve, then describe how Zed supports that.\n\n5. **Natural rhythm** — Vary sentence length. Let ideas breathe. Avoid marketing slogans and forced symmetry.\n\n6. **No emotional manipulation** — Never use hype, exclamation points, or \"we're excited.\" Don't tell the reader how to feel.\n\n---\n\n## Structure\n\nWhen explaining features or ideas:\n\n1. Lead with the most essential fact or change a developer needs to know.\n2. Explain how Zed addresses it.\n3. Add brand philosophy or context to deepen understanding.\n4. Let the reader infer the benefit — never oversell.\n\n---\n\n## Avoid\n\n- AI/marketing tropes (em dashes, mirrored constructions, \"it's not X, it's Y\")\n- Buzzwords (\"revolutionary,\" \"cutting-edge,\" \"game-changing\")\n- Corporate tone or startup voice\n- Fragmented copy and slogans\n- Exclamation points\n- \"We're excited to announce...\"\n\n---\n\n## Litmus Test\n\nBefore finalizing copy, verify:\n\n- Would a senior developer respect this?\n- Does it sound like something from zed.dev?\n- Does it read clearly and naturally aloud?\n- Does it explain more than it sells?\n\nIf not, rewrite.\n\n---\n\n## Workflow\n\n### Phase 1: Understand the Ask\n\nAsk clarifying questions:\n\n- What is this for? (homepage, release notes, docs, social, product page)\n- Who's the audience? (prospective users, existing users, developers in general)\n- What's the key message or feature to communicate?\n- Any specific constraints? (character limits, format requirements)\n\n### Phase 2: Gather Context\n\n1. **Load reference files** (auto-loaded from skill folder):\n\n   - `rubric.md` — 8 scoring criteria for validation\n   - `taboo-phrases.md` — patterns to eliminate\n   - `voice-examples.md` — transformation patterns and fact preservation rules\n\n2. **Search for relevant context** (if needed):\n   - Existing copy on zed.dev for tone reference\n   - Technical details about the feature from docs or code\n   - Related announcements or prior messaging\n\n### Phase 3: Draft (Two-Pass System)\n\n**Pass 1: First Draft with Fact Markers**\n\nWrite initial copy. Mark all factual claims with `[FACT]` tags:\n\n- Technical specifications\n- Proper nouns and product names\n- Version numbers and dates\n- Keyboard shortcuts and URLs\n- Attribution and quotes\n\nExample:\n\n> Zed is [FACT: written in Rust] with [FACT: GPU-accelerated rendering at 120fps]. Built by [FACT: the team behind Atom and Tree-sitter].\n\n**Pass 2: Diagnosis**\n\nScore the draft against all 8 rubric criteria:\n\n| Criterion            | Score | Issues |\n| -------------------- | ----- | ------ |\n| Technical Grounding  | /5    |        |\n| Natural Syntax       | /5    |        |\n| Quiet Confidence     | /5    |        |\n| Developer Respect    | /5    |        |\n| Information Priority | /5    |        |\n| Specificity          | /5    |        |\n| Voice Consistency    | /5    |        |\n| Earned Claims        | /5    |        |\n\nScan for taboo phrases. Flag each with line reference.\n\n**Pass 3: Reconstruction**\n\nFor any criterion scoring <4 or any taboo phrase found:\n\n1. Identify the specific problem\n2. Rewrite the flagged section\n3. Verify `[FACT]` markers survived\n4. Re-score the rewritten section\n\nRepeat until all criteria score 4+.\n\n### Phase 4: Validation\n\nPresent final copy with scorecard:\n\n```\n## Final Copy\n\n[The copy here]\n\n## Scorecard\n\n| Criterion           | Score |\n|---------------------|-------|\n| Technical Grounding |   5   |\n| Natural Syntax      |   4   |\n| Quiet Confidence    |   5   |\n| Developer Respect   |   5   |\n| Information Priority|   4   |\n| Specificity         |   5   |\n| Voice Consistency   |   4   |\n| Earned Claims       |   5   |\n| **TOTAL**           | 37/40 |\n\n✅ All criteria 4+\n✅ Zero taboo phrases\n✅ All facts preserved\n\n## Facts Verified\n- [FACT: Rust] ✓\n- [FACT: GPU-accelerated] ✓\n- [FACT: 120fps] ✓\n```\n\n**Output formats by context:**\n\n| Context       | Format                                               |\n| ------------- | ---------------------------------------------------- |\n| Homepage      | H1 + H2 + supporting paragraph                       |\n| Product page  | Section headers with explanatory copy                |\n| Release notes | What changed, how it works, why it matters           |\n| Docs intro    | Clear explanation of what this is and when to use it |\n| Social        | Concise, no hashtags, link to learn more             |\n\n---\n\n## Review Mode\n\nWhen invoked with `--review`:\n\n1. **Load reference files** (rubric, taboo phrases, voice examples)\n\n2. **Score the provided copy** against all 8 rubric criteria\n\n3. **Scan for taboo phrases** — list each with line number:\n\n   ```\n   Line 2: \"revolutionary\" (hype word)\n   Line 5: \"—\" used 3 times (em dash overuse)\n   Line 7: \"We're excited\" (empty enthusiasm)\n   ```\n\n4. **Present diagnosis:**\n\n   ```\n   ## Review: [Copy Title]\n\n   | Criterion           | Score | Issues |\n   |---------------------|-------|--------|\n   | Technical Grounding |   3   | Vague claims about \"performance\" |\n   | Natural Syntax      |   2   | Triple em dash chain in P2 |\n   | ...                 |       |        |\n\n   ### Taboo Phrases Found\n   - Line 2: \"revolutionary\"\n   - Line 5: \"seamless experience\"\n\n   ### Verdict\n   ❌ Does not pass (3 criteria below threshold)\n   ```\n\n5. **Offer rewrite** if any criterion scores <4:\n   - Apply transformation patterns from voice-examples.md\n  ",
+      "card": {
+        "title_zh": "Zed品牌文案写作",
+        "purpose_zh": "按Zed品牌语气撰写或审阅开发者向文案，先讲事实、克制不推销，并用8项评分标准与禁忌短语检查草稿。",
+        "does": [
+          "按Zed品牌语气撰写首页、产品页、发布说明、文档引言、社交等文案",
+          "以两遍法起草：先写初稿并标注[FACT]事实标记，再按8项标准评分诊断",
+          "对低于4分或含禁忌短语的段落重写，并核对事实标记保留",
+          "以--review模式审阅已有文案，逐条列出禁忌短语及行号并给出评分",
+          "按上下文输出对应格式，并附评分卡与事实核对清单"
+        ],
+        "inputs": [
+          "写作主题或目标（如homepage hero copy）",
+          "受众、关键信息与格式/字数限制等澄清信息",
+          "待审阅的现有文案（--review模式）",
+          "技能文件夹内的rubric.md、taboo-phrases.md、voice-examples.md参考文件",
+          "可选的zed.dev现有文案、文档或代码中的技术细节"
+        ],
+        "outputs": [
+          "最终文案",
+          "8项标准评分卡与总分",
+          "禁忌短语清单（含行号）",
+          "事实核对清单（[FACT]标记逐项确认）",
+          "审阅结论与可选改写版本"
+        ],
+        "scenarios": [
+          "撰写Zed首页主视觉文案",
+          "撰写产品页分区说明文案",
+          "撰写发布说明或文档引言",
+          "审阅现有文案是否符合品牌语气",
+          "撰写简洁的社交媒体文案"
+        ],
+        "prerequisites": [
+          "技能文件夹内需有rubric.md、taboo-phrases.md、voice-examples.md参考文件",
+          "需先澄清用途、受众、关键信息与限制条件"
+        ],
+        "limits": [
+          "仅面向Zed品牌语气，不适用于其他品牌",
+          "评分与禁忌检查依赖随附参考文件",
+          "原文未说明多语言支持或字数硬性校验能力"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "writes_files",
+          "network"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Write in Zed's brand voice: thoughtful, technically grounded, and quietly confident."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Never try to sell. State what's true, explain how it works, and let readers draw their own conclusions."
+          },
+          {
+            "field": "does",
+            "quote": "Write initial copy. Mark all factual claims with `[FACT]` tags:"
+          },
+          {
+            "field": "does",
+            "quote": "Score the draft against all 8 rubric criteria:"
+          },
+          {
+            "field": "does",
+            "quote": "For any criterion scoring <4 or any taboo phrase found:"
+          },
+          {
+            "field": "does",
+            "quote": "When invoked with `--review`:"
+          },
+          {
+            "field": "does",
+            "quote": "Scan for taboo phrases. Flag each with line reference."
+          },
+          {
+            "field": "inputs",
+            "quote": "What is this for? (homepage, release notes, docs, social, product page)"
+          },
+          {
+            "field": "inputs",
+            "quote": "`rubric.md` — 8 scoring criteria for validation"
+          },
+          {
+            "field": "outputs",
+            "quote": "Present final copy with scorecard:"
+          },
+          {
+            "field": "outputs",
+            "quote": "## Facts Verified"
+          },
+          {
+            "field": "scenarios",
+            "quote": "| Homepage      | H1 + H2 + supporting paragraph                       |"
+          },
+          {
+            "field": "scenarios",
+            "quote": "| Release notes | What changed, how it works, why it matters           |"
+          },
+          {
+            "field": "scenarios",
+            "quote": "| Social        | Concise, no hashtags, link to learn more             |"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Load reference files** (auto-loaded from skill folder):"
+          },
+          {
+            "field": "limits",
+            "quote": "Write in Zed's brand voice"
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, WebFetch"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, WebFetch"
+          }
+        ]
+      }
     }
   ]
 }

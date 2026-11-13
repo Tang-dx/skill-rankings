@@ -8,18 +8,140 @@
       "skill_path": "skills/hill-climb/SKILL.md",
       "blob_sha": "ae4fcf0e9a560e00dcb2baf78183e771ebafda61",
       "source_url": "https://github.com/Bil0000/Hill-Climb/blob/84b95909383379d4a84ad02ecadf928aba6b3b9b/skills/hill-climb/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "generated_at": "2026-11-13T11:43:07.027Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "hill-climb",
         "description": "Reach any goal that a command can score (faster, fewer bugs, an audit, \"make X stable\", a port, a UI, a text) in small steps, keeping wins and undoing losses, across one or many repos. Use for \"hill climb\", \"/hill-climb\", \"climb this\", \"keep going until it passes\", or to resume or report on a climb."
       },
       "excerpt": "---\nname: hill-climb\ndescription: Reach any goal that a command can score (faster, fewer bugs, an audit, \"make X stable\", a port, a UI, a text) in small steps, keeping wins and undoing losses, across one or many repos. Use for \"hill climb\", \"/hill-climb\", \"climb this\", \"keep going until it passes\", or to resume or report on a climb.\n---\n\n# Hill climb\n\nYou work toward a goal in many small steps. A check scores each step with no\nhuman in the loop. `scripts/climb.py` keeps the score: you edit code, it runs\nthe check, commits a win or undoes a loss, and writes the log. Never write a\nscore down yourself, and never decide a step \"basically\" passed.\n\nAny goal fits, because every goal becomes the same thing: a command that\nprints a number. Faster is a time or a count. \"Audit billing\" or \"make\nroles stable\" is the number of failing tests, one test per finding. A port\nis the number of outputs that match. A UI is a judge's score. Pick the\nnumber, and the rest of this skill is the same for every goal.\n\nWhat the script gives you that working without it does not:\n\n- **No lost wins and no silent breaks.** Every kept step passed the check\n  and the guards. Every failed idea is undone in every repo, so the branch\n  only holds proven steps.\n- **A score you can't fool.** The check is locked, so no step can weaken a\n  test to pass. The report quotes measured numbers, not your opinion.\n- **It survives compaction and restarts.** The card, the log, the notes,\n  and the last check output are on disk. `status` shows them in one call.\n- **The next climb starts faster.** `init` saves the check as a kit that\n  any repo can reuse.\n\nIt adds seconds a step, not minutes: `try` runs the check you would run\nanyway. Never skip it because a goal \"feels too open\" or spans repos. Both\nfit, as shown in step 2.\n\n**Small goal? Read only this.** For a goal you can finish in under an hour:\n\n1. Write the check before `init`, and the reference it compares with:\n   - Fix or audit: tests that fail today, from the spec or the bug report.\n     Score with `--score '<failure count regex>' --direction min --target 0`.\n     Guard with the tests that pass today, kept in their own files, so a\n     fix can't break old behavior and a crash can't pass as fewer failures.\n   - Faster or smaller: a script that times or counts the work on fresh\n     random input. Copy the old code as the reference, and add a guard that\n     compares the new output with it. Score with `--direction min --target\n     <N>x --runs 3`, and add `--paired` when it is a timer.\n   - Anything else: whatever prints how close you are as a number.\n2. `init <name> --goal \"...\" --check \"<command>\" --lock <check files>`.\n   `init` commits the new check files as the first step on the climb\n   branch. Add a `--check` and a `--repo` for each other repo the work\n   touches.\n3. Change, `try`, repeat. Review the whole diff yourself. Then the report.\n\nSkip the card, helpers, and holdout when the goal is this small. Use the\nrest of this file when the goal is big, slow, or noisy.\n\nYour order of work:\n\n1. Know the goal.\n2. Build a check that scores it with no human. This matters most.\n3. Get the tools, compute, and reference material the climb needs.\n4. When progress slows, find what slows it and fix that.\n\nI start a climb and leave. I don't read the thread while it works. I come\nback when it asks me something or when it is done. Work for that:\n\n- Don't stop to give updates. The only messages I read are the card, a\n  question I must answer, and the report.\n- Ask with the harness's question tool (`AskUserQuestion` in Claude Code,\n  `request_user_input` in Codex), so the thread shows it needs me. Without\n  one, end the turn with the question.\n- Keep the state on disk (`status`, `notes.md`), not in chat.\n\nWall-clock time is the cost I care about. Finish as fast as the goal\nallows: a small goal in minutes, a hard one in as many hours as it keeps\ngaining. A climb ends when the bar is met or the gains stop, not on a\nclock. Where the time goes, in order: setup, slow checks, noisy checks,\nbars no step can reach, and retrying ideas. Each section below cuts one of\nthem.\n\n- **Never wait with a sleep loop.** Run long commands in the background and\n  let the harness wake you when they finish. Plan the next step meanwhile.\n\n`CLIMB` below means the absolute path of `scripts/climb.py` next to this file.\nWrite the full path into each command, because shell variables may not\nsurvive between calls. Run it from inside the target repo, or any repo of\na multi-repo climb. Every command is\nin \"Commands\" at the end, so you never need to read the script.\n\nThe climb gets its own branch. An undone step resets the tree and deletes\nuntracked files that git doesn't ignore. If someone else works in the same\ncheckout, climb in a separate worktree.\n\n## 0. Resume or reuse\n\nRun both in one call:\n\n```\npython3 \"$CLIMB\" list; python3 \"$CLIMB\" kits \"<two or three goal words>\"\n```\n\n- A climb for this goal exists: switch to its branch, run `status <name>`,\n  read `.hill-climb/<name>/notes.md`, and go to step 4. \"Continue\" after a\n  crash or a reset means this.\n- A kit fits: `python3 \"$CLIMB\" reuse <kit>` restores its check, guards,\n  holdout, and notes, and prints the `init` it used. Edit what differs for\n  this goal, run the check once, and go to the card. A kit from another repo\n  is a starting point, not a check: make it fail and pass before you trust it.\n\n## 1. Get to a first score fast\n\nA rough check that runs beats a perfect one you are still designing. Aim for\na first real score within 15 minutes and the card within 30. You can sharpen\nthe check later with `relock`. A realistic rig, like a real server behind a\nslow-network proxy, is worth building only as the holdout; the per-step\ncheck stays small.\n\n- **Read in bulk.** One command that greps or prints ten files beats ten\n  calls. If you can start subagents, send read-only explorers in\n  parallel, one per area: the code path, the tests and harnesses, the setup. Build\n  the check while they read.\n- **Reuse a harness.** Search for one before you write one: `bench`, `perf`,\n  `latency`, `e2e`, `fixture`, `harness`, `mock`. Extending one beats\n  writing one.\n- **Start slow setup at once, in the background.** Installs, builds, and\n  seed data run while you read.\n- **Small data.** A small synthetic fixture beats a copy of real data. Copy\n  real data only when its shape matters, keep it under 100 MB, and put it\n  under `.hill-climb/<name>/data/`, where git ignores it and kits skip it.\n- **Profile once.** Before step 1, find where the time or the errors go.\n  Attack the biggest part first.\n\n## Helpers\n\nIf the harness can start subagents, use them to work in parallel. Pick each\nhelper's model by the job, from the models the harness offers. Don't\nhard-code a name:\n\n| Tier | Example | Use it for |\n| --- | --- | --- |\n| Fast | the cheapest model, like a Haiku or mini class | Reading code, finding harnesses, summarizing logs |\n| Mid | a Sonnet class model | Proposing next ideas from the profile and the log |\n| Frontier | the strongest model, like an Opus class | The blocker review and the final review |\n\n- **Only you write in the climb tree.** `try` resets it, so a helper that\n  edits it loses its work. A helper may read, or draft a fix in its own\n  worktree and return a patch. You apply the patch and run `try`.\n- **Run them in the background** while a check runs or setup installs. Don't\n  wait on a helper when you have other work.\n- **Brief them tight:** the goal, the files, and the answer shape, like\n  \"up to 5 ideas, each with file:line and an expected gain, under 200 words\".\n  Ask for conclusions, not file dumps.\n- **Use as many as help.** Start one per independent question, all at once.\n  Use the cheapest tier that can answer it. Don't start a helper for\n  something two of your own tool calls can do.\n- No subagents in this harness: do the same work inline.\n\nGood moments for helpers:\n\n- **Setup:** fast explorers map the code path, the tests, and",
-      "card": null
+      "card": {
+        "title_zh": "爬坡式自动优化",
+        "purpose_zh": "用一个无人工介入的检查命令给每一步打分，通过小步修改代码、保留通过检查的改动、回滚失败的改动，逐步逼近任意可量化的目标。",
+        "does": [
+          "把任意目标转成一个打印数字的检查命令，并用该数字作为评分",
+          "通过 scripts/climb.py 运行检查、提交胜利步骤或撤销失败步骤并写日志",
+          "锁定检查文件防止步骤削弱测试来通过",
+          "支持多仓库同时保留或回滚同一步骤",
+          "支持复用 kit、恢复中断的爬坡并查看状态与笔记",
+          "用 judge.py 按评分标准给外观、写作、API 形态等主观目标打分"
+        ],
+        "inputs": [
+          "目标描述（--goal）",
+          "检查命令（--check）",
+          "评分正则（--score）与方向、目标值",
+          "需要锁定的检查文件路径（--lock）",
+          "其他仓库路径（--repo）",
+          "运行次数、最小增益、配对等参数"
+        ],
+        "outputs": [
+          "爬坡分支上的已证明步骤提交",
+          "评分日志与状态（status）",
+          "notes.md 笔记",
+          "最终报告（引用实测数字）",
+          "可复用的 kit"
+        ],
+        "scenarios": [
+          "让代码更快或更小",
+          "修复 bug 或审计问题直到失败测试归零",
+          "移植或克隆工具使输出匹配参考",
+          "让 UI 或写作达到评审标准",
+          "跨多个仓库持续改进直到达标"
+        ],
+        "prerequisites": [
+          "目标能由一个命令打印出数字来评分",
+          "在目标仓库内运行，且爬坡使用独立分支",
+          "需要 git 环境，撤销步骤会重置工作树并删除未忽略的未跟踪文件"
+        ],
+        "limits": [
+          "评分必须由脚本记录，不能自己写分数或判定基本通过",
+          "检查必须锁定，防止通过削弱测试来通过",
+          "检查要足够快，建议单步在 2 分钟内",
+          "噪声大的检查需要多次运行和最小增益阈值",
+          "主观目标依赖 judge.py 与评分标准",
+          "小目标可跳过卡片、辅助与留出集"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "测试",
+          "代码审查",
+          "运维部署"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "You work toward a goal in many small steps. A check scores each step with no human in the loop."
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/climb.py` keeps the score: you edit code, it runs the check, commits a win or undoes a loss, and writes the log."
+          },
+          {
+            "field": "does",
+            "quote": "The check is locked, so no step can weaken a test to pass."
+          },
+          {
+            "field": "does",
+            "quote": "A kit fits: `python3 \"$CLIMB\" reuse <kit>` restores its check, guards, holdout, and notes"
+          },
+          {
+            "field": "inputs",
+            "quote": "`init <name> --goal \"...\" --check \"<command>\" --lock <check files>`."
+          },
+          {
+            "field": "inputs",
+            "quote": "Add a `--check` and a `--repo` for each other repo the work touches."
+          },
+          {
+            "field": "outputs",
+            "quote": "The card, the log, the notes, and the last check output are on disk. `status` shows them in one call."
+          },
+          {
+            "field": "outputs",
+            "quote": "The report quotes measured numbers, not your opinion."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Faster is a time or a count. \"Audit billing\" or \"make roles stable\" is the number of failing tests, one test per finding. A port is the number of outputs that match. A UI is a judge's score."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Any goal fits, because every goal becomes the same thing: a command that prints a number."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The climb gets its own branch. An undone step resets the tree and deletes untracked files that git doesn't ignore."
+          },
+          {
+            "field": "limits",
+            "quote": "Never write a score down yourself, and never decide a step \"basically\" passed."
+          },
+          {
+            "field": "limits",
+            "quote": "Skip the card, helpers, and holdout when the goal is this small."
+          },
+          {
+            "field": "hosts",
+            "quote": "Ask with the harness's question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run long commands in the background and let the harness wake you when they finish."
+          }
+        ]
+      }
     }
   ]
 }
