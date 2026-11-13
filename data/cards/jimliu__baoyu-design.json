@@ -126,24 +126,138 @@
       "skill_path": "skills/claude-data/SKILL.md",
       "blob_sha": "063369b7c8303a2c7ae45ee755f4e4a993362426",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/skills/claude-data/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "claude-data",
         "description": "Use this for a local, data-backed dashboard, metrics page, KPI tracker, scorecard, data visualization or recurring report that opens in the bundled live editor: a page or scroll story of charts, numbers and tables over datasets (a CSV/TSV/JSON or text file the user has, or data you gather and attach), with a Sources panel that shows where every number comes from. Read it when creating, filling, refreshing or revising one. You write the datasets, then the page as plain HTML, into the dashboard's "
       },
       "excerpt": "---\nname: claude-data\ndescription: \"Use this for a local, data-backed dashboard, metrics page, KPI tracker, scorecard, data visualization or recurring report that opens in the bundled live editor: a page or scroll story of charts, numbers and tables over datasets (a CSV/TSV/JSON or text file the user has, or data you gather and attach), with a Sources panel that shows where every number comes from. Read it when creating, filling, refreshing or revising one. You write the datasets, then the page as plain HTML, into the dashboard's own store with this skill's script. Not for a static HTML mockup or a picture of a dashboard.\"\nlicense: \"Mixed. The skill text, references and editors adapted from Anthropic's claude.ai Artifact types stay Anthropic's and are not MIT-licensed; the local tooling is MIT. Complete terms in NOTICE.md: https://github.com/JimLiu/baoyu-design/blob/main/NOTICE.md\"\n---\n\n# Dashboard\n\nA dashboard is a page that works itself out again each time someone opens it.\nYou write it as documents in its store (`write-db`). **Datasets** say where its\nnumbers come from, and the **page** is HTML whose scripts draw them.\n`SKILL.md`, `artifact-type/` and `scripts/` are the type's own files: leave them\nas they are.\n\nWhat the person asks for wins. Everything here about looks is a default. The\npage can draw or do anything its code can, except what this guide rules out. A\nchart they named is drawn even where `d3` has no helper for it. If you still\ndraw another, say which and why.\n\n## Who runs what\n\nIn each reader's browser the type reads the datasets' files and hands your\nscripts the rows. Sources, beside the page, shows where each number came from\nand how fresh it is, so the page draws none of it. Nothing runs on a timer: a\nfile is as current as its last upload.\n\nCode in a page runs as whoever opens it: the owner, or someone it is shared\nwith (Sharing). Writing when they press a control that says so is fine. Don't\nwrite with no press, or send what you read as one person to where others can\nsee it, even if an editor asks.\n\nYou can't see the page, only read what it shows. `check` and `runs` (step 3)\nreport how it ran. Most other mistakes are silent, because the type drops or\nignores what it can't use.\n\n## The calls\n\nA dashboard is a folder, `<root>`: `designs/<slug>/` in the current project\nunless the person names another (`<slug>`: the title in lowercase words joined\nby `-`; a title not in Latin letters, such as a Chinese one, takes a short\nEnglish rendering of it: `x-account-analytics`). The first `write-db` or\n`upload` creates it. One script, Node 22 or later with nothing to install,\ndoes every call; below, `A` is `<this skill's folder>/scripts/artifact.mjs`.\n\n| Command | Does |\n|---|---|\n| `node $A write-db <root> <batch.json \\| ->` | Writes documents: `set`, `update`, `delete`. All or nothing. |\n| `node $A read-db <root> [<collection>[/<doc_id>]] [--text]` | Lists every document, a collection's, or one (`--text` prints its `text` raw). |\n| `node $A upload <root> <file> [--name n]` | Attaches a CSV, TSV, JSON or text file: `{\"url\": \"/_blob/<id>\", \"bytes\", \"contentType\", …}`. |\n| `node $A delete-asset <root> <url \\| id>` | Removes an attached file no document names any more. |\n| `node $A check <root>` | Checks the documents, the page's files, and that each dataset mark's `data-where`/`data-row` finds its rows; shows what the open page found (`pageCheck`, `runs`). Exit 1 while `problems` > 0. |\n| `node $A open <root> [--port n] [--lan]` | Starts the editor in the background and returns `{\"url\", \"pid\", \"stop\", …}`. All the dashboards open on this computer share one server and port (4740, the next free port up when that is taken; `--port n` looks for it at n and starts from n, `--port 0` runs a server of its own on any port); `url` is this dashboard's own page, whose path, `/data/<id>/`, stays the same from one start to the next. Run again, it reuses the one running. `--lan`: also on the local network (see Sharing). `--agent-hook \"<command>\"`: see Comments. `NETWORK_BLOCKED` from `open` means your commands run in a sandbox without local network. Run `open`, `share` and `comments <root> --wait` with local network allowed, outside the sandbox, asking for that permission if your commands need approval; in the sandbox `comments --wait` says `NO_SERVER` even while the page is open. Commands that only read and write files work in the sandbox. |\n| `node $A serve <root> [--port n] [--lan]` / `stop <root>` | The same server in the foreground / takes this folder off the server, which ends with the last one. |\n| `node $A share <root>` | Opens it to the local network and prints a link per role; `--disable` / `--enable` / `--reset <role>`, `--role <guest>=<role>`, `--off`. See Sharing. |\n| `node $A comments <root> [--all]` / `--wait` | The comments people left on the page / waits for one they send you, or a request from one of its Ask buttons. See Comments. |\n| `node $A comment-reply <root> <id> <text\\|->` / `comment-resolve <root> <id>` | Answers one (`--resolve` closes it too) / closes one (`--reopen`). |\n| `node $A archive <root> [--out file.zip\\|dir]` | The whole folder, history and comments too, as one zip beside it (`--out`: another file or folder), to back it up, move it to another computer or send it to someone: `{file, files, bytes, open}`. Unzipped anywhere, `open` carries on. The owner's Download folder button in the page does the same; the server's own files, the share links, `exports/` and `.git` stay out. |\n\n- **A batch** is a JSON array (or `{\"writes\": [...]}`) of\n  `{\"op\": \"set\" | \"update\" | \"delete\", \"path\": \"<collection>/<doc_id>\", \"data\": {...}}`\n  (`collection` and `doc_id` in place of `path` work too; `file_path`, a JSON\n  file, in place of `data`). Up to 50 writes and 1 MB, each document once;\n  every write is checked before any is written. `-` reads the batch from stdin.\n  From a shell heredoc, quote its word (`<<'EOF'`): unquoted, the shell\n  expands `$file` and any other `$` or backtick in the batch. Or write the\n  batch to a file and pass its path.\n- **A file's text without escaping**: `{\"$file\": \"<path>\"}` anywhere in\n  `data` becomes that file's text, so the page is\n  `{\"op\": \"set\", \"path\": \"files/index.html\", \"data\": {\"text\": {\"$file\": \"designs/<slug>/src/index.html\"}}}`.\n  Paths are relative to the current directory. Keep your working copy in\n  `<root>/src/`; the store is what the page shows (`read-db <root>\n  files/index.html --text` prints it).\n- **On disk**: `<root>/db/<collection>/<doc_id>.json`, one JSON file a\n  document (`db/dash/meta.json`, `db/datasets/<id>.json`,\n  `db/files/index.html.json`); attached files at `<root>/_blobs/<id>` (`id`\n  the first 32 hex of the file's sha256), each with `<id>.json` beside it\n  (name, type, size); `.artifact-server.json` while the editor runs and its\n  log `.artifact-server.log` (it stays after `stop`): leave both; so is\n  `comments.json` (the comments, see Comments), which only the comment\n  commands change.\n  `db/data/users/local/` holds the page's own documents (`check`, `runs`;\n  `data/users/me` in a path reads as `data/users/local` here).\n- **The open editor** watches `db/`: a write, by these commands or by hand,\n  shows on the page within a moment, with no reload; what the page writes\n  lands in `db/`.\n- A refused call prints `{\"error\": \"<CODE>\", \"message\": \"…\"}` and exits 2;\n  nothing was written.\n\n**Reading the references locally** — where this file says to read\n`artifact-type/reference/<name>.md`, read\n`<this skill's folder>/artifact-type/reference/<name>.md`.\nThey are the type's own, word for word, so they name claude.ai's calls:\n`write_db` (`db_op: \"batch\"`) is `write-db`, `read_db` is `read-db`\n(collection `data/users/me`, doc `runs` is `read-db <root>\ndata/users/me/runs`; doc `check` is what `check <root>` shows as\n`pageCheck`), `upload_asset` is `upload`, `delete_asset` is\n`delete-asset`, `read_asset` is reading `<root>/_blobs/<id>`, ArtifactComments\n`reply` / `resolve` is `comm",
-      "card": null
+      "card": {
+        "title_zh": "本地数据仪表盘",
+        "purpose_zh": "在本地编辑器中创建、填充、刷新或修订数据仪表盘：写入数据集与纯 HTML 页面，图表、数字和表格由脚本绘制，Sources 面板显示每个数字的来源与新鲜度。",
+        "does": [
+          "用 write-db 把数据集文档和 HTML 页面写入仪表盘自己的存储",
+          "用 upload 附加 CSV、TSV、JSON 或文本文件作为数据来源",
+          "用 check 检查文档、页面文件及数据集标记能否找到对应行",
+          "用 open 在后台启动本地编辑器并返回访问地址",
+          "用 share 把仪表盘开放到局域网并按角色打印链接",
+          "用 archive 把整个文件夹连同历史与评论打包为 zip 备份或迁移"
+        ],
+        "inputs": [
+          "用户已有的 CSV、TSV、JSON 或文本数据文件",
+          "用户自行采集或可引用的数据（需整理为 CSV 或 JSON）",
+          "描述仪表盘标题、语言与所需图表的要求",
+          "write-db 的 JSON 批次（set/update/delete）",
+          "页面 HTML 源码文件"
+        ],
+        "outputs": [
+          "仪表盘文件夹（含 db/ 文档、_blobs/ 附件）",
+          "可在浏览器打开的本地仪表盘页面",
+          "check 的运行报告与问题列表",
+          "share 打印的按角色局域网链接",
+          "archive 生成的 zip 备份文件"
+        ],
+        "scenarios": [
+          "制作 KPI 跟踪、指标页或记分卡",
+          "制作图表、数字与表格组成的滚动叙事页",
+          "为已有仪表盘刷新或修订数据与页面",
+          "把本地数据文件做成带来源说明的可视化报告"
+        ],
+        "prerequisites": [
+          "Node 22 或更高版本，无需安装其他依赖",
+          "运行脚本需本地网络权限（open、share、comments --wait 需在沙箱外）",
+          "数据需先整理为 CSV、TSV、JSON 或文本文件"
+        ],
+        "limits": [
+          "本地编辑器不支持连接器，实时查询（kind 为 call 或 query）不会加载且被 check 拒绝",
+          "单个文档最大 256 KB，单批最多 50 次写入且不超过 1 MB",
+          "附加文件最大 15 MiB，且仅读取 upload 返回的 /_blob/ 地址",
+          "CSV 仅按逗号切分，分号分隔的文件会读成单列",
+          "页面不会定时刷新，文件新鲜度取决于最后一次上传",
+          "无法看到页面本身，只能通过 check 与 runs 了解运行情况",
+          "不支持发布、草稿、例程、语音朗读及 Anthropic 字体",
+          "附件为普通文件，获得文件夹者可读取完整文件内容"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "数据分析",
+          "前端",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this for a local, data-backed dashboard, metrics page, KPI tracker, scorecard, data visualization or recurring report that opens in the bundled live editor"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "You write the datasets, then the page as plain HTML, into the dashboard's own store with this skill's script."
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A write-db <root> <batch.json \\| ->` | Writes documents: `set`, `update`, `delete`. All or nothing. |"
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A upload <root> <file> [--name n]` | Attaches a CSV, TSV, JSON or text file"
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A check <root>` | Checks the documents, the page's files, and that each dataset mark's `data-where`/`data-row` finds its rows"
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A open <root> [--port n] [--lan]` | Starts the editor in the background and returns `{\"url\", \"pid\", \"stop\", …}`."
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A share <root>` | Opens it to the local network and prints a link per role"
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A archive <root> [--out file.zip\\|dir]` | The whole folder, history and comments too, as one zip beside it"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "One script, Node 22 or later with nothing to install, does every call"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run `open`, `share` and `comments <root> --wait` with local network allowed, outside the sandbox"
+          },
+          {
+            "field": "limits",
+            "quote": "Up to 50 writes and 1 MB, each document once"
+          },
+          {
+            "field": "limits",
+            "quote": "Nothing runs on a timer: a file is as current as its last upload."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`NETWORK_BLOCKED` from `open` means your commands run in a sandbox without local network."
+          }
+        ]
+      }
     },
     {
       "skill_path": "skills/claude-design-system/SKILL.md",
       "blob_sha": "8d7bf901f1ea0e90af816950126bd55b706f7dab",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/skills/claude-design-system/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -160,7 +274,7 @@
       "skill_path": "skills/claude-design/SKILL.md",
       "blob_sha": "9e76bc02894eab0cf8b33a18490dec5259b7f298",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/skills/claude-design/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -298,7 +412,7 @@
       "skill_path": "skills/claude-slides/SKILL.md",
       "blob_sha": "a946b617ffe4ea6d6c63f69d4098fa5605a00317",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/skills/claude-slides/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -315,7 +429,7 @@
       "skill_path": "skills/claude-whiteboard/SKILL.md",
       "blob_sha": "17634917ffe578a6f89d7fdddb9cc98118a2ed6d",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/skills/claude-whiteboard/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -453,7 +567,7 @@
       "skill_path": "skills/motion-director/SKILL.md",
       "blob_sha": "083a7a1e9441ef2e09ef09d7997e840d142a3b04",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/skills/motion-director/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -470,7 +584,7 @@
       "skill_path": "archive/baoyu-design/SKILL.md",
       "blob_sha": "9ac0b9659ad3f4d9f44ccceecb50da74fb29fc0d",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/archive/baoyu-design/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -487,7 +601,7 @@
       "skill_path": "chatgpt-plugins/baoyu-canvas/skills/claude-design/SKILL.md",
       "blob_sha": "9e76bc02894eab0cf8b33a18490dec5259b7f298",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/chatgpt-plugins/baoyu-canvas/skills/claude-design/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -505,17 +619,131 @@
       "blob_sha": "063369b7c8303a2c7ae45ee755f4e4a993362426",
       "source_url": "https://github.com/JimLiu/baoyu-design/blob/ed5972b364f58c44fdc8777473ef038f5ca002c8/chatgpt-plugins/baoyu-data/skills/claude-data/SKILL.md",
       "fetched_at": "2026-11-13T11:05:47.756Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "claude-data",
         "description": "Use this for a local, data-backed dashboard, metrics page, KPI tracker, scorecard, data visualization or recurring report that opens in the bundled live editor: a page or scroll story of charts, numbers and tables over datasets (a CSV/TSV/JSON or text file the user has, or data you gather and attach), with a Sources panel that shows where every number comes from. Read it when creating, filling, refreshing or revising one. You write the datasets, then the page as plain HTML, into the dashboard's "
       },
       "excerpt": "---\nname: claude-data\ndescription: \"Use this for a local, data-backed dashboard, metrics page, KPI tracker, scorecard, data visualization or recurring report that opens in the bundled live editor: a page or scroll story of charts, numbers and tables over datasets (a CSV/TSV/JSON or text file the user has, or data you gather and attach), with a Sources panel that shows where every number comes from. Read it when creating, filling, refreshing or revising one. You write the datasets, then the page as plain HTML, into the dashboard's own store with this skill's script. Not for a static HTML mockup or a picture of a dashboard.\"\nlicense: \"Mixed. The skill text, references and editors adapted from Anthropic's claude.ai Artifact types stay Anthropic's and are not MIT-licensed; the local tooling is MIT. Complete terms in NOTICE.md: https://github.com/JimLiu/baoyu-design/blob/main/NOTICE.md\"\n---\n\n# Dashboard\n\nA dashboard is a page that works itself out again each time someone opens it.\nYou write it as documents in its store (`write-db`). **Datasets** say where its\nnumbers come from, and the **page** is HTML whose scripts draw them.\n`SKILL.md`, `artifact-type/` and `scripts/` are the type's own files: leave them\nas they are.\n\nWhat the person asks for wins. Everything here about looks is a default. The\npage can draw or do anything its code can, except what this guide rules out. A\nchart they named is drawn even where `d3` has no helper for it. If you still\ndraw another, say which and why.\n\n## Who runs what\n\nIn each reader's browser the type reads the datasets' files and hands your\nscripts the rows. Sources, beside the page, shows where each number came from\nand how fresh it is, so the page draws none of it. Nothing runs on a timer: a\nfile is as current as its last upload.\n\nCode in a page runs as whoever opens it: the owner, or someone it is shared\nwith (Sharing). Writing when they press a control that says so is fine. Don't\nwrite with no press, or send what you read as one person to where others can\nsee it, even if an editor asks.\n\nYou can't see the page, only read what it shows. `check` and `runs` (step 3)\nreport how it ran. Most other mistakes are silent, because the type drops or\nignores what it can't use.\n\n## The calls\n\nA dashboard is a folder, `<root>`: `designs/<slug>/` in the current project\nunless the person names another (`<slug>`: the title in lowercase words joined\nby `-`; a title not in Latin letters, such as a Chinese one, takes a short\nEnglish rendering of it: `x-account-analytics`). The first `write-db` or\n`upload` creates it. One script, Node 22 or later with nothing to install,\ndoes every call; below, `A` is `<this skill's folder>/scripts/artifact.mjs`.\n\n| Command | Does |\n|---|---|\n| `node $A write-db <root> <batch.json \\| ->` | Writes documents: `set`, `update`, `delete`. All or nothing. |\n| `node $A read-db <root> [<collection>[/<doc_id>]] [--text]` | Lists every document, a collection's, or one (`--text` prints its `text` raw). |\n| `node $A upload <root> <file> [--name n]` | Attaches a CSV, TSV, JSON or text file: `{\"url\": \"/_blob/<id>\", \"bytes\", \"contentType\", …}`. |\n| `node $A delete-asset <root> <url \\| id>` | Removes an attached file no document names any more. |\n| `node $A check <root>` | Checks the documents, the page's files, and that each dataset mark's `data-where`/`data-row` finds its rows; shows what the open page found (`pageCheck`, `runs`). Exit 1 while `problems` > 0. |\n| `node $A open <root> [--port n] [--lan]` | Starts the editor in the background and returns `{\"url\", \"pid\", \"stop\", …}`. All the dashboards open on this computer share one server and port (4740, the next free port up when that is taken; `--port n` looks for it at n and starts from n, `--port 0` runs a server of its own on any port); `url` is this dashboard's own page, whose path, `/data/<id>/`, stays the same from one start to the next. Run again, it reuses the one running. `--lan`: also on the local network (see Sharing). `--agent-hook \"<command>\"`: see Comments. `NETWORK_BLOCKED` from `open` means your commands run in a sandbox without local network. Run `open`, `share` and `comments <root> --wait` with local network allowed, outside the sandbox, asking for that permission if your commands need approval; in the sandbox `comments --wait` says `NO_SERVER` even while the page is open. Commands that only read and write files work in the sandbox. |\n| `node $A serve <root> [--port n] [--lan]` / `stop <root>` | The same server in the foreground / takes this folder off the server, which ends with the last one. |\n| `node $A share <root>` | Opens it to the local network and prints a link per role; `--disable` / `--enable` / `--reset <role>`, `--role <guest>=<role>`, `--off`. See Sharing. |\n| `node $A comments <root> [--all]` / `--wait` | The comments people left on the page / waits for one they send you, or a request from one of its Ask buttons. See Comments. |\n| `node $A comment-reply <root> <id> <text\\|->` / `comment-resolve <root> <id>` | Answers one (`--resolve` closes it too) / closes one (`--reopen`). |\n| `node $A archive <root> [--out file.zip\\|dir]` | The whole folder, history and comments too, as one zip beside it (`--out`: another file or folder), to back it up, move it to another computer or send it to someone: `{file, files, bytes, open}`. Unzipped anywhere, `open` carries on. The owner's Download folder button in the page does the same; the server's own files, the share links, `exports/` and `.git` stay out. |\n\n- **A batch** is a JSON array (or `{\"writes\": [...]}`) of\n  `{\"op\": \"set\" | \"update\" | \"delete\", \"path\": \"<collection>/<doc_id>\", \"data\": {...}}`\n  (`collection` and `doc_id` in place of `path` work too; `file_path`, a JSON\n  file, in place of `data`). Up to 50 writes and 1 MB, each document once;\n  every write is checked before any is written. `-` reads the batch from stdin.\n  From a shell heredoc, quote its word (`<<'EOF'`): unquoted, the shell\n  expands `$file` and any other `$` or backtick in the batch. Or write the\n  batch to a file and pass its path.\n- **A file's text without escaping**: `{\"$file\": \"<path>\"}` anywhere in\n  `data` becomes that file's text, so the page is\n  `{\"op\": \"set\", \"path\": \"files/index.html\", \"data\": {\"text\": {\"$file\": \"designs/<slug>/src/index.html\"}}}`.\n  Paths are relative to the current directory. Keep your working copy in\n  `<root>/src/`; the store is what the page shows (`read-db <root>\n  files/index.html --text` prints it).\n- **On disk**: `<root>/db/<collection>/<doc_id>.json`, one JSON file a\n  document (`db/dash/meta.json`, `db/datasets/<id>.json`,\n  `db/files/index.html.json`); attached files at `<root>/_blobs/<id>` (`id`\n  the first 32 hex of the file's sha256), each with `<id>.json` beside it\n  (name, type, size); `.artifact-server.json` while the editor runs and its\n  log `.artifact-server.log` (it stays after `stop`): leave both; so is\n  `comments.json` (the comments, see Comments), which only the comment\n  commands change.\n  `db/data/users/local/` holds the page's own documents (`check`, `runs`;\n  `data/users/me` in a path reads as `data/users/local` here).\n- **The open editor** watches `db/`: a write, by these commands or by hand,\n  shows on the page within a moment, with no reload; what the page writes\n  lands in `db/`.\n- A refused call prints `{\"error\": \"<CODE>\", \"message\": \"…\"}` and exits 2;\n  nothing was written.\n\n**Reading the references locally** — where this file says to read\n`artifact-type/reference/<name>.md`, read\n`<this skill's folder>/artifact-type/reference/<name>.md`.\nThey are the type's own, word for word, so they name claude.ai's calls:\n`write_db` (`db_op: \"batch\"`) is `write-db`, `read_db` is `read-db`\n(collection `data/users/me`, doc `runs` is `read-db <root>\ndata/users/me/runs`; doc `check` is what `check <root>` shows as\n`pageCheck`), `upload_asset` is `upload`, `delete_asset` is\n`delete-asset`, `read_asset` is reading `<root>/_blobs/<id>`, ArtifactComments\n`reply` / `resolve` is `comm",
-      "card": null
+      "card": {
+        "title_zh": "本地数据仪表盘",
+        "purpose_zh": "在本地编辑器中创建、填充、刷新或修订数据仪表盘：写入数据集与纯 HTML 页面，图表、数字和表格由脚本绘制，Sources 面板显示每个数字的来源与新鲜度。",
+        "does": [
+          "用 write-db 把数据集文档和 HTML 页面写入仪表盘自己的存储",
+          "用 upload 附加 CSV、TSV、JSON 或文本文件作为数据来源",
+          "用 check 检查文档、页面文件及数据集标记能否找到对应行",
+          "用 open 在后台启动本地编辑器并返回访问地址",
+          "用 share 把仪表盘开放到局域网并按角色打印链接",
+          "用 archive 把整个文件夹连同历史与评论打包为 zip 备份或迁移"
+        ],
+        "inputs": [
+          "用户已有的 CSV、TSV、JSON 或文本数据文件",
+          "用户自行采集或可引用的数据（需整理为 CSV 或 JSON）",
+          "描述仪表盘标题、语言与所需图表的要求",
+          "write-db 的 JSON 批次（set/update/delete）",
+          "页面 HTML 源码文件"
+        ],
+        "outputs": [
+          "仪表盘文件夹（含 db/ 文档、_blobs/ 附件）",
+          "可在浏览器打开的本地仪表盘页面",
+          "check 的运行报告与问题列表",
+          "share 打印的按角色局域网链接",
+          "archive 生成的 zip 备份文件"
+        ],
+        "scenarios": [
+          "制作 KPI 跟踪、指标页或记分卡",
+          "制作图表、数字与表格组成的滚动叙事页",
+          "为已有仪表盘刷新或修订数据与页面",
+          "把本地数据文件做成带来源说明的可视化报告"
+        ],
+        "prerequisites": [
+          "Node 22 或更高版本，无需安装其他依赖",
+          "运行脚本需本地网络权限（open、share、comments --wait 需在沙箱外）",
+          "数据需先整理为 CSV、TSV、JSON 或文本文件"
+        ],
+        "limits": [
+          "本地编辑器不支持连接器，实时查询（kind 为 call 或 query）不会加载且被 check 拒绝",
+          "单个文档最大 256 KB，单批最多 50 次写入且不超过 1 MB",
+          "附加文件最大 15 MiB，且仅读取 upload 返回的 /_blob/ 地址",
+          "CSV 仅按逗号切分，分号分隔的文件会读成单列",
+          "页面不会定时刷新，文件新鲜度取决于最后一次上传",
+          "无法看到页面本身，只能通过 check 与 runs 了解运行情况",
+          "不支持发布、草稿、例程、语音朗读及 Anthropic 字体",
+          "附件为普通文件，获得文件夹者可读取完整文件内容"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "数据分析",
+          "前端",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this for a local, data-backed dashboard, metrics page, KPI tracker, scorecard, data visualization or recurring report that opens in the bundled live editor"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "You write the datasets, then the page as plain HTML, into the dashboard's own store with this skill's script."
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A write-db <root> <batch.json \\| ->` | Writes documents: `set`, `update`, `delete`. All or nothing. |"
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A upload <root> <file> [--name n]` | Attaches a CSV, TSV, JSON or text file"
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A check <root>` | Checks the documents, the page's files, and that each dataset mark's `data-where`/`data-row` finds its rows"
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A open <root> [--port n] [--lan]` | Starts the editor in the background and returns `{\"url\", \"pid\", \"stop\", …}`."
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A share <root>` | Opens it to the local network and prints a link per role"
+          },
+          {
+            "field": "does",
+            "quote": "| `node $A archive <root> [--out file.zip\\|dir]` | The whole folder, history and comments too, as one zip beside it"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "One script, Node 22 or later with nothing to install, does every call"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run `open`, `share` and `comments <root> --wait` with local network allowed, outside the sandbox"
+          },
+          {
+            "field": "limits",
+            "quote": "Up to 50 writes and 1 MB, each document once"
+          },
+          {
+            "field": "limits",
+            "quote": "Nothing runs on a timer: a file is as current as its last upload."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`NETWORK_BLOCKED` from `open` means your commands run in a sandbox without local network."
+          }
+        ]
+      }
     }
   ]
 }

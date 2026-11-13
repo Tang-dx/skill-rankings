@@ -108,7 +108,7 @@
       "skill_path": "replica-backend/SKILL.md",
       "blob_sha": "1aacf10acb4969dfe6795fd7f765fd5361ddf694",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-backend/SKILL.md",
-      "fetched_at": "2026-11-13T11:49:55.150Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -125,7 +125,7 @@
       "skill_path": "replica-brand/SKILL.md",
       "blob_sha": "08933c7cfd2b570b084a890c7874fc2c3372120c",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-brand/SKILL.md",
-      "fetched_at": "2026-11-13T11:49:55.150Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -280,24 +280,146 @@
       "skill_path": "replica-deploy/SKILL.md",
       "blob_sha": "cd0ab67170a96690a748bfa1975b1845b6731e50",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-deploy/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "replica-deploy",
         "description": "Ships an app clone live on the user's own domain: a preflight gate (tests green, parity must-haves done, rebrand sweep clean, listing linted, legal pages up), production database and env vars, the host, DNS records for the domain and for email, Stripe live mode, OAuth redirects, monitoring, and mobile builds to TestFlight and Play. Use when the user says \"deploy it\", \"ship it\", \"put it live\", \"connect my domain\", \"go to production\", \"publish the app\", or after /replica-launch."
       },
       "excerpt": "---\nname: replica-deploy\ndescription: >-\n  Ships an app clone live on the user's own domain: a preflight gate (tests\n  green, parity must-haves done, rebrand sweep clean, listing linted, legal\n  pages up), production database and env vars, the host, DNS records for the\n  domain and for email, Stripe live mode, OAuth redirects, monitoring, and\n  mobile builds to TestFlight and Play. Use when the user says \"deploy it\",\n  \"ship it\", \"put it live\", \"connect my domain\", \"go to production\",\n  \"publish the app\", or after /replica-launch.\n---\n\n# replica-deploy\n\nReads everything in `replica/`. Writes `replica/deploy.md` (the checklist in\n`preflight.md` in this folder, filled in).\n\n## The rules\n\n- **Nothing goes live without the user's go.** Show the preflight results and\n  ask.\n- **The user buys and signs in.** Claude never buys a domain, enters a card,\n  types a password or pastes a live key. Claude writes the exact DNS records,\n  env var names and commands; the user does the account steps.\n- **Not until it is rebranded.** The sweep must be clean. No exceptions.\n\n## Step 1: preflight\n\nRun every check and paste the results into `deploy.md`:\n\n```bash\nnpx playwright test                                                  # replica-test\npython3 ../replica-diff/parity.py replica/features.csv               # must-haves done\npython3 ../replica-brand/sweep.py . --config replica/brand.json      # exit 0: clean\npython3 ../replica-launch/listing.py replica/launch/listing.json     # if shipping to stores\nnpm run build                                                        # production build passes\n```\n\n(Paths are relative to wherever the pack is installed. Under\n`~/.claude/skills/` that is `~/.claude/skills/replica-diff/parity.py` and so\non.)\n\nPlus by hand: no open S1 or S2 bugs, privacy policy and terms pages live\n(listing every processor), cookie banner if you use non-essential cookies in\nthe EU or UK, account deletion works, the favicon, titles and OG image are\nyours.\n\nAny failure stops the deploy. Say which and why.\n\n## Step 2: production services\n\n- A **separate production project** for the database (never the dev one),\n  backups on, migrations run by the deploy, not by hand.\n- Env vars set in the host for production, matching `.env.example`. Live\n  keys only here.\n- **Stripe**: switch to live mode, recreate products and prices, add the\n  production webhook endpoint and its signing secret, test one real\n  purchase and refund it.\n- **OAuth**: add the production domain to every provider's redirect URIs and\n  authorised origins. Google scopes that need verification must be approved,\n  or only test users can sign in.\n- **Email**: the sending domain verified with the provider.\n\n## Step 3: host and domain\n\nDefault: Vercel for Next.js (Netlify, Cloudflare Pages, Fly or Render\notherwise). Connect the repo so `main` deploys and pull requests get preview\nURLs.\n\nThe domain, after the user buys it at any registrar:\n\n| record | name | value |\n| --- | --- | --- |\n| A | @ | the host's apex IP (Vercel: shown in the domain settings) |\n| CNAME | www | the host's target (Vercel: `cname.vercel-dns.com`) |\n| TXT | @ or a subdomain | the host's verification value, if asked |\n\nEmail DNS from the email provider: SPF (TXT), DKIM (CNAME or TXT), and a\nDMARC record starting at `v=DMARC1; p=none; rua=mailto:you@yourdomain` then\ntightened to `quarantine` once reports are clean. Without these, your\nconfirmation emails go to spam.\n\nPick one canonical host (apex or www) and redirect the other. HTTPS is\nautomatic on the hosts above; check it.\n\n## Step 4: watch it\n\nError tracking (Sentry or the host's), uptime checks on the home page and the\ncore flow's API, logs kept, analytics (a privacy-friendly one avoids the\ncookie banner), and an alert to the user's email or phone. Then do the core\nflow on the live site yourself, and ask the user to do it on their phone.\n\n## Step 5: mobile, if there is an app\n\nExpo: `eas build` then `eas submit` to TestFlight and Play internal testing.\nNative: archive in Xcode, upload to App Store Connect; Gradle bundle to Play\nConsole. The user owns the developer accounts ($99 a year for Apple, $25 once\nfor Google). Beta first, then review with the listing from replica-launch.\n\n## Output\n\n`replica/deploy.md` with every check and its result, the live URL, the DNS\nrecords set, and what to watch in the first week. The clone is now an app\nwith your name on it.\n",
-      "card": null
+      "card": {
+        "title_zh": "克隆应用上线部署",
+        "purpose_zh": "把克隆应用部署到用户自有域名：先跑预检门禁，再配生产数据库与环境变量、托管、域名和邮件 DNS、Stripe 实盘、OAuth 回调、监控，以及移动端上架。",
+        "does": [
+          "运行预检门禁：Playwright 测试、功能对齐、品牌替换扫描、商店文案检查、生产构建",
+          "配置生产数据库、环境变量、Stripe 实盘、OAuth 回调与发信域名",
+          "连接托管平台并给出域名与邮件所需的 DNS 记录",
+          "设置错误追踪、可用性监控、日志、分析告警，并实测核心流程",
+          "有移动端时用 EAS 或原生工具构建并提交 TestFlight 与 Play 内测",
+          "把全部检查结果写入 replica/deploy.md"
+        ],
+        "inputs": [
+          "replica/ 目录下的项目资料",
+          "replica/features.csv 功能对齐清单",
+          "replica/brand.json 品牌配置",
+          "replica/launch/listing.json 商店文案",
+          "用户的明确上线许可"
+        ],
+        "outputs": [
+          "replica/deploy.md 部署清单与结果",
+          "线上访问 URL",
+          "已设置的 DNS 记录清单",
+          "首周需关注的监控项"
+        ],
+        "scenarios": [
+          "用户说 deploy it、ship it、put it live 时",
+          "用户要连接自有域名时",
+          "准备发布到应用商店时",
+          "执行 /replica-launch 之后"
+        ],
+        "prerequisites": [
+          "预检全部通过：测试绿、必备功能完成、品牌扫描干净、构建通过",
+          "无未关闭的 S1/S2 缺陷",
+          "隐私政策与条款页已上线，必要时有 Cookie 横幅",
+          "账号购买与登录由用户本人完成"
+        ],
+        "limits": [
+          "未经用户同意不得上线",
+          "Claude 不买域名、不输卡号、不填密码、不粘贴实盘密钥",
+          "品牌替换未完成不得部署",
+          "任一预检失败即停止部署"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "运维部署",
+          "自动化",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Ships an app clone live on the user's own domain: a preflight gate"
+          },
+          {
+            "field": "does",
+            "quote": "Run every check and paste the results into `deploy.md`"
+          },
+          {
+            "field": "does",
+            "quote": "A **separate production project** for the database (never the dev one), backups on"
+          },
+          {
+            "field": "does",
+            "quote": "Connect the repo so `main` deploys and pull requests get preview URLs."
+          },
+          {
+            "field": "does",
+            "quote": "Error tracking (Sentry or the host's), uptime checks on the home page and the core flow's API"
+          },
+          {
+            "field": "does",
+            "quote": "Expo: `eas build` then `eas submit` to TestFlight and Play internal testing."
+          },
+          {
+            "field": "outputs",
+            "quote": "`replica/deploy.md` with every check and its result, the live URL, the DNS records set, and what to watch in the first week."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Any failure stops the deploy. Say which and why."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "no open S1 or S2 bugs, privacy policy and terms pages live"
+          },
+          {
+            "field": "limits",
+            "quote": "**Nothing goes live without the user's go.** Show the preflight results and ask."
+          },
+          {
+            "field": "limits",
+            "quote": "Claude never buys a domain, enters a card, types a password or pastes a live key."
+          },
+          {
+            "field": "limits",
+            "quote": "**Not until it is rebranded.** The sweep must be clean. No exceptions."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx playwright test"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm run build"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Writes `replica/deploy.md`"
+          },
+          {
+            "field": "hosts",
+            "quote": "Under `~/.claude/skills/` that is `~/.claude/skills/replica-diff/parity.py`"
+          }
+        ]
+      }
     },
     {
       "skill_path": "replica-design/SKILL.md",
       "blob_sha": "cfb3df4161d770770e5440f3d1d22344e24747f4",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-design/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -314,7 +436,7 @@
       "skill_path": "replica-diff/SKILL.md",
       "blob_sha": "1322d76e6f383171808491f691dbdc477f250343",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-diff/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -331,7 +453,7 @@
       "skill_path": "replica-entrepreneur/SKILL.md",
       "blob_sha": "6d43280fb5026cf8eca3f7f73eea386141fdba79",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-entrepreneur/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -348,7 +470,7 @@
       "skill_path": "replica-launch/SKILL.md",
       "blob_sha": "0fe60edc02e4d8fc91db0716998632beb5dc5b91",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-launch/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -365,7 +487,7 @@
       "skill_path": "replica-recon/SKILL.md",
       "blob_sha": "e877302e106c839b81835edaa2a409cd239c52e3",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-recon/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -382,7 +504,7 @@
       "skill_path": "replica-test/SKILL.md",
       "blob_sha": "7dbe9dafa4c75fe02b6fb9eca37cadd809a73a36",
       "source_url": "https://github.com/Jakeschincariol/replica-skill/blob/77c9436fb3d18c3d58169efb8caf4fe906b0dc51/replica-test/SKILL.md",
-      "fetched_at": "2026-11-13T10:59:35.565Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",

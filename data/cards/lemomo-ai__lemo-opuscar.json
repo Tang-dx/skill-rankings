@@ -8,35 +8,283 @@
       "skill_path": "plugin/skills/lemo-opuscar/SKILL.md",
       "blob_sha": "7bc1e0320773c18f698503d9c1de69c98c477369",
       "source_url": "https://github.com/lemomo-ai/lemo-opuscar/blob/3a7132b996be0241c1ea0ab180d519f06e6f10b6/plugin/skills/lemo-opuscar/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "lemo-opuscar",
         "description": "Direct and produce a short film made entirely in code, in one of the styles of the Lemo-Opuscar library (e.g. Impasto Oil Painting 油画厚涂, Watercolor Brush 水彩笔刷, Ukiyo-e 浮世绘, Satellite Briefing 卫星简报, Exploded Teardown 产品拆解). Use when the user asks for a video, film, short, promo, explainer or animation (视频、短片、动画、宣传片) in a named style, including explainers built from real material such as satellite imagery, laser scans, CAD files or archive scans (数据解说、科普、产品拆解), and new films cut from real archive "
       },
       "excerpt": "---\nname: lemo-opuscar\ndescription: Direct and produce a short film made entirely in code, in one of the styles of the Lemo-Opuscar library (e.g. Impasto Oil Painting 油画厚涂, Watercolor Brush 水彩笔刷, Ukiyo-e 浮世绘, Satellite Briefing 卫星简报, Exploded Teardown 产品拆解). Use when the user asks for a video, film, short, promo, explainer or animation (视频、短片、动画、宣传片) in a named style, including explainers built from real material such as satellite imagery, laser scans, CAD files or archive scans (数据解说、科普、产品拆解), and new films cut from real archive footage and documents (剪辑纪实, e.g. 用档案影像剪一支新闻片); when they want a film about their own topic and haven't chosen a style (help them choose); when they want to change a style into their own, make their own style from a blank page, or use a style they saved (改风格、从空白开始、我的风格); when they start the skill without saying what they want; or when they ask which film styles there are. Not for plain editing, trimming or converting the user's existing video files.\n---\n\n# Lemo-Opuscar\n\nThe styles, guides and tools live in the Lemo-Opuscar library (github.com/lemomo-ai/lemo-opuscar). This skill fetches it and hands you over to it.\n\n1. **Get the library.** Run `sh \"<skill base directory>/scripts/setup.sh\"`. It clones or updates the library (default `~/lemo-opuscar`; a clone the user is standing in is used as it is), lists any missing system tools (Node, ffmpeg, Python) and prints `LIB=<path>` on its last line.\n2. **Install the core tools early.** Start `sh \"<skill base directory>/scripts/setup.sh\" deps` right away, in the background if you can: it takes a few minutes the first time. Add `deps voice` or `deps music` later, only if the film needs them (`$LIB/TECHNIQUE.md` §1). Report missing system tools (Node, ffmpeg, Python) in your one round of questions; don't install system software yourself. A style marked ✦ also needs an image generator the user provides (`$LIB/AGENTS.md`, Workflow, Brief). Packages a style needs (its `STYLE.md` lists them) you install yourself, into the project folder.\n3. **Follow the library.** Read `$LIB/AGENTS.md` and do what it says, starting with **Start** (the user's own styles in `~/lemo-my-styles/`; when they started the skill without writing anything, the language question first, then the ways in): finding the style or making their own, the one round of questions, the treatment, production and delivery.\n\nWhat changes in skill mode:\n\n| | |\n|---|---|\n| Project folder | `<name>/` in the folder the user started from (lowercase letters, digits, hyphens; avoid `#` and `?` in the path). Wherever the guides say `films/<name>/`, read this folder |\n| Running tools | from `$LIB`, with the project's absolute path: `cd \"$LIB\" && node core/render/still.mjs \"<project>\" 1.5 3` |\n| Library files in pages | absolute URLs: `/core/lib.js`, `/node_modules/three/…` (the project is served at `/@film/`) |\n| Library files in scripts and `build.sh` | `$LIB/…`, with `LIB=<path>` at the top of `build.sh`; never `../..` |\n| Demo source | not downloaded. `sh \"<skill base directory>/scripts/setup.sh\" demo <slug>`, only after your `TREATMENT.md` is written, to read its techniques; it is not meant to be rendered. An Edit & Documentary style is the exception: fetch it before the treatment to use the material tools its `STYLE.md` names in `demo/tools/` (`$LIB/AGENTS.md`, \"Treatment first\") |\n\nDeliver what `$LIB/DIRECTOR.md` §11 lists, in the project folder, and tell the user where it is.\n",
-      "card": null
+      "card": {
+        "title_zh": "代码短片制作",
+        "purpose_zh": "按 Lemo-Opuscar 风格库用代码制作短片，先拉取风格库并安装工具，再按库内指南完成风格选择、提问、方案、制作与交付。",
+        "does": [
+          "运行 setup.sh 克隆或更新 Lemo-Opuscar 风格库并列出缺失的系统工具",
+          "在后台安装核心工具，按需追加语音或音乐依赖",
+          "读取库内 AGENTS.md 与 DIRECTOR.md，按流程引导选风格或自建风格",
+          "按需下载 demo 源码以参考技法，剪辑纪实风格需先取素材工具",
+          "在项目文件夹内完成方案、制作与交付并告知用户位置"
+        ],
+        "inputs": [
+          "用户想要的视频主题与风格（如油画厚涂、水彩笔刷、浮世绘等）",
+          "用户自有的风格或已保存风格",
+          "真实素材（卫星影像、激光扫描、CAD 文件、档案扫描、档案影像）",
+          "用户提供的图像生成器（用于标 ✦ 的风格）"
+        ],
+        "outputs": [
+          "项目文件夹内的成片及 DIRECTOR.md 第11节列出的交付物",
+          "TREATMENT.md 制作方案"
+        ],
+        "scenarios": [
+          "制作指定风格的短片、宣传片、解说或动画",
+          "用卫星影像、扫描或 CAD 等真实素材做数据解说或产品拆解",
+          "用档案影像与文件剪辑纪实新闻片",
+          "用户未定风格时协助挑选风格",
+          "改造风格、从空白自建风格或使用已保存风格"
+        ],
+        "prerequisites": [
+          "需安装 Node、ffmpeg、Python 等系统工具（脚本只列出缺失，不代为安装）",
+          "标 ✦ 的风格需用户自备图像生成器",
+          "首次安装核心工具需数分钟"
+        ],
+        "limits": [
+          "不适用于对用户已有视频做普通剪辑、裁剪或转码",
+          "不自行安装系统软件",
+          "demo 源码不默认下载，且不用于渲染"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "视频",
+          "自动化",
+          "设计/UI",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Direct and produce a short film made entirely in code, in one of the styles of the Lemo-Opuscar library"
+          },
+          {
+            "field": "does",
+            "quote": "Start `sh \"<skill base directory>/scripts/setup.sh\" deps` right away, in the background if you can: it takes a few minutes the first time."
+          },
+          {
+            "field": "does",
+            "quote": "Read `$LIB/AGENTS.md` and do what it says, starting with **Start**"
+          },
+          {
+            "field": "does",
+            "quote": "`sh \"<skill base directory>/scripts/setup.sh\" demo <slug>`, only after your `TREATMENT.md` is written, to read its techniques; it is not meant to be rendered."
+          },
+          {
+            "field": "does",
+            "quote": "Deliver what `$LIB/DIRECTOR.md` §11 lists, in the project folder, and tell the user where it is."
+          },
+          {
+            "field": "inputs",
+            "quote": "including explainers built from real material such as satellite imagery, laser scans, CAD files or archive scans"
+          },
+          {
+            "field": "inputs",
+            "quote": "A style marked ✦ also needs an image generator the user provides"
+          },
+          {
+            "field": "outputs",
+            "quote": "Deliver what `$LIB/DIRECTOR.md` §11 lists, in the project folder"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user asks for a video, film, short, promo, explainer or animation (视频、短片、动画、宣传片) in a named style"
+          },
+          {
+            "field": "scenarios",
+            "quote": "new films cut from real archive footage and documents (剪辑纪实, e.g. 用档案影像剪一支新闻片)"
+          },
+          {
+            "field": "scenarios",
+            "quote": "when they want to change a style into their own, make their own style from a blank page, or use a style they saved (改风格、从空白开始、我的风格)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Report missing system tools (Node, ffmpeg, Python) in your one round of questions; don't install system software yourself."
+          },
+          {
+            "field": "limits",
+            "quote": "Not for plain editing, trimming or converting the user's existing video files."
+          },
+          {
+            "field": "limits",
+            "quote": "Demo source | not downloaded."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "It clones or updates the library"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Packages a style needs (its `STYLE.md` lists them) you install yourself, into the project folder."
+          }
+        ]
+      }
     },
     {
       "skill_path": "tools/directory/SKILL.md",
       "blob_sha": "3e28a83d4031cb8a6ee5c021043ef806509a3d53",
       "source_url": "https://github.com/lemomo-ai/lemo-opuscar/blob/3a7132b996be0241c1ea0ab180d519f06e6f10b6/tools/directory/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "lemo-opuscar",
         "description": "Direct and produce a short film made entirely in code, in one of the styles of the Lemo-Opuscar library (e.g. Impasto Oil Painting 油画厚涂, Watercolor Brush 水彩笔刷, Ukiyo-e 浮世绘, Satellite Briefing 卫星简报, Exploded Teardown 产品拆解). Use when the user asks for a video, film, short, promo, explainer or animation (视频、短片、动画、宣传片) in a named style, including explainers built from real material such as satellite imagery, laser scans, CAD files or archive scans (数据解说、科普、产品拆解), and new films cut from real archive "
       },
       "excerpt": "---\nname: lemo-opuscar\ndescription: Direct and produce a short film made entirely in code, in one of the styles of the Lemo-Opuscar library (e.g. Impasto Oil Painting 油画厚涂, Watercolor Brush 水彩笔刷, Ukiyo-e 浮世绘, Satellite Briefing 卫星简报, Exploded Teardown 产品拆解). Use when the user asks for a video, film, short, promo, explainer or animation (视频、短片、动画、宣传片) in a named style, including explainers built from real material such as satellite imagery, laser scans, CAD files or archive scans (数据解说、科普、产品拆解), and new films cut from real archive footage and documents (剪辑纪实, e.g. 用档案影像剪一支新闻片); when they want a film about their own topic and haven't chosen a style (help them choose); when they want to change a style into their own, make their own style from a blank page, or use a style they saved (改风格、从空白开始、我的风格); when they start the skill without saying what they want; or when they ask which film styles there are. Not for plain editing, trimming or converting the user's existing video files.\n---\n\n# Lemo-Opuscar\n\nThe styles, guides and tools ship with this plugin, in `library/` next to this file. Nothing is downloaded to tell you what to do.\n\n1. **Get the library ready.** Run `sh \"<skill base directory>/scripts/setup.sh\"`. It copies the bundled library to its working folder (default `~/.lemo-opuscar`, so installed packages survive plugin updates), lists any missing system tools (Node, ffmpeg, Python) and prints `LIB=<path>` on its last line.\n2. **Install the core tools early.** Start `sh \"<skill base directory>/scripts/setup.sh\" deps` right away, in the background if you can: it takes a few minutes the first time. Add `deps voice` or `deps music` later, only if the film needs them (`$LIB/TECHNIQUE.md` §1). Report missing system tools (Node, ffmpeg, Python) in your one round of questions; don't install system software yourself. A style marked ✦ also needs an image generator the user provides (`$LIB/AGENTS.md`, Workflow, Brief). Packages a style needs (its `STYLE.md` lists them) you install yourself, into the project folder.\n3. **Follow the library.** Read `$LIB/AGENTS.md` and do what it says, starting with **Start** (the user's own styles in `~/lemo-my-styles/`; when they started the skill without writing anything, the language question first, then the ways in): finding the style or making their own, the one round of questions, the treatment, production and delivery.\n\nWhat changes in skill mode:\n\n| | |\n|---|---|\n| Project folder | `<name>/` in the folder the user started from (lowercase letters, digits, hyphens; avoid `#` and `?` in the path). Wherever the guides say `films/<name>/`, read this folder |\n| Running tools | from `$LIB`, with the project's absolute path: `cd \"$LIB\" && node core/render/still.mjs \"<project>\" 1.5 3`. `sh tools/setup.sh` and `sh tools/fetch.sh` also run from `$LIB` |\n| Library files in pages | absolute URLs: `/core/lib.js`, `/node_modules/three/…` (the project is served at `/@film/`) |\n| Library files in scripts and `build.sh` | `$LIB/…`, with `LIB=<path>` at the top of `build.sh`; never `../..` |\n| Demo films | not in this edition: no `demo/` source and no `poster.jpg`. Each style's `DEMO.md` (how its demo was made) is there; read it only after your `TREATMENT.md` is written, as the guides say. An Edit & Documentary style needs its material before the treatment: find and log it yourself, as its `STYLE.md` describes (the `demo/tools/` it names aren't in this edition). The films are on the gallery, https://lemomo-ai.github.io/lemo-opuscar/, if the user wants to watch one |\n| Chinese narration | Kokoro's Chinese voices (offline) by default. edge-tts (`core/tts/tts_zh.py`) sounds better but sends the narration text to Microsoft's speech service: offer it in your one round of questions and use it only if the user agrees |\n| Big downloads | only what the film needs, from the sources `$LIB/TECHNIQUE.md` §1 lists (npm, PyPI, Playwright's browser, this library's GitHub Releases, Hugging Face for the speech check). Name them in your one round of questions the first time |\n\nDeliver what `$LIB/DIRECTOR.md` §11 lists, in the project folder, and tell the user where it is.\n",
-      "card": null
+      "card": {
+        "title_zh": "代码短片制作库",
+        "purpose_zh": "按 Lemo-Opuscar 风格库用代码制作短片，涵盖油画、水彩、浮世绘、卫星简报、产品拆解等风格，也支持数据解说、档案剪辑和自定义风格。",
+        "does": [
+          "运行 setup.sh 准备随附风格库并列出缺失的系统工具",
+          "安装核心工具依赖，按需追加语音或音乐依赖",
+          "读取库内指南，完成选风格或自建风格、提问、方案、制作与交付",
+          "在项目文件夹内用库工具渲染静帧、构建影片",
+          "按风格需要安装其列出的包，并处理素材与中文旁白",
+          "交付 DIRECTOR.md 第11节所列成果并告知位置"
+        ],
+        "inputs": [
+          "用户想要的影片主题与风格（或未指定风格）",
+          "用户自有的风格目录 ~/lemo-my-styles/",
+          "真实素材，如卫星影像、激光扫描、CAD 文件、档案扫描件或影像",
+          "用户对旁白方案、大体积下载来源的确认"
+        ],
+        "outputs": [
+          "项目文件夹内的短片成品及 DIRECTOR.md 第11节所列交付物",
+          "TREATMENT.md 等制作文档"
+        ],
+        "scenarios": [
+          "制作指定风格的视频、短片、动画或宣传片",
+          "用卫星影像、扫描或 CAD 等真实材料做数据解说或产品拆解",
+          "用档案影像和文件剪辑纪实新闻片",
+          "帮用户挑选风格或从空白创建自己的风格",
+          "询问有哪些影片风格"
+        ],
+        "prerequisites": [
+          "需安装 Node、ffmpeg、Python 等系统工具，由用户自行安装",
+          "首次运行 setup.sh deps 需数分钟",
+          "标 ✦ 的风格需用户自备图像生成器",
+          "使用 edge-tts 需用户同意，因其会把旁白文本发送到微软语音服务"
+        ],
+        "limits": [
+          "不适用于对用户已有视频做普通剪辑、裁剪或格式转换",
+          "本版本不含 demo 影片源码与 poster.jpg",
+          "edge-tts 会把旁白文本发送至微软服务，默认改用离线 Kokoro 中文语音",
+          "大体积下载仅限影片所需，且首次需在提问环节列明来源",
+          "不自行安装系统软件"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "视频",
+          "自动化",
+          "设计/UI",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Direct and produce a short film made entirely in code, in one of the styles of the Lemo-Opuscar library"
+          },
+          {
+            "field": "does",
+            "quote": "Run `sh \"<skill base directory>/scripts/setup.sh\"`. It copies the bundled library to its working folder"
+          },
+          {
+            "field": "does",
+            "quote": "Start `sh \"<skill base directory>/scripts/setup.sh\" deps` right away, in the background if you can"
+          },
+          {
+            "field": "does",
+            "quote": "Read `$LIB/AGENTS.md` and do what it says, starting with **Start**"
+          },
+          {
+            "field": "does",
+            "quote": "Packages a style needs (its `STYLE.md` lists them) you install yourself, into the project folder."
+          },
+          {
+            "field": "does",
+            "quote": "Deliver what `$LIB/DIRECTOR.md` §11 lists, in the project folder, and tell the user where it is."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "lists any missing system tools (Node, ffmpeg, Python)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "it takes a few minutes the first time"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "A style marked ✦ also needs an image generator the user provides"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "edge-tts (`core/tts/tts_zh.py`) sounds better but sends the narration text to Microsoft's speech service: offer it in your one round of questions and use it only if the user agrees"
+          },
+          {
+            "field": "limits",
+            "quote": "Not for plain editing, trimming or converting the user's existing video files."
+          },
+          {
+            "field": "limits",
+            "quote": "not in this edition: no `demo/` source and no `poster.jpg`"
+          },
+          {
+            "field": "limits",
+            "quote": "Kokoro's Chinese voices (offline) by default."
+          },
+          {
+            "field": "limits",
+            "quote": "only what the film needs, from the sources `$LIB/TECHNIQUE.md` §1 lists"
+          },
+          {
+            "field": "limits",
+            "quote": "don't install system software yourself"
+          },
+          {
+            "field": "scenarios",
+            "quote": "when they ask which film styles there are"
+          },
+          {
+            "field": "scenarios",
+            "quote": "new films cut from real archive footage and documents"
+          },
+          {
+            "field": "inputs",
+            "quote": "the user's own styles in `~/lemo-my-styles/`"
+          }
+        ]
+      }
     }
   ]
 }

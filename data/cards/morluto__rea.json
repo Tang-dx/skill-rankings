@@ -566,17 +566,126 @@
       "blob_sha": "baea9f529b572dd28a72d874f192a75c426b845e",
       "source_url": "https://github.com/morluto/rea/blob/bbe2bcc979be747698d9ad9ce87af017b92e0f10/.agents/skills/reverse-engineer-anything/SKILL.md",
       "fetched_at": "2026-11-13T11:11:48.516Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "generated_at": "2026-11-13T11:11:48.516Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "reverse-engineer-anything",
         "description": "Reverse engineer native, managed, Electron/JavaScript, packaged, firmware, and browser targets with REA, and build agent environments (AgentEnv bundles) of web applications from a live instance or a capture, and of Linux desktop apps with a task from a request. Use shipped-artifact or requested runtime evidence to explain features, compare versions, decompile code, or guide a reconstruction. Skip REA for ordinary source-repository architecture analysis."
       },
       "excerpt": "---\nname: reverse-engineer-anything\ndescription: Reverse engineer native, managed, Electron/JavaScript, packaged, firmware, and browser targets with REA, and build agent environments (AgentEnv bundles) of web applications from a live instance or a capture, and of Linux desktop apps with a task from a request. Use shipped-artifact or requested runtime evidence to explain features, compare versions, decompile code, or guide a reconstruction. Skip REA for ordinary source-repository architecture analysis.\nmetadata:\n  version: \"62\"\n---\n\n# REA\n\nUse REA when a claim depends on a shipped binary or package, decompilation,\nrequested runtime evidence, or comparison with\nbehavior not established by available source. For ordinary analysis of a\ncomplete source repository, use normal repository tools and do not run REA\nreadiness or provider commands.\n\n## Connect only when needed\n\nInstalling this skill supplies instructions; it does not register the REA MCP\nserver, install analysis engines, or add tools to an already-running agent.\nThe exception is a Claude Code, Codex, or Cursor Marketplace plugin install:\nthe plugin bundles this skill and registers its own `rea` server, outside the\nstate that `rea setup` and `rea doctor` manage.\n\nIf REA tools are available and their registration is not known to be stale,\nproceed directly to the target. Do not run diagnostics or setup before every\ninvestigation. Use the connected server's actual tool list and input schemas;\na skill installed from repository main may describe capabilities absent from\nan older npm release. Keep complete inline Evidence when that server does not\nadvertise retained references.\n\nIf tools are absent, a call is blocked by the client, or a required provider is\nunavailable, read [connection and recovery](references/connection-and-recovery.md).\nDiagnose the observed blocker, continue useful supported work, and resume the\noriginal task after repair. Client approval, shell PATH, registration and engine\navailability have different remedies; avoid repeating setup for all of them.\nIf the host times out without a REA result, do not repeat the unchanged call or\nassume work stopped. Read the recovery guide's deadline distinction before retrying.\nIf the MCP connection drops, retry that call once only when it is safe to\nrepeat or known not to have started. If it may already have changed the\ntarget, or it fails again, tell the user and ask them to restart the MCP\nclient. If REA could not start its connection, retry once, then tell the user\nand ask them to restart the MCP client. Do not retry a startup failure that\nreturns the same unchanged result. For plugin installs, follow\n[plugin recovery](references/connection-and-recovery.md#rea-installed-as-a-client-plugin).\nFor setup-owned registrations, run `rea doctor` when REA could not start\nor tools stay missing after that restart. For `cleanup_incomplete`, a retryable\ncapacity limit, or `configuration_invalid`, follow the recovery guide's ladder\nbefore asking for a restart. Read that guide before a second repair attempt.\n\nChoose the installation owner before repairing registration. Plugin installs use\n[plugin recovery](references/connection-and-recovery.md#rea-installed-as-a-client-plugin);\nonly setup-owned registrations use the guide's\n[registration repair plan](references/connection-and-recovery.md#repair-registration-when-needed).\nA plugin-only doctor result of `missing` does not call for `rea setup`.\n\nREA setup never installs or upgrades Node.js, npm, Homebrew, Java, Ghidra, IDA,\nJADX, Kuna, Binwalk, or Unblob. Use existing prerequisites; do not install unrelated\nsoftware to repair MCP registration. For an unsupported client, use manual stdio\nregistration with an existing installation’s absolute runtime and entry script, or continue through the CLI.\n\nA concrete CLI fallback for an operator-supplied JavaScript tree or ASAR is:\n\n```bash\nnpx -y rea-agents@latest analyze-javascript-application /absolute/path/to/app --json\n```\n\nNo MCP registration or native engine is required. Read the returned Evidence,\ngraph, limitations, and unknowns with the same care as an MCP result; the CLI\nreturns the Evidence record directly. This fallback does not establish that\nMCP is configured. Native CLI tasks still require their selected engine.\nPrefer an existing `rea` CLI. When none is installed and REA package acquisition\nis within the authorized scope, use `npx -y rea-agents@latest` in its place from a\ntrusted directory outside the target project, with absolute target paths. Managed\nsetup binds the current installation directly; retain its runtime and package\ncache entry, or restore that installation before repairing its registration.\nFor setup-owned registration, configuration repair starts with a read-only setup plan; show paths, backups and\nskill replacement before applying authorized changes. Preserve existing approval\nand target-execution boundaries.\n\n## Route the target first\n\nChoose the first tool from the target the user supplied. Use `open_binary` for\nactive-target native or archive workflows; target-free tools take their own\nexplicit path or endpoint and do not need it.\n\n- ASAR or extracted JavaScript/Electron tree:\n  `analyze_javascript_application`.\n- Archive/package member inventory (ZIP/APK/IPA/MSIX/AppX, DMG, or a PyInstaller\n  executable): `open_binary` with the supplied local path; use `inspect_artifact`\n  when its graph and findings help answer the question. A PyInstaller CArchive\n  is the application layer; the bootloader is only the native prefix. Start with\n  `detail: \"summary\"` for large inventories, then use retained inventory views\n  for selected member fields/pages. A complete small inventory can cost less\n  than extra calls and schemas. Runtime options are metadata, not files.\n  Compact delivery still inventories and hashes members. See the\n  [Python packaged applications guide](https://github.com/morluto/rea/blob/main/docs/python-packaged-applications.md).\n- Bun `--compile` executable: `open_binary`, then `inspect_artifact`; the Bun\n  module graph is the application layer. Extract stored modules and analyze the\n  JavaScript. See [Bun standalone executables](https://github.com/morluto/rea/blob/main/docs/bun-standalone.md).\n- Deno `deno compile` executable: `open_binary`, then `inspect_artifact`; the\n  embedded virtual filesystem is the application layer. Extract stored files and\n  analyze compatible JavaScript. Environment-file values and CA certificate bytes\n  are retained in local Evidence with their counts and byte lengths. The npm\n  snapshot length is reported and not decoded, and the executable is not run. See\n  [Deno compile executables](https://github.com/morluto/rea/blob/main/docs/deno-standalone.md).\n- Apple app plist, Interface Builder, asset catalog, or keyed archive resources:\n  `open_bundle_resources`, then the selected resource tool. This does not\n  require `CFBundleExecutable` or a deep provider. Resource sessions have no\n  executable digest or binary snapshot; use `open_binary` for native code.\n- Android APK code, classes, methods, or incoming references:\n  `inspect_android_package`, then focused Android tools when advertised.\n  Archive member inventory still uses the archive route above.\n- Managed PE/CLI assembly: `inspect_managed_artifact`.\n- Firmware image: `inspect_firmware_regions` when advertised. Use\n  `extract_firmware` when extraction is requested, with a caller-selected new\n  absolute output directory. These tools use caller-supplied Binwalk/Unblob on\n  Linux; see the [firmware guide](https://github.com/morluto/rea/blob/main/docs/guides/firmware/firmware-analysis.md).\n- ESP32-family app or bootloader image (`0xE9` magic): `inspect_artifact`\n  without a provider; see the ESP section of `references/native-and-artifacts.md`.\n- .NET NativeAOT PE/ELF: native Ghidra analysis. Native code can yield pseudocode;\n  consult the NativeAOT workflow in `references/native-and-artifacts.md` for\n  optional metadata recovery and its supported host/layo",
-      "card": null
+      "card": {
+        "title_zh": "REA逆向工程技能",
+        "purpose_zh": "在结论依赖已发布二进制、包、反编译、运行时证据或版本行为对比时，用REA分析原生、托管、Electron/JavaScript、打包、固件与浏览器目标，并可构建Web或Linux桌面应用的AgentEnv环境。",
+        "does": [
+          "按目标类型路由到对应工具：ASAR/JS树、归档包、Bun/Deno可执行文件、APK、托管程序集、固件、ESP32镜像等",
+          "对原生程序做静态分析，并在需要时选择运行时观测、插桩或命令执行效果工作流",
+          "分析浏览器页面、被动流量捕获、HAR/SAZ/qlog抓包与Fiddler流量",
+          "用capture_browser_scenario录制浏览器场景，并用export_environment_bundle导出Web应用AgentEnv包",
+          "从请求出发在构建机上驱动Linux桌面应用，导出并见证其环境",
+          "对本地.app、安装目录、ASAR或可执行文件运行audit_release_exposure做发布暴露审计"
+        ],
+        "inputs": [
+          "用户提供的本地目标路径（二进制、归档、ASAR、APK、固件镜像等）",
+          "用户拥有的浏览器页面或Electron运行时目标",
+          "已保存的HAR/SAZ/qlog抓包文件或Fiddler Everywhere流量",
+          "浏览器动作声明（点击、输入、导航）",
+          "构建Linux桌面应用环境的任务描述",
+          "允许的源站列表allowed_origins"
+        ],
+        "outputs": [
+          "Evidence记录、图与发现结果",
+          "限制与未知项说明",
+          "导出的AgentEnv环境包",
+          "发布暴露审计报告（含检查id、状态与修复建议）",
+          "反编译代码或伪代码",
+          "归档成员清单与哈希"
+        ],
+        "scenarios": [
+          "判断某功能是否存在于已发布二进制或包中",
+          "反编译代码或对比不同版本行为",
+          "从实时实例或抓包构建Web应用的AgentEnv环境",
+          "为Linux桌面应用按任务构建Agent环境",
+          "审计本地发布产物的暴露面"
+        ],
+        "prerequisites": [
+          "需要已注册并连接的REA MCP服务器或可用的rea CLI；安装技能本身不注册服务器、不安装分析引擎",
+          "原生CLI任务需要其选定的分析引擎（如Ghidra、IDA、JADX等）已存在",
+          "固件工具需调用方自备Linux上的Binwalk/Unblob",
+          "插件安装（Claude Code、Codex、Cursor Marketplace）会自带注册rea服务器"
+        ],
+        "limits": [
+          "REA setup不安装或升级Node.js、npm、Homebrew、Java、Ghidra、IDA、JADX、Kuna、Binwalk、Unblob",
+          "普通完整源码仓库的架构分析不应使用REA",
+          "open_binary与trace_native_values只建立静态事实，不观测执行",
+          "qlog仅支持aioquic 1.5.0 JSON 0.3，其他布局与PCAP关联不支持",
+          "被动抓包默认仅限页面自身源站，需显式传入API源站",
+          "连接失败时不应重复相同调用，需按恢复指南处理"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "安全",
+          "代码审查",
+          "调研",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use REA when a claim depends on a shipped binary or package, decompilation, requested runtime evidence, or comparison with behavior not established by available source."
+          },
+          {
+            "field": "does",
+            "quote": "ASAR or extracted JavaScript/Electron tree: `analyze_javascript_application`."
+          },
+          {
+            "field": "does",
+            "quote": "Firmware image: `inspect_firmware_regions` when advertised. Use `extract_firmware` when extraction is requested, with a caller-selected new absolute output directory."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Installing this skill supplies instructions; it does not register the REA MCP server, install analysis engines, or add tools to an already-running agent."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "These tools use caller-supplied Binwalk/Unblob on Linux"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "the plugin bundles this skill and registers its own `rea` server"
+          },
+          {
+            "field": "limits",
+            "quote": "REA setup never installs or upgrades Node.js, npm, Homebrew, Java, Ghidra, IDA, JADX, Kuna, Binwalk, or Unblob."
+          },
+          {
+            "field": "limits",
+            "quote": "For ordinary analysis of a complete source repository, use normal repository tools and do not run REA readiness or provider commands."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx -y rea-agents@latest analyze-javascript-application /absolute/path/to/app --json"
+          },
+          {
+            "field": "hosts",
+            "quote": "The exception is a Claude Code, Codex, or Cursor Marketplace plugin install"
+          }
+        ]
+      }
     },
     {
       "skill_path": ".cursor-plugin/skills/reverse-engineer-anything/SKILL.md",

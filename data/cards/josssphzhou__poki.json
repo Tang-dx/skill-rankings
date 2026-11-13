@@ -1,32 +1,160 @@
 {
   "schema": 1,
   "repo": "JosssphZhou/poki",
-  "tree_sha": "ec1cd9e42dd44d3328bd5a75beaf59854636f9cd",
+  "tree_sha": "cc782d3b3a4776e7662f837417c982ff3f5ff45e",
   "truncated_paths": 0,
   "skills": [
     {
       "skill_path": "skills/install-poki/SKILL.md",
-      "blob_sha": "08d2a3520bdadab785a71a39bba0599dd0068b07",
-      "source_url": "https://github.com/JosssphZhou/poki/blob/35ffeb336f4da1538e587cd3909244f7cf4f67a0/skills/install-poki/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "blob_sha": "dea0f587b89f212d7f4f3b4140690a53ede9ce76",
+      "source_url": "https://github.com/JosssphZhou/poki/blob/8c646da743b11264d777ff56b0cec8efccdf17e9/skills/install-poki/SKILL.md",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "install-poki",
-        "description": "Install the Poki app on the user's iPhone from a Mac, end to end, when they ask something like \"install Poki on my iPhone\". Runs bin/install-iphone.mjs from a Poki checkout and tells the user the one sentence it prints at each step only a person can do."
+        "description": "Install or update the Poki app on the user's iPhone from a Mac, when they ask something like \"install Poki on my iPhone\" or \"update Poki\", or when Poki's own update on the iPhone fails, cannot download or stalls. Uses the checkout installer for first installs and checks the existing signing identity before a computer-assisted update."
       },
-      "excerpt": "---\nname: install-poki\ndescription: Install the Poki app on the user's iPhone from a Mac, end to end, when they ask something like \"install Poki on my iPhone\". Runs bin/install-iphone.mjs from a Poki checkout and tells the user the one sentence it prints at each step only a person can do.\nlicense: AGPL-3.0-only\n---\n\n# Install Poki on an iPhone\n\nThis installs the standalone Poki app on the user's iPhone through Poki Setup's helper, without its window. It is not the Poki MCP install in the repository's `AGENTS.md`. Works from Claude Code, Codex or any agent that can run a shell command on the user's Mac.\n\nThe installer does the work. You start it, relay its person stops, and report its result. Do not run its steps yourself.\n\n## Before you start\n\n**First-time installation requires Wi-Fi.** Ask the user to connect the iPhone to Wi-Fi and keep it connected until initial setup is complete. If it is on cellular data only, wait for the user to confirm Wi-Fi before starting. This applies to both the checkout installer and Poki Setup's bundled command line tool.\n\n1. Find or make a Poki checkout. In a checkout, `bin/install-iphone.mjs` exists. Otherwise run `git clone --branch standalone https://github.com/JosssphZhou/poki.git` and work in that folder.\n2. Check: a Mac with macOS 14 or later, Node.js 24 or later, an iPhone on iOS 18 or later, a USB data cable, and the user's Apple Account. A free account works with 7-day signing; it must be renewed before it expires. The iPhone also needs a VPN app that routes 10.7.0.1 back to the iPhone: the free LocalDevVPN from the App Store, or Karing or Shadowrocket, configured as Poki's Setup page directs. On iOS 27 and later Poki controls the iPhone through its native services by default; on iOS 18 to 26 it uses the XCTest session, which needs UI Automation. That path was not tested on a physical iPhone below iOS 27 for this release: tell the user so before installing on an older iOS. Xcode is not required. With Xcode installed, the installer can see when Poki opens and give it the model key even with an older Poki Setup. Without Node.js 24, or on Windows, use \"Without Node.js, or on Windows\" below instead of the checkout.\n3. Ask the user one question: \"Should I also give Poki on the iPhone your model API key from this Mac's keychain?\" Default is no. On yes, ask which provider (`openai`, `anthropic`, `deepseek`, `gemini` or `openrouter`) and add `--model-key <provider>` below. The installer reads the keychain item `<provider>-api-key` (for example `openai-api-key`; another name with `--model-key-item <item>`). Never read the key yourself and never ask for it in chat.\n\n## Run it\n\nFrom the checkout, start the installer in the background and read its output as it comes:\n\n```sh\nnode bin/install-iphone.mjs run --json\n```\n\nEach line is one JSON event with an `at` time:\n\n- `{\"event\":\"step\",\"step\":\"install\",...}` starts a step. `done` or `skipped` (with a `reason`) ends it.\n- `{\"event\":\"wait\",\"wait\":\"pair\",\"who\":\"phone\",\"say\":\"...\"}` is a person stop. Tell the user `say` word for word. `who` is `phone` (tap on the iPhone) or `input` (type into a window on the Mac). The installer sees when it is done and continues.\n- `{\"event\":\"note\",\"text\":\"...\"}` is information. Pass it on when it asks something of the user.\n- `{\"event\":\"error\",\"code\":\"...\",\"reason\":\"...\",\"agent_fix\":\"...\",\"retrying\":true}` is a failure. With `retrying` true, the installer is already trying again.\n- `{\"event\":\"result\",\"ok\":true,\"check\":{...}}` is the last line only when the checks passed without manual steps left unverified.\n- A result with `ok:false` and `unverified` exits with code 3. Relay every entry's `say`, including instructions from skipped steps. Have the user finish them in Poki and confirm each result. Report what was manually confirmed and what remains unverified; do not call the phone ready just because the app was installed. Older Poki Setup without Xcode can require manual model-key entry and loopback setup.\n\nSeveral iPhones plugged in: list them with `node bin/install-iphone.mjs phones` and add `--udid <udid>`.\n\n## The steps\n\nThe installer runs these in order. Most need nobody.\n\n1. **`setup_app`** Downloads Poki Setup and checks its SHA-256, Developer ID team (`Q64ZL36CJN`) and notarization. Nobody acts.\n2. **`bridge`** Starts Poki Setup's helper without a window. Nobody acts.\n3. **`channel`** Chooses the release channel, Alpha by default. Nobody acts.\n4. **`apple_account`** Signs in with the Apple Account, on the Mac only. Poki Setup keeps the sign-in for renewals. Stops `apple_dialog` and `apple_code_dialog` when this Mac was never signed in.\n5. **`phone`** Waits for the iPhone. Stop `phone_plug`.\n6. **`install`** Pairs, turns on Developer Mode, signs and installs Poki, gives it its pairing file and disk image. Stops `pair` and `devmode` on a phone that needs them, `pairing_file` rarely.\n7. **`open_poki`** The user trusts the developer and opens Poki. Stop `open_poki`, and the installer sees Poki open by itself. Stop `open_poki_tell` only when this Mac cannot read Poki's files. Then the user tells you, and you run `node bin/install-iphone.mjs done open_poki`.\n8. **`model_key`** Only with `--model-key`. Gives Poki the key, sealed to a key only that iPhone holds, and waits until Poki says it took it. The first time, macOS may ask on the Mac whether node can use the keychain item; tell the user to click Allow. Poki takes the key while it is in front.\n9. **`loopback`** Checks that Poki's local connection (10.7.0.1) answers. Stop `loopback` when it does not, with Poki's own sentence for the VPN app on the phone. If the person has no VPN app, also tell them the free LocalDevVPN from the App Store works.\n10. **`relay`** Deploys the relay when `CLOUDFLARE_API_TOKEN` is set or Poki Setup keeps a token. Skipped otherwise. Poki and its own chat work without it; agents on other computers need it.\n11. **`check`** Self-check: the install record, Developer Mode, pairing, disk image and relay.\n\nPoki turns itself on after this install, and ticks Developer Mode and UI Automation in its Setup once it runs. The iPhone's own switch for UI Automation (Settings > Developer > Enable UI Automation) is still the user's to turn on; Poki's Setup page says so. When Poki first opens it asks for Automation Mode: tell the user to tap Continue and enter the iPhone passcode on iOS's screen. If they cancel, Poki does not ask again until they turn it on again.\n\n## Person stops\n\n| `wait` | What you do |\n|---|---|\n| `apple_dialog` | Tell the user `say`. A Poki Setup window on the Mac asks for the Apple Account email, then the password (hidden). If they close it, the installer stops with `apple_credentials_missing`; run it again when they are ready. |\n| `apple_code_dialog` | Tell the user `say`. Another window asks for the 6-digit code (hidden). Never ask for the code in chat. |\n| `apple_password` | Only without windows (`POKI_INSTALL_DIALOGS=0`, or a session with no screen such as SSH). Give the user the command in `say`. They run it in their own Terminal, where macOS asks for the password without showing it. Never type it for them. |\n| `apple_code` | Only without windows. Give the user the command in `say` exactly as printed (it has this checkout's absolute path). They type the code at its hidden prompt. The installer takes no code as an argument. |\n| `phone_plug` | Tell the user `say`. |\n| `pair` | Tell the user `say`. A phone already paired with this Mac gets only a `note`. |\n| `devmode` | Tell the user `say`. The phone restarts; the installer waits for it. |\n| `pairing_file` | Tell the user `say`. Rare: Poki Setup could not write the pairing file into Poki. |\n| `open_poki` | Tell the user `say`. The installer sees Poki open. If the user says Poki is open and the installer has not moved on within a minute (an older Poki writes no hello), run `node bin/install-iphone.mjs done open_poki`. |\n| `open_poki_tell` | Tell the user `say`. When they say Poki is open, run `node bin/insta",
-      "card": null
+      "excerpt": "---\nname: install-poki\ndescription: Install or update the Poki app on the user's iPhone from a Mac, when they ask something like \"install Poki on my iPhone\" or \"update Poki\", or when Poki's own update on the iPhone fails, cannot download or stalls. Uses the checkout installer for first installs and checks the existing signing identity before a computer-assisted update.\nlicense: AGPL-3.0-only\n---\n\n# Install or update Poki on an iPhone\n\nThis installs the standalone Poki app on the user's iPhone through Poki Setup's helper, without its window. It is not the Poki MCP install or update in the repository's `AGENTS.md`. Works from Claude Code, Codex or any agent that can run a shell command on the user's Mac.\n\nFor a first install, start the installer, relay its person stops, and verify its result. For an update, complete the preservation checks below before any installation command.\n\nPick one branch:\n\n- **First install.** Poki is not on the iPhone. Follow \"Before you start\", \"Run it\", \"Check the version\" and \"What to keep running\".\n- **Update.** Poki is on the iPhone and the user asks to update it, or Poki's own update failed, could not download or stopped moving. Follow \"Update an installed Poki\". Poki's own update downloads from GitHub on the iPhone, and that download sometimes cannot reach GitHub; this branch is the backup, where the Mac downloads the build and installs it over USB.\n- **Stuck on \"Finishing the update\".** Follow \"When Poki's own update stalls\".\n\nIn Poki 0.4.0, open the conversations drawer and tap the Settings button at the bottom. Paths below such as Settings > General > Updates start there.\n\n## Before you start\n\n**First-time installation requires Wi-Fi.** Ask the user to connect the iPhone to Wi-Fi and keep it connected until initial setup is complete. If it is on cellular data only, wait for the user to confirm Wi-Fi before starting. This applies to both the checkout installer and Poki Setup's bundled command line tool.\n\n1. Find or make a Poki checkout. In a checkout, `bin/install-iphone.mjs` exists. Otherwise run `git clone https://github.com/JosssphZhou/poki.git` and work in that folder. An existing checkout on `main` with no local changes can take `git pull --ff-only` first, so the installer is current; leave any other checkout as it is and use a separate clone of `main`. Done when the checkout contains the current installer.\n2. Check: a Mac with macOS 14 or later, Node.js 24 or later, an iPhone on iOS 18 or later, a USB data cable, and the user's Apple Account. A free account works with 7-day signing; see \"No paid developer account\" below. The iPhone also needs a VPN app that routes 10.7.0.1 back to the iPhone; see \"No VPN app\" below. On iOS 27 and later Poki controls the iPhone through its native services by default; on iOS 18 to 26 it uses the XCTest session, which needs UI Automation. That path was not tested on a physical iPhone below iOS 27 for this release: tell the user so before installing on an older iOS. Xcode is not required. With Xcode installed, the installer can see when Poki opens and give it the model key even with an older Poki Setup. Without Node.js 24, or on Windows, use \"Without Node.js, or on Windows\" below instead of the checkout. Done when the prerequisites are present and the user has confirmed the phone is ready.\n3. Ask the user one question: \"Should I also give Poki on the iPhone your model API key from this Mac's keychain?\" Default is no. On yes, ask which provider (`openai`, `anthropic`, `deepseek`, `gemini` or `openrouter`) and add `--model-key <provider>` below. The installer reads the keychain item `<provider>-api-key` (for example `openai-api-key`; another name with `--model-key-item <item>`). Never read the key yourself and never ask for it in chat. Done when the user has chosen whether to transfer a key.\n\n## Which Poki you get\n\nThe installer installs the newest build on its channel: Alpha, unless you pass `--channel stable`, `beta` or `pre-alpha`. A channel also offers the more stable channels' builds, and a channel with no release yet takes the next less stable channel's newest (Stable, then Beta, then Alpha, then Pre-alpha). Stable and Beta therefore use the Alpha build while neither Stable nor Beta offers an installable release. Do not state a version from memory; read it from the run:\n\n- The `channel` step prints `<channel>: Poki <version> (<build>)`, the release this run installs. For a Beta or Stable release the part in brackets is the release name (`beta.1`) or empty, not the build number.\n- The `install` step prints `Poki <version> (<build>) installed`, with the build number from the app itself.\n\nOn November 13, 2026, the published Alpha asset was Poki 0.4.0 (1130), and neither Beta nor Stable had its own app release. This is a dated snapshot, not a version to pin. Resolve the selected channel again for each installation. If it offers an older version than requested, stop and report the release mismatch.\n\nWith Poki Setup installed, `\"<tool>\" release --all --json` lists current releases and `\"<tool>\" channel --json` reads its saved channel without changing it. The tool paths are under \"Without Node.js, or on Windows\". Release names such as `beta.1` are not numeric build numbers. Before an update, download the selected IPA and its SHA256SUMS from the same release, verify the checksum, and read `CFBundleShortVersionString` and `CFBundleVersion` from `Payload/*.app/Info.plist`. Do not install when the numeric build cannot be established. A dry run simulates the phone and is not version or data-preservation proof.\n\n## Run it\n\nFrom the checkout, start the installer in the background and read its output as it comes:\n\n```sh\nnode bin/install-iphone.mjs run --json\n```\n\nEach line is one JSON event with an `at` time:\n\n- `{\"event\":\"step\",\"step\":\"install\",...}` starts a step. `done` or `skipped` (with a `reason`) ends it.\n- `{\"event\":\"wait\",\"wait\":\"pair\",\"who\":\"phone\",\"say\":\"...\"}` is a person stop. Tell the user `say` word for word. `who` is `phone` (tap on the iPhone) or `input` (type into a window on the Mac). The installer sees when it is done and continues.\n- `{\"event\":\"note\",\"text\":\"...\"}` is information. Pass it on when it asks something of the user.\n- `{\"event\":\"error\",\"code\":\"...\",\"reason\":\"...\",\"agent_fix\":\"...\",\"retrying\":true}` is a failure. With `retrying` true, the installer is already trying again.\n- `{\"event\":\"result\",\"ok\":true,\"check\":{...}}` is the last line only when the checks passed without manual steps left unverified.\n- A result with `ok:false` and `unverified` exits with code 3. Relay every entry's `say`, including instructions from skipped steps. Have the user finish them in Poki and confirm each result. Report what was manually confirmed and what remains unverified; do not call the phone ready just because the app was installed. Older Poki Setup without Xcode can require manual model-key entry and loopback setup.\n\nSome helper prompts still name older pages. After relaying the prompt, give the 0.4.0 path: Setup > Connect to this iPhone means Settings > Automation > Setup > Local Connection; Agents > Accounts and Models means Settings > Models > Add Account. Do not follow a helper instruction to delete an existing app.\n\nSeveral iPhones plugged in: list them with `node bin/install-iphone.mjs phones` and add `--udid <udid>`.\n\n## The steps\n\nThe installer runs these in order. Most need nobody. Each step is complete when its `done` event confirms the result described below. A `wait` remains incomplete until its condition is met. Inspect every `skipped` reason; a skipped installation does not prove an update, and a manual step remains unverified until the user confirms it.\n\n1. **`setup_app`** Downloads Poki Setup and checks its SHA-256, Developer ID team (`Q64ZL36CJN`) and notarization. Nobody acts.\n2. **`bridge`** Starts Poki Setup's helper without a window. Nobody acts.\n3. **`channel`** Chooses the release channel, Alpha by default, and saves it as Poki Setup's channel on this Mac. ",
+      "card": {
+        "title_zh": "iPhone 安装或更新 Poki",
+        "purpose_zh": "在 Mac 上通过 Poki Setup 助手把独立版 Poki 应用安装到用户 iPhone，或在 Poki 自身更新失败、卡住时用 USB 备份方式更新，并校验版本与保留数据。",
+        "does": [
+          "首次安装：从代码检出运行 bin/install-iphone.mjs，按步骤安装 Poki 到 iPhone",
+          "更新：先下载所选 IPA 与 SHA256SUMS 校验，读取 Info.plist 版本后再安装",
+          "处理 Poki 自身更新卡在 Finishing the update 的情况",
+          "逐条转述安装器输出中的人员操作提示（配对、开发者模式、信任开发者、打开 Poki）",
+          "可选把 Mac 钥匙串中的模型 API key 传给 iPhone 上的 Poki",
+          "自检安装记录、开发者模式、配对、磁盘镜像与 relay"
+        ],
+        "inputs": [
+          "用户 iPhone 与 USB 数据线",
+          "Mac（macOS 14+）与 Node.js 24+",
+          "用户 Apple Account",
+          "是否转移模型 API key 及 provider 选择",
+          "可选 --channel、--udid、--model-key 参数"
+        ],
+        "outputs": [
+          "iPhone 上安装或更新的 Poki 应用",
+          "逐行 JSON 事件流（step/wait/note/error/result）",
+          "安装版本与构建号信息",
+          "自检结果与未验证项清单"
+        ],
+        "scenarios": [
+          "用户要求把 Poki 安装到 iPhone",
+          "用户要求更新 iPhone 上的 Poki",
+          "Poki 自身更新失败、无法下载或停滞",
+          "Poki 更新卡在 Finishing the update"
+        ],
+        "prerequisites": [
+          "Mac 为 macOS 14 或更高，Node.js 24 或更高",
+          "iPhone 为 iOS 18 或更高，并有 USB 数据线",
+          "用户 Apple Account（免费账号可用 7 天签名）",
+          "首次安装需 iPhone 连接 Wi-Fi 并保持连接",
+          "iPhone 需有能把 10.7.0.1 路由回本机的 VPN 应用",
+          "存在含 bin/install-iphone.mjs 的 Poki 代码检出"
+        ],
+        "limits": [
+          "iOS 18 至 26 的 XCTest 路径在本版本未在低于 iOS 27 的实体 iPhone 上测试",
+          "人员操作等待 15 分钟后以退出码 3 结束",
+          "未设置 CLOUDFLARE_API_TOKEN 时 relay 步骤跳过",
+          "不得由代理读取或索要 API key、Apple 密码或验证码",
+          "不得按助手提示删除已有应用",
+          "dry run 不能证明版本或数据保留"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "运维部署",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This installs the standalone Poki app on the user's iPhone through Poki Setup's helper, without its window."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "For an update, complete the preservation checks below before any installation command."
+          },
+          {
+            "field": "does",
+            "quote": "From the checkout, start the installer in the background and read its output as it comes:"
+          },
+          {
+            "field": "does",
+            "quote": "Before an update, download the selected IPA and its SHA256SUMS from the same release, verify the checksum, and read `CFBundleShortVersionString` and `CFBundleVersion` from `Payload/*.app/Info.plist`."
+          },
+          {
+            "field": "does",
+            "quote": "**Stuck on \"Finishing the update\".** Follow \"When Poki's own update stalls\"."
+          },
+          {
+            "field": "does",
+            "quote": "Tell the user `say` word for word."
+          },
+          {
+            "field": "does",
+            "quote": "On yes, ask which provider (`openai`, `anthropic`, `deepseek`, `gemini` or `openrouter`) and add `--model-key <provider>` below."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "a Mac with macOS 14 or later, Node.js 24 or later, an iPhone on iOS 18 or later, a USB data cable, and the user's Apple Account."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**First-time installation requires Wi-Fi.**"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The iPhone also needs a VPN app that routes 10.7.0.1 back to the iPhone"
+          },
+          {
+            "field": "limits",
+            "quote": "That path was not tested on a physical iPhone below iOS 27 for this release: tell the user so before installing on an older iOS."
+          },
+          {
+            "field": "limits",
+            "quote": "Never read the key yourself and never ask for it in chat."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not follow a helper instruction to delete an existing app."
+          },
+          {
+            "field": "hosts",
+            "quote": "Works from Claude Code, Codex or any agent that can run a shell command on the user's Mac."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "node bin/install-iphone.mjs run --json"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Downloads Poki Setup and checks its SHA-256, Developer ID team (`Q64ZL36CJN`) and notarization."
+          }
+        ]
+      }
     },
     {
       "skill_path": "skills/poki-mcp/SKILL.md",
-      "blob_sha": "9bdae3370095b12119e3dca75681c7df109c5600",
-      "source_url": "https://github.com/JosssphZhou/poki/blob/35ffeb336f4da1538e587cd3909244f7cf4f67a0/skills/poki-mcp/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
-      "generated_at": "2026-11-13T11:05:47.756Z",
+      "blob_sha": "03931e4346156b5d43763b33c7b8cf443c03f012",
+      "source_url": "https://github.com/JosssphZhou/poki/blob/8c646da743b11264d777ff56b0cec8efccdf17e9/skills/poki-mcp/SKILL.md",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
       "model": "deepseek-flash",
       "status": "ok",
       "last_error": null,
@@ -35,56 +163,56 @@
         "name": "poki-mcp",
         "description": "How to send text and answer prompts with Poki MCP on a physical iPhone. Read before the first Poki call on a task that types into a field, meets a system prompt, or navigates with hardware buttons."
       },
-      "excerpt": "---\nname: poki-mcp\ndescription: How to send text and answer prompts with Poki MCP on a physical iPhone. Read before the first Poki call on a task that types into a field, meets a system prompt, or navigates with hardware buttons.\nlicense: AGPL-3.0-only\n---\n\n# Poki MCP\n\n## Tool discovery\n\nThe default `tools/list` contains the tools for device selection, screen reads, app launch, touch, text input, navigation, prompts, and batches. For tools outside that list, read `docs/tools.md` in the Poki checkout used by your registered MCP server. This skill can be copied into a client skill directory.\n\nSet `POKI_MCP_TOOLS=all` in the MCP client's process environment and reconnect to list the complete catalog. Tools absent from the default list still accept direct calls. Device actions can run inside `batch_commands`; lease management calls must stay outside a batch. Consecutive calls do not require `acquire_device`. Poki Agent selects the complete catalog for its own MCP process and retains its own tool allowlist.\n\n`run_code` is in the complete catalog, not the default list. It runs an async JavaScript function that calls device tools with `await tools.<name>(args)`, so the code reads a result and decides the next step in one call instead of a model round trip per step. Prefer it when a task is predictable but depends on what each step returns, such as scrolling until a row appears and then reading its value. A tool error throws and the code can catch it; an action that reports `sent=false` or an unknown outcome stops the script, as a batch stops. The sandbox has no require, file system, network, process or timers.\n\nThe examples below record earlier physical-iPhone checks. They are not a guarantee for every iOS version or app. Verify the current screen after each task.\n\n## Send known text in one batch\n\nWhen the text is already decided, send the steps that open the field and the `fill` in one `batch_commands` call, with `submit: true` on the `fill` when Return sends. `fill` reads the text back from that field before it sends Return, and a failed `fill` stops a batch with the default `stop_on_error: true`, so no look at the draft is needed in between. Keep them apart when the user asked to review the draft.\n\nBasis: tapping `Add Row` then `fill` with `submit: true` in one batch, in a list of text fields: only the new row changed and Return followed the read-back, 3 of 3. A search typed into Chrome's address bar the same way reached the results, 1 of 1.\n\n## When `fill` refuses\n\n`fill` types nothing unless it can confirm the field being edited is the one you aimed at. A field-confirmation error says nothing was typed or sent. The default batch stops there. Read `screen` in the reply, aim again, and retry only the unfinished steps. A `batch_commands` failure returns `remaining_steps` for that batch.\n\nBasis: a tap that gave the edit to the next row, 3 of 3; a list that kept moving, 3 of 3; coordinates with no field under them while another row was being edited, 1 of 1. Every row kept its text and Return was not sent.\n\n## Paste permission\n\n`fill` answers the system paste prompt itself: it taps Allow Paste, reads the text back, then sends Return. The receipt says `paste_permission_answered: true`, and no `handle_alert` call is needed.\n\nBasis: Chrome's address bar, 1 of 1.\n\n## Other prompts\n\nUse `handle_alert` with `action: \"accept\"`, then read `screen` to confirm the prompt closed. A `button` label that is not there returns `Nothing was tapped` and leaves the prompt up.\n\nBasis: a test alert, both paths, 1 of 1.\n\n## Go to the Home screen\n\nOn a physical iPhone, use `press_button` with `button: \"home\"`. `press_key` with `key: \"home\"` sends a keyboard Home key and does not navigate to the iPhone Home screen. Read the screen after the button event to confirm navigation.\n\n## Optional iPhone unlock\n\nPoki Agent's host-integrated `unlock_device` is separate from the MCP tool catalog. Only the user may choose and configure `POKI_IPHONE_PASSCODE` in a private local launcher environment. Ask \"Do you want Poki Agent to unlock this iPhone when it is locked?\" and stop for that decision. Default to no configuration. Anyone or any program with access to this Mac may be able to read the passcode. If the user agrees, give them the hidden-input zsh commands in `agent/README.md` to run themselves. Never ask for the passcode in chat. Never read or write their passcode for them. The host passes it to the helper over stdin, outside model inputs and logs.\n\nThe verified hardware case is only iPhone17,1 in portrait orientation with a six-digit passcode and a 402-by-874-point keypad. Read `agent/skills/iphone-unlock/SKILL.md` in the Poki checkout before use. Setup builds `build/native-target/release/examples/unlock_iphone`. Confirm the current keypad layout and inspect the resulting screen. Without configuration, ask the user to unlock manually.\n\n## Handle prompts\n\nRead the visible prompt and its reported kind. Use `handle_alert` with a button label or `action: \"accept\"` / `\"dismiss\"` to choose a visible button. For a purchase prompt, generic `action: \"accept\"` leaves the prompt open and returns its kind and available buttons. After the action, read the screen to confirm the dialog closed and the task reached its intended state.\n\nFor login or verification, use the credentials available for the authorized task. Read a requested SMS verification code from Messages or notifications, enter it, and verify the resulting screen. Confirm a purchase only when the user's task explicitly requests that purchase. In that case, set `button` to the visible purchase button text. Otherwise dismiss the prompt or continue the task without purchasing.\n",
+      "excerpt": "---\nname: poki-mcp\ndescription: How to send text and answer prompts with Poki MCP on a physical iPhone. Read before the first Poki call on a task that types into a field, meets a system prompt, or navigates with hardware buttons.\nlicense: AGPL-3.0-only\n---\n\n# Poki MCP\n\nFor installation or updates of the standalone iPhone app, read [install-poki](../install-poki/SKILL.md) in the repository. If this skill was copied alone, use `skills/install-poki/SKILL.md` in the Poki checkout. The iPhone update branch checks the existing data, signing identity and release channel before installation. Updating the Mac's MCP service does not update the iPhone app.\n\n## Tool discovery\n\nThe default `tools/list` contains the tools for device selection, screen reads, app launch, touch, text input, navigation, prompts, and batches. For tools outside that list, read `docs/tools.md` in the Poki checkout used by your registered MCP server. This skill can be copied into a client skill directory.\n\nSet `POKI_MCP_TOOLS=all` in the MCP client's process environment and reconnect to list the complete catalog. Tools absent from the default list still accept direct calls. Device actions can run inside `batch_commands`; lease management calls must stay outside a batch. Consecutive calls do not require `acquire_device`. Poki Agent selects the complete catalog for its own MCP process and retains its own tool allowlist.\n\n`run_code` is in the complete catalog, not the default list. It runs an async JavaScript function that calls device tools with `await tools.<name>(args)`, so the code reads a result and decides the next step in one call instead of a model round trip per step. Prefer it when a task is predictable but depends on what each step returns, such as scrolling until a row appears and then reading its value. A tool error throws and the code can catch it; an action that reports `sent=false` or an unknown outcome stops the script, as a batch stops. The sandbox has no require, file system, network, process or timers.\n\nThe examples below record earlier physical-iPhone checks. They are not a guarantee for every iOS version or app. Verify the current screen after each task.\n\n## Send known text in one batch\n\nWhen the text is already decided, send the steps that open the field and the `fill` in one `batch_commands` call, with `submit: true` on the `fill` when Return sends. `fill` reads the text back from that field before it sends Return, and a failed `fill` stops a batch with the default `stop_on_error: true`, so no look at the draft is needed in between. Keep them apart when the user asked to review the draft.\n\nBasis: tapping `Add Row` then `fill` with `submit: true` in one batch, in a list of text fields: only the new row changed and Return followed the read-back, 3 of 3. A search typed into Chrome's address bar the same way reached the results, 1 of 1.\n\n## When `fill` refuses\n\n`fill` types nothing unless it can confirm the field being edited is the one you aimed at. A field-confirmation error says nothing was typed or sent. The default batch stops there. Read `screen` in the reply, aim again, and retry only the unfinished steps. A `batch_commands` failure returns `remaining_steps` for that batch.\n\nBasis: a tap that gave the edit to the next row, 3 of 3; a list that kept moving, 3 of 3; coordinates with no field under them while another row was being edited, 1 of 1. Every row kept its text and Return was not sent.\n\n## Paste permission\n\n`fill` answers the system paste prompt itself: it taps Allow Paste, reads the text back, then sends Return. The receipt says `paste_permission_answered: true`, and no `handle_alert` call is needed.\n\nBasis: Chrome's address bar, 1 of 1.\n\n## Other prompts\n\nUse `handle_alert` with `action: \"accept\"`, then read `screen` to confirm the prompt closed. A `button` label that is not there returns `Nothing was tapped` and leaves the prompt up.\n\nBasis: a test alert, both paths, 1 of 1.\n\n## Go to the Home screen\n\nOn a physical iPhone, use `press_button` with `button: \"home\"`. `press_key` with `key: \"home\"` sends a keyboard Home key and does not navigate to the iPhone Home screen. Read the screen after the button event to confirm navigation.\n\n## Optional iPhone unlock\n\nPoki Agent's host-integrated `unlock_device` is separate from the MCP tool catalog. Only the user may choose and configure `POKI_IPHONE_PASSCODE` in a private local launcher environment. Ask \"Do you want Poki Agent to unlock this iPhone when it is locked?\" and stop for that decision. Default to no configuration. Anyone or any program with access to this Mac may be able to read the passcode. If the user agrees, give them the hidden-input zsh commands in `agent/README.md` to run themselves. Never ask for the passcode in chat. Never read or write their passcode for them. The host passes it to the helper over stdin, outside model inputs and logs.\n\nThe verified hardware case is only iPhone17,1 in portrait orientation with a six-digit passcode and a 402-by-874-point keypad. Read `agent/skills/iphone-unlock/SKILL.md` in the Poki checkout before use. Setup builds `build/native-target/release/examples/unlock_iphone`. Confirm the current keypad layout and inspect the resulting screen. Without configuration, ask the user to unlock manually.\n\n## Handle prompts\n\nRead the visible prompt and its reported kind. Use `handle_alert` with a button label or `action: \"accept\"` / `\"dismiss\"` to choose a visible button. For a purchase prompt, generic `action: \"accept\"` leaves the prompt open and returns its kind and available buttons. After the action, read the screen to confirm the dialog closed and the task reached its intended state.\n\nFor login or verification, use the credentials available for the authorized task. Read a requested SMS verification code from Messages or notifications, enter it, and verify the resulting screen. Confirm a purchase only when the user's task explicitly requests that purchase. In that case, set `button` to the visible purchase button text. Otherwise dismiss the prompt or continue the task without purchasing.\n",
       "card": {
         "title_zh": "Poki MCP iPhone 操作",
-        "purpose_zh": "指导在物理 iPhone 上通过 Poki MCP 发送文本、填写输入框、处理系统提示与弹窗、用硬件按钮导航，并说明工具发现、批量调用与解锁配置的注意事项。",
+        "purpose_zh": "说明在物理 iPhone 上通过 Poki MCP 发送文本、填写输入框、处理系统提示与弹窗、用硬件按钮返回主屏，以及可选的设备解锁注意事项。",
         "does": [
-          "说明默认 tools/list 与完整工具目录的差异及 POKI_MCP_TOOLS=all 的启用方式",
-          "指导用 batch_commands 一次批量完成打开输入框与 fill 提交已知文本",
-          "说明 fill 字段确认失败时的报错、remaining_steps 与重试方式",
-          "说明 fill 自动应答粘贴权限提示及 handle_alert 处理其他弹窗",
-          "指导用 press_button home 返回主屏，并区分 press_key home",
-          "说明可选 iPhone 解锁配置流程与密码安全要求"
+          "用 batch_commands 批量执行打开输入框与 fill 提交文本",
+          "fill 前确认目标输入框，失败时读取 screen 后重试剩余步骤",
+          "fill 自动应答系统粘贴权限提示并回读文本",
+          "用 handle_alert 接受或关闭可见提示，并读屏确认",
+          "用 press_button 的 home 按钮返回 iPhone 主屏",
+          "说明可选解锁配置与购买、验证码提示的处理原则"
         ],
         "inputs": [
           "MCP 客户端进程环境变量（如 POKI_MCP_TOOLS）",
-          "设备工具调用参数（fill、batch_commands、handle_alert、press_button 等）",
-          "用户对是否配置解锁的明确决定",
-          "授权任务所需的登录或验证凭据"
+          "batch_commands 中的设备操作步骤与 fill 参数",
+          "handle_alert 的按钮标签或 accept/dismiss 动作",
+          "press_button 的按钮名",
+          "用户对是否配置解锁的明确决定"
         ],
         "outputs": [
-          "设备操作执行结果与回执（如 paste_permission_answered、remaining_steps）",
-          "屏幕读取结果用于确认状态",
-          "弹窗处理结果与提示种类、可用按钮信息"
+          "工具调用回执（如 paste_permission_answered、remaining_steps）",
+          "screen 读取结果用于确认界面状态",
+          "fill 回读的输入框文本",
+          "提示类型与可用按钮信息"
         ],
         "scenarios": [
-          "在 iPhone 应用输入框中填写并提交已确定的文本",
-          "填写被拒绝后重新定位字段并重试未完成步骤",
-          "处理粘贴权限、测试弹窗或购买提示",
-          "返回 iPhone 主屏幕",
-          "按用户意愿配置锁屏解锁"
+          "向列表新增行并填写文本后提交",
+          "在 Chrome 地址栏输入搜索词",
+          "处理系统粘贴权限弹窗",
+          "关闭或接受应用内提示对话框",
+          "在物理 iPhone 上返回主屏"
         ],
         "prerequisites": [
-          "已注册可用的 Poki MCP 服务器",
+          "已注册 Poki MCP 服务器并连接客户端",
           "需要完整工具目录时设置 POKI_MCP_TOOLS=all 并重连",
-          "解锁功能需用户自行在私有本地启动环境配置 POKI_IPHONE_PASSCODE",
-          "解锁前阅读 Poki 检出中的 iphone-unlock/SKILL.md 并完成构建"
+          "安装或更新 iPhone 应用需参考 install-poki 技能",
+          "可选解锁需用户自行在本地启动环境配置 POKI_IPHONE_PASSCODE"
         ],
         "limits": [
-          "示例仅为过往物理 iPhone 验证，不保证所有 iOS 版本或应用",
-          "run_code 沙箱无 require、文件系统、网络、进程与定时器",
+          "示例仅为早期物理 iPhone 验证，不保证所有 iOS 版本或应用",
+          "run_code 沙箱无 require、文件系统、网络、进程或定时器",
           "租约管理调用不能放在 batch 内",
-          "fill 无法确认目标字段时不输入任何内容",
-          "解锁仅验证 iPhone17,1 竖屏、六位密码与特定键盘尺寸",
-          "不得在聊天中索要密码，不得代用户读写密码"
+          "解锁仅验证 iPhone17,1 竖屏、六位密码、402x874 点键盘",
+          "press_key 的 home 不会导航到 iPhone 主屏",
+          "购买提示的通用 accept 不会关闭提示"
         ],
         "hosts": [
           "未说明"
         ],
         "risk_flags": [
-          "shell",
-          "writes_files",
           "needs_secret"
         ],
         "tags": [
@@ -98,15 +226,7 @@
           },
           {
             "field": "does",
-            "quote": "Set `POKI_MCP_TOOLS=all` in the MCP client's process environment and reconnect to list the complete catalog."
-          },
-          {
-            "field": "does",
             "quote": "When the text is already decided, send the steps that open the field and the `fill` in one `batch_commands` call, with `submit: true` on the `fill` when Return sends."
-          },
-          {
-            "field": "does",
-            "quote": "A `batch_commands` failure returns `remaining_steps` for that batch."
           },
           {
             "field": "does",
@@ -114,19 +234,23 @@
           },
           {
             "field": "does",
+            "quote": "Use `handle_alert` with `action: \"accept\"`, then read `screen` to confirm the prompt closed."
+          },
+          {
+            "field": "does",
             "quote": "On a physical iPhone, use `press_button` with `button: \"home\"`."
           },
           {
             "field": "does",
+            "quote": "Read `screen` in the reply, aim again, and retry only the unfinished steps."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Set `POKI_MCP_TOOLS=all` in the MCP client's process environment and reconnect to list the complete catalog."
+          },
+          {
+            "field": "prerequisites",
             "quote": "Only the user may choose and configure `POKI_IPHONE_PASSCODE` in a private local launcher environment."
-          },
-          {
-            "field": "prerequisites",
-            "quote": "For tools outside that list, read `docs/tools.md` in the Poki checkout used by your registered MCP server."
-          },
-          {
-            "field": "prerequisites",
-            "quote": "Read `agent/skills/iphone-unlock/SKILL.md` in the Poki checkout before use."
           },
           {
             "field": "limits",
@@ -142,11 +266,7 @@
           },
           {
             "field": "limits",
-            "quote": "The verified hardware case is only iPhone17,1 in portrait orientation with a six-digit passcode and a 402-by-874-point keypad."
-          },
-          {
-            "field": "risk_flags",
-            "quote": "Setup builds `build/native-target/release/examples/unlock_iphone`."
+            "quote": "`press_key` with `key: \"home\"` sends a keyboard Home key and does not navigate to the iPhone Home screen."
           },
           {
             "field": "risk_flags",
@@ -163,7 +283,7 @@
       "generated_at": "2026-11-13T11:05:47.756Z",
       "model": "deepseek-flash",
       "status": "ok",
-      "last_error": null,
+      "last_error": "Skill card failed schema or evidence validation",
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "poki-standalone",
@@ -311,19 +431,128 @@
     {
       "skill_path": "agent/skills/iphone-unlock/SKILL.md",
       "blob_sha": "fca7a8b97d17635052ab87680a79cc4b1335534d",
-      "source_url": "https://github.com/JosssphZhou/poki/blob/35ffeb336f4da1538e587cd3909244f7cf4f67a0/agent/skills/iphone-unlock/SKILL.md",
-      "fetched_at": "2026-11-13T11:05:47.756Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "source_url": "https://github.com/JosssphZhou/poki/blob/8c646da743b11264d777ff56b0cec8efccdf17e9/agent/skills/iphone-unlock/SKILL.md",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "iphone-unlock",
         "description": "手机锁屏或面容 ID 有密码入口时，用本机配置的密码解锁，并以当前截图核实结果。"
       },
       "excerpt": "---\nname: iphone-unlock\ndescription: 手机锁屏或面容 ID 有密码入口时，用本机配置的密码解锁，并以当前截图核实结果。\nlicense: AGPL-3.0-only\n---\n\n# iPhone 解锁\n\nPoki Agent 通过 unlock_device 加载本技能并调用本地助手。模型只提供设备页面的确认信息，密码由宿主读取 POKI_IPHONE_PASSCODE，通过子进程标准输入传递。密码不进入模型输入、参数、日志、证据和提交。缺少本机密码时工具返回明确错误，模型根据任务和可用能力继续解决，无法完成就 finish_task(success=false)。\n\n1. 先观察当前屏幕。已经解锁时直接继续原任务。面容 ID 有密码入口时进入密码页。\n2. 核对当前截图与 [键盘布局](references/iphone-402x874.json) 一致，为普通 iPhone 402×874 逻辑点、竖屏、六位数字。输入圆点应为空。其他布局要根据当前页面选择匹配的输入方式。\n3. 调用 unlock_device，传 keypadConfirmed=true。宿主取得设备租约后执行连续输入，并返回截图。工具输出只代表输入发送，是否解锁要以截图为准。输入结果不明时先观察当前状态，避免重复已发送的数字。\n4. 核验锁屏已退出、当前应用明确，再继续原任务。\n\n本地助手来自本仓库提交 5134e1a。编译命令：\n\n```sh\ncargo build --locked --release --manifest-path native/bridge/Cargo.toml --target-dir build/native-target --example unlock_iphone -j 4\n```\n\n命令行独立使用可运行 scripts/unlock.py --device '<UDID>'，密码通过隐藏终端输入。宿主模式添加 --stdin，原生程序可由 POKI_UNLOCK_NATIVE 指定。原始真机验证记录见 [verified-run.md](references/verified-run.md)；本次接入验证使用假助手，未执行真实解锁。\n",
-      "card": null
+      "card": {
+        "title_zh": "iPhone 解锁技能",
+        "purpose_zh": "在手机锁屏或面容 ID 出现密码入口时，用本机配置的密码解锁，并以当前截图核实结果。",
+        "does": [
+          "观察当前屏幕，已解锁则继续原任务",
+          "核对截图与键盘布局一致后调用 unlock_device 输入密码",
+          "由宿主读取本机密码并通过子进程标准输入传递",
+          "返回截图，以截图为准核验是否解锁",
+          "核验锁屏已退出、当前应用明确后继续原任务"
+        ],
+        "inputs": [
+          "设备页面确认信息（keypadConfirmed=true）",
+          "宿主环境变量 POKI_IPHONE_PASSCODE",
+          "可选命令行参数 --device UDID、--stdin",
+          "可选环境变量 POKI_UNLOCK_NATIVE 指定原生程序"
+        ],
+        "outputs": [
+          "unlock_device 返回的截图",
+          "缺少密码时的明确错误",
+          "工具输出仅代表输入已发送"
+        ],
+        "scenarios": [
+          "iPhone 锁屏需要输入密码解锁",
+          "面容 ID 出现密码入口需进入密码页",
+          "解锁后继续原任务前需核实状态"
+        ],
+        "prerequisites": [
+          "本机已配置 POKI_IPHONE_PASSCODE",
+          "当前截图与 references/iphone-402x874.json 键盘布局一致（402×874 逻辑点、竖屏、六位数字）",
+          "需编译 native/bridge 的 unlock_iphone 示例或使用 scripts/unlock.py"
+        ],
+        "limits": [
+          "密码不进入模型输入、参数、日志、证据和提交",
+          "缺少本机密码时工具返回明确错误，无法完成则 finish_task(success=false)",
+          "工具输出只代表输入发送，是否解锁以截图为准",
+          "输入结果不明时先观察当前状态，避免重复已发送的数字",
+          "其他键盘布局需根据当前页面选择匹配的输入方式",
+          "本次接入验证使用假助手，未执行真实解锁"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "needs_secret",
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "手机锁屏或面容 ID 有密码入口时，用本机配置的密码解锁，并以当前截图核实结果。"
+          },
+          {
+            "field": "does",
+            "quote": "先观察当前屏幕。已经解锁时直接继续原任务。面容 ID 有密码入口时进入密码页。"
+          },
+          {
+            "field": "does",
+            "quote": "调用 unlock_device，传 keypadConfirmed=true。宿主取得设备租约后执行连续输入，并返回截图。"
+          },
+          {
+            "field": "does",
+            "quote": "核验锁屏已退出、当前应用明确，再继续原任务。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "密码由宿主读取 POKI_IPHONE_PASSCODE，通过子进程标准输入传递。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "核对当前截图与 [键盘布局](references/iphone-402x874.json) 一致，为普通 iPhone 402×874 逻辑点、竖屏、六位数字。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "cargo build --locked --release --manifest-path native/bridge/Cargo.toml --target-dir build/native-target --example unlock_iphone -j 4"
+          },
+          {
+            "field": "limits",
+            "quote": "密码不进入模型输入、参数、日志、证据和提交。"
+          },
+          {
+            "field": "limits",
+            "quote": "缺少本机密码时工具返回明确错误，模型根据任务和可用能力继续解决，无法完成就 finish_task(success=false)。"
+          },
+          {
+            "field": "limits",
+            "quote": "工具输出只代表输入发送，是否解锁要以截图为准。"
+          },
+          {
+            "field": "limits",
+            "quote": "输入结果不明时先观察当前状态，避免重复已发送的数字。"
+          },
+          {
+            "field": "limits",
+            "quote": "本次接入验证使用假助手，未执行真实解锁。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "命令行独立使用可运行 scripts/unlock.py --device '<UDID>'，密码通过隐藏终端输入。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "cargo build --locked --release --manifest-path native/bridge/Cargo.toml --target-dir build/native-target --example unlock_iphone -j 4"
+          }
+        ]
+      }
     }
   ]
 }

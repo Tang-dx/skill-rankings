@@ -243,18 +243,108 @@
       "skill_path": "skills/engineering/codebase-design/SKILL.md",
       "blob_sha": "3f63c8146dd2604b419c929e9876b90c30d410e9",
       "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/codebase-design/SKILL.md",
-      "fetched_at": "2026-11-13T11:11:48.516Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "codebase-design",
         "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary."
       },
       "excerpt": "---\nname: codebase-design\ndescription: Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.\n---\n\n# Codebase Design\n\nDesign **deep modules**: a lot of behaviour behind a small interface, placed at a clean seam, testable through that interface. Use this language and these principles wherever code is being designed or restructured. The aim is leverage for callers, locality for maintainers, and testability for everyone.\n\n## Glossary\n\nUse these terms exactly: don't substitute \"component,\" \"service,\" \"API,\" or \"boundary.\" Consistent language is the whole point.\n\n**Module**: anything with an interface and an implementation. Deliberately scale-agnostic: a function, class, package, or tier-spanning slice. _Avoid_: unit, component, service.\n\n**Interface**: everything a caller must know to use the module correctly: the type signature, but also invariants, ordering constraints, error modes, required configuration, and performance characteristics. _Avoid_: API, signature (too narrow, they refer only to the type-level surface).\n\n**Implementation**: what's inside a module, its body of code. Distinct from **Adapter**: a thing can be a small adapter with a large implementation (a Postgres repo) or a large adapter with a small implementation (an in-memory fake). Reach for \"adapter\" when the seam is the topic; \"implementation\" otherwise.\n\n**Depth**: leverage at the interface. The amount of behaviour a caller (or test) can exercise per unit of interface they have to learn. A module is **deep** when a large amount of behaviour sits behind a small interface, **shallow** when the interface is nearly as complex as the implementation.\n\n**Seam** _(Michael Feathers)_: a place where you can alter behaviour without editing in that place; the *location* at which a module's interface lives. Where to put the seam is its own design decision, distinct from what goes behind it. _Avoid_: boundary (overloaded with DDD's bounded context).\n\n**Adapter**: a concrete thing that satisfies an interface at a seam. Describes *role* (what slot it fills), not substance (what's inside).\n\n**Leverage**: what callers get from depth. More capability per unit of interface they learn. One implementation pays back across N call sites and M tests.\n\n**Locality**: what maintainers get from depth. Change, bugs, knowledge, and verification concentrate in one place rather than spreading across callers. Fix once, fixed everywhere.\n\n## Deep vs shallow\n\n**Deep module** = small interface + lots of implementation:\n\n```\n┌─────────────────────┐\n│   Small Interface   │  ← Few methods, simple params\n├─────────────────────┤\n│                     │\n│  Deep Implementation│  ← Complex logic hidden\n│                     │\n└─────────────────────┘\n```\n\n**Shallow module** = large interface + little implementation (avoid):\n\n```\n┌─────────────────────────────────┐\n│       Large Interface           │  ← Many methods, complex params\n├─────────────────────────────────┤\n│  Thin Implementation            │  ← Just passes through\n└─────────────────────────────────┘\n```\n\nWhen designing an interface, ask:\n\n- Can I reduce the number of methods?\n- Can I simplify the parameters?\n- Can I hide more complexity inside?\n\n## Principles\n\n- **Depth is a property of the interface, not the implementation.** A deep module can be internally composed of small, mockable, swappable parts; they just aren't part of the interface. A module can have **internal seams** (private to its implementation, used by its own tests) as well as the **external seam** at its interface.\n- **The deletion test.** Imagine deleting the module. If complexity vanishes, it was a pass-through. If complexity reappears across N callers, it was earning its keep.\n- **The interface is the test surface.** Callers and tests cross the same seam. If you want to test *past* the interface, the module is probably the wrong shape.\n- **One adapter means a hypothetical seam. Two adapters means a real one.** Don't introduce a seam unless something actually varies across it.\n\n## Designing for testability\n\nGood interfaces make testing natural:\n\n1. **Accept dependencies, don't create them.**\n\n   ```typescript\n   // Testable\n   function processOrder(order, paymentGateway) {}\n\n   // Hard to test\n   function processOrder(order) {\n     const gateway = new StripeGateway();\n   }\n   ```\n\n2. **Return results, don't produce side effects.**\n\n   ```typescript\n   // Testable\n   function calculateDiscount(cart): Discount {}\n\n   // Hard to test\n   function applyDiscount(cart): void {\n     cart.total -= discount;\n   }\n   ```\n\n3. **Small surface area.** Fewer methods = fewer tests needed. Fewer params = simpler test setup.\n\n## Relationships\n\n- A **Module** has exactly one **Interface** (the surface it presents to callers and tests).\n- **Depth** is a property of a **Module**, measured against its **Interface**.\n- A **Seam** is where a **Module**'s **Interface** lives.\n- An **Adapter** sits at a **Seam** and satisfies the **Interface**.\n- **Depth** produces **Leverage** for callers and **Locality** for maintainers.\n\n## Rejected framings\n\n- **Depth as ratio of implementation-lines to interface-lines** (Ousterhout): rewards padding the implementation. We use depth-as-leverage instead.\n- **\"Interface\" as the TypeScript `interface` keyword or a class's public methods**: too narrow: interface here includes every fact a caller must know.\n- **\"Boundary\"**: overloaded with DDD's bounded context. Say **seam** or **interface**.\n\n## Going deeper\n\n- **Deepening a cluster given its dependencies**, see [DEEPENING.md](DEEPENING.md): dependency categories, seam discipline, and replace-don't-layer testing.\n- **Exploring alternative interfaces**, see [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md): spin up parallel sub-agents to design the interface several radically different ways, then compare on depth, locality, and seam placement.\n",
-      "card": null
+      "card": {
+        "title_zh": "深模块设计词汇",
+        "purpose_zh": "为设计深模块提供共享词汇与原则：大量行为藏在小接口后，置于干净接缝，并通过该接口测试；用于设计或改进模块接口、寻找深化机会、决定接缝位置、提升可测试性与可导航性。",
+        "does": [
+          "提供模块、接口、实现、深度、接缝、适配器等术语的统一定义与禁用替代词",
+          "区分深模块（小接口+大量实现）与浅模块（大接口+薄实现），并给出设计自问",
+          "给出原则：深度属于接口、删除测试、接口即测试面、一个适配器只是假设接缝",
+          "给出可测试性设计建议：接受依赖而非创建、返回结果而非副作用、缩小接口面",
+          "说明模块、接口、深度、接缝、适配器、杠杆、局部性之间的关系",
+          "指向 DEEPENING.md 与 DESIGN-IT-TWICE.md 以进一步深化与探索替代接口"
+        ],
+        "inputs": [
+          "用户希望设计或改进模块接口的需求",
+          "需要判断深化机会或接缝位置的代码或设计",
+          "需要深模块词汇的其他技能调用"
+        ],
+        "outputs": [
+          "统一的深模块设计词汇与原则说明",
+          "接口设计自问清单与可测试性建议",
+          "对深/浅模块的图示化对比"
+        ],
+        "scenarios": [
+          "设计或改进模块接口",
+          "寻找模块深化机会",
+          "决定接缝放在哪里",
+          "让代码更可测试或更易被 AI 导航",
+          "其他技能需要深模块词汇时引用"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "仅为词汇与原则性指导，不含具体实现代码或工具",
+          "深度不按实现行数与接口行数之比衡量，拒绝 Ousterhout 式定义",
+          "不使用 component、service、API、boundary 等替代词"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "后端",
+          "代码审查",
+          "文档",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Design **deep modules**: a lot of behaviour behind a small interface, placed at a clean seam, testable through that interface."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable"
+          },
+          {
+            "field": "does",
+            "quote": "Use these terms exactly: don't substitute \"component,\" \"service,\" \"API,\" or \"boundary.\" Consistent language is the whole point."
+          },
+          {
+            "field": "does",
+            "quote": "**Deep module** = small interface + lots of implementation:"
+          },
+          {
+            "field": "does",
+            "quote": "**The deletion test.** Imagine deleting the module. If complexity vanishes, it was a pass-through."
+          },
+          {
+            "field": "does",
+            "quote": "**Accept dependencies, don't create them.**"
+          },
+          {
+            "field": "does",
+            "quote": "**Return results, don't produce side effects.**"
+          },
+          {
+            "field": "does",
+            "quote": "A **Module** has exactly one **Interface** (the surface it presents to callers and tests)."
+          },
+          {
+            "field": "does",
+            "quote": "**Deepening a cluster given its dependencies**, see [DEEPENING.md](DEEPENING.md)"
+          },
+          {
+            "field": "limits",
+            "quote": "**Depth as ratio of implementation-lines to interface-lines** (Ousterhout): rewards padding the implementation. We use depth-as-leverage instead."
+          },
+          {
+            "field": "limits",
+            "quote": "**\"Boundary\"**: overloaded with DDD's bounded context. Say **seam** or **interface**."
+          }
+        ]
+      }
     },
     {
       "skill_path": "skills/engineering/diagnosing-bugs/SKILL.md",
@@ -813,7 +903,7 @@
       "skill_path": "skills/engineering/improve-codebase-architecture/SKILL.md",
       "blob_sha": "f1eabb568464f03ae79a3346fc1918fdde6d8285",
       "source_url": "https://github.com/mattpocock/skills/blob/5863806dd4e15c63174bee4e7515a4256792ecfa/skills/engineering/improve-codebase-architecture/SKILL.md",
-      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",

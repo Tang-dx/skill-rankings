@@ -829,18 +829,135 @@
       "skill_path": "plugins/codex-security/skills/deep-security-scan/SKILL.md",
       "blob_sha": "18ac4937b1ccacd0f2281b39f292155dbdfa188b",
       "source_url": "https://github.com/openai/codex-security/blob/f26b669b56a4423abd773c81f6c6c9c2ebadc42a/plugins/codex-security/skills/deep-security-scan/SKILL.md",
-      "fetched_at": "2026-11-13T11:18:42.880Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
+      "generated_at": "2026-11-13T11:57:00.564Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "deep-security-scan",
         "description": "Run repeated Standard security scans of a repository or scoped path when the user requests a deep, exhaustive, or multi-pass audit. For changes to a PR, commit, branch or working tree, use security-diff-scan."
       },
       "excerpt": "---\nname: deep-security-scan\ndescription: Run repeated Standard security scans of a repository or scoped path when the user requests a deep, exhaustive, or multi-pass audit. For changes to a PR, commit, branch or working tree, use security-diff-scan.\n---\n\n# Deep Security Scan\n\nThe host runs Standard audits and merges their findings. Workers in the same scan can exchange investigation leads and verify each other’s evidence. Later passes receive the titles and locations already reported. The host stops when consecutive audits add nothing new or the configured scan or time limit is reached. Its final report includes every accepted audit.\n\n1. Resolve the authorized target and scope. For a scoped directory use that directory as `targetPath` and `scope: \".\"`. For a continuation, call `get_codex_security_scan_context` with its `scanId` and supplied `handoffClaimToken`. Use its saved identity and scope. If its mode is Standard or diff, continue with the corresponding scan skill. Follow `../../references/scan-prologue.md` for source access and context updates.\n2. For a new target, call `inspect_codex_security_setup({ targetPath, scope: \".\", mode: \"deep\", projectConfigPath? })`. Show the effective settings and their sources. `max_discovery_runs` caps the total number of Standard scans, including when several run together. Pass a project file only when the user selected it. Existing scans use their saved configuration.\n3. For a newly launched native scan with a supplied scan ID, inspect `otherRunningDeepScans` in the result of `get_codex_security_scan_context` once. Target-based setup previews have no scan ID. If another Deep scan is active, show its target, phase and human-friendly start time. Explain the additional CPU, memory and token use. Offer **Cancel (Recommended)** and **Continue** using `request_user_input`, then `request_codex_security_user_input` or plain chat if unavailable. Wait for an explicit choice. A dismissed dialog is not a cancellation. Cancel only the new scan if requested.\n4. Follow `../../references/access-advisory.md`, then call `start_codex_security_deep_scan({ scanId, handoffClaimToken? })` for an existing scan or `start_codex_security_deep_scan({ targetPath, scope: \".\", userContext?, projectConfigPath? })` for a new target. Reuse the project file selected at setup. Await the tool. If the tool runner returns a running cell ID, wait on that cell until it returns the scan result. If the connection closes, rejoin with the same arguments. Report a terminal failure with its saved results. For a policy refusal, identify the worker from its saved error when available. On explicit cancellation call `cancel_codex_security_scan({ scanId })` from the owning thread.\n5. For an SDK-owned scan, return the host's scan ID and manifest path so the SDK can finalize it. When the tool returns `completion`, link its generated `report.md` and canonical artifacts. Use `completion.scan.usage` and any separate cost estimate to report usage per `../../references/final-report.md`. Distinguish a completed audit with zero findings from a deadline reached before any audit completed.\n",
-      "card": null
+      "card": {
+        "title_zh": "深度安全扫描",
+        "purpose_zh": "在用户要求深度、穷尽或多轮审计时，对仓库或指定路径反复运行 Standard 安全扫描并合并发现，直到连续审计无新增或达到扫描或时间上限。",
+        "does": [
+          "对授权目标或指定目录反复运行 Standard 安全扫描",
+          "在同一扫描内让各 worker 交换调查线索并互相验证证据",
+          "后续轮次接收已报告的问题标题与位置",
+          "连续审计无新增或达到配置上限时停止",
+          "生成包含所有已接受审计的最终报告",
+          "支持通过 scanId 与 handoffClaimToken 续接已有扫描"
+        ],
+        "inputs": [
+          "targetPath 目标路径",
+          "scope 扫描范围",
+          "projectConfigPath 项目配置文件（用户选择时）",
+          "scanId 与 handoffClaimToken（续接时）",
+          "userContext 用户上下文"
+        ],
+        "outputs": [
+          "最终报告 report.md",
+          "规范产物（canonical artifacts）",
+          "扫描用量与成本估算",
+          "扫描 ID 与 manifest 路径"
+        ],
+        "scenarios": [
+          "用户要求对仓库做深度、穷尽或多轮安全审计",
+          "对指定目录范围做安全扫描",
+          "续接已有的深度扫描",
+          "需要多轮扫描互相验证证据的安全审查"
+        ],
+        "prerequisites": [
+          "已解析授权目标与范围",
+          "新目标需先调用 inspect_codex_security_setup 查看生效设置及来源",
+          "遵循 scan-prologue.md 与 access-advisory.md 的访问与上下文要求"
+        ],
+        "limits": [
+          "仅适用于深度/多轮审计；PR、提交、分支或工作树变更应改用 security-diff-scan",
+          "max_discovery_runs 限制 Standard 扫描总次数",
+          "达到扫描或时间上限即停止",
+          "存在其他活跃 Deep 扫描时需用户明确选择取消或继续",
+          "需区分零发现的已完成审计与未完成任何审计即到期限"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "安全",
+          "代码审查",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Run repeated Standard security scans of a repository or scoped path when the user requests a deep, exhaustive, or multi-pass audit."
+          },
+          {
+            "field": "does",
+            "quote": "The host runs Standard audits and merges their findings. Workers in the same scan can exchange investigation leads and verify each other’s evidence."
+          },
+          {
+            "field": "does",
+            "quote": "Later passes receive the titles and locations already reported."
+          },
+          {
+            "field": "does",
+            "quote": "The host stops when consecutive audits add nothing new or the configured scan or time limit is reached."
+          },
+          {
+            "field": "does",
+            "quote": "Its final report includes every accepted audit."
+          },
+          {
+            "field": "does",
+            "quote": "For a continuation, call `get_codex_security_scan_context` with its `scanId` and supplied `handoffClaimToken`."
+          },
+          {
+            "field": "inputs",
+            "quote": "call `inspect_codex_security_setup({ targetPath, scope: \".\", mode: \"deep\", projectConfigPath? })`"
+          },
+          {
+            "field": "outputs",
+            "quote": "When the tool returns `completion`, link its generated `report.md` and canonical artifacts."
+          },
+          {
+            "field": "outputs",
+            "quote": "Use `completion.scan.usage` and any separate cost estimate to report usage"
+          },
+          {
+            "field": "outputs",
+            "quote": "return the host's scan ID and manifest path so the SDK can finalize it"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Resolve the authorized target and scope."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Show the effective settings and their sources."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Follow `../../references/access-advisory.md`"
+          },
+          {
+            "field": "limits",
+            "quote": "For changes to a PR, commit, branch or working tree, use security-diff-scan."
+          },
+          {
+            "field": "limits",
+            "quote": "`max_discovery_runs` caps the total number of Standard scans, including when several run together."
+          },
+          {
+            "field": "limits",
+            "quote": "Distinguish a completed audit with zero findings from a deadline reached before any audit completed."
+          }
+        ]
+      }
     },
     {
       "skill_path": "plugins/codex-security/skills/define-security-policy/SKILL.md",
@@ -987,7 +1104,7 @@
       "skill_path": "plugins/codex-security/skills/finding-discovery/SKILL.md",
       "blob_sha": "678708aa1204e91cac4ec95bfba546c1a90807e3",
       "source_url": "https://github.com/openai/codex-security/blob/f26b669b56a4423abd773c81f6c6c9c2ebadc42a/plugins/codex-security/skills/finding-discovery/SKILL.md",
-      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "fetched_at": "2026-11-13T11:57:00.564Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
