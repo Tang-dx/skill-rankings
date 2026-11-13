@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "repo": "github/spec-kit",
+  "tree_sha": "c06ec9724d0e50a7392574232ada74bbb224026a",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": ".github/skills/add-community-extension/SKILL.md",
+      "blob_sha": "409845cc1f32c820d668c1cb2ac391c64208fe7f",
+      "source_url": "https://github.com/github/spec-kit/blob/2ee2b1e8005905db05f5717300a469b3068b908f/.github/skills/add-community-extension/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "add-community-extension",
+        "description": "Add a community extension to the Spec Kit catalog from a GitHub issue submission. USE FOR: processing extension submission issues, validating catalog entries, updating catalog.community.json and docs/community/extensions.md, creating PRs. DO NOT USE FOR: creating new extensions from scratch, or first-party extension work."
+      },
+      "excerpt": "---\nname: add-community-extension\ndescription: 'Add a community extension to the Spec Kit catalog from a GitHub issue submission. USE FOR: processing extension submission issues, validating catalog entries, updating catalog.community.json and docs/community/extensions.md, creating PRs. DO NOT USE FOR: creating new extensions from scratch, or first-party extension work.'\nargument-hint: 'GitHub issue URL or number for the extension submission'\n---\n\n# Add Community Extension\n\nProcess an extension submission issue and add or update it in the community catalog.\n\n## When to Use\n\n- A new `[Extension]` submission issue is filed\n- An existing extension submits an update issue (new version, changed metadata)\n- You need to add or update a community extension in `extensions/catalog.community.json` and `docs/community/extensions.md`\n\n## Procedure\n\n### 1. Fetch the submission issue\n\nRead the GitHub issue to extract all metadata:\n- Extension ID, name, version, description, author\n- Repository URL, download URL, homepage, documentation, changelog\n- License, required spec-kit version, optional tool dependencies\n- Number of commands and hooks\n- Tags\n\n### 2. Validate against publishing rules\n\nCheck **all** of the following (per `docs/extensions/publishing.md`):\n\n| Check | How |\n|-------|-----|\n| Repository exists and is public | Fetch the repository URL |\n| `extension.yml` manifest present | Confirm in repo file listing |\n| README.md present | Confirm in repo file listing |\n| LICENSE file present | Confirm in repo file listing |\n| GitHub release exists matching version | Check releases on the repo page |\n| Download URL is accessible | Verify it follows `archive/refs/tags/<tag>.zip` or `releases/download/<tag>/<asset>.zip` pattern and release exists |\n| Extension ID is lowercase-with-hyphens only | Regex: `^[a-z][a-z0-9-]*$` |\n| Version follows semver | Format: `X.Y.Z` |\n| Submission checklists are all checked | Confirm in issue body |\n\n### 3. Determine if this is an add or update\n\nSearch `extensions/catalog.community.json` for the extension ID.\n\n- **Not found** → this is a **new addition**. Proceed to step 4.\n- **Found** → this is an **update**. Proceed to step 4 but replace the existing entry in-place instead of inserting.\n\n### 4. Add or update `extensions/catalog.community.json`\n\n**New extension:** Insert the entry in **alphabetical order** by extension ID.\n\n**Update:** Replace the existing entry in-place. Update only the fields that changed (typically `version`, `download_url`, `description`, `provides`, `requires`, `tags`, `updated_at`). Preserve `created_at` and `downloads`/`stars` from the existing entry.\n\nUse the existing entries as the format template. Entry format:\n\n```json\n{\n  \"<id>\": {\n    \"name\": \"<name>\",\n    \"id\": \"<id>\",\n    \"description\": \"<description>\",\n    \"author\": \"<author>\",\n    \"version\": \"<version>\",\n    \"download_url\": \"<download_url>\",\n    \"repository\": \"<repository>\",\n    \"homepage\": \"<homepage>\",\n    \"documentation\": \"<documentation>\",\n    \"changelog\": \"<changelog>\",\n    \"license\": \"<license>\",\n    \"category\": \"<category>\",\n    \"effect\": \"<effect>\",\n    \"requires\": {\n      \"speckit_version\": \"<speckit_version>\"\n    },\n    \"provides\": {\n      \"commands\": <N>,\n      \"hooks\": <N>\n    },\n    \"tags\": [\"<tag1>\", \"<tag2>\"],\n    \"verified\": false,\n    \"downloads\": 0,\n    \"stars\": 0,\n    \"created_at\": \"<today>T00:00:00Z\",\n    \"updated_at\": \"<today>T00:00:00Z\"\n  }\n}\n```\n\n**Category** — free-form string; common values: `docs`, `code`, `process`, `integration`, `visibility`\n**Effect** — one of: `read-only`, `read-write`\n\nIf the extension has optional tool dependencies, add a `\"tools\"` array inside `\"requires\"`:\n\n```json\n\"tools\": [{ \"name\": \"<tool>\", \"required\": false }]\n```\n\nAlso update the top-level `\"updated_at\"` timestamp in the catalog.\n\nAfter editing, **validate the JSON** by running:\n\n```bash\npython3 -c \"import json; json.load(open('extensions/catalog.community.json')); print('Valid JSON')\"\n```\n\n### 5. Add or update `docs/community/extensions.md` community extensions table\n\n**New extension:** Insert a new row into the `# Community Extensions` table in **alphabetical order** by extension name.\n\n**Update:** Find the existing row and update the description or other changed fields in-place.\n\nDetermine the category and effect from the extension's behavior:\n\n```\n| <Name> | <Description> | `<category>` | <Effect> | [<repo-name>](<repository-url>) |\n```\n\n**Category** — free-form; common values: `docs`, `code`, `process`, `integration`, `visibility`\n**Effect** — write canonical values `read-only` or `read-write` in `extension.yml` and `catalog.community.json`; use `Read-only`/`Read+Write` only for the docs table display\n\n### 6. Commit, push, and open PR\n\nUse `add-` for new extensions, `update-` for updates:\n\n```bash\n# New extension\ngit checkout -b add-<extension-id>-extension\n\n# Update\ngit checkout -b update-<extension-id>-extension\n```\n\n```bash\ngit add extensions/catalog.community.json docs/community/extensions.md\n\n# New extension\ngit commit -m \"Add <Name> extension to community catalog\n\nAdd <id> extension submitted by @<issue-author> to:\n- extensions/catalog.community.json (alphabetical order)\n- docs/community/extensions.md community extensions table\n\nCloses #<issue-number>\"\n\n# Update\ngit commit -m \"Update <Name> extension to v<version>\n\nUpdate <id> extension submitted by @<issue-author>:\n- extensions/catalog.community.json (version, download_url, etc.)\n- docs/community/extensions.md community extensions table\n\nCloses #<issue-number>\"\n\ngit push origin <branch-name>\n```\n\nThen create a PR to `upstream` (`github/spec-kit`) with:\n- **Title:** `Add <Name> extension to community catalog` (or `Update <Name> extension to v<version>`)\n- **Body:** Include validation summary, `Closes #<issue-number>`, and `cc @<issue-author>`\n- **Head:** `<fork-owner>:<branch-name>`\n- **Base:** `main`\n\n## Common Pitfalls\n\n- **Alphabetical order matters** — entries must be sorted by ID in the JSON and by name in the docs table.\n- **Don't forget the catalog `updated_at`** — the top-level timestamp in `catalog.community.json` must be refreshed.\n- **Validate JSON after editing** — a trailing comma or missing brace will break the catalog.\n- **Use `Closes` not `Fixes`** — `Closes #N` is the correct keyword for submission issues.\n- **Match the proposed entry but verify** — the issue may include a proposed JSON block, but always validate field values against the actual repository state.\n- **Preserve `created_at` on updates** — keep the original `created_at` value; only change `updated_at`.\n- **Preserve `downloads` and `stars` on updates** — these reflect usage metrics and must not be reset.\n",
+      "card": {
+        "title_zh": "社区扩展目录收录",
+        "purpose_zh": "处理 GitHub 上的扩展提交 issue，校验元数据与发布规则，把扩展新增或更新到社区目录 JSON 与文档表格，并提交 PR。",
+        "does": [
+          "读取 GitHub issue 提取扩展元数据",
+          "按发布规则校验仓库、清单、许可证、版本与下载链接",
+          "判断是新增还是更新，并按字母序写入 catalog.community.json",
+          "同步更新 docs/community/extensions.md 的社区扩展表格",
+          "用 python3 校验 JSON 合法性",
+          "创建分支、提交、推送并向上游仓库开 PR"
+        ],
+        "inputs": [
+          "扩展提交 issue 的 URL 或编号",
+          "扩展元数据（ID、名称、版本、作者、仓库与下载链接等）",
+          "仓库中的 extension.yml、README、LICENSE 与 release 信息"
+        ],
+        "outputs": [
+          "更新后的 extensions/catalog.community.json",
+          "更新后的 docs/community/extensions.md 表格",
+          "提交并推送的分支与 PR"
+        ],
+        "scenarios": [
+          "新的 [Extension] 提交 issue 被创建",
+          "已有扩展提交版本或元数据更新 issue",
+          "需要把社区扩展登记进目录与文档"
+        ],
+        "prerequisites": [
+          "可访问 GitHub issue 与扩展仓库",
+          "本地已有 spec-kit 仓库及 extensions/catalog.community.json、docs/community/extensions.md",
+          "具备 git 与 python3 环境",
+          "有上游仓库的 fork 与推送权限"
+        ],
+        "limits": [
+          "不用于从零创建新扩展",
+          "不用于第一方扩展工作",
+          "仅处理社区目录收录与更新流程"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Process an extension submission issue and add or update it in the community catalog."
+          },
+          {
+            "field": "does",
+            "quote": "Read the GitHub issue to extract all metadata:"
+          },
+          {
+            "field": "does",
+            "quote": "Check **all** of the following (per `docs/extensions/publishing.md`):"
+          },
+          {
+            "field": "does",
+            "quote": "**New extension:** Insert the entry in **alphabetical order** by extension ID."
+          },
+          {
+            "field": "does",
+            "quote": "**New extension:** Insert a new row into the `# Community Extensions` table in **alphabetical order** by extension name."
+          },
+          {
+            "field": "does",
+            "quote": "python3 -c \"import json; json.load(open('extensions/catalog.community.json')); print('Valid JSON')\""
+          },
+          {
+            "field": "does",
+            "quote": "Then create a PR to `upstream` (`github/spec-kit`) with:"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: 'GitHub issue URL or number for the extension submission'"
+          },
+          {
+            "field": "outputs",
+            "quote": "git add extensions/catalog.community.json docs/community/extensions.md"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- A new `[Extension]` submission issue is filed"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- An existing extension submits an update issue (new version, changed metadata)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "You need to add or update a community extension in `extensions/catalog.community.json` and `docs/community/extensions.md`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "git push origin <branch-name>"
+          },
+          {
+            "field": "limits",
+            "quote": "DO NOT USE FOR: creating new extensions from scratch, or first-party extension work."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "git checkout -b add-<extension-id>-extension"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Fetch the repository URL"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/code-review/SKILL.md",
+      "blob_sha": "b3e549b2ca8e704f8c25e2573b8b204af05e2293",
+      "source_url": "https://github.com/github/spec-kit/blob/2ee2b1e8005905db05f5717300a469b3068b908f/.github/skills/code-review/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "code-review",
+        "description": "Reviews Spec Kit code changes for consistency with applicable design documents, positive and negative test coverage, regression evidence for bug fixes, and consistent repository terminology. Use when reviewing a diff or pull request. Do not use for implementing changes or posting GitHub review actions."
+      },
+      "excerpt": "---\nname: code-review\ndescription: Reviews Spec Kit code changes for consistency with applicable design documents, positive and negative test coverage, regression evidence for bug fixes, and consistent repository terminology. Use when reviewing a diff or pull request. Do not use for implementing changes or posting GitHub review actions.\nargument-hint: 'Diff or pull request to review'\n---\n\n# Code Review\n\n1. Ensure each code change has test cases that verify what the code should do and what it should prevent.\n2. Ensure bug-fix pull requests include a regression test that demonstrates the bug was reproducible before the change and is fixed afterward; if the reviewer cannot run the comparison, use available evidence and state that limitation.\n3. Ensure wording changes use repository-consistent terms; exclude community-authored catalog content and its generated documentation from this check.\n4. Identify the affected domains and read the applicable documents in `design/` before evaluating architectural consistency. For CLI command changes, use `design/cli.md`; for agent integrations, use `design/integration.md`; for workflow step types, use `design/workflow-step.md`. Read other design documents when relevant, not every document for every PR.\n5. Check the changes against the applicable design requirements, including implementation boundaries, ownership, lifecycle, and delivery requirements. Reference the documents rather than duplicating their rules in this skill. Cite the document and section for each reported mismatch.\n6. Distinguish an unexplained design violation from an intentional design change. Evaluate the rationale and evidence for an intentional change; updating the design document alone does not establish that the implementation is justified.\n",
+      "card": {
+        "title_zh": "代码审查",
+        "purpose_zh": "审查 Spec Kit 代码改动与适用设计文档的一致性、正反测试覆盖、缺陷修复的回归证据及仓库术语一致性；用于审查 diff 或拉取请求，不用于实现改动或提交 GitHub 审查操作。",
+        "does": [
+          "检查每处代码改动是否有验证应有行为与应防行为的测试用例",
+          "检查缺陷修复 PR 是否含回归测试，证明改动前可复现、改动后已修复",
+          "检查措辞改动是否使用仓库一致术语，排除社区目录内容及其生成文档",
+          "先识别受影响领域，再读取 design/ 下适用文档评估架构一致性",
+          "对照适用设计要求检查实现边界、归属、生命周期与交付要求，并引用文档章节",
+          "区分无解释的设计违背与有意的设计变更，评估其理由与证据"
+        ],
+        "inputs": [
+          "待审查的 diff 或拉取请求",
+          "design/ 下的适用设计文档（如 design/cli.md、design/integration.md、design/workflow-step.md）"
+        ],
+        "outputs": [
+          "针对每处不一致报告所引用的文档与章节",
+          "关于测试覆盖、回归证据与术语一致性的审查结论"
+        ],
+        "scenarios": [
+          "审查代码 diff",
+          "审查拉取请求",
+          "审查缺陷修复 PR 的回归测试",
+          "审查 CLI 命令、代理集成或工作流步骤类型的改动"
+        ],
+        "prerequisites": [
+          "可访问待审查的 diff 或拉取请求",
+          "可读取 design/ 目录下相关设计文档"
+        ],
+        "limits": [
+          "不用于实现改动",
+          "不用于提交 GitHub 审查操作",
+          "不要求每个 PR 阅读全部设计文档，只读相关文档",
+          "无法运行改动前后对比时，只能使用现有证据并说明该局限",
+          "仅更新设计文档本身不足以证明实现合理"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "测试",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Reviews Spec Kit code changes for consistency with applicable design documents, positive and negative test coverage, regression evidence for bug fixes, and consistent repository terminology."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Use when reviewing a diff or pull request. Do not use for implementing changes or posting GitHub review actions."
+          },
+          {
+            "field": "does",
+            "quote": "Ensure each code change has test cases that verify what the code should do and what it should prevent."
+          },
+          {
+            "field": "does",
+            "quote": "Ensure wording changes use repository-consistent terms; exclude community-authored catalog content and its generated documentation from this check."
+          },
+          {
+            "field": "does",
+            "quote": "Identify the affected domains and read the applicable documents in `design/` before evaluating architectural consistency."
+          },
+          {
+            "field": "does",
+            "quote": "Check the changes against the applicable design requirements, including implementation boundaries, ownership, lifecycle, and delivery requirements."
+          },
+          {
+            "field": "does",
+            "quote": "Distinguish an unexplained design violation from an intentional design change."
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: 'Diff or pull request to review'"
+          },
+          {
+            "field": "inputs",
+            "quote": "For CLI command changes, use `design/cli.md`; for agent integrations, use `design/integration.md`; for workflow step types, use `design/workflow-step.md`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read other design documents when relevant, not every document for every PR."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not use for implementing changes or posting GitHub review actions."
+          },
+          {
+            "field": "limits",
+            "quote": "if the reviewer cannot run the comparison, use available evidence and state that limitation."
+          },
+          {
+            "field": "limits",
+            "quote": "updating the design document alone does not establish that the implementation is justified."
+          }
+        ]
+      }
+    }
+  ]
+}

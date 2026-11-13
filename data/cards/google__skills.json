@@ -1,0 +1,943 @@
+{
+  "schema": 1,
+  "repo": "google/skills",
+  "tree_sha": "81a76a78970cc7440eccd36513f151bc2bcb31e0",
+  "truncated_paths": 188,
+  "skills": [
+    {
+      "skill_path": "skills/ads/data-manager-api-audience-ingestion/SKILL.md",
+      "blob_sha": "ad7e9bc76a99abf9b3bb062de8fe6591813cddb8",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/data-manager-api-audience-ingestion/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "data-manager-api-audience-ingestion",
+        "description": "Guides developers through managing (adding, removing, and clearing) audience members for Google products using the Data Manager API and its associated client libraries. Use this skill when the user wants to upload audience members, remove specific users, or clear/replace an entire audience for Customer Match, mobile device ID audiences, or any other audience use case supported by the Data Manager API. Don't use for uploading events or conversions (use the data-manager-api-event-ingestion skill)."
+      },
+      "excerpt": "---\nname: data-manager-api-audience-ingestion\ndescription: >-\n  Guides developers through managing (adding, removing, and clearing) audience members for Google products using\n  the Data Manager API and its associated client libraries. Use this skill when the user wants to upload audience\n  members, remove specific users, or clear/replace an entire audience for Customer Match, mobile device ID audiences, or any\n  other audience use case supported by the Data Manager API. Don't use for uploading events or\n  conversions (use the data-manager-api-event-ingestion skill).\nmetadata:\n  version: \"1.1.0\"\n  category: GoogleAds\n---\n\n# Data Manager API Audience Ingestion\n\n## Implementation Workflow\n\n### Prerequisites\n\n-   **Authentication & Library Installation**: If you need to set up access to\n    the Data Manager API or install the client and utility libraries, refer to\n    the `data-manager-api-setup` skill.\n-   **Audience Creation (if needed)**: If the user does not have an existing\n    audience or needs to create a new one, use the\n    [Create an Audience](references/create-audience.md) reference. This step\n    provides the `product_destination_id` needed for the ingestion or removal\n    requests.\n\n### Step 1: Identify Use Case & Read Documentation\n\n-   **Determine Destination Account Type**: [CRITICAL] If it's not clear where\n    the data is being sent (e.g., Google Ads, Display & Video 360, etc.), STOP\n    and CLARIFY with the user BEFORE generating any code. Do not assume Google\n    Ads by default. This maps to the `account_type` field of the\n    `operating_account` in the `Destination`.\n-   **Read the implementation guide**: Read the relevant guide for your\n    destination and use case. Do this before answering questions or writing code\n    because each destination has unique payload structures, consent rules, and\n    required fields.\n\n| Destination | Audience Type | Accepted Data Types | Upload Guide | Remove All/Replace All Guide |\n| :--- | :--- | :--- | :--- | :--- |\n| **Google Ads** | Customer Match | `composite_data.user_data` (contact info), `mobile_data` (device IDs), `user_id_data` (user IDs) | [Upload Data](https://developers.google.com/data-manager/api/devguides/audiences/google-ads/customer-match/upload-data.md.txt) | [Remove All/Replace All](https://developers.google.com/data-manager/api/devguides/audiences/google-ads/customer-match/remove-all-members.md.txt) |\n| **Display & Video 360** (DV360) | Customer Match | `composite_data.user_data` (contact info), `mobile_data` (device IDs) | [Upload Data](https://developers.google.com/data-manager/api/devguides/audiences/display-video/customer-match/upload-data.md.txt) | [Remove All/Replace All](https://developers.google.com/data-manager/api/devguides/audiences/display-video/customer-match/remove-all-members.md.txt) |\n\n### Step 2: Retrieve Code Sample\n\n> [!IMPORTANT] If writing or updating an ingestion script, ALWAYS retrieve the\n> relevant code sample to use as a reference:\n\n| Language | Sample |\n| :--- | :--- |\n| **Python** | [`ingest_audience_members.py`](https://github.com/googleads/data-manager-python/blob/main/samples/audiences/ingest_audience_members.py) |\n| **Java** | [`IngestAudienceMembers.java`](https://github.com/googleads/data-manager-java/blob/main/data-manager-samples/src/main/java/com/google/ads/datamanager/samples/IngestAudienceMembers.java) |\n| **PHP** | [`ingest_audience_members.php`](https://github.com/googleads/data-manager-php/blob/main/samples/audiences/ingest_audience_members.php) |\n| **Node** | [`ingest_audience_members.ts`](https://github.com/googleads/data-manager-node/blob/main/samples/audiences/ingest_audience_members.ts) |\n| **.NET**| [`IngestAudienceMembers.cs`](https://github.com/googleads/data-manager-dotnet/blob/main/samples/IngestAudienceMembers.cs) |\n\n### Step 3: Retrieve Migration Guides\n\n> [!IMPORTANT] If refactoring code to upgrade from another Google API, ALWAYS\n> extract the full contents of the relevant field mapping guide.\n\n#### Google Ads\n\n*   **Google Ads API Customer Match**: [Google Ads API to Customer Match\n    Migration Field\n    Mappings](https://developers.google.com/data-manager/api/devguides/audiences/google-ads/customer-match/upgrade/field-mappings.md.txt)\n\n#### Display & Video 360\n\n*   **Display & Video 360 API Customer Match**: [Display & Video 360 API to\n    Customer Match Migration Field\n    Mappings](https://developers.google.com/data-manager/api/devguides/audiences/display-video/customer-match/upgrade/field-mappings.md.txt)\n\n### Step 4: Implementation\n\nImplement the ingestion logic using the following checkpoints:\n\n-   [ ] **Initialize Client**: Instantiate the Data Manager client\n    (`IngestionServiceClient`).\n-   [ ] **Define Destinations**: Build the `Destination` object using the\n    `product_destination_id` and the appropriate account configurations:\n    `operating_account` (target account receiving data), `login_account` (if\n    authenticating using a manager account or a data partner account), and\n    `linked_account` (if you're a data partner accessing the account via a\n    partner link to a manager account). **STRONGLY RECOMMENDED**: Refer to the\n    [Configure destinations and headers](https://developers.google.com/data-manager/api/devguides/concepts/destinations.md.txt)\n    guide for more details on configuring destinations.\n-   [ ] **Format User Data**: If sending an `IngestAudienceMembersRequest` or\n    `RemoveAudienceMembersRequest`, refer to **[Formatting User\n    Data](references/formatting.md)** to properly normalize and hash user identifiers using\n    the utility library.\n-   [ ] **Construct Payload**: Build the appropriate request payload based on\n    the operation:\n    *   **Add**: `IngestAudienceMembersRequest`\n    *   **Remove**: `RemoveAudienceMembersRequest`\n    *   **Remove All**: `RemoveAllAudienceMembersRequest`\n-   [ ] **Support Validation**: Support sending the `validate_only` boolean\n    option on the payload to allow developers to validate schemas without\n    actually applying changes.\n-   [ ] **Send Request**: Execute the appropriate method and record the returned\n    `request_id` for later diagnostics:\n    *   **Add**: `ingest_audience_members`\n    *   **Remove**: `remove_audience_members`\n    *   **Remove All**: `remove_all_audience_members`\n-   [ ] **Check for Ingestion Warnings**: If any non-required field had a\n    validation failure, the response from `ingest_audience_members` will also\n    include `field_warnings`, a list of `FieldWarning` objects detailing the\n    issues.\n-   [ ] **Retrieve Request Status**: Check the status of the ingestion request\n    using diagnostics. Since request processing is asynchronous, a successful\n    response (HTTP 200 OK returning a `request_id`) only indicates the payload\n    was received. To check if the records actually succeeded, partially\n    succeeded, or failed to process, query `client.retrieve_request_status`\n    using the `request_id`. Skipping this step is a common user mistake.\n\n## Critical Gotchas\n\n*   If sending hashed user identifiers in `user_data` for\n    `ingest_audience_members` or `remove_audience_members`, you must set the\n    `encoding` field on the `IngestAudienceMembersRequest` to `HEX` or `BASE64`.\n*   If *uploading* to a Customer Match audience, the `terms_of_service` field is\n    required on the `IngestAudienceMembersRequest` to indicate the user has\n    accepted the policies.\n*   Only set the `address` field on `UserIdentifier` if all required fields\n    (`postal_code`, `family_name`, `given_name`, `region_code`) are present;\n    incomplete `address` fields will cause the API request to fail.\n*   `product_destination_id` must be a numeric string. It is NOT a resource\n    name.\n*   The enum values for `ConsentStatus` are `CONSENT_GRANTED` and\n    `CONSENT_DENIED`. Do not use the values `GRANTED` and `DENIED`.\n*   Field names on `UserIdentifier` are `email_address` and `phone_number`. Do\n    not use the Google Ads API field names `hashed_emai",
+      "card": null
+    },
+    {
+      "skill_path": "skills/ads/data-manager-api-event-ingestion/SKILL.md",
+      "blob_sha": "f440dc32525d4187ed5864aa549c42cca8ed9912",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/data-manager-api-event-ingestion/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "data-manager-api-event-ingestion",
+        "description": "Guides developers through implementing event and conversion ingestion to Google products using the Data Manager API /v1/events/ingest endpoint and its associated client libraries. Use this skill when the user wants to upload offline conversions, enhanced conversions for leads, click conversions, Google Analytics web or app events, or any other event ingestion use case supported by the Data Manager API. Don't use for uploading audience members (use the data-manager-api-audience-ingestion skill)."
+      },
+      "excerpt": "---\nname: data-manager-api-event-ingestion\ndescription: >-\n  Guides developers through implementing event and conversion ingestion to\n  Google products using the Data Manager API /v1/events/ingest endpoint\n  and its associated client libraries. Use this skill when the user wants to upload\n  offline conversions, enhanced conversions for leads, click conversions, Google\n  Analytics web or app events, or any other event ingestion use case supported by\n  the Data Manager API. Don't use for uploading audience members (use the\n  data-manager-api-audience-ingestion skill).\nmetadata:\n  version: \"1.2.0\"\n  category: GoogleAds\n---\n# Data Manager API Event Ingestion\n\n## Implementation Workflow\n\n### Prerequisites\n\n-   **Authentication & Library Installation**: If you need to set up access to\n    the Data Manager API or install the client and utility libraries, refer to\n    the `data-manager-api-setup` skill.\n\n### Step 1: Identify Use Case & Read Documentation\n\n-   **Determine Destination Account Type**: [CRITICAL] If it can't be determined\n    from the user's context, consider clarifying which destination events are\n    being ingested to before generating any code. This maps to the\n    `account_type` field of the `operating_account` in the `Destination`,\n    and also determines valid event identifiers and requirements.\n-   **Identify User Intent**:\n    -   **Implementing ingestion code**: Follow the relevant\n        implementation guide for the destination and use case in the\n        **Implementation guide** column below. This is critical to ensure field\n        requirements are met and destinations are correctly configured.\n    -   **Checking request status or inspecting errors**: Refer to the\n        [Error Handling & Troubleshooting](#error-handling-troubleshooting)\n        section below.\n    -   **Migrating from another Google API**: Refer to\n        [Step 3: Retrieve Migration Guides](#step-3-retrieve-migration-guides)\n        below to extract the full contents of the relevant field mapping guide.\n\n| Destination (`operating_account.account_type`) | Use case | Implementation guide |\n| :--- | :--- | :--- |\n| **Google Ads** (`GOOGLE_ADS`) | Offline conversions, enhanced conversions for leads | [Send events](https://developers.google.com/data-manager/api/devguides/events/google-ads/offline/send-events.md.txt) |\n| **Google Ads** (`GOOGLE_ADS`) | Multi-source conversions supplementing the Google tag | [Send events](https://developers.google.com/data-manager/api/devguides/events/google-ads/online/send-events.md.txt) |\n| **Google Ads** (`GOOGLE_ADS`) | Store sales conversions | [Send events](https://developers.google.com/data-manager/api/devguides/events/google-ads/store-sales/send-events.md.txt) |\n| **Google Analytics** (`GOOGLE_ANALYTICS_PROPERTY`) | Recommended and custom GA4 events | [Send events](https://developers.google.com/data-manager/api/devguides/events/analytics/recommended-custom-events/send-events.md.txt) |\n| **Google Analytics** (`GOOGLE_ANALYTICS_PROPERTY`) | Multi-source events with a transaction ID | [Send events](https://developers.google.com/data-manager/api/devguides/events/analytics/online/send-events.md.txt) |\n| **Floodlight** (`FLOODLIGHT_CONFIG`) | Floodlight offline conversions | [Send events](https://developers.google.com/data-manager/api/devguides/events/cm360/offline/send-events.md.txt) |\n| **Floodlight** (`FLOODLIGHT_CONFIG`) | Multi-source conversions supplementing the Google or Floodlight tag | [Send events](https://developers.google.com/data-manager/api/devguides/events/cm360/online/send-events.md.txt) |\n\nIf the request doesn't match any row, fetch the\n[Events overview](https://developers.google.com/data-manager/api/devguides/events.md.txt)\nto find the right guide rather than guessing.\n\n### Step 2: Retrieve Code Sample\n\n> [!IMPORTANT]\n> If writing or updating an ingestion script, ALWAYS retrieve the\n> relevant code sample to use as a reference:\n\n| Language | Sample |\n| :--- | :--- |\n| **Python** | [`ingest_events.py`](https://github.com/googleads/data-manager-python/blob/main/samples/events/ingest_events.py) |\n| **Java** | [`IngestEvents.java`](https://github.com/googleads/data-manager-java/blob/main/data-manager-samples/src/main/java/com/google/ads/datamanager/samples/IngestEvents.java) |\n| **PHP** | [`ingest_events.php`](https://github.com/googleads/data-manager-php/blob/main/samples/events/ingest_events.php) |\n| **Node** | [`ingest_events.ts`](https://github.com/googleads/data-manager-node/blob/main/samples/events/ingest_events.ts) |\n| **.NET**| [`IngestEvents.cs`](https://github.com/googleads/data-manager-dotnet/blob/main/samples/IngestEvents.cs) |\n\n### Step 3: Retrieve Migration Guides\n\n> [!IMPORTANT]\n> If refactoring code to upgrade from another Google API, ALWAYS\n> extract the full contents of the relevant field mapping guide.\n\n#### Google Ads\n\n*   **Offline conversions, enhanced conversions for leads** (migrating from the Google Ads API):\n    [Google Ads Offline Conversions Migration Field Mappings](https://developers.google.com/data-manager/api/devguides/events/google-ads/offline/upgrade/field-mappings.md.txt)\n*   **Store sales conversions** (migrating from the Google Ads API):\n    [Google Ads Store Sales Migration Field Mappings](https://developers.google.com/data-manager/api/devguides/events/google-ads/store-sales/upgrade/field-mappings.md.txt)\n\n#### Google Analytics\n\n*   **Recommended and custom GA4 events** (migrating from the Google Analytics Measurement Protocol):\n    [Google Analytics Measurement Protocol Migration Field Mappings](https://developers.google.com/data-manager/api/devguides/events/analytics/measurement-protocol/upgrade/field-mappings.md.txt)\n\n#### Floodlight\n\n*   **Floodlight offline conversions** (migrating from the Campaign Manager 360 API):\n    [Campaign Manager 360 Offline Conversions Migration Field Mappings](https://developers.google.com/data-manager/api/devguides/events/cm360/offline/upgrade/field-mappings.md.txt)\n\n### Step 4: Implementation\n\nImplement the ingestion logic using the following checkpoints:\n\n-   [ ] **Initialize Client**: Instantiate the Data Manager client\n    (`IngestionServiceClient`).\n-   [ ] **Define Destinations**: Build the `Destination` object using the\n    `product_destination_id` and the appropriate account configurations:\n    `operating_account` (target account receiving data), `login_account` (if\n    authenticating using a manager account or a data partner account), and\n    `linked_account` (if you're a data partner accessing the account via a\n    partner link to a manager account). **STRONGLY RECOMMENDED**: Refer to the\n    [Configure destinations and headers](https://developers.google.com/data-manager/api/devguides/concepts/destinations.md.txt)\n    guide for more details on configuring destinations.\n-   [ ] **Prepare Event Data**: Use the utility library helpers to format and\n    normalize user identifiers correctly.\n-   [ ] **Construct Payload**: Build the request payload\n    (`IngestEventsRequest`) containing the destinations, event records, and\n    consent permissions.\n-   [ ] **Support Validation**: Support sending the `validate_only` boolean\n    option on the `IngestEventsRequest` to allow developers to validate schemas\n    without actually uploading data.\n-   [ ] **Send Request**: Execute `ingest_events` and record the returned\n    `request_id` for later diagnostics.\n-   [ ] **Check for Ingestion Warnings**: If any non-required field had a\n    validation failure, the response from `ingest_events` will also\n    include `field_warnings`, a list of `FieldWarning` objects detailing the\n    issues.\n-   [ ] **Retrieve Request Status**: Check the status of the ingestion request\n    using diagnostics. Since request processing is asynchronous, a\n    successful ingestion response (HTTP 200 OK returning a `request_id`) only\n    indicates the payload was received. To check if the records actually\n    succeeded, partially succeeded, or failed to process, query the\n    `client",
+      "card": null
+    },
+    {
+      "skill_path": "skills/ads/data-manager-api-setup/SKILL.md",
+      "blob_sha": "bc390439db829fbd383420ad9c97947a6738a831",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/data-manager-api-setup/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "data-manager-api-setup",
+        "description": "Guides developers through client library installation and authentication setup steps for the Data Manager API. Use this skill when a user is getting started with the Data Manager API and needs to setup their local environment, install the client library, or setup access to the API. Don't use for implementing audience or event ingestion logic (use the data-manager-api-audience-ingestion or data-manager-api-event-ingestion skills instead)."
+      },
+      "excerpt": "---\nname: data-manager-api-setup\ndescription: >-\n  Guides developers through client library installation and authentication setup\n  steps for the Data Manager API. Use this skill when a user is getting started\n  with the Data Manager API and needs to setup their local environment, install\n  the client library, or setup access to the API. Don't use for implementing\n  audience or event ingestion logic (use the data-manager-api-audience-ingestion\n  or data-manager-api-event-ingestion skills instead).\nmetadata:\n  version: \"1.1.0\"\n  category: GoogleAds\n---\n# Data Manager API Setup\n\n## Setup Authentication\n\nRefer to [Set up API access](https://developers.google.com/data-manager/api/devguides/quickstart/set-up-access.md.txt)\nfor more details.\n\n### 1. Enable the API\n\n**Prerequisites**: A Google Cloud project, the Google Cloud CLI (`gcloud`), and\na Google Account with a project role that can enable APIs, such as **Owner**,\n**Editor**, or **Service Usage Admin**. Always tell the user about the required\nrole. If `gcloud` isn't installed, prompt the user to install it first.\n\n```shell\ngcloud services enable datamanager.googleapis.com --project={project_id}\ngcloud services list --enabled --project=PROJECT_ID --filter=\"datamanager.googleapis.com\"\n```\n\n### 2. Generate Application Default Credentials (ADC)\n\nChoose the method that matches the user's scenario:\n\n*   **User account** (API calls are made as the user's own Google Account): The\n    Data Manager API scopes are sensitive, so the user must first configure\n    their project's Google Auth Platform:\n    1.  **Data Access** page: Add the Data Manager API scopes.\n    2.  **Audience** page: Set **Publishing status** to **Testing**. Use the\n        **Internal** user type for a Google Workspace organization, or\n        **External** with the user's account added as a **Test user**.\n    3.  Create (or reuse) a **Desktop app** OAuth client and download its JSON\n        configuration file.\n    4.  The user runs the following command, which opens a browser login:\n\n        ```shell\n        gcloud auth application-default login \\\n          --scopes=\"https://www.googleapis.com/auth/datamanager,https://www.googleapis.com/auth/cloud-platform\" \\\n          --client-id-file=\"{client_id_file_path}\"\n        ```\n\n    **Unverified app screen**: This warning appears because the Data Manager API\n    scopes are sensitive. During **Testing**, External test users still see it\n    and can continue past it. Before other users can sign in, the app must\n    complete\n    [OAuth app verification](https://developers.google.com/data-manager/api/devguides/concepts/oauth-verification.md.txt).\n    Service accounts don't need verification.\n*   **Service account** (API calls are made as an app identity instead of a\n    person): For local development, use service account impersonation rather\n    than a service account key, since keys are a security risk if not managed\n    carefully.\n    *   Grant the Service Account the `Service Usage Consumer` IAM role\n        (`roles/serviceusage.serviceUsageConsumer`) on the project.\n    *   Grant the user executing `gcloud` the Token Creator role\n        (`roles/iam.serviceAccountTokenCreator`) on that Service Account.\n    *   Run:\n\n        ```shell\n        gcloud auth application-default login \\\n          --impersonate-service-account={service_account_email} \\\n          --scopes=\"https://www.googleapis.com/auth/datamanager,https://www.googleapis.com/auth/cloud-platform\"\n        ```\n*   **Data partner creating partner links** in advertiser accounts: Read\n    [Partner Links](references/partner-links.md).\n\n**Multiple APIs**: To use the same credentials for other APIs, append their\nscopes to the `--scopes` list in the commands above (e.g.,\n`https://www.googleapis.com/auth/adwords` for the Google Ads API or\n`https://www.googleapis.com/auth/display-video` for the Display & Video 360\nAPI).\n\n**Verify**: `gcloud auth application-default print-access-token` prints an\naccess token when credentials are set up correctly.\n\n**Troubleshooting `PERMISSION_DENIED` with a valid token**: Add the user or\nservice account to the destination account (for example, the Google Ads account\nor its manager account). For service accounts, also confirm the\n`Service Usage Consumer` role on the Cloud project.\n\n**Production**: For production authentication (workloads in or outside Google\nCloud, apps that act on behalf of other users, or partner links), see\n[Deploy to production](https://developers.google.com/data-manager/api/devguides/concepts/deploy.md.txt).\n\n## Install Client & Utility Libraries\n\nRefer to [Install a client library](https://developers.google.com/data-manager/api/devguides/quickstart/install-library.md.txt)\nfor more details.\n\nThe companion utility libraries provide pre-built helper classes\nand functions to correctly format, hash, and encrypt user identifiers (such as\nemails, phone numbers, and physical addresses) prior to API ingestion. Use of\nthese libraries is highly recommended to ensure that user identifier formatting\nmatches the API's specifications.\n\nSelect the language-specific installation guide below:\n\n*   [Python Setup Reference](references/python.md) (packages: `google-ads-datamanager` and `google-ads-datamanager-util`)\n*   [Java Setup Reference](references/java.md) (packages: `com.google.api-ads:data-manager` and `com.google.api-ads:data-manager-util`)\n*   [Node Setup Reference](references/node.md) (packages: `@google-ads/datamanager` and `@google-ads/datamanager-util`)\n*   [PHP Setup Reference](references/php.md) (packages: `googleads/data-manager` and `googleads/data-manager-util`)\n*   [.NET Setup Reference](references/dotnet.md) (packages: `Google.Ads.DataManager.V1` and `Google.Ads.DataManager.Util`)\n",
+      "card": {
+        "title_zh": "数据管理器API环境配置",
+        "purpose_zh": "指导开发者完成 Data Manager API 的本地环境准备：启用 API、配置应用默认凭据（ADC）认证，并安装各语言客户端与工具库。",
+        "does": [
+          "指导启用 datamanager.googleapis.com 并检查启用状态",
+          "说明用户账号与服务账号两种 ADC 认证配置流程",
+          "给出 gcloud 登录命令及所需 OAuth 范围",
+          "说明验证凭据与排查 PERMISSION_DENIED 的方法",
+          "指引安装 Python、Java、Node、PHP、.NET 客户端与工具库",
+          "推荐使用工具库对用户标识符进行格式化、哈希与加密"
+        ],
+        "inputs": [
+          "Google Cloud 项目 ID",
+          "具备启用 API 权限的 Google 账号或服务账号",
+          "Desktop app OAuth 客户端 JSON 配置文件路径",
+          "服务账号邮箱（服务账号模拟方式）",
+          "目标编程语言"
+        ],
+        "outputs": [
+          "已启用的 Data Manager API",
+          "本地应用默认凭据（ADC）",
+          "可打印访问令牌的验证结果",
+          "已安装的客户端库与工具库"
+        ],
+        "scenarios": [
+          "初次使用 Data Manager API 需搭建本地环境",
+          "为 API 调用配置用户账号或服务账号认证",
+          "按语言安装客户端库与标识符工具库"
+        ],
+        "prerequisites": [
+          "拥有 Google Cloud 项目",
+          "已安装 Google Cloud CLI（gcloud）",
+          "账号具备 Owner、Editor 或 Service Usage Admin 等项目角色",
+          "服务账号方式需授予 Service Usage Consumer 与 Token Creator 角色"
+        ],
+        "limits": [
+          "不适用于实现受众或事件摄取逻辑，应改用对应的摄取技能",
+          "外部用户类型在测试阶段仍会看到未验证应用提示，需完成 OAuth 应用验证",
+          "生产环境认证需另行参考部署文档"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "needs_secret"
+        ],
+        "tags": [
+          "后端",
+          "运维部署",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Guides developers through client library installation and authentication setup steps for the Data Manager API."
+          },
+          {
+            "field": "does",
+            "quote": "gcloud services enable datamanager.googleapis.com --project={project_id}"
+          },
+          {
+            "field": "does",
+            "quote": "The companion utility libraries provide pre-built helper classes and functions to correctly format, hash, and encrypt user identifiers"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "A Google Cloud project, the Google Cloud CLI (`gcloud`), and a Google Account with a project role that can enable APIs, such as **Owner**, **Editor**, or **Service Usage Admin**."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Grant the Service Account the `Service Usage Consumer` IAM role"
+          },
+          {
+            "field": "limits",
+            "quote": "Don't use for implementing audience or event ingestion logic"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "gcloud auth application-default login"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "since keys are a security risk if not managed carefully"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ads/google-ads-api-account-diagnostics/SKILL.md",
+      "blob_sha": "c1f3e465887dd98b757528e223356ff3341bc586",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-ads-api-account-diagnostics/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-ads-api-account-diagnostics",
+        "description": "Diagnoses Google Ads account performance issues such as conversion loss (value or volume), low lead flow/volume, and lost impression share (opportunities) due to ad rank, bids, or budgets. Use when troubleshooting sudden performance drops, analyzing campaign impression share metrics, investigating low lead flow, or searching for bidding and budget constraints. Don't use for setting up new campaigns, uploading conversion events directly, or general Google Mobile Ads SDK integration issues (use gm"
+      },
+      "excerpt": "---\nname: google-ads-api-account-diagnostics\ndescription: >-\n  Diagnoses Google Ads account performance issues such as conversion loss (value or volume), low lead flow/volume, and lost impression share (opportunities) due to ad rank, bids, or budgets. Use when troubleshooting sudden performance drops, analyzing campaign impression share metrics, investigating low lead flow, or searching for bidding and budget constraints. Don't use for setting up new campaigns, uploading conversion events directly, or general Google Mobile Ads SDK integration issues (use gma-android-integrate instead).\ncompatibility: \"Google Ads MCP Server (tools: search, list_accessible_customers, get_resource_metadata); see the google-ads-api-mcp-setup skill.\"\nmetadata:\n  category: GoogleAds\n  author: google-ads-api-team\n  version: \"1.0.2\"\n---\n\n# Google Ads API Account Performance Diagnostics Skill\n\nThis skill provides instructions on how to use the Google Ads MCP server tools to diagnose common account performance issues.\n\n## Workflows\n\n### Pre-Flight Tool Verification\nBefore starting any diagnostic task, verify whether the Google Ads MCP Server tools (`search`, `list_accessible_customers`, `get_resource_metadata` — these may be exposed with a server prefix, e.g. `customers_list_accessible_customers`) are available in the runtime environment:\n- **If MCP tools are available**: Proceed with live diagnostics — first [identify active client accounts](#identifying-active-client-accounts), then run GAQL via the `search` tool (arguments `customer_id` and `query`).\n- **If MCP tools are missing**: Follow [Fallback When MCP Tools Are Unavailable](#fallback-when-mcp-tools-are-unavailable).\n\n### Identifying Active Client Accounts\nMost diagnostics tasks require sending GAQL queries to a specific customer account. If the customer ID is not explicitly provided by the user, you must first call the `list_accessible_customers` (or `customers_list_accessible_customers`) tool to retrieve the customer resource names/IDs you have access to.\n\nOnce you have the list of accessible customer IDs, query the `customer_client` resource using the `search` tool under those customer accounts to find active client customer accounts. Make sure to select only enabled client accounts and filter out manager accounts:\n```sql\nSELECT\n  customer_client.id,\n  customer_client.descriptive_name,\n  customer_client.status,\n  customer_client.manager\nFROM customer_client\nWHERE customer_client.status = 'ENABLED' AND customer_client.manager = FALSE\n```\nOnly run subsequent diagnostic queries against the enabled client customer IDs retrieved from this list. Do not query deactivated or manager accounts, as doing so will cause API errors.\n\n### Fallback When MCP Tools Are Unavailable\nWhen Google Ads MCP tools (`search`, `list_accessible_customers`, `get_resource_metadata` — these may be exposed with a server prefix, e.g. `customers_list_accessible_customers`) are not registered in the runtime environment:\n1. **Inform the User**: State that live account performance diagnostics require the Google Ads MCP Server.\n2. **Reference Setup Guide**: Direct the user to the setup instructions in the [google-ads-api-mcp-setup](../google-ads-api-mcp-setup/SKILL.md) skill to install and configure the Google Ads MCP Server for their assistant environment.\n3. **Provide GAQL Templates, Gotchas, and Remediation Guidance**: Formulate and output the complete diagnostic plan for manual execution in the Google Ads Query Builder or via API integration:\n   - Provide all multi-step GAQL queries for the workflow, including current-vs-prior date window comparisons (e.g. traffic, impression share, conversion breakdowns, or change events).\n   - Explain all metric conversion and constraint gotchas (`metrics.cost_micros / 1,000,000` for currency, impression share reported as decimals or `\"< 0.10\"`, `change_event` 30-day window and `LIMIT 10000` without `metrics.*`, and `successful_event_count / total_event_count` plus `status` for upload health).\n   - Outline concrete **actionable next steps** for each diagnostic branch (e.g., raising campaign budgets when `search_budget_lost_impression_share` is high vs. improving ad quality or bids when `search_rank_lost_impression_share` is high).\n4. **Do Not Attempt Unauthorized Local Probing**: Do **not** attempt to run shell commands, custom Python scripts, local SQL/database queries, or direct RPC CLI utilities to access account data. These commands lack credentials and API access and will fail.\n\n### 1. Conversion and Conversion Value Loss\n\nWhen conversions or conversion value suddenly decline, use the following steps to diagnose the issue.\n\n**Steps:**\n1.  **Discover Fields**: Use `get_resource_metadata` with resource `campaign` or `ad_group` to ensure you have the correct field names.\n2.  **Query Performance**: Use `search` to retrieve performance data.\n    *   **Resource**: `campaign` or `ad_group`\n    *   **Fields**: Include `campaign.name`, `metrics.conversions`, `metrics.conversions_value`, `metrics.cost_micros`.\n    *   **Segments**: To isolate the loss, include segments like `segments.date`, `segments.device`, `segments.conversion_action`.\n    *   **Conditions**: Compare the period of decline with a previous period (e.g., `segments.date >= '{start_date}'`).\n    *   *Gotcha*: `metrics.cost_micros` must be divided by 1,000,000 to get standard currency amounts.\n    *   *Gotcha (conversion action segmentation)*: In GAQL, `metrics.cost_micros` cannot be selected when segmenting by `segments.conversion_action`. Query conversion action breakdowns separately without `metrics.cost_micros`.\n\n    **Example GAQL Queries:**\n    1. To query performance and cost by date and device:\n    ```sql\n    SELECT\n      campaign.name,\n      metrics.conversions,\n      metrics.conversions_value,\n      metrics.cost_micros,\n      segments.date,\n      segments.device\n    FROM campaign\n    WHERE segments.date >= '{start_date}' AND segments.date <= '{end_date}'\n    ```\n\n    2. To query conversion breakdown by conversion action (without `metrics.cost_micros`):\n    ```sql\n    SELECT\n      campaign.name,\n      metrics.conversions,\n      metrics.conversions_value,\n      segments.date,\n      segments.conversion_action\n    FROM campaign\n    WHERE segments.date >= '{start_date}' AND segments.date <= '{end_date}'\n    ```\n\n3.  **Analyze**: Check if the loss is limited to certain devices (e.g., mobile vs desktop) or specific conversion actions.\n4.  **Check Uploads**: If using offline imports, query `offline_conversion_upload_conversion_action_summary` to verify upload pipeline health. If the query returns no results, report that no offline uploads exist for the account and proceed.\n\n    **Example GAQL Query:**\n    To check upload pipeline health for a customer account `{customer_id}`:\n    ```sql\n    SELECT\n      offline_conversion_upload_conversion_action_summary.conversion_action_name,\n      offline_conversion_upload_conversion_action_summary.successful_event_count,\n      offline_conversion_upload_conversion_action_summary.total_event_count,\n      offline_conversion_upload_conversion_action_summary.status\n    FROM offline_conversion_upload_conversion_action_summary\n    ```\n\n### 2. Opportunities Lost (Impression Share)\n\nTo identify lost opportunities due to ad rank, bids, or budgets, analyze impression share metrics.\n\n**Steps:**\n1.  **Query Impression Share**: Use `search` to retrieve impression share metrics.\n    *   **Resource**: `campaign`\n    *   **Fields**: Include `campaign.name`, `metrics.search_impression_share`, `metrics.search_rank_lost_impression_share`, `metrics.search_budget_lost_impression_share`.\n    *   *Gotcha*: Impression share values in the API are returned as decimals (e.g., 0.35 = 35%) or formatted strings (e.g., `\"< 0.10\"`).\n\n    **Example GAQL Query:**\n    To query impression share metrics for a customer account `{customer_id}` between `{start_date}` and `{end_date}`:\n    ```sql\n    SELECT\n      campaign.name,\n      metrics.search_impress",
+      "card": {
+        "title_zh": "谷歌广告账户诊断",
+        "purpose_zh": "通过 Google Ads MCP 服务器工具查询账户数据，诊断转化或转化价值下降、线索量低、因广告评级、出价或预算导致的展示份额损失等常见账户表现问题。",
+        "does": [
+          "先验证运行时是否具备 Google Ads MCP 工具，缺失时给出降级方案",
+          "用 list_accessible_customers 与 customer_client 查询定位启用的客户账户",
+          "用 search 工具执行 GAQL 查询转化、转化价值与花费数据",
+          "分析搜索展示份额及评级、预算导致的份额损失",
+          "按日期、设备、转化操作细分排查线索量下降原因",
+          "查询 change_event 与离线转化上传汇总以定位变更和上传健康度"
+        ],
+        "inputs": [
+          "客户账户 customer_id（可选，未提供则先列出可访问账户）",
+          "诊断起始与结束日期 start_date、end_date",
+          "用户描述的账户表现问题（如转化下降、线索量低）"
+        ],
+        "outputs": [
+          "GAQL 查询结果与诊断分析结论",
+          "针对各诊断分支的可执行后续建议",
+          "MCP 工具不可用时输出的完整 GAQL 模板、注意事项与人工执行方案"
+        ],
+        "scenarios": [
+          "排查转化量或转化价值突然下降",
+          "分析广告系列展示份额与出价、预算约束",
+          "调查近期线索流量偏低的原因",
+          "检查离线转化上传管道是否正常",
+          "定位账户在表现下滑前后的变更事件"
+        ],
+        "prerequisites": [
+          "运行环境已注册 Google Ads MCP 服务器工具 search、list_accessible_customers、get_resource_metadata",
+          "已按 google-ads-api-mcp-setup 技能完成安装配置",
+          "拥有可访问的启用客户账户（非经理账户）"
+        ],
+        "limits": [
+          "不用于新建广告系列、直接上传转化事件或 Google Mobile Ads SDK 集成问题",
+          "change_event 查询须限定过去 30 天、LIMIT 不超过 10000 且不能选 metrics",
+          "按 segments.conversion_action 细分时不能同时选 metrics.cost_micros",
+          "不得查询已停用或经理账户，否则会报 API 错误",
+          "MCP 工具缺失时不得尝试 shell 命令、本地脚本或直接 RPC 访问账户数据"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "数据分析",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Diagnoses Google Ads account performance issues such as conversion loss (value or volume), low lead flow/volume, and lost impression share (opportunities) due to ad rank, bids, or budgets."
+          },
+          {
+            "field": "does",
+            "quote": "Use `get_resource_metadata` with resource `campaign` or `ad_group` to ensure you have the correct field names."
+          },
+          {
+            "field": "does",
+            "quote": "first call the `list_accessible_customers` (or `customers_list_accessible_customers`) tool to retrieve the customer resource names/IDs you have access to."
+          },
+          {
+            "field": "does",
+            "quote": "query `offline_conversion_upload_conversion_action_summary` to verify upload pipeline health."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "compatibility: \"Google Ads MCP Server (tools: search, list_accessible_customers, get_resource_metadata); see the google-ads-api-mcp-setup skill.\""
+          },
+          {
+            "field": "limits",
+            "quote": "Don't use for setting up new campaigns, uploading conversion events directly, or general Google Mobile Ads SDK integration issues (use gma-android-integrate instead)."
+          },
+          {
+            "field": "limits",
+            "quote": "In GAQL, `metrics.cost_micros` cannot be selected when segmenting by `segments.conversion_action`."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not query deactivated or manager accounts, as doing so will cause API errors."
+          },
+          {
+            "field": "limits",
+            "quote": "Do **not** attempt to run shell commands, custom Python scripts, local SQL/database queries, or direct RPC CLI utilities to access account data."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ads/google-ads-api-mcp-setup/SKILL.md",
+      "blob_sha": "7fb722fd2df3acd40513b252996ec5d9afc79281",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-ads-api-mcp-setup/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-ads-api-mcp-setup",
+        "description": "Guides developers through downloading, configuring, and installing the official open-source Google Ads MCP Server. Use this skill when a user wants to connect their AI assistant (such as Gemini, Claude Code, or Cursor) to their Google Ads account to query campaigns or retrieve reporting metrics using natural language."
+      },
+      "excerpt": "---\nname: google-ads-api-mcp-setup\ndescription: Guides developers through downloading, configuring, and installing the official open-source Google Ads MCP Server. Use this skill when a user wants to connect their AI assistant (such as Gemini, Claude Code, or Cursor) to their Google Ads account to query campaigns or retrieve reporting metrics using natural language.\ncompatibility: Python 3.12+, pipx\nmetadata:\n  author: google-ads-api-team\n  version: \"1.1.0\"\n  category: GoogleAds\n---\n# Google Ads API MCP Server Installation\n\nThis skill provides a structured setup guide to install, configure, and integrate the official open-source **[Google Ads Model Context Protocol (MCP) Server](https://github.com/googleads/google-ads-mcp)**.\n\n---\n\n## System Requirements & Compatibility (Agent Action: State Required Prerequisites)\n\nWhen answering questions about installing or setting up the MCP server, you\n**MUST** explicitly state to the user that both **Python 3.12+** and **`pipx`**\nare strictly required prerequisites for the installation.\n\n> [!IMPORTANT]\n> **Pre-Flight Environment Check:**\n> *   **Python Runtime:** Version **`3.12+`** is strictly required.\n> *   **Package Manager:** **`pipx`** must be installed and globally accessible in\n>     the system path.\n> *   **Network Connectivity:** Outbound HTTPS access is required to connect to the\n>     Google Ads API endpoints (`googleads.googleapis.com`) and PyPI.\n---\n## ⚠️ Prerequisites: Credentials Required\n> [!WARNING]\n> **Dependency Check:** The MCP server **requires** a Google Cloud project with\n> Google Ads API access and the same OAuth credentials as a standard\n> integration. Developer tokens were sunset on September 9, 2026 and are not\n> used.\n>\n> If you **do not** have your Google Cloud project ID, Client ID, Client\n> Secret, Refresh Token, and Customer IDs yet:\n> 1. **STOP** executing this skill.\n> 2. **Transition to** the **`google-ads-api-quickstart`** skill first to generate them, then return here.\n\n---\n\n## Step 1: Validate Your Google Ads API Credentials\n\nThe Google Ads MCP Server requires the same parameters as the standard client\nlibraries. Before proceeding to installation, verify that you have these values\nsecured and formatted correctly:\n\n1.  **Google Cloud Project ID:** The project in which the Google Ads API is enabled and that owns your OAuth client. Its access level (Test, Explorer, Basic, or Standard) decides which accounts the server can query; check it on the [Google Ads API Overview page](https://console.cloud.google.com/google/ads-apis/overview).\n2.  **OAuth2 Client ID & Client Secret:** Desktop Application credentials from the Google Cloud Console.\n3.  **OAuth2 Refresh Token:** The long-lived token generated via the OAuth consent flow.\n4.  **Client Customer ID:** The 10-digit target Google Ads account ID.\n    *   > [!IMPORTANT]\n    *   > **Format:** Must contain **digits only, no hyphens** (e.g., `1234567890`, NOT `123-456-7890`).\n5.  **Login Customer ID (Required for MCC Hierarchies):** The 10-digit Manager Account (MCC) ID.\n    *   **Format:** **Digits only, no hyphens** (e.g., `9876543210`).\n    *   **Note:** Essential if your OAuth credentials belong to a Manager Account administrator rather than directly to the client account.\n\n---\n\n*Once you have verified that all parameters are present and formatted\ncorrectly, proceed to Step 2.*\n\n## Step 2: Install Prerequisites (Python & pipx)\n\nYou **MUST** verify if the prerequisites are already installed before proposing any installation commands.\n\n### 1. Verification Phase (Agent Action)\nYou **MUST** run the following commands to check the environment:\n\n1.  Check Python version: `python3 --version` (Verify it is `3.12+`).\n2.  Check if pipx is installed: `pipx --version`.\n\n*   **If both are present:** Skip the installation phase and proceed directly to **Step 3**.\n*   **If Python is missing/outdated:** Stop and ask the user to upgrade Python to `3.12+` on their host machine.\n*   **If pipx is missing:** Proceed to the installation phase below.\n\n---\n\n### 2. Installation Phase (OS-Specific)\nDetect the operating system and propose the appropriate command to install `pipx` using your terminal tools:\n\n#### macOS\nIf the environment is macOS, propose:\n\n```bash\nbrew install pipx && pipx ensurepath\n# Or alternatively (if Homebrew is not installed):\npip install pipx && pipx ensurepath\n```\n\n#### Windows (PowerShell)\nIf the environment is Windows, propose:\n\n```powershell\nscoop install pipx\n# Or alternatively:\npip install pipx && pipx ensurepath\n```\n\n#### Linux (Ubuntu/Debian)\nIf the environment is Linux, propose:\n\n```bash\nsudo apt install pipx && pipx ensurepath\n```\n\n> [!WARNING]\n> **Shell Restart Required:** If you installed `pipx` and ran `pipx ensurepath`, the updated `PATH` will not be available in the current terminal session.\n> 1. **DO NOT** immediately attempt to run `pipx` commands in the same session.\n> 2. **Instruct the user** to restart their terminal or reload their shell configuration before proceeding to **Step 3**.\n\n---\n\n## Step 3: Install the Google Ads MCP Server\n\nYou must install the server package. By default, you **MUST** install the stable release from PyPI. Only install the GitHub development version if the user explicitly requests it.\n\n### 1. Installation Command\nPropose and execute the installation command:\n\n```bash\n# Install stable release from PyPI (Using required package manager pipx)\npipx install google-ads-mcp\n```\n\nIf the user explicitly requests the latest development version from GitHub, propose:\n\n```bash\n# Install development version from GitHub (Only if explicitly requested)\npipx install git+https://github.com/googleads/google-ads-mcp.git\n```\n\n### 2. Verification Phase\n\nTo verify the installation, execute:\n\n```bash\ngoogle-ads-mcp --help\n```\n\n### Troubleshooting PATH Issues (Agent Action)\n`pipx` installs binaries into a specific local directory (typically `~/.local/bin`). If the user's shell configuration (e.g., `.bashrc` or `.zshrc`) hasn't been reloaded, `google-ads-mcp` might not be found in the current `PATH`.\n\nIf `google-ads-mcp --help` fails with a \"command not found\" error:\n\n1. **DO NOT** assume the installation failed or get stuck in an installation loop.\n2. Verify the installation using the absolute path to the `pipx` binary directory:\n\n   ```bash\n   ~/.local/bin/google-ads-mcp --help\n   ```\n3. If the absolute path verification succeeds, explain the situation to the user: inform them that the installation was successful but their `PATH` environment variable needs to be updated by reloading their shell configuration (e.g., running `source ~/.bashrc` or `source ~/.zshrc`, or restarting their terminal).\n\n### 3. Communication Protocol: Stdio Transport\n\n> [!IMPORTANT]\n> **Mandatory Agent Directive (Installation & Protocol Checklist):**\n> When a user asks how to install, download, or set up the official Google Ads MCP server, your response **MUST** systematically include all of the following:\n> 1. [ ] **State Prerequisites:** Explicitly state that Python 3.12+ and `pipx` are required prerequisites.\n> 2. [ ] **Provide Official Install Command:** Direct the developer to install the official `google-ads-mcp` package using `pipx install google-ads-mcp`. Do not suggest third-party unvetted servers.\n> 3. [ ] **Explain Stdio Transport:** You **MUST** explicitly explain the communication architecture using the exact terminology: state that the MCP server communicates via the **Model Context Protocol (MCP)** using **standard input/output (`stdio`) transport**. Do not omit the words \"standard input/output\" or \"transport\".\n\n#### Key points to explain to the user regarding Stdio Transport:\n\n*   **Subprocess Execution:** The host client (e.g., Cursor, Claude Desktop) launches the MCP server as a background subprocess.\n*   **Command-Line Launch:** The host client must be configured with the exact command to run the server (`google-ads-mcp`) and the environment variables containing your Google Ads credentials.\n*   **No Network Ports:** ",
+      "card": null
+    },
+    {
+      "skill_path": "skills/ads/google-ads-api-quickstart/SKILL.md",
+      "blob_sha": "8176bb5492d40b19c94fe311b0f3a95e4deae15b",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-ads-api-quickstart/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-ads-api-quickstart",
+        "description": "Guides developers through Google Ads API quickstart: credential setup, choosing from 6 client libraries/REST, configuring environments, and running a \"retrieve campaigns\" script. Troubleshoots common setup errors: USER_PERMISSION_DENIED, login_customer_id issues, and CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION (a Google Cloud project with Test access calling a production account).\n\nUse this skill when:\n- The user asks how to get started with the Google Ads API.\n- The user needs to set up Google Ad"
+      },
+      "excerpt": "---\nname: google-ads-api-quickstart\ndescription: |\n  Guides developers through Google Ads API quickstart: credential setup, choosing from 6 client libraries/REST, configuring environments, and running a \"retrieve campaigns\" script. Troubleshoots common setup errors: USER_PERMISSION_DENIED, login_customer_id issues, and CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION (a Google Cloud project with Test access calling a production account).\n\n  Use this skill when:\n  - The user asks how to get started with the Google Ads API.\n  - The user needs to set up Google Ads API access in a Google Cloud project or OAuth credentials.\n  - The user wants to write a quickstart/example script for Google Ads.\n  - The user encounters errors like USER_PERMISSION_DENIED, CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION, or the legacy DEVELOPER_TOKEN_NOT_APPROVED.\ncompatibility: \"Outbound HTTPS connectivity required to access the Google Ads API and documentation. Note: If network access is restricted, the agent will fall back to using the last-known stable versions cached within the skill resources.\"\nmetadata:\n  author: google-ads-api-team\n  version: \"1.1.0\"\n  category: GoogleAds\n---\n# Google Ads API Quickstart\nThis skill guides you from absolute zero to running your first successful request to retrieve campaigns.\n\n## Supported Tracks\nYou can choose to use this skill with:\n\n1. **Official Client Libraries:** Python, Java, .NET, PHP, Ruby, or Perl.\n2. **Direct REST:** Raw HTTP REST requests.\n\n---\n\n## Crucial Requirement: Dynamic Version Resolution & Runtime Resolution\n\n> [!IMPORTANT]\n> To ensure the integration is secure, stable, and up-to-date, you must resolve all API and runtime versions dynamically. Do not rely on hardcoded defaults.\n\n### Strict Constraints:\n\n*   **DO NOT Hardcode:** Never use hardcoded Google Ads API versions (e.g., `v24`) or language runtime versions (e.g., `Python 3.8+`, `Java 11+`) in generated code or environment setup instructions, unless the user explicitly requests a specific version.\n*   **MANDATORY Dynamic Resolution:** You must dynamically resolve the latest stable versions *at the start of execution* before generating any code or configuration, using the procedures detailed below.\n\n### A. Dynamic API Version Resolution\nTo ensure the integration is secure, stable, and up-to-date, you **MUST** resolve the absolute newest stable major version of the Google Ads API dynamically.\n\n#### Execution Steps:\n\n1.  **Pre-Flight Version Resolution:** Use your web search or URL-reading tools to inspect the latest entry in the [Google Ads API Release Notes](https://developers.google.com/google-ads/api/docs/release-notes.md.txt) or the highest versioned directory in the [Googleapis Github Repository](https://github.com/googleapis/googleapis/tree/master/google/ads/googleads) to resolve `RESOLVED_API_VERSION` (e.g., `v24`). If using Java, you **MUST** also resolve the latest stable release version of the Google Ads Java Client Library (referred to as `RESOLVED_LIBRARY_VERSION`, e.g., `34.0.0`).\n\n2.  **Mandatory Response Anchor:** You **MUST** output the following confirmation block as the **very first line** of your response to the user. Do not output any greeting, pleasantries, or introductory text before this block.\n    \n    ```text\n    [SYSTEM: Using Google Ads API version: RESOLVED_API_VERSION (Resolved from release notes)]\n    ```\n\n3.  **Strict Placeholder Mapping Table:** You **MUST** perform on-the-fly search-and-replace on all code templates and reference files using the mapping table below. Do not leave raw placeholders in the final output.\n\n    | Target Language / Tech | Placeholder in Template | Replacement Pattern | Example (Assuming API `v24`) |\n    | :--- | :--- | :--- | :--- |\n    | **Java** (Maven/Gradle) | `LATEST_LIBRARY_VERSION` | Search & substitute the latest Maven release version of the library. | `34.0.0` |\n    | **Java** (Imports) | `vXX` | Replace with **lower-case** API version. | `com.google.ads.googleads.v24` |\n    | **.NET / C#** (Namespaces) | `VXX` | Replace with **title-case** API version. | `Google.Ads.GoogleAds.V24` |\n    | **PHP** (Namespaces) | `VXX` | Replace with **title-case** API version. | `Google\\Ads\\GoogleAds\\V24` |\n    | **REST** (Endpoint URL) | `vXX` | Replace with **lower-case** API version. | `https://googleads.googleapis.com/v24/...` |\n\n> [!TIP]\n> **Offline Fallback:** If the URLs are unreachable or the scrape fails, do not halt execution. Fall back to these last-known stable versions:\n> *   **Google Ads API Major Version (`RESOLVED_API_VERSION`):** `v24`\n> *   **Java Client Library Version (`RESOLVED_LIBRARY_VERSION`):** `34.0.0`\n\n### B. Dynamic Language Runtime Version Resolution\nTo prevent the generated setup guides from becoming obsolete due to language deprecation cycles, you **MUST** resolve language requirements dynamically.\n\n#### Execution Steps:\n\n1.  **Fetch Live Requirements:** Use your URL-reading tools to inspect the official [Google Ads Client Libraries - Supported Versions](https://developers.google.com/google-ads/api/docs/client-libs.md.txt#supported_api_versions) page.\n\n2.  **Extract Minimums:** Identify the minimum supported runtime version for the user's chosen language by scanning the Overview page or compatibility tables (e.g., looking for explicit requirements like Python 3.8+, Java 11+, .NET 6.0+, PHP 8.1+, Ruby 3.0+).\n\n3.  **Apply On-The-Fly:** Substitute all runtime placeholders (e.g., `<PYTHON_MIN_VERSION>`) in your generated setup guides with these resolved versions.\n\n> [!TIP]\n> **Offline Fallback:** If the URL is unreachable or the scrape fails, do not halt execution. Fall back to these last-known safe minimum versions:\n> *   **Python:** `3.9+`\n> *   **Java:** `11+`\n> *   **.NET:** `6.0+`\n> *   **PHP:** `8.1+`\n> *   **Ruby:** `3.0+`\n> *   **Perl:** `5.28.1+`\n\n---\n\n## Step 1: Obtain Google Ads API Credentials\n\nBefore installing libraries or making API calls, you need a Google Cloud\nproject with Google Ads API access and four authentication parameters.\n\n> [!NOTE]\n> **Developer tokens were sunset on September 9, 2026.** API access levels now\n> belong to the Google Cloud project that owns your OAuth client (or service\n> account). Do not send the user to the API Center in a Google Ads manager\n> account to request a developer token; those requests are no longer processed.\n> Existing `developer_token` values in configuration files are ignored by the\n> API and can be removed.\n\n### 1. Google Cloud Project with Google Ads API Access\n\n*   **Purpose:** Holds your API access level and quota. The project that owns your OAuth client ID (or service account) determines which accounts you can call and how many operations per day you get.\n*   **How to Obtain:**\n    1. Open the [Google Ads API Overview page](https://console.cloud.google.com/google/ads-apis/overview) in the Google Cloud Console and select (or create) a project.\n    2. Click **Enable**. Enabling the API grants **Test access**: up to 15,000 operations per day against Google Ads **test accounts** only.\n    3. To call **production** accounts, apply for **Explorer access** from the\n       same Overview page (review is automated in most cases; up to 2,880\n       operations per day). **Basic** and **Standard** access are applied for\n       from the same page and require brand verification for the project.\n    4. If your team already had a developer token, its access level was transferred to the Cloud projects that used it in the 90 days before the sunset. Check the Overview page, not the API Center.\n\n> [!WARNING]\n> **Test Access Restriction:** If your Cloud project only has Test access, you\n> **MUST ONLY** target **Google Ads Test Accounts**. Calling a production\n> account fails with `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION` (API v25 and\n> later) or `ACTION_NOT_PERMITTED` (v24 and earlier).\n\n### 2. OAuth2 Client ID & Client Secret\n\n*   **Purpose:** Identifies your application to Google's OAuth 2.0 server and allows you to request user authorization.\n*   **How",
+      "card": {
+        "title_zh": "Google Ads API 快速入门",
+        "purpose_zh": "指导开发者从零完成 Google Ads API 接入：配置凭据、选择客户端库或 REST、动态解析版本、运行获取广告系列的示例脚本，并排查常见权限与项目审批错误。",
+        "does": [
+          "引导获取 Google Cloud 项目、OAuth 客户端、刷新令牌与客户 ID 等凭据",
+          "要求动态解析最新 Google Ads API 版本与语言运行时版本，并提供离线回退版本",
+          "支持 Python、Java、.NET、PHP、Ruby、Perl 客户端库或直接 REST 两种接入方式",
+          "提供获取广告系列（campaigns）的快速入门脚本编写指导",
+          "排查 USER_PERMISSION_DENIED、login_customer_id 缺失、CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION 等错误",
+          "说明 Test 访问与生产访问的权限差异及申请路径"
+        ],
+        "inputs": [
+          "Google Cloud 项目及 Google Ads API 启用状态",
+          "OAuth2 Client ID 与 Client Secret（client_secrets.json）",
+          "OAuth2 刷新令牌",
+          "10 位客户 ID（Client Customer ID）",
+          "10 位登录客户 ID（Login Customer ID，经理账户场景）",
+          "所选编程语言或 REST 方式"
+        ],
+        "outputs": [
+          "凭据配置与接入步骤说明",
+          "按语言替换占位符后的示例代码或配置",
+          "首行输出版本确认块",
+          "获取广告系列的请求结果",
+          "常见错误排查建议"
+        ],
+        "scenarios": [
+          "开发者首次接入 Google Ads API",
+          "在 Google Cloud 项目中配置 OAuth 凭据与刷新令牌",
+          "编写获取广告系列的快速入门脚本",
+          "遇到权限或项目审批类错误需要排查",
+          "选择客户端库或 REST 接入方式"
+        ],
+        "prerequisites": [
+          "需要可访问 Google Ads API 与文档的出站 HTTPS 连接（受限时可回退到技能内缓存版本）",
+          "需要 Google Cloud 项目并启用 Google Ads API",
+          "需要 OAuth 同意屏幕配置并将登录邮箱加为测试用户",
+          "需要安装 gcloud CLI 以生成刷新令牌",
+          "客户 ID 必须为 10 位无连字符数字"
+        ],
+        "limits": [
+          "仅覆盖快速入门与凭据配置，未说明其他 API 功能",
+          "Test 访问仅能调用测试账户，调用生产账户会报错",
+          "开发者令牌已于 2026 年 9 月 9 日停用，旧配置中的 developer_token 被忽略",
+          "离线时只能使用缓存中的已知稳定版本",
+          "未说明具体宿主平台"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files",
+          "needs_secret",
+          "shell"
+        ],
+        "tags": [
+          "后端",
+          "文档",
+          "调研",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Guides developers through Google Ads API quickstart: credential setup, choosing from 6 client libraries/REST, configuring environments, and running a \"retrieve campaigns\" script."
+          },
+          {
+            "field": "does",
+            "quote": "Troubleshoots common setup errors: USER_PERMISSION_DENIED, login_customer_id issues, and CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION"
+          },
+          {
+            "field": "does",
+            "quote": "You must dynamically resolve the latest stable versions *at the start of execution* before generating any code or configuration"
+          },
+          {
+            "field": "does",
+            "quote": "You can choose to use this skill with:\n\n1. **Official Client Libraries:** Python, Java, .NET, PHP, Ruby, or Perl.\n2. **Direct REST:** Raw HTTP REST requests."
+          },
+          {
+            "field": "does",
+            "quote": "This skill guides you from absolute zero to running your first successful request to retrieve campaigns."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Outbound HTTPS connectivity required to access the Google Ads API and documentation."
+          },
+          {
+            "field": "limits",
+            "quote": "**Developer tokens were sunset on September 9, 2026.**"
+          },
+          {
+            "field": "limits",
+            "quote": "**Offline Fallback:** If the URLs are unreachable or the scrape fails, do not halt execution."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Use your web search or URL-reading tools to inspect the latest entry in the [Google Ads API Release Notes]"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ads/google-mobile-ads-android-migrate-to-next-gen/SKILL.md",
+      "blob_sha": "5fc8bf4af4d0c89f784d84314680bc03989886d5",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-mobile-ads-android-migrate-to-next-gen/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-mobile-ads-android-migrate-to-next-gen",
+        "description": "Migrates Android applications from the old, legacy Google Mobile"
+      },
+      "excerpt": "---\nname: google-mobile-ads-android-migrate-to-next-gen\ndescription: Migrates Android applications from the old, legacy Google Mobile\n  Ads (GMA) SDK (com.google.android.gms:play-services-ads) to the new GMA\n  Next-Gen SDK (com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk).\n  Provides comprehensive mapping tables for imports, classes, and method\n  signatures to help determine migration steps. Use when migrating an existing\n  Android codebase from the old, legacy GMA SDK to GMA Next-Gen SDK.\nmetadata:\n  version: \"1.1.0\"\n  category: GoogleAds\n---\n# AI Migration Agent Instructions for the Google Mobile Ads SDK\n\n## Migration Workflow\n\nUse this checklist to track your migration progress:\n\n*   **Configure Gradle**:\n    -   [ ] Replace `com.google.android.gms:play-services-ads` with the latest\n        stable version of\n        `com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk`. If you\n        cannot access Maven directly, run the following command to fetch the\n        latest version. The version returned in the `latest` tag is the latest\n        version of the GMA Next-Gen SDK:\n\n        ```bash\n        curl -sS https://dl.google.com/dl/android/maven2/com/google/android/libraries/ads/mobile/sdk/ads-mobile-sdk/maven-metadata.xml | sed -n 's/.*<latest>\\(.*\\)<\\/latest>.*/\\1/p'\n        ```\n\n    -   [ ] Update `minSdk` (24+) and `compileSdk` (34+).\n    -   [ ] Exclude `play-services-ads` and `play-services-ads-lite` from all\n        dependencies globally in the app-level build file to avoid duplicate\n        symbol errors.\n    -   [ ] Sync Gradle before moving on to the next step.\n*   **Per-File Migration**:\n    -   [ ] Refactor the codebase following the API Mapping and Method Mapping\n        tables to migrate imports, class names, and method signature to GMA\n        Next-Gen SDK.\n*   **Verify and Build**:\n    -   [ ] Run `gradle build -x test` to confirm a successful clean build.\n        Resolve any GMA SDK related compile errors.\n\n## Core Migration Rules\n\n*   **App ID Usage**: **Always** use the value of the\n    `com.google.android.gms.ads.APPLICATION_ID` meta-data tag from\n    `AndroidManifest.xml` for the `applicationId` in `InitializationConfig`.\n    *   *Constraint*: Preserve the `<meta-data>` tag in the manifest; it is\n        still required for publishers using the User Messaging Platform SDK.\n*   **Initialization Sequence**:\n    1.  Call `MobileAds.initialize()` on a background thread.\n    2.  Ensure `initialize()` is called **before** any other SDK methods.\n    3.  If using `RequestConfiguration`, bundle it into\n        `InitializationConfig.Builder.setRequestConfiguration()`. **Do not**\n        call `MobileAds.setRequestConfiguration()` before initialization.\n*   **UI Threading**: **MANDATORY**: Callbacks in GMA-Next Gen SDK are invoked\n    on a background thread. **ALL UI-RELATED OPERATIONS** (e.g., Toasts, View\n    updates, Fragment transactions) **MUST** be wrapped in `runOnUiThread {}` or\n    `Dispatchers.Main.launch {}` within GMA SDK callbacks. SKIPPING THIS STEP\n    WILL CAUSE THE APPLICATION TO CRASH.\n*   **Mediation**: Classes implementing\n    `com.google.android.gms.ads.mediation.Adapter` MUST continue using\n    `com.google.android.gms.ads`.\n\n## Format Specifics\n\n### Banner Ads\n\n*   Use `com.google.android.libraries.ads.mobile.sdk.banner.AdView` for loading\n    GMA Next-Gen SDK banners.\n*   The following API checks if a banner is collapsible:\n    `adView.getBannerAd().isCollapsible()`.\n\n### Native Ads\n\n*   **NativeAdLoader**: `NativeAdLoader` is abstract and cannot be instantiated.\n    It is used statically (e.g., `NativeAdLoader.load(...)`).\n*   The following APIs are now set on the `NativeAdRequest.Builder`:\n    *   `.setCustomFormatIds(customFormatIds: List<String>)`\n    *   `.disableImageDownloading()`\n    *   `.setMediaAspectRatio(mediaAspectRatio: NativeMediaAspectRatio)`\n    *   `.setAdChoicesPlacement(adChoicesPlacement: AdChoicesPlacement)`\n    *   `.setVideoOptions(videoOptions: VideoOptions)`\n*   **Removal**: Delete all \"Mute This Ad\" logic; it is unsupported in GMA\n    Next-Gen SDK.\n*   **MediaView**: `NativeAd` no longer has a direct `mediaView` variable; use\n    `registerNativeAd(nativeAd, mediaView)` to associate the ad with the view.\n\n### Ad preloading\n\n*   Unless specified in the mapping table, ad preloading methods in the GMA\n    Next-Gen SDK retain the same API signatures and parameters as the Old SDK.\n\n## API Mapping\n\nThis table covers the main classes and their GMA Next-Gen SDK equivalents.\n\n| Feature                    | Old SDK Import (`com.google.android.gms.ads...`)                                     | GMA Next-Gen SDK Import (`com.google.android.libraries.ads.mobile.sdk...` )                                                                                                           |\n|:---------------------------|:-------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|\n| **Core**                   |                                                                                      |                                                                                                                                                                                       |\n| Initialization             | `MobileAds`                                                                          | `MobileAds`, `initialization.InitializationConfig`                                                                                                                                    |\n| Initialization Listener    | `initialization.OnInitializationCompleteListener`                                    | `initialization.OnAdapterInitializationCompleteListener`                                                                                                                              |\n| Ad Request                 | `AdRequest`                                                                          | *Format specific* (e.g. `common.AdRequest`, `banner.BannerAdRequest`, `nativead.NativeAdRequest`) (Ad Unit ID is declared in `Builder`. Load() no longer takes an activity)           |\n| Load Error                 | `LoadAdError`                                                                        | `common.LoadAdError` (`LoadAdError` no longer has a domain variable. REMOVE the domain variable if found.)                                                                            |\n| Full Screen Show Error     | `AdError` (within `FullScreenContentCallback`)                                       | `common.FullScreenContentError` (within format-specific `AdEventCallback`)                                                                                                            |\n| Request Configuration      | `RequestConfiguration`                                                               | `common.RequestConfiguration` (Nested Enums/Constants for RequestConfiguration are now under common.RequestConfiguration.)                                                            |\n| Event Callbacks            | `FullScreenContentCallback` (for full screen formats), `AdListener` (Banner, Native) | *Format Specific* (e.g., `interstitial.InterstitialAdEventCallback`, `banner.BannerAdEventCallback`, `native.NativeAdEventCallback`). Variable on the ad format is `adEventCallback`. |\n| **Tools**                  |                                                                                      |                                                                                                                                                                                       |\n| Ad Inspector               | `MobileAds.openAdInspector()`                                                        | `MobileAds.openAdInspector()` (`ope",
+      "card": {
+        "title_zh": "GMA下一代SDK迁移",
+        "purpose_zh": "将Android应用从旧版Google Mobile Ads SDK迁移到GMA Next-Gen SDK，提供导入、类名与方法签名的映射表及迁移步骤。",
+        "does": [
+          "提供Gradle依赖替换与minSdk、compileSdk升级的迁移清单",
+          "给出旧SDK到GMA Next-Gen SDK的类与导入映射表",
+          "说明初始化顺序、App ID使用与UI线程回调规则",
+          "列出横幅、原生、插屏等广告格式的API差异",
+          "要求运行gradle build -x test验证编译"
+        ],
+        "inputs": [
+          "现有使用旧版GMA SDK的Android代码库",
+          "AndroidManifest.xml中的APPLICATION_ID元数据",
+          "应用级build.gradle依赖配置"
+        ],
+        "outputs": [
+          "迁移后的Gradle依赖与代码改动",
+          "映射表对照的迁移步骤清单",
+          "编译验证结果"
+        ],
+        "scenarios": [
+          "将旧版play-services-ads替换为ads-mobile-sdk",
+          "按映射表重构广告相关导入与类名",
+          "调整广告初始化与回调线程处理"
+        ],
+        "prerequisites": [
+          "minSdk为24及以上",
+          "compileSdk为34及以上",
+          "可访问Maven或能执行curl获取最新版本"
+        ],
+        "limits": [
+          "仅覆盖Android平台GMA SDK迁移",
+          "映射表未列出的预加载方法签名保持不变",
+          "实现mediation Adapter的类仍需使用旧包com.google.android.gms.ads"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network"
+        ],
+        "tags": [
+          "后端",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Migrates Android applications from the old, legacy Google Mobile Ads (GMA) SDK (com.google.android.gms:play-services-ads) to the new GMA Next-Gen SDK"
+          },
+          {
+            "field": "does",
+            "quote": "Replace `com.google.android.gms:play-services-ads` with the latest stable version of `com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk`."
+          },
+          {
+            "field": "does",
+            "quote": "This table covers the main classes and their GMA Next-Gen SDK equivalents."
+          },
+          {
+            "field": "does",
+            "quote": "Call `MobileAds.initialize()` on a background thread."
+          },
+          {
+            "field": "does",
+            "quote": "Run `gradle build -x test` to confirm a successful clean build."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Update `minSdk` (24+) and `compileSdk` (34+)."
+          },
+          {
+            "field": "limits",
+            "quote": "Unless specified in the mapping table, ad preloading methods in the GMA Next-Gen SDK retain the same API signatures and parameters as the Old SDK."
+          },
+          {
+            "field": "limits",
+            "quote": "Classes implementing `com.google.android.gms.ads.mediation.Adapter` MUST continue using `com.google.android.gms.ads`."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "curl -sS https://dl.google.com/dl/android/maven2/com/google/android/libraries/ads/mobile/sdk/ads-mobile-sdk/maven-metadata.xml"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run `gradle build -x test` to confirm a successful clean build."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ads/google-mobile-ads-banner/SKILL.md",
+      "blob_sha": "9e8fc60fcfe3dcd5c9a4aceff564524f9a0018f2",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-mobile-ads-banner/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-mobile-ads-banner",
+        "description": "Provides instructions to implement, integrate, or configure Google Mobile Ads (GMA) banner ads in Android, iOS, or Unity mobile applications. Use when the task involves setting up banner ads in a mobile application. Don't use for other ad formats like interstitial or rewarded ads."
+      },
+      "excerpt": "---\nname: google-mobile-ads-banner\ndescription: >-\n  Provides instructions to implement, integrate, or configure Google Mobile\n  Ads (GMA) banner ads in Android, iOS, or Unity mobile applications. Use\n  when the task involves setting up banner ads in a mobile application. Don't\n  use for other ad formats like interstitial or rewarded ads.\nmetadata:\n  version: \"1.1.1\"\n  category: GoogleAds\n---\n# Google Mobile Ads SDK - Banner Ads\n\nBanner ads are rectangular image or text ads that occupy a spot within an app's\nlayout. They remain on screen during user interaction and can refresh\nautomatically.\n\n### Banner Ad Types\n\nDefault to **Large Anchored Adaptive Banner** if the user says \"banner\" without\ndefining a type. If the user suggests or asks about other banner ad types,\nrecommend large anchored adaptive banners.\n\n| Banner Type | Description |\n| :--- | :--- |\n| **Large Anchored Adaptive** | **Default**. Can be anchored to the top or bottom of the screen. |\n| **Anchored Adaptive** | Can be anchored to the top or bottom of the screen. |\n| **Inline Adaptive** | **ONLY** available to use for **Android and iOS**. Placed within content. |\n\n## Workflow\n\n1.  **Determine the user's platform**: Identify if the project is Android, iOS,\n    or Unity. If unclear, ask before proceeding.\n\n2.  **Read the platform guide** for implementation details:\n    -   Android: `references/android-banner.md`\n    -   iOS: `references/ios-banner.md`\n    -   Unity: `references/unity-banner.md`\n\n3.  **Follow these steps in order**:\n    -   [ ] Define the ad view\n    -   [ ] Set the ad size\n    -   [ ] Register for ad load events\n    -   [ ] Load the banner ad\n    -   [ ] Verify the implementation\n\n4.  After the banner ad is successfully implemented, remind the user to replace\n  the test ad unit ID with their own.",
+      "card": {
+        "title_zh": "Google移动广告横幅集成",
+        "purpose_zh": "为Android、iOS或Unity移动应用提供Google Mobile Ads横幅广告的实现、集成与配置指导，默认推荐大尺寸锚定自适应横幅，并提醒替换测试广告单元ID。",
+        "does": [
+          "识别项目平台为Android、iOS或Unity，不明确时先询问",
+          "按平台读取对应的横幅实现参考文档",
+          "按顺序指导定义广告视图、设置广告尺寸、注册加载事件、加载横幅、验证实现",
+          "默认推荐大尺寸锚定自适应横幅，并说明各横幅类型差异",
+          "实现完成后提醒用户将测试广告单元ID替换为自己的ID"
+        ],
+        "inputs": [
+          "项目所属平台（Android、iOS或Unity）",
+          "用户对横幅广告类型的选择或疑问"
+        ],
+        "outputs": [
+          "横幅广告实现步骤指导",
+          "平台对应的实现参考内容",
+          "测试广告单元ID替换提醒"
+        ],
+        "scenarios": [
+          "在Android应用中集成GMA横幅广告",
+          "在iOS应用中集成GMA横幅广告",
+          "在Unity项目中配置横幅广告",
+          "用户询问横幅广告类型选择时给出推荐"
+        ],
+        "prerequisites": [
+          "已明确项目平台为Android、iOS或Unity"
+        ],
+        "limits": [
+          "不适用于插屏或激励广告等其他广告格式",
+          "内联自适应横幅仅支持Android和iOS",
+          "平台不明确时需先询问再继续"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "前端",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Provides instructions to implement, integrate, or configure Google Mobile Ads (GMA) banner ads in Android, iOS, or Unity mobile applications."
+          },
+          {
+            "field": "does",
+            "quote": "Default to **Large Anchored Adaptive Banner** if the user says \"banner\" without defining a type."
+          },
+          {
+            "field": "does",
+            "quote": "After the banner ad is successfully implemented, remind the user to replace the test ad unit ID with their own."
+          },
+          {
+            "field": "limits",
+            "quote": "Don't use for other ad formats like interstitial or rewarded ads."
+          },
+          {
+            "field": "limits",
+            "quote": "**Inline Adaptive** | **ONLY** available to use for **Android and iOS**."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If unclear, ask before proceeding."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ads/google-mobile-ads-get-started/SKILL.md",
+      "blob_sha": "79f8847a4cf95b8a61c7433ebd08db817dc6386c",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-mobile-ads-get-started/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-mobile-ads-get-started",
+        "description": "Provides instructions for integrating the Google Mobile Ads (GMA) SDK. Use this skill when the user wants to get started with, install, integrate, set up, or configure the SDK for AdMob or Ad Manager, GMA Next-Gen SDK or mobile ads framework in an Android, iOS, or Unity application."
+      },
+      "excerpt": "---\nname: google-mobile-ads-get-started\ndescription: >-\n  Provides instructions for integrating the Google Mobile Ads (GMA)\n  SDK. Use this skill when the user wants to get started with, install,\n  integrate, set up, or configure the SDK for AdMob or Ad Manager, GMA Next-Gen\n  SDK or mobile ads framework in an Android, iOS, or Unity application.\nmetadata:\n  version: \"1.2.0\"\n  category: GoogleAds\n---\n# Google Mobile Ads SDK - Install\n\n## Workflow\n\n1.  **Determine the user's platform**: Identify if the project is Android, iOS,\n    or Unity. If unclear, ask before proceeding.\n\n2. **Read the platform guide** for implementation details:\n    - Android: `references/android-get-started.md`\n    - iOS: `references/ios-get-started.md`\n    - Unity: `references/unity-get-started.md`\n\n3. **Follow these steps in order**:\n   - [ ] Add the SDK dependency\n   - [ ] Set the application identifier\n   - [ ] Initialize the SDK\n   - [ ] Verify the integration\n\n4. After the SDK is successfully installed, ask the user to select an ad format\n   to continue the integration.\n",
+      "card": {
+        "title_zh": "GMA SDK 接入指引",
+        "purpose_zh": "为 Android、iOS 或 Unity 应用提供 Google Mobile Ads SDK 的安装与集成指引，涵盖 AdMob 或 Ad Manager、GMA Next-Gen SDK 及移动广告框架的配置。",
+        "does": [
+          "判断项目属于 Android、iOS 还是 Unity 平台，不明确时先询问",
+          "按平台读取对应的接入参考文档",
+          "按顺序引导添加 SDK 依赖、设置应用标识符、初始化 SDK、验证集成",
+          "SDK 安装成功后请用户选择广告格式以继续集成"
+        ],
+        "inputs": [
+          "项目所属平台（Android、iOS 或 Unity）",
+          "用户对广告格式的选择"
+        ],
+        "outputs": [
+          "分平台的 SDK 接入步骤指引",
+          "后续广告格式集成方向"
+        ],
+        "scenarios": [
+          "在 Android 应用中集成 Google Mobile Ads SDK",
+          "在 iOS 应用中配置 AdMob 或 Ad Manager",
+          "在 Unity 项目中安装 GMA SDK",
+          "初次接入 GMA Next-Gen SDK 时获取步骤指导"
+        ],
+        "prerequisites": [
+          "已明确项目平台为 Android、iOS 或 Unity"
+        ],
+        "limits": [
+          "原文仅给出工作流与参考文档路径，未包含具体依赖坐标或代码",
+          "未说明支持的具体 SDK 版本或广告格式清单"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Provides instructions for integrating the Google Mobile Ads (GMA) SDK."
+          },
+          {
+            "field": "does",
+            "quote": "**Determine the user's platform**: Identify if the project is Android, iOS, or Unity. If unclear, ask before proceeding."
+          },
+          {
+            "field": "does",
+            "quote": "**Read the platform guide** for implementation details:"
+          },
+          {
+            "field": "does",
+            "quote": "- [ ] Add the SDK dependency - [ ] Set the application identifier - [ ] Initialize the SDK - [ ] Verify the integration"
+          },
+          {
+            "field": "does",
+            "quote": "After the SDK is successfully installed, ask the user to select an ad format to continue the integration."
+          },
+          {
+            "field": "inputs",
+            "quote": "Identify if the project is Android, iOS, or Unity."
+          },
+          {
+            "field": "outputs",
+            "quote": "ask the user to select an ad format to continue the integration."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If unclear, ask before proceeding."
+          },
+          {
+            "field": "limits",
+            "quote": "- Android: `references/android-get-started.md` - iOS: `references/ios-get-started.md` - Unity: `references/unity-get-started.md`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ads/google-mobile-ads-interstitial/SKILL.md",
+      "blob_sha": "bb9c1b8af7c6f25c7dafabd3a70f3b194a24ba00",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-mobile-ads-interstitial/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-mobile-ads-interstitial",
+        "description": "Provides instructions for implementing, integrating, or configuring Google Mobile Ads (GMA) SDK interstitial ads in Android, iOS, or Unity mobile applications. Use when the task involves setting up interstitial ads. Don't use for \"rewarded interstitial\" ads."
+      },
+      "excerpt": "---\nname: google-mobile-ads-interstitial\ndescription: >-\n  Provides instructions for implementing, integrating, or configuring Google\n  Mobile Ads (GMA) SDK interstitial ads in Android, iOS, or Unity mobile\n  applications. Use when the task involves setting up interstitial ads. Don't\n  use for \"rewarded interstitial\" ads.\nmetadata:\n  version: \"1.1.0\"\n  category: GoogleAds\n---\n# Google Mobile Ads SDK - Interstitial Ads\n\nInterstitial ads show full-page ads for users on mobile apps. Interstitial ads\nare designed to be placed between content and are best placed at natural app\ntransition points.\n\n## Workflow\n\n1.  **Determine the user's platform**: Identify if the project is Android,\n    iOS, or Unity. If unclear, ask before proceeding.\n\n2.  **Read the platform guide** for implementation details:\n    -   Android: `references/android-interstitial.md`\n    -   iOS: `references/ios-interstitial.md`\n    -   Unity: `references/unity-interstitial.md`\n\n3.  **Follow these steps in order**:\n    -   [ ] Load the ad\n    -   [ ] Register for ad event callbacks\n    -   [ ] Show the ad\n    -   [ ] Verify the implementation\n",
+      "card": {
+        "title_zh": "插屏广告集成指引",
+        "purpose_zh": "为 Android、iOS 或 Unity 移动应用提供 Google Mobile Ads SDK 插屏广告的实现、集成与配置指引，不适用于激励插屏广告。",
+        "does": [
+          "先确认项目平台是 Android、iOS 还是 Unity，不清楚时先询问",
+          "按平台读取对应的插屏广告实现参考文档",
+          "按顺序引导完成加载广告、注册广告事件回调、展示广告、验证实现"
+        ],
+        "inputs": [
+          "用户项目的目标平台（Android、iOS 或 Unity）"
+        ],
+        "outputs": [
+          "对应平台的插屏广告实现步骤指引"
+        ],
+        "scenarios": [
+          "在 Android 应用中接入插屏广告",
+          "在 iOS 应用中接入插屏广告",
+          "在 Unity 项目中接入插屏广告"
+        ],
+        "prerequisites": [
+          "已明确项目所属平台为 Android、iOS 或 Unity"
+        ],
+        "limits": [
+          "不适用于激励插屏（rewarded interstitial）广告",
+          "平台不明确时需先询问用户，不能直接继续"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Provides instructions for implementing, integrating, or configuring Google\n  Mobile Ads (GMA) SDK interstitial ads in Android, iOS, or Unity mobile\n  applications."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Don't\n  use for \"rewarded interstitial\" ads."
+          },
+          {
+            "field": "does",
+            "quote": "**Determine the user's platform**: Identify if the project is Android,\n    iOS, or Unity. If unclear, ask before proceeding."
+          },
+          {
+            "field": "does",
+            "quote": "**Read the platform guide** for implementation details:"
+          },
+          {
+            "field": "does",
+            "quote": "-   [ ] Load the ad\n    -   [ ] Register for ad event callbacks\n    -   [ ] Show the ad\n    -   [ ] Verify the implementation"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Identify if the project is Android,\n    iOS, or Unity."
+          },
+          {
+            "field": "limits",
+            "quote": "Don't\n  use for \"rewarded interstitial\" ads."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ads/google-mobile-ads-rewarded/SKILL.md",
+      "blob_sha": "6d23fd539fc9ef360cbb79a162d708a7cb1e6fe5",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-mobile-ads-rewarded/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-mobile-ads-rewarded",
+        "description": "Provides instructions for implementing, integrating, or configuring Google Mobile Ads (GMA) SDK rewarded ads in Android, iOS, or Unity mobile applications. Use when the task involves setting up rewarded ads. Don't use for \"rewarded interstitial\" ads."
+      },
+      "excerpt": "---\nname: google-mobile-ads-rewarded\ndescription: >-\n  Provides instructions for implementing, integrating, or configuring Google\n  Mobile Ads (GMA) SDK rewarded ads in Android, iOS, or Unity mobile\n  applications. Use when the task involves setting up rewarded ads. Don't use\n  for \"rewarded interstitial\" ads.\nmetadata:\n  version: \"1.1.0\"\n  category: GoogleAds\n---\n# Google Mobile Ads SDK - Rewarded Ads\n\nRewarded ads reward users with in-app items for interacting with full-screen\nads. Rewarded ads are served after a user explicitly opts in to view a rewarded\nad.\n\n## Workflow\n\n1.  **Determine the user's platform**: Identify if the project is Android,\n    iOS, or Unity. If unclear, ask before proceeding.\n\n2.  **Read the platform guide** for implementation details:\n    -   Android: `references/android-rewarded.md`\n    -   iOS: `references/ios-rewarded.md`\n    -   Unity: `references/unity-rewarded.md`\n\n3.  **Follow these steps in order**:\n    -   [ ] Load the ad\n    -   [ ] Register for ad event callbacks\n    -   [ ] Add a UI element to view the ad for a reward\n    -   [ ] Show the ad\n    -   [ ] Verify the implementation",
+      "card": {
+        "title_zh": "激励广告集成指南",
+        "purpose_zh": "为 Android、iOS 或 Unity 移动应用提供 Google Mobile Ads SDK 激励广告的实现、集成与配置说明，指导加载、回调注册、展示与验证流程。",
+        "does": [
+          "判断项目平台为 Android、iOS 或 Unity，不明确时先询问",
+          "按平台读取对应参考文档中的实现细节",
+          "按顺序指导加载广告、注册广告事件回调、添加用于观看广告获取奖励的 UI 元素、展示广告、验证实现"
+        ],
+        "inputs": [
+          "项目所属平台（Android、iOS 或 Unity）"
+        ],
+        "outputs": [
+          "激励广告实现步骤与平台参考指引"
+        ],
+        "scenarios": [
+          "在 Android 应用中集成激励广告",
+          "在 iOS 应用中集成激励广告",
+          "在 Unity 项目中集成激励广告"
+        ],
+        "prerequisites": [
+          "已确定项目平台为 Android、iOS 或 Unity"
+        ],
+        "limits": [
+          "不适用于激励插页式（rewarded interstitial）广告",
+          "平台不明确时需先询问再继续"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Provides instructions for implementing, integrating, or configuring Google Mobile Ads (GMA) SDK rewarded ads in Android, iOS, or Unity mobile applications."
+          },
+          {
+            "field": "does",
+            "quote": "Load the ad"
+          },
+          {
+            "field": "does",
+            "quote": "Register for ad event callbacks"
+          },
+          {
+            "field": "does",
+            "quote": "Add a UI element to view the ad for a reward"
+          },
+          {
+            "field": "does",
+            "quote": "Show the ad"
+          },
+          {
+            "field": "does",
+            "quote": "Verify the implementation"
+          },
+          {
+            "field": "limits",
+            "quote": "Don't use for \"rewarded interstitial\" ads."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Identify if the project is Android, iOS, or Unity. If unclear, ask before proceeding."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ads/google-mobile-ads-validate/SKILL.md",
+      "blob_sha": "dacb2b65157fcbd3628fb90d891aca723353a3fd",
+      "source_url": "https://github.com/google/skills/blob/85f227ea6a8f347d34b76039d826c446f891f75d/skills/ads/google-mobile-ads-validate/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-mobile-ads-validate",
+        "description": "Validates a project's Google Mobile Ads (GMA) SDK integration for iOS, Android, or Unity projects. Use when conducting a full pre-launch audit of an app that integrates GMA SDK or when validating any individual GMA SDK integration checks, such as when validating ad unit IDs and ad formats, SKAdNetwork IDs, mediation adapter SDK version compatibility, or ad preloading."
+      },
+      "excerpt": "---\nname: google-mobile-ads-validate\ndescription: >-\n  Validates a project's Google Mobile Ads (GMA) SDK integration for iOS,\n  Android, or Unity projects. Use when conducting a full pre-launch audit of an\n  app that integrates GMA SDK or when validating any individual GMA SDK\n  integration checks, such as when validating ad unit IDs and ad formats,\n  SKAdNetwork IDs, mediation adapter SDK version compatibility, or ad\n  preloading.\nmetadata:\n  version: \"1.1.0\"\n  category: GoogleAds\n---\n\n# Validate Google Mobile Ads SDK Integration\n\nValidate a project's Google Mobile Ads (GMA) SDK integration either as a\ncomplete audit or for specific requested checks.\n\n-   **Full Audit**: If the user requests a general validation or full audit,\n    evaluate all checklist items.\n-   **Specific Checks**: If the user asks to validate only a specific area\n    (e.g., ad preloading), evaluate only the relevant check(s) without running\n    the entire checklist.\n\n## Scoring Rules\n\nFor each check, apply one of the following statuses:\n\n-   **Pass**: None of the Warning, Fail, or N/A criteria are met.\n-   **Warning**, **Fail**, or **N/A**: The conditions described under each\n    respective status are met.\n\n## Validation Checklist\n\nRead the reference guide for each check to be performed:\n\n-   No test application ID is in the project, format correct:\n    `references/application-id.md`\n-   No test ad units are in the project, format correct:\n    `references/ad-units.md`\n-   Implemented all Google SKAdNetwork IDs:\n    `references/google-skadnetwork-ids.md`\n-   Mediation adapter compatibility:\n    `references/mediation-adapter-compatibility.md`\n-   Ad preloading validation checks: `references/ad-preloading.md`\n\n## Final Output\n\nGenerate a Markdown report following the format below. **ONLY** include the\nfindings for items that were actually checked.\n\n| Check | Status | Findings | Next Steps |\n| :--- | :---: | :--- | :--- |\n| No test application ID is in the project, format correct | {{status_1}} | {{findings_1}} | {{next_steps_1}} |\n| No test ad units are in the project, format correct | {{status_2}} | {{findings_2}} | {{next_steps_2}} |\n| Implemented all Google SKAdNetwork IDs | {{status_3}} | {{findings_3}} | {{next_steps_3}} |\n| Mediation adapter compatibility | {{status_4}} | {{findings_4}} | {{next_steps_4}} |\n| Ad preloading validation checks | {{status_5}} | {{findings_5}} | {{next_steps_5}} |\n",
+      "card": {
+        "title_zh": "GMA SDK 集成校验",
+        "purpose_zh": "校验 iOS、Android 或 Unity 项目的 Google Mobile Ads SDK 集成，可做完整上线前审计，也可只做指定检查项，如广告单元 ID、SKAdNetwork ID、中介适配器兼容性、广告预加载。",
+        "does": [
+          "按用户请求执行完整审计或仅执行指定检查项",
+          "检查项目中是否存在测试应用 ID 及其格式是否正确",
+          "检查项目中是否存在测试广告单元及其格式是否正确",
+          "检查是否已实现全部 Google SKAdNetwork ID",
+          "检查中介适配器版本兼容性",
+          "校验广告预加载相关检查项"
+        ],
+        "inputs": [
+          "待校验的 iOS、Android 或 Unity 项目",
+          "用户指定的检查范围（完整审计或特定检查项）"
+        ],
+        "outputs": [
+          "Markdown 格式校验报告，含检查项、状态、发现与后续步骤",
+          "状态取值：Pass、Warning、Fail、N/A"
+        ],
+        "scenarios": [
+          "应用上线前对 GMA SDK 集成做完整审计",
+          "仅校验广告单元 ID 与广告格式",
+          "校验 SKAdNetwork ID 是否齐全",
+          "校验中介适配器 SDK 版本兼容性",
+          "校验广告预加载配置"
+        ],
+        "prerequisites": [
+          "项目已集成 Google Mobile Ads SDK",
+          "可读取 references 目录下各检查项的参考指南"
+        ],
+        "limits": [
+          "仅覆盖原文列出的五项检查",
+          "报告只包含实际检查过的项目",
+          "原文未说明支持的具体平台版本或自动化程度"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "测试",
+          "代码审查",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Validates a project's Google Mobile Ads (GMA) SDK integration for iOS, Android, or Unity projects."
+          },
+          {
+            "field": "does",
+            "quote": "**Full Audit**: If the user requests a general validation or full audit, evaluate all checklist items."
+          },
+          {
+            "field": "does",
+            "quote": "**Specific Checks**: If the user asks to validate only a specific area (e.g., ad preloading), evaluate only the relevant check(s) without running the entire checklist."
+          },
+          {
+            "field": "does",
+            "quote": "No test application ID is in the project, format correct: `references/application-id.md`"
+          },
+          {
+            "field": "does",
+            "quote": "No test ad units are in the project, format correct: `references/ad-units.md`"
+          },
+          {
+            "field": "does",
+            "quote": "Implemented all Google SKAdNetwork IDs: `references/google-skadnetwork-ids.md`"
+          },
+          {
+            "field": "does",
+            "quote": "Mediation adapter compatibility: `references/mediation-adapter-compatibility.md`"
+          },
+          {
+            "field": "does",
+            "quote": "Ad preloading validation checks: `references/ad-preloading.md`"
+          },
+          {
+            "field": "outputs",
+            "quote": "Generate a Markdown report following the format below."
+          },
+          {
+            "field": "outputs",
+            "quote": "**Pass**: None of the Warning, Fail, or N/A criteria are met."
+          },
+          {
+            "field": "limits",
+            "quote": "**ONLY** include the findings for items that were actually checked."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the reference guide for each check to be performed:"
+          }
+        ]
+      }
+    }
+  ]
+}

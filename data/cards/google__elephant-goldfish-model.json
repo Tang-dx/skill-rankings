@@ -1,0 +1,730 @@
+{
+  "schema": 1,
+  "repo": "google/elephant-goldfish-model",
+  "tree_sha": "026f02fe5f0dfa3eb8521f4ecbd5da565bd28860",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/egm-bootstrap/SKILL.md",
+      "blob_sha": "3e988c9ec9a310c40701c27c8e577fd1956a792d",
+      "source_url": "https://github.com/google/elephant-goldfish-model/blob/270b10326bf366d823bc76fd662cf83808d5781e/skills/egm-bootstrap/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "egm-bootstrap",
+        "description": "Bootstrap directory README.md files across a repository subtree."
+      },
+      "excerpt": "---\nname: egm-bootstrap\nlicense: Apache-2.0\ndisable-model-invocation: true\ndescription: Bootstrap directory README.md files across a repository subtree.\n---\n\n# EGM Peanuts and Hay Bootstrap (`egm-bootstrap`)\n\nWhen running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md).\nIn Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first.\n\n## Overview\n\nThis skill automates the creation, correction, formatting, and correctness\nverification of Elephant-and-Goldfish Model (EGM) compliant `README.md` files\nacross a directory tree. It establishes clear architectural contracts\n(interfaces, invariants, and side effects) for both human developers and AI\nassistants.\n\n*   **Peanuts**: Leaf-level Component Package READMEs containing specific file\n    contracts.\n*   **Hay**: Parent-level Repository Blueprints that roll up child interface\n    contracts into high-altitude indexes.\n\n## Delegation\n\nA Goldfish runs in a fresh context with no conversation history. Spawn each\nsubagent with your harness's subagent tool (Antigravity: `invoke_subagent`; Claude Code: `Agent`; Codex: `spawn_agent`). Each subagent is defined in `agents/<file>.md`, and its\nfrontmatter `name` (for example `egm-zoom-out`) is the subagent type to request\nwhere your harness registers named subagents. Otherwise spawn a general-purpose\nsubagent and tell it to read that persona file first. Pass the prompt verbatim\nand wait for the report. If your harness cannot nest subagents,\nuse direct dispatch instead of the synthesizer. See `docs/harnesses.md`.\nIf your harness has no subagent tool, run the scout steps inline.\n\n## Inputs\n\n*   **`path`**: The target root directory path to bootstrap (Required).\n*   **`is_worker`**: Internal parameter. `true` if executing as a worker\n    Sub-Orchestrator (Optional, default: `false`).\n*   **`sub_tree_root`**: Internal parameter. The root path of the assigned\n    subtree partition (Optional).\n*   **`target_filename`**: Target contract filename to generate or update\n    (Optional, default: `\"README.md\"`). Supports alternate blueprint filenames\n    such as `\"EGM.md\"` when pre-existing human-maintained READMEs must not be\n    modified.\n\n## Execution Constraints (CRITICAL)\n\n1.  **No Code Generation**: You are strictly limited to documentation. Do not\n    write or refactor any functional source code.\n2.  **VCS Isolation**: Do not perform any version control commits (`git commit`,\n    `git add`). All filesystem changes must be written locally using standard\n    file-writing tools. Tracking\n    and submitting is deferred to the human user.\n3.  **Temporary File Isolation**: Each worker keeps its status, checkpoint,\n    and log files in its own directory outside the workspace (host scratch or\n    `mktemp -d`), never a fixed, shared path. If neither exists, skip them.\n4.  **Tool Usage (CRITICAL)**: Use your shell, file-reading, file-writing, and file-editing tools for directory discovery and contract/README\n    generation. Adhere to clean Markdown formatting directly during generation\n    (standard headers, tables, and fenced code blocks). If a project markdown\n    formatter (e.g. `npx prettier --write`) is explicitly configured in the\n    repository, it may optionally be invoked.\n5.  **Subagent Delegation**: Spawn sub-orchestrator workers in parallel.\n6.  **Mandatory Safety Gate (CRITICAL)**: If you discover more than 15\n    subdirectories, you MUST immediately request user approval (using a structured question tool, if your harness has one, or plain chat) before proceeding with full-tree execution\n    or unbounded subagent spawning.\n\n---\n\n## Workflow\n\n### Step 0: Ecosystem & Verification Discovery\n\n1.  Inspect the repository root for package/build manifests:\n    *   Node.js / TypeScript: `package.json` -> `npm test` (or `pnpm test` / `yarn test`)\n    *   Rust: `Cargo.toml` -> `cargo test`\n    *   Go: `go.mod` -> `go test ./...`\n    *   Python: `pyproject.toml` / `pytest.ini` / `setup.py` -> `pytest`\n    *   .NET / C#: `*.sln` / `*.slnx` / `*.csproj` -> `dotnet test`\n    *   C/C++ / Make: `Makefile` -> `make test`\n    *   Bazel: `BUILD` / `BUILD.bazel` -> `bazel test //...`\n    *   None found: `<test-command>`\n2.  Record as `VerificationCommand` to populate generated README contracts.\n\n---\n\n### Step 1: Startup Branching Control\n\n1.  Check the `is_worker` input parameter.\n2.  If `is_worker` is `true`, jump directly to **Step 4: Sub-Orchestrator Worker\n    Flow** to process the assigned `sub_tree_root`.\n3.  If `is_worker` is `false` or unset, proceed as the Root Orchestrator to\n    **Step 2: Incremental Scoping & Safety Gate**.\n\n---\n\n### Step 2: Incremental Scoping & Safety Gate (Root Orchestrator)\n\n1.  **Incremental BFS Discovery**: Map the target `path` tree level-by-level\n    (BFS) using a directory queue, listing one directory level at a time. (CRITICAL: never run a recursive search such as `find` or `ls -R`.)\n\n    *   Preserve intermediate folder nodes.\n    *   Ignore symbolic links to prevent infinite recursion.\n    *   Ignore hidden/system directories (`.git`, `.antigravity`, `node_modules`,\n        `venv`, `dist`, `build`, `third_party`).\n    *   Read `.gitignore` and `.egmignore` (if present) and ignore matching glob patterns.\n    *   Preserve package and build manifests (`package.json`, `Cargo.toml`,\n        `go.mod`, `pyproject.toml`, `*.sln`, `*.csproj`, `Makefile`, `BUILD`) in\n        the discovery map to extract verification targets later.\n\n2.  **Safety Gate & Unbounded Spawning Approval (CRITICAL)**: During the BFS\n    loop, if the total running count of discovered directories exceeds **15**,\n    immediately pause discovery and request user approval (using a structured question tool, if your harness has one, or plain chat) to warn the user and request approval\n    for full-tree execution:\n\n    *   `question`: \"The target directory tree contains more than 15\n        subdirectories. This is a large execution scope. Do you want to proceed\n        with full-tree bootstrapping?\"\n    *   `options`: `[\"Yes, proceed with full tree bootstrapping\",\n        \"No, abort execution\"]`\n    *   (CRITICAL: After requesting approval, you MUST wait for the user's\n        response before continuing or spawning any workers).\n    *   If the user selects abort, terminate execution immediately.\n\n3.  **Bottom-up Post-Pruning Pass**: Once mapping is complete (and approved),\n    walk the mapped tree bottom-up (leaves to root). Filter out non-code and\n    test-only directories:\n\n    *   *Source Code Files*: Files matching recognized source code, schema, and\n        contract extensions:\n        - Systems & Compiled: `.c`, `.cc`, `.cpp`, `.cxx`, `.h`, `.hh`, `.hpp`,\n          `.rs`, `.go`, `.zig`, `.lean`, `.f`, `.f90`, `.f95`, `.f03`, `.f08`,\n          `.hs`\n        - Managed & Enterprise: `.java`, `.kt`, `.scala`, `.cs`, `.razor`,\n          `.cshtml`, `.fs`, `.vb`\n        - Scripting & Dynamic: `.py`, `.rb`, `.php`, `.lua`, `.sh`, `.bash`,\n          `.ps1`, `.psm1`, `.psd1`, `.r`, `.R`, `.ex`, `.exs`\n        - Web & Mobile: `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.swift`,\n          `.m`, `.dart`\n        - Data & Schemas / IDLs: `.sql`, `.proto`, `.graphql`, `.gql`,\n          `.thrift`, `.prisma`\n        - Infrastructure / Declarative Code: `.tf`, `.hcl`, `.cue`\n        (Excludes build manifests, lockfiles, test fixtures, documentation, and\n        generic data dumps like `.csv`, `.tsv`, `.parquet`).\n    *   *Test Directory Exclusion*: Exclude directories containing exclusively\n        test code (e.g. named `tests`, `testing`, `testdata`, or containing only\n        files matching `*_test.*`, `*Test.*`, `test_*.*`, or `*.spec.*`).\n    *   *Non-Code Filtering*: Exclude any directory that contains no source code\n        files AND contains no subdirectories with code. Retain empty\n        intermediate folders only if they have child directories that contain\n        code.\n\n4.  Calculate the total count of pruned directories and maximum depth. Proceed\n  ",
+      "card": {
+        "title_zh": "EGM README 引导生成",
+        "purpose_zh": "在目录树中自动创建、修正、格式化并校验符合 EGM 规范的 README.md 契约文件，为人类开发者与 AI 助手建立接口、不变量与副作用等架构契约。",
+        "does": [
+          "按广度优先逐层发现目标目录树，忽略符号链接、隐藏目录与 gitignore/egmignore 匹配项",
+          "自底向上剪枝，排除纯测试目录与不含源码的目录",
+          "目录数不超过5时在当前线程直接生成文档，超过5时按自适应深度分区并行派发子代理",
+          "用只读探索子代理提取目录的接口、不变量与副作用并附文件符号引用",
+          "生成或更新 README.md 等目标契约文件，并汇总子目录索引",
+          "发现超过15个子目录时暂停并请求用户批准后再继续"
+        ],
+        "inputs": [
+          "path：要引导的目标根目录路径（必填）",
+          "is_worker：内部参数，是否作为子编排器执行（可选，默认 false）",
+          "sub_tree_root：内部参数，分配的子目录树根路径（可选）",
+          "target_filename：要生成或更新的契约文件名（可选，默认 README.md）"
+        ],
+        "outputs": [
+          "各目录下符合 EGM 规范的 README.md 或指定契约文件",
+          "子目录索引 JSON 载荷",
+          "只读探索子代理返回的接口、不变量与副作用 JSON"
+        ],
+        "scenarios": [
+          "为多目录代码仓库批量建立架构契约文档",
+          "为已有 README 做格式与正确性校验修正",
+          "在大型仓库中按子树并行生成文档索引"
+        ],
+        "prerequisites": [
+          "运行环境需具备 shell、文件读取、文件写入与文件编辑工具",
+          "需先阅读对应宿主的集成文档（如 Codex 或 Claude 文档）",
+          "若使用子代理，需宿主提供子代理工具，否则改为内联执行"
+        ],
+        "limits": [
+          "严格限于文档，不编写或重构任何功能源码",
+          "不执行任何版本控制提交或暂存操作",
+          "禁止使用 find、ls -R 等递归搜索，必须逐层 BFS",
+          "发现超过15个子目录必须先获得用户批准",
+          "临时文件须放在工作区外的独立目录，否则跳过"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "自动化",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill automates the creation, correction, formatting, and correctness verification of Elephant-and-Goldfish Model (EGM) compliant `README.md` files across a directory tree."
+          },
+          {
+            "field": "does",
+            "quote": "If you discover more than 15 subdirectories, you MUST immediately request user approval"
+          },
+          {
+            "field": "inputs",
+            "quote": "**`path`**: The target root directory path to bootstrap (Required)."
+          },
+          {
+            "field": "inputs",
+            "quote": "**`target_filename`**: Target contract filename to generate or update (Optional, default: `\"README.md\"`)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use your shell, file-reading, file-writing, and file-editing tools for directory discovery and contract/README generation."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If your harness has no subagent tool, run the scout steps inline."
+          },
+          {
+            "field": "hosts",
+            "quote": "When running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md). In Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "All filesystem changes must be written locally using standard file-writing tools."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Use your shell, file-reading, file-writing, and file-editing tools for directory discovery and contract/README generation."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/egm-brainstorm/SKILL.md",
+      "blob_sha": "1abb51c456710b5b559f55f672f2e49e35db35f8",
+      "source_url": "https://github.com/google/elephant-goldfish-model/blob/270b10326bf366d823bc76fd662cf83808d5781e/skills/egm-brainstorm/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "egm-brainstorm",
+        "description": "Interactive ideation and brainstorming skill for the Elephant & Goldfish Model (EGM). Helps turn half-baked concepts into structured hypotheses via clarifying questions, review, and iterative refinement. Produces an RFC summary for human review or more detailed design with egm-draft."
+      },
+      "excerpt": "---\nname: egm-brainstorm\nlicense: Apache-2.0\ndisable-model-invocation: true\ndescription: >-\n  Interactive ideation and brainstorming skill for the Elephant &\n  Goldfish Model (EGM). Helps turn half-baked concepts into structured\n  hypotheses via clarifying questions, review, and iterative refinement.\n  Produces an RFC summary for human review or more detailed design with\n  egm-draft.\n---\n\n# EGM Brainstorm: Interactive Multi-Lens Ideation & Refinement\n\nWhen running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md).\nIn Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first.\n\n## Overview\n\nThis skill acts as the upstream conversational brainstorming engine for the\nElephant-Goldfish Model (EGM). It turns \"half-baked\" or raw concepts into\nhypotheses by combining **interactive clarifying questions** with an automated\n**Goldfish review**. The outcome is an iteratively refined RFC summary\n(`concepts_brief.md`) that leads directly into `/egm-draft` or review with\npeers.\n\n## Delegation\n\nA Goldfish runs in a fresh context with no conversation history. Spawn each\nsubagent with your harness's subagent tool (Antigravity: `invoke_subagent`; Claude Code: `Agent`; Codex: `spawn_agent`). Each subagent is defined in `agents/<file>.md`, and its\nfrontmatter `name` (for example `egm-zoom-out`) is the subagent type to request\nwhere your harness registers named subagents. Otherwise spawn a general-purpose\nsubagent and tell it to read that persona file first. Pass the prompt verbatim\nand wait for the report. If your harness cannot nest subagents,\nuse direct dispatch instead of the synthesizer. See `docs/harnesses.md`.\nIf your harness has no subagent tool, stop and tell the user: a review in the same context is not a Goldfish review.\n\n## Execution Constraints (CRITICAL)\n\n1.  **Artifact-First Delivery (MANDATORY)**: You are **STRICTLY FORBIDDEN** from\n    presenting large proposals, drafts, brainstorm summaries, or briefs directly\n    in the chat pane. You **MUST** write/update them directly to a file (e.g.,\n    `./concepts_brief.md` in the working directory or your harness's artifact\n    directory, if it has one) using your file-writing tool and notify the user\n    in the chat with a clean link to the file.\n2.  **Multi-Turn Open-Ended Clarification & Readiness Gate**: You **MUST** drill\n    down into the concept through open-ended plain-text questions across\n    multiple chat turns until the problem statement and boundaries are\n    thoroughly clear. You **MUST NOT** spawn subagents until the user explicitly\n    confirms readiness after reviewing the anchored working hypothesis. You are\n    **STRICTLY FORBIDDEN** from using structured question tools (`ask_question`)\n    or supplying pre-canned multiple-choice candidate answers during open-ended\n    questioning.\n3.  **Parallel Goldfish Reviews**: You **MUST** evaluate the feature concept\n    across specialized Goldfish lenses simultaneously to prevent sequential bias\n    and maximize critique breadth.\n4.  **Plain-English Standard**: You **MUST** write all concepts briefs, RFC\n    summaries, and communications in simple, direct, jargon-free plain English.\n    Explain technical mechanisms directly. Do not summarize away substance or\n    rely on buzzwords. Do not use ungrounded promotional adjectives (e.g.,\n    *seamless*, *robust*, *blazingly fast*) or decorative adverbs (e.g.,\n    *seamlessly*, *effortlessly*, *literally*, *drastically*, *obviously*).\n5.  **Default to Stress-Testing**: Never agree by default. Your primary\n    directive is to stress-test ideas, strategies, and opinions. Find the\n    weakest points, edge cases, and blind spots before affirming anything.\n6.  **No Glazing**: Eliminate sycophancy. Do not call ideas \"great,\"\n    \"brilliant,\" or \"smart.\" Compliments without substance are noise.\n7.  **Critique First**: Even when an idea is strong, lead with what is wrong,\n    missing, or risky before highlighting its merits.\n8.  **Reject Echo-Chamber Framing**: Never parrot framing back to the user. If a\n    conclusion is asserted, do not validate it reflexively.\n9.  **Generate Counter-Arguments**: For every strategy proposed, actively\n    outline: What is the user not seeing? What is the strongest\n    counter-argument? Is the opposing view justified?\n10. **Earn Your Agreement**: Only agree when the idea has survived rigorous,\n    objective scrutiny.\n11. **Banned Adjectives (No Flattery)**: You are strictly prohibited from using\n    validating adjectives like \"brilliant,\" \"great,\" \"smart,\" \"correct,\"\n    \"perfect,\" \"excellent,\" or \"spot-on\" when referring to the user's inputs,\n    corrections, or decisions.\n12. **Banned Apologies**: You MUST NOT output polite apologies (e.g., \"I\n    apologize,\" \"I am sorry,\" \"Forgive me\") when challenged or corrected.\n    Instead, outline the corrected technical logic or trade-offs directly.\n13. **Interaction Invariants**: All interactive gates (structured question tools\n    such as `ask_question`, if your harness has one, or plain chat) MUST contain\n    strictly one question (`len(questions) == 1`), be the sole tool call in the\n    turn, and provide clear, action-oriented options without `(Recommended)`\n    prefixes.\n\n## The Goldfish Brainstorming Lenses\n\n| Lens / Persona          | Core Objective          | Key Questions Challenged |\n| :---------------------- | :---------------------- | :----------------------- |\n| **Contrarian / YAGNI** | Code & complexity minimization | *Why does this feature need to exist? Can an existing library, open-source dependency, API, or service solve 90% of this problem without writing new code?* |\n| **Cost, Quota & Token Economics** | Infrastructure & budget scaling | *What is the peak QPS, memory footprint, database query load, or LLM token budget? Will this hit quota ceilings at scale?* |\n| **UX & Developer Ergonomics** | Usability & cognitive overhead | *Is the API/CLI intuitive? Does it match ecosystem conventions? Are error messages actionable, or does it add developer friction?* |\n| **Migration & Backward Compatibility** | Rollout safety & version skew | *How do existing clients/data migrate? Does this break serialized schemas, protos, or persistent storage? How is rollback handled mid-migration?* |\n| **Observability & SRE Debuggability** | Telemetry & operational visibility | *Are key operations traceable via distributed tracing? Are telemetry metrics actionable? How will oncall engineers triage a production incident at 3 AM?* |\n| **Long-Term Tech Debt & Maintenance** | Future maintainability | *Does this introduce tightly coupled dependencies or brittle state machines that will be painful to maintain in 2 years?* |\n| **Inventive Catalyst** | Contradiction elimination & inventive transforms | *What fundamental trade-off is this design accepting as inevitable? How can we resolve this conflict using proven software transforms to achieve the Ideal Final Result without compromise?* |\n\n## Execution Workflow\n\n### Step 1: Deep Clarification & Problem Statement Drilling\n\n1.  **Check for Concept Foundation & Author Identity**: Verify if the user provided an initial\n    feature idea or concept prompt. If missing, prompt the user to describe what\n    they want to brainstorm. Resolve the brief's `Author` from `git config user.name`,\n    then `GIT_AUTHOR_NAME`; if neither is set, ask in chat.\n2.  **Iterative Problem Drilling (Multi-Turn Chat)**: Do **NOT** rush into\n    launching subagents after a single response. Continue asking targeted,\n    open-ended clarifying questions across multiple chat turns as needed until\n    the problem statement, constraints, and target behavior are thoroughly\n    defined. Do NOT use structured question tools (`ask_question`) and do NOT\n    provide candidate multiple-choice options during problem exploration. Ask\n    open-ended questions directly in chat:\n\n    *   *What specific problem, bottleneck, or pain point does this solve?*\n    *   *Who or what system will consume this feature,",
+      "card": {
+        "title_zh": "EGM 头脑风暴",
+        "purpose_zh": "把半成品想法通过多轮开放式澄清提问和并行 Goldfish 评审，迭代成结构化假设，并写出 concepts_brief.md 供人工评审或交给 egm-draft 深化设计。",
+        "does": [
+          "通过多轮开放式聊天提问澄清问题、约束、边界与成功度量",
+          "在用户确认锚定假设后启动 egm-synthesizer 并行多视角评审",
+          "去重汇总各评审视角发现并整理为连贯分析",
+          "将简报写入工作目录的 concepts_brief.md 并给出文件链接",
+          "以压力测试、先批评、反回声室的方式审视想法",
+          "按固定结构生成含目标/非目标、备选方案、关键决策的简报"
+        ],
+        "inputs": [
+          "用户提供的初始功能想法或概念提示",
+          "多轮聊天中的澄清回答与约束说明",
+          "用户对锚定假设的就绪确认",
+          "git config user.name 或 GIT_AUTHOR_NAME 作为作者名"
+        ],
+        "outputs": [
+          "concepts_brief.md 简报文件",
+          "聊天中的文件链接通知",
+          "锚定工作假设摘要与就绪确认门",
+          "供 egm-draft 使用的备选方案与关键决策内容"
+        ],
+        "scenarios": [
+          "把模糊的产品或功能想法整理成可评审的假设",
+          "在写详细设计前对概念做多视角批判性评审",
+          "需要明确目标、非目标与备选方案时",
+          "为后续 egm-draft 提供上游输入"
+        ],
+        "prerequisites": [
+          "宿主需具备子代理工具，否则应停止并告知用户",
+          "Codex 或 ChatGPT Work 环境需先读 docs/codex.md",
+          "Claude Code 或 Cowork 环境需先读 docs/claude.md",
+          "需能使用文件写入工具写 concepts_brief.md"
+        ],
+        "limits": [
+          "禁止在聊天面板直接展示大型提案或简报，必须写入文件",
+          "用户明确确认就绪前不得启动子代理",
+          "开放式提问阶段禁止使用结构化选择题工具或预设选项",
+          "无子代理工具的宿主无法进行 Goldfish 评审",
+          "交互门每次只能包含一个问题且为当轮唯一工具调用",
+          "禁止使用奉承性形容词与礼貌道歉",
+          "所有简报须用简明无术语的平实英文撰写"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "产品规划",
+          "写作",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Helps turn half-baked concepts into structured hypotheses via clarifying questions, review, and iterative refinement."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "The outcome is an iteratively refined RFC summary (`concepts_brief.md`) that leads directly into `/egm-draft` or review with peers."
+          },
+          {
+            "field": "does",
+            "quote": "Continue asking targeted, open-ended clarifying questions across multiple chat turns as needed until the problem statement, constraints, and target behavior are thoroughly defined."
+          },
+          {
+            "field": "does",
+            "quote": "Never agree by default. Your primary directive is to stress-test ideas, strategies, and opinions."
+          },
+          {
+            "field": "inputs",
+            "quote": "Verify if the user provided an initial feature idea or concept prompt. If missing, prompt the user to describe what they want to brainstorm."
+          },
+          {
+            "field": "inputs",
+            "quote": "Resolve the brief's `Author` from `git config user.name`, then `GIT_AUTHOR_NAME`; if neither is set, ask in chat."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If your harness has no subagent tool, stop and tell the user: a review in the same context is not a Goldfish review."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "When running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "In Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first."
+          },
+          {
+            "field": "limits",
+            "quote": "You **MUST NOT** spawn subagents until the user explicitly confirms readiness after reviewing the anchored working hypothesis."
+          },
+          {
+            "field": "limits",
+            "quote": "You are **STRICTLY FORBIDDEN** from using structured question tools (`ask_question`) or supplying pre-canned multiple-choice candidate answers during open-ended questioning."
+          },
+          {
+            "field": "limits",
+            "quote": "You are **STRICTLY FORBIDDEN** from presenting large proposals, drafts, brainstorm summaries, or briefs directly in the chat pane."
+          },
+          {
+            "field": "hosts",
+            "quote": "Spawn each subagent with your harness's subagent tool (Antigravity: `invoke_subagent`; Claude Code: `Agent`; Codex: `spawn_agent`)."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/egm-draft/SKILL.md",
+      "blob_sha": "9cdb4cd94e55db0138f2711edbf98b21578da7dc",
+      "source_url": "https://github.com/google/elephant-goldfish-model/blob/270b10326bf366d823bc76fd662cf83808d5781e/skills/egm-draft/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "egm-draft",
+        "description": "Drafts a design document section-by-section using the concepts brief from egm-brainstorm (or user notes). This is the second step in the Elephant-Goldfish (EGM) feature flow. Use when you are ready to write a design doc after aligning on requirements + solution."
+      },
+      "excerpt": "---\nname: egm-draft\nlicense: Apache-2.0\ndisable-model-invocation: true\ndescription: >-\n  Drafts a design document section-by-section using the concepts brief from\n  egm-brainstorm (or user notes). This is the second step in the Elephant-Goldfish (EGM)\n  feature flow. Use when you are ready to write a design doc after aligning on\n  requirements + solution.\n---\n\n# Design Drafting (Document Construction)\n\nWhen running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md).\nIn Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first.\n\nThis skill guides the user through drafting a technical design document based on\nthe aligned problem and requirements from the brainstorm phase.\n\n## Execution Constraints (CRITICAL)\n\n1.  You **MUST** read and apply the\n    execution instructions in `resources/execution_instructions.md`.\n2.  **Artifact-First Delivery (MANDATORY)**: You are **STRICTLY FORBIDDEN** from\n    presenting large proposals, drafts, summaries, or plans directly in the chat\n    pane. You **MUST** write them directly to the working directory (or your\n    harness's artifact directory, if it has one) (`design_draft.md` or\n    `./design_draft.md`) using your file-writing tool and tell the user in chat\n    the file path and ask for review. This applies to the Discussion Summary,\n    Design Drafts, and all review reports.\n3.  **Plain-English Standard**: You **MUST** write all concepts briefs,\n    summaries, and communications in simple, direct, jargon-free plain English.\n    Explain technical mechanisms directly. Do not summarize away substance or\n    rely on buzzwords. Do not use ungrounded promotional adjectives (e.g.,\n    *seamless*, *robust*, *blazingly fast*) or decorative adverbs (e.g.,\n    *seamlessly*, *effortlessly*, *literally*, *drastically*, *obviously*).\n4.  **Default to Stress-Testing**: Never agree by default. Your primary\n    directive is to stress-test ideas, strategies, and opinions. Find the\n    weakest points, edge cases, and blind spots before affirming anything.\n5.  **No Glazing**: Eliminate sycophancy. Do not call ideas \"great,\"\n    \"brilliant,\" or \"smart.\" Compliments without substance are noise.\n6.  **Critique First**: Even when an idea is strong, lead with what is wrong,\n    missing, or risky before highlighting its merits.\n7.  **Reject Echo-Chamber Framing**: Never parrot framing back to the user. If a\n    conclusion is asserted, do not validate it reflexively.\n8.  **Generate Counter-Arguments**: For every strategy proposed, actively\n    outline: What is the user not seeing? What is the strongest\n    counter-argument? Is the opposing view justified?\n9.  **Earn Your Agreement**: Only agree when the idea has survived rigorous,\n    objective scrutiny.\n10. **Banned Adjectives (No Flattery)**: You are strictly prohibited from using\n    validating adjectives like \"brilliant,\" \"great,\" \"smart,\" \"correct,\"\n    \"perfect,\" \"excellent,\" or \"spot-on\" when referring to the user's inputs,\n    corrections, or decisions.\n11. **Banned Apologies**: You MUST NOT output polite apologies (e.g., \"I\n    apologize,\" \"I am sorry,\" \"Forgive me\") when challenged or corrected.\n    Instead, outline the corrected technical logic or trade-offs directly.\n12. **Interaction Invariants**: All interactive gates (structured question tools\n    such as `ask_question`, if your harness has one, or plain chat) MUST contain\n    strictly one question (`len(questions) == 1`), be the sole tool call in the\n    turn, and provide clear, action-oriented options without `(Recommended)`\n    prefixes.\n13. **Author Decides Architecture**: When a design decision has more than one\n    defensible answer (e.g., data model, component boundaries, storage,\n    protocols), present up to three options, each with its mechanism,\n    trade-offs, and the conditions under which it fails, and ask the author to\n    choose through a single-select gate. Do not rank the options, mark a\n    default, or pick one. If the author asks you to choose (\"just pick one\"),\n    restate the trade-offs and present the same gate again. Decide mechanical\n    choices with one defensible answer (e.g., file naming, formatting)\n    yourself.\n\n## Inputs\n\n*   **`Context File`** (Optional): File path to a predecessor document (e.g.,\n    `docs/designs/<feature_name>.md`, `concepts_brief.md`, or\n    `discussion_summary.md`). If omitted, the skill defaults to consuming\n    predecessor context (e.g., `concepts_brief.md` or `discussion_summary.md`).\n\n## Execution Workflow\n\nFollow these steps sequentially. Execute steps in order but allow the user to\nrevisit old phases in case they forgot something. Do not skip ahead without\nexplicit consensus from the user to confirm we can proceed between steps. Write\nthe document iteratively as the conversation progresses between sections.\n\n### Section Approval Gate (Steps 2–5)\n\nAfter writing or updating each section in `design_draft.md` using your\nfile-writing tool, you must present the approval gate in the same turn following\nthis strict generation order:\n\n1.  **Visible Chat Summary & Link (FIRST)**: You **MUST** output conversational\n    markdown text before the question gate. State which section was drafted or\n    updated, highlight 2–3 key decisions or additions, and provide a link or\n    path to `design_draft.md` (e.g., `[design draft](/absolute/project/design_draft.md)` in Codex).\n2.  **Approval Gate (SECOND)**: In the same turn, present the single-select\n    approval choice (using a structured question tool such as `ask_question`\n    with `len(questions) == 1` and `is_multi_select: false` if your harness has\n    one, or plain chat):\n\n> [!CAUTION] **Negative Constraint (No Empty Chat Bubbles)**: NEVER emit a\n> structured question tool call with empty response text. Always generate the\n> visible chat explanation and file link before invoking the question gate.\n\n```json\n{\n  \"questions\": [\n    {\n      \"question\": \"Drafted [Section Name] in design_draft.md. Please review. How would you like to proceed?\",\n      \"options\": [\n        \"Approve [Section Name] and proceed to next section\",\n        \"Request revisions to [Section Name] (via inline comments or write-in)\"\n      ],\n      \"is_multi_select\": false\n    }\n  ]\n}\n```\n\n*   **Option 0 (`Approve [Section Name] and proceed to next section`)**:\n    *   If inline comments on `design_draft.md` are also present in the turn\n        context, apply those inline updates to `design_draft.md` first before\n        advancing to the next section.\n    *   Otherwise, advance immediately to drafting the next section.\n*   **Option 1 (`Request revisions to [Section Name] (via inline comments or\n    write-in)`) or Modal Skip with Inline Comments**:\n    *   **With Inline Comments and/or Write-in Instructions**: Inspect both the\n        write-in response and any inline comments left on `design_draft.md`\n        (honoring positive callouts to retain highlighted sections and negative\n        callouts to revise or remove content). Apply all revisions to\n        `design_draft.md` using your file-writing tool, notify the user, and\n        re-present the approval gate.\n    *   **Empty Write-in Guard (CRITICAL)**: If selected without write-in text\n        **and** without any inline comments in the turn context, **DO NOT** loop\n        or fail. Prompt in chat: `\"Please specify the adjustments or additions\n        needed for [Section Name] (either via inline comments on design_draft.md\n        or here in chat) so I can revise the draft.\"` and yield active execution\n        to wait for user clarification in chat.\n\n### Step 1: Ingest Predecessor Context (Concepts Brief or Notes)\n\n1.  **Context File**: If `Context File` is specified, read and parse it directly.\n2.  **Polymorphic Intake**: If omitted, discover context by checking sources in\n    strict priority order:\n    *   **Priority 1: Modern Ideation Brief (`concepts_brief.md`)**: Check for\n        `concepts_brief.md` in `./concepts_brief.md`, the conversation artifact\n        director",
+      "card": {
+        "title_zh": "设计文档起草",
+        "purpose_zh": "基于头脑风暴阶段对齐的问题与需求，逐节起草技术设计文档，写入 design_draft.md 并逐节请作者审批。",
+        "does": [
+          "读取前序概念简报或讨论摘要作为上下文",
+          "按模板逐节撰写问题、目标、技术方案与备选方案",
+          "将草稿写入工作目录的 design_draft.md 而非聊天窗口",
+          "每节写完后提供单问题审批门，等待作者批准或修改",
+          "对多解设计决策列出至多三个选项交由作者选择",
+          "以批判优先、反回声室的方式压力测试方案"
+        ],
+        "inputs": [
+          "可选的前序文档路径（如 concepts_brief.md、discussion_summary.md）",
+          "若未提供则按优先级自动查找 concepts_brief.md、discussion_summary.md",
+          "若均不存在则在聊天中询问问题陈述、目标与技术背景",
+          "作者名（取自简报、git config user.name 或 GIT_AUTHOR_NAME）"
+        ],
+        "outputs": [
+          "design_draft.md 设计文档草稿文件",
+          "聊天中的章节摘要与文件路径链接",
+          "逐节审批门与修订记录"
+        ],
+        "scenarios": [
+          "需求与方案已对齐后撰写技术设计文档",
+          "需要逐节评审并迭代修改设计稿",
+          "需要记录被否决的备选方案及原因"
+        ],
+        "prerequisites": [
+          "已具备头脑风暴产出的概念简报或讨论摘要，或用户可提供背景",
+          "宿主具备文件写入工具",
+          "运行于 Codex 或 ChatGPT Work 时先读 docs/codex.md，Claude Code 或 Cowork 时先读 docs/claude.md"
+        ],
+        "limits": [
+          "禁止在聊天窗口直接展示大段草稿、摘要或计划",
+          "所有交互门必须只含一个问题且为当轮唯一工具调用",
+          "不得默认赞同，须先指出缺陷与风险",
+          "禁止使用奉承性形容词与礼貌道歉",
+          "多解架构决策不得替作者选择或排序",
+          "未获用户明确同意不得跳步"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "产品规划",
+          "写作"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Drafts a design document section-by-section using the concepts brief from egm-brainstorm (or user notes)."
+          },
+          {
+            "field": "does",
+            "quote": "present up to three options, each with its mechanism, trade-offs, and the conditions under which it fails, and ask the author to choose through a single-select gate."
+          },
+          {
+            "field": "does",
+            "quote": "Your primary directive is to stress-test ideas, strategies, and opinions."
+          },
+          {
+            "field": "inputs",
+            "quote": "**`Context File`** (Optional): File path to a predecessor document (e.g., `docs/designs/<feature_name>.md`, `concepts_brief.md`, or `discussion_summary.md`)."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when you are ready to write a design doc after aligning on requirements + solution."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "When running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md). In Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first."
+          },
+          {
+            "field": "limits",
+            "quote": "You are **STRICTLY FORBIDDEN** from presenting large proposals, drafts, summaries, or plans directly in the chat pane."
+          },
+          {
+            "field": "limits",
+            "quote": "All interactive gates (structured question tools such as `ask_question`, if your harness has one, or plain chat) MUST contain strictly one question (`len(questions) == 1`)"
+          },
+          {
+            "field": "limits",
+            "quote": "Do not rank the options, mark a default, or pick one."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Apply all revisions to `design_draft.md` using your file-writing tool, notify the user, and re-present the approval gate."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/egm-drift-report/SKILL.md",
+      "blob_sha": "1947221778bea357a98409c0d580c741a7b72be9",
+      "source_url": "https://github.com/google/elephant-goldfish-model/blob/270b10326bf366d823bc76fd662cf83808d5781e/skills/egm-drift-report/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "egm-drift-report",
+        "description": "Runs drift detection on all design documents to check for document and code consistency. Produces an actionable report with differences. Use when the user asks to detect drift or check for consistency across all design documents or READMEs in a directory."
+      },
+      "excerpt": "---\nname: egm-drift-report\nlicense: Apache-2.0\ndisable-model-invocation: true\ndescription: >-\n  Runs drift detection on all design documents to check for document and\n  code consistency. Produces an actionable report with differences. Use when the\n  user asks to detect drift or check for consistency across all design documents\n  or READMEs in a directory.\n---\n\n# Detect Drift In Designs and Code\n\nWhen running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md).\nIn Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first.\n\nWhen the user asks to detect drift across all designs or a set of READMEs, the\ngoal is to identify all instances where the codebase has diverged or failed to\nimplement the specifications described by those designs or READMEs.\n\n1.  **Check Input**: Verify a directory containing design documents or READMEs\n    is provided. If not provided, ask the user to specify the target directory.\n2.  **List Documents**: List all files in the design directory.\n3.  **Analyze**: For EACH design document:\n\n    *   **Contextualize**: Read the design document. Identify the intent,\n        proposed changes, and specific filenames/symbols mentioned.\n    *   **Locate Source**: Find the corresponding source code files in the\n        source tree. If paths aren't explicit, use code search or grep to\n        locate the relevant classes, functions, or API endpoints mentioned in\n        the doc. Prompt the user to add missing links to the document to make\n        future detection cheaper.\n    *   **Verify**: Read the current state of those source files.\n    *   **Detect Drift**: Compare the design vs. reality. Look specifically for:\n        *   Missing Features: Logic described in the doc but absent in the code.\n        *   Incomplete Models: Dataclasses/Classes/Structs/Protos missing fields\n            specified in the design.\n        *   Logic Shortcuts: Hardcoded values where dynamic logic was planned.\n        *   Architectural Divergence: Implementation using different\n            patterns/libraries than proposed.\n    *   **Filter**: Report ONLY the differences. Do not describe what is working\n        or what matches. If the code matches the design perfectly, output \"No\n        drift detected.\"\n\n4.  **Report**: Produce a single report listing all discrepancies found.\n\n    *   Append the analysis for each file to `{YYYY-MM-DD}_DRIFT_REPORT.md`\n        using your file-writing tool.\n    *   Strict Format:\n\n        ```markdown\n        ## <DESIGN_DOC_NAME>\n\n        <Bulleted list of specific divergences found>\n        <Or \"No drift detected\">\n        ```\n\n5.  **Guidance**\n\n    -   Be rigorous. If a design doc mentions a specific object, field or file\n        name and the code doesn't have it, that is a reportable drift. Double\n        check for coverage. If there is some part of the logic that is not\n        referenced in a design or README, this is a reportable drift.\n    -   Read files liberally to ensure you are looking at the current state\n        of the code, not relying on memory.\n    -   Process the files sequentially to ensure the tool output buffer doesn't\n        overflow.\n",
+      "card": {
+        "title_zh": "设计文档漂移检测",
+        "purpose_zh": "对目录内所有设计文档或 README 做漂移检测，比对文档描述与代码实际状态，找出代码偏离或未实现规格之处，并生成可执行的差异报告。",
+        "does": [
+          "校验用户是否提供包含设计文档或 README 的目标目录，未提供则询问",
+          "列出设计目录中的所有文件",
+          "逐份阅读设计文档，识别意图、变更及提到的文件名与符号",
+          "在源码树中定位对应代码文件，必要时用代码搜索或 grep 查找",
+          "比对设计与代码实际状态，识别缺失功能、模型字段缺失、逻辑简化、架构偏离",
+          "仅报告差异，将结果按固定格式追加写入日期命名的漂移报告文件"
+        ],
+        "inputs": [
+          "包含设计文档或 README 的目录路径",
+          "设计文档与 README 文件内容",
+          "对应源码文件内容"
+        ],
+        "outputs": [
+          "{YYYY-MM-DD}_DRIFT_REPORT.md 漂移报告文件",
+          "按设计文档名分节的差异条目列表，或 No drift detected"
+        ],
+        "scenarios": [
+          "用户要求检测所有设计文档的漂移",
+          "用户要求检查目录内 README 与代码的一致性",
+          "需要确认代码是否实现了设计规格"
+        ],
+        "prerequisites": [
+          "用户需提供包含设计文档或 README 的目录",
+          "在 Codex 或 ChatGPT Work 中运行需先阅读 Codex 集成文档",
+          "在 Claude Code 或 Cowork 中运行需先阅读 claude.md 文档"
+        ],
+        "limits": [
+          "仅报告差异，不描述正常或匹配的部分",
+          "需逐份顺序处理文件以避免输出缓冲溢出",
+          "若设计文档未显式给出路径，需依赖代码搜索定位",
+          "未在设计或 README 中引用的逻辑部分也视为可报告的漂移"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "文档",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Runs drift detection on all design documents to check for document and code consistency. Produces an actionable report with differences."
+          },
+          {
+            "field": "does",
+            "quote": "Verify a directory containing design documents or READMEs is provided. If not provided, ask the user to specify the target directory."
+          },
+          {
+            "field": "does",
+            "quote": "List all files in the design directory."
+          },
+          {
+            "field": "does",
+            "quote": "Read the design document. Identify the intent, proposed changes, and specific filenames/symbols mentioned."
+          },
+          {
+            "field": "does",
+            "quote": "Find the corresponding source code files in the source tree. If paths aren't explicit, use code search or grep to locate the relevant classes, functions, or API endpoints mentioned in the doc."
+          },
+          {
+            "field": "does",
+            "quote": "Append the analysis for each file to `{YYYY-MM-DD}_DRIFT_REPORT.md` using your file-writing tool."
+          },
+          {
+            "field": "outputs",
+            "quote": "Produce a single report listing all discrepancies found."
+          },
+          {
+            "field": "outputs",
+            "quote": "<Or \"No drift detected\">"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "When running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "In Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first."
+          },
+          {
+            "field": "limits",
+            "quote": "Report ONLY the differences. Do not describe what is working or what matches."
+          },
+          {
+            "field": "limits",
+            "quote": "Process the files sequentially to ensure the tool output buffer doesn't overflow."
+          },
+          {
+            "field": "limits",
+            "quote": "If there is some part of the logic that is not referenced in a design or README, this is a reportable drift."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Append the analysis for each file to `{YYYY-MM-DD}_DRIFT_REPORT.md` using your file-writing tool."
+          },
+          {
+            "field": "hosts",
+            "quote": "When running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md)."
+          },
+          {
+            "field": "hosts",
+            "quote": "In Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/egm-resolve/SKILL.md",
+      "blob_sha": "ebd5a67c1f7bc776a1fce27d00b78436de9e159e",
+      "source_url": "https://github.com/google/elephant-goldfish-model/blob/270b10326bf366d823bc76fd662cf83808d5781e/skills/egm-resolve/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "egm-resolve",
+        "description": "The Elephant resolution skill. Ingests flat deficiency reports from concurrent Goldfish reviewers, applies automated fixes for PROPOSE FIX items via UI multiple-choice gates, and presents interactive negotiation/re-sync checkpoints."
+      },
+      "excerpt": "---\nname: egm-resolve\nlicense: Apache-2.0\ndisable-model-invocation: true\ndescription: >-\n  The Elephant resolution skill. Ingests flat deficiency reports from\n  concurrent Goldfish reviewers, applies automated fixes for PROPOSE FIX\n  items via UI multiple-choice gates, and presents interactive\n  negotiation/re-sync checkpoints.\n---\n\n# Goldfish Review: Resolve\n\nWhen running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md).\nIn Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first.\n\n## Overview\n\nThis skill instructs the agent on how to operate within the primary Elephant\ncontext window to parse flat deficiency reports from concurrent Goldfish\nreviewers. It defends accurate design choices, applies automated textual\nrepairs, and manages interactive negotiation checkpoints.\n\n## Prerequisites & Context Strategy\n\n*   **Context Recommendation (Elephant Memory)**: This skill should be run in\n    the persistent conversation session that generated the target document (the\n    Elephant) to recall earlier reasoning and craft higher-quality fixes.\n\n## Inputs\n\nThe caller or orchestration driver provides exactly these parameters:\n\n*   **`TargetFile`**: Absolute or relative path to target document.\n*   **`LineRange`**: Exact line numbers (or `full file`).\n*   **`FindingsList`**: Aggregated flat list of findings from Goldfish\n    reviewers.\n\n## Execution Workflow\n\n### Step 1: Intake Validation & Gather Context\n\n1.  **Hybrid Execution UX**: Detect if execution arguments are present:\n\n    *   *Automated Mode*: If all parameters are provided, execute silently as a\n        subprocess.\n    *   *Standalone Human Mode*: If parameters are omitted, trigger a friendly\n        onboarding flow. Prompt for one piece of input at a time, waiting for\n        the user's response after each turn. Once all inputs are specified,\n        display the final setup and verify the user is ready to continue.\n\n2.  Read `TargetFile` at `LineRange` by reading it and parse the `FindingsList`.\n\n### Step 2: Evaluate & Categorize\n\nGive each finding exactly one category:\n\n*   **CONTEST**: The critique is inaccurate or relies on a misunderstanding of\n    the codebase. Cite evidence that the reviewer could read: a file and\n    symbol, or a decision recorded in the document.\n*   **ESCALATE**: The critique is inaccurate, but the evidence is outside every\n    file the reviewer could read (for example, a team convention or a verbal\n    decision). State that fact. Do not fix the finding. Give it to the user.\n*   **PROPOSE FIX**: The critique is valid. Define precise textual replacements\n    or structural formatting adjustments to resolve the gap.\n*   **DECLINE**: The finding is a Nit. Record it. Do not fix it. You can use\n    PROPOSE FIX for a Nit if the fix is worth it.\n\nApply these rules:\n\n*   **A contest must be checkable.** \"This was intentional\" is not evidence.\n    If you cannot cite evidence the reviewer could read, use ESCALATE or\n    PROPOSE FIX.\n*   **Do not add context only to satisfy a reviewer.** Add context when a human\n    reader of the document needs it. If only a zero-context subagent needs it,\n    use ESCALATE.\n*   **Do not contest a comprehension gap.** If a fresh reader could not follow\n    the document, the document is missing context.\n*   **Do not change a severity.** If you think a Blocker is a Nit, CONTEST it\n    and state the reason.\n*   You wrote the document under review. A wish to contest is not evidence\n    that the reviewer is wrong.\n\n### Step 3: Report Fixes\n\nConstruct the final report and save it named\n`goldfish_review_report.md` in the working directory (or your harness's artifact directory, if it has one)\nusing your file-writing tool. Use this layout:\n\n```markdown\n# Goldfish Annotated Review Report\n\n**Target:** `[TargetFile]` (`[LineRange]`)\n\n## Prioritized Findings & AI Suggestions\n\n{{range findings, ordered by Severity}}\n### [Issue 1] [`[ReviewerPersona]`] - Severity: [Blocker | Major | Nit]\n*   **Affected Scope:** [Lines Start-End]([RelativePath]#L[Start]-L[End]) ([Sub-header])\n*   **Discrepancy Description:** [copied from FindingsList]\n*   **Rationale:** [copied from FindingsList]\n*   ***AI Suggestion:*** [CONTEST | ESCALATE | PROPOSE FIX | DECLINE]\n*   ***Justification:*** [Detailed reason]\n*   ***Proposed Edit:***\n    *   Location: [Line/Header]\n    *   Change: [Precise replacement string or deletion note]\n{{end}}\n```\n\n### Step 4: Interactive Resolution Gate\n\nIf any finding is `ESCALATE`, list those findings first in the chat message.\nThey need the user's knowledge, not only approval.\n\nBefore proceeding, output a visible chat message to the user: *\"I have compiled\nthe audit findings into `goldfish_review_report.md`. Please review the findings there and choose how you would like to\nproceed:\n\n-   **Comment directly on the file**: Review `goldfish_review_report.md` in\n    chat or the file and leave comments/edits to approve, reject, or contest\n    specific items.\n-   **Auto accept**: Reply \"auto accept\" to batch-apply all proposed fixes\n    (skipping contested items).\n-   **Continue to next phase**: Reply \"continue\" or \"no changes\" to proceed\n    without applying fixes.\n-   **Interactive breakdown**: Reply \"interactive breakdown\" for a guided,\n    item-by-item walkthrough in chat with detailed explanations for each\n    proposed edit or contested finding before making decisions.\n-   **Custom instruction / Wildcard request**: Reply with any custom\n    instruction, question, or out-of-band request.\"*\n\nYou **MUST** immediately yield active execution by calling **zero tools** in\nthis turn payload. You must stop execution and go idle, waiting for the human\ndeveloper to comment on/edit the artifact or reply in the chat.\n\nInterpret the user's action/response as follows:\n\n-   **\"Auto accept\" / \"Accept all suggestions\" / User clicks \"Proceed\" without\n    contesting**: Apply all fixes where the AI suggestion was `PROPOSE FIX`\n    directly to `TargetFile` at `LineRange` in a single batch using\n    your file-editing tool. Any items categorized as `CONTEST`, `ESCALATE`, or\n    `DECLINE` are explicitly bypassed. Then proceed to Step 5.\n-   **\"Continue to next phase\" / \"No changes\"**: Do not apply any automated\n    fixes. Then proceed to Step 5.\n-   **\"Interactive breakdown\"**: Enter a sequential breakdown loop over ALL\n    finding items (all categories except `DECLINE`):\n\n    1.  For each item `i`, output a visible chat message formatting the full\n        finding details and explanation in rich markdown:\n\n        ```markdown\n        ### Breakdown Item [i]: [Issue Title] [`[ReviewerPersona]`]\n        * **Scope:** [Lines Start-End]([RelativePath]#L[Start]-L[End]) ([Sub-header])\n        * **Description:** [Description]\n        * **AI Suggestion:** [CONTEST | ESCALATE | PROPOSE FIX]\n        * **Explanation & Justification:** [Detailed reason and background explaining why the fix is proposed or why the finding is contested]\n        * **Proposed Edit:** [Precise replacement text or deletion note]\n        ```\n\n        Then prompt the user in chat for their decision on this item (calling\n        **zero tools** and going idle):\n\n        *   If `PROPOSE FIX`: Ask the user to reply with **Accept proposed\n            fix**, **Skip / ignore**, or **Discuss**.\n        *   If `CONTEST`: Ask the user to reply with **Skip / agree with\n            contest**, **Overrule contest (propose fix)**, or **Discuss**.\n        *   If `ESCALATE`: Ask the user to reply with **Confirm (no change)**,\n            **Add the fact to the document**, or **Discuss**.\n\n    2.  Record the user's decisions in an internal memory checklist (e.g., *Item\n        1: Accepted*, *Item 2: Ignored*, *Item 3: Overruled*). **Do NOT call any\n        file editing tools during this sequential loop.**\n\n    3.  Once all items have been decided, summarize the accepted edits, execute\n        them using your file-editing tool, and proceed to Step 5.\n\n-   **Custom instruction / Out-of-band edit**: I",
+      "card": {
+        "title_zh": "评审缺陷处理",
+        "purpose_zh": "解析并发评审者提交的扁平缺陷报告，对目标文档逐条分类为质疑、上报、建议修复或忽略，生成评审报告并支持人工确认后批量或逐条应用文本修复。",
+        "does": [
+          "读取目标文件指定行范围并解析缺陷发现列表",
+          "将每条发现归类为CONTEST、ESCALATE、PROPOSE FIX或DECLINE",
+          "生成goldfish_review_report.md评审报告并按严重度排序",
+          "在聊天中输出交互式解决门，等待用户选择处理方式",
+          "按用户指令批量应用建议修复或逐条交互确认后应用",
+          "修复后校验文件结构并标记报告为已解决，向调用方交接统计"
+        ],
+        "inputs": [
+          "TargetFile：目标文档路径",
+          "LineRange：行号范围或full file",
+          "FindingsList：评审者发现的聚合扁平列表",
+          "用户交互回复（auto accept、continue、interactive breakdown或自定义指令）"
+        ],
+        "outputs": [
+          "goldfish_review_report.md评审报告文件",
+          "对TargetFile的文本修复编辑",
+          "聊天中的逐条分解说明与决策提示",
+          "返回调用方的接受、质疑、上报、忽略及未处理数量统计"
+        ],
+        "scenarios": [
+          "汇总多个并发评审者对同一文档的缺陷报告",
+          "对文档评审意见逐条判断并给出修复建议",
+          "人工审阅评审报告后批量接受修复",
+          "逐条交互式讨论每条评审意见并决定处理方式"
+        ],
+        "prerequisites": [
+          "应在生成目标文档的持久会话中运行以回忆先前推理",
+          "需提供TargetFile、LineRange、FindingsList参数或通过引导流程输入",
+          "在Codex或ChatGPT Work中需先阅读Codex集成文档，在Claude Code或Cowork中需先阅读claude.md"
+        ],
+        "limits": [
+          "不修改严重度，若认为严重度不当应质疑并说明理由",
+          "质疑必须可核查，无法引用评审者可读证据时应上报或建议修复",
+          "不得仅为满足评审者而添加上下文",
+          "交互分解循环期间不得调用文件编辑工具",
+          "ESCALATE项不修复，交由用户处理"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "parse flat deficiency reports from concurrent Goldfish reviewers. It defends accurate design choices, applies automated textual repairs, and manages interactive negotiation checkpoints."
+          },
+          {
+            "field": "does",
+            "quote": "Construct the final report and save it named `goldfish_review_report.md` in the working directory"
+          },
+          {
+            "field": "does",
+            "quote": "Apply all fixes where the AI suggestion was `PROPOSE FIX` directly to `TargetFile` at `LineRange` in a single batch using your file-editing tool."
+          },
+          {
+            "field": "does",
+            "quote": "Enter a sequential breakdown loop over ALL finding items (all categories except `DECLINE`)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "This skill should be run in the persistent conversation session that generated the target document (the Elephant) to recall earlier reasoning and craft higher-quality fixes."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "When running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md). In Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first."
+          },
+          {
+            "field": "limits",
+            "quote": "Do NOT call any file editing tools during this sequential loop."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "using your file-writing tool"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Apply all fixes where the AI suggestion was `PROPOSE FIX` directly to `TargetFile` at `LineRange` in a single batch using your file-editing tool."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/egm-review-loop/SKILL.md",
+      "blob_sha": "7ee4205ad294de89035c31e2d0eeddccf516e5c1",
+      "source_url": "https://github.com/google/elephant-goldfish-model/blob/270b10326bf366d823bc76fd662cf83808d5781e/skills/egm-review-loop/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "egm-review-loop",
+        "description": "Executes the Antagonistic-Review process from the Elephant-Goldfish Model (EGM) via an automated multi-agent review loop to audit documents against qualitative standards and structural templates, and automatically apply approved fixes. Use when reviewing design docs, READMEs, feature specifications, implementation plans, or verifying document completeness and tone."
+      },
+      "excerpt": "---\nname: egm-review-loop\nlicense: Apache-2.0\ndisable-model-invocation: true\ndescription: >-\n  Executes the Antagonistic-Review process from the Elephant-Goldfish\n  Model (EGM) via an automated multi-agent review loop to audit documents\n  against qualitative standards and structural templates, and automatically\n  apply approved fixes. Use when reviewing design docs, READMEs, feature\n  specifications, implementation plans, or verifying document completeness\n  and tone.\n---\n\n# Goldfish Review: Loop (Orchestration Driver)\n\nWhen running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md).\nIn Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first.\n\n## Overview\n\nThis skill acts as the central orchestration engine driving the multi-agent\nreview loop. It coordinates two distinct agent memory models:\n\n*   **The Goldfish (Adversarial Auditors)**: Subagents spawned in isolated,\n    fresh context windows to catch unstated assumptions without historical bias.\n*   **The Elephant (Persistent Resolver)**: The primary agent context holding\n    institutional knowledge to evaluate findings and apply approved repairs.\n\nThe driver manages argument intake, resolves paths for reviewers and standards,\nunconditionally re-parses target line ranges before every iteration, spawns\nconcurrent specialized Goldfish auditors based on configuration, and coordinates\nwith the Elephant context to resolve findings.\n\n## Delegation\n\nA Goldfish runs in a fresh context with no conversation history. Spawn each\nsubagent with your harness's subagent tool (Antigravity: `invoke_subagent`; Claude Code: `Agent`; Codex: `spawn_agent`). Each subagent is defined in `agents/<file>.md`, and its\nfrontmatter `name` (for example `egm-zoom-out`) is the subagent type to request\nwhere your harness registers named subagents. Otherwise spawn a general-purpose\nsubagent and tell it to read that persona file first. Pass the prompt verbatim\nand wait for the report. If your harness cannot nest subagents,\nuse direct dispatch instead of the synthesizer. See `docs/harnesses.md`.\nIf your harness has no subagent tool, stop and tell the user: a review in the same\ncontext is not a Goldfish review.\n\n## Inputs\n\nThe caller or user provides exactly these parameters:\n\n*   **`TargetFile`**: Absolute or relative path to target document.\n*   **`SemanticTarget`**: Descriptive targeting string (e.g., *\"Target the H4\n    block with SS-ID 'S1.12'\"*), or `full file`.\n*   **`Reviewers`**: List of reviewer names (shortnames or paths).\n*   **`Standards`**: Mapping of reviewer names to standard names (shortnames or\n    paths).\n*   **`GoldfishContext`**: A reading list (source files, directories, or\n    documentation URLs) fed to reviewers to establish their baseline. An empty\n    list from the caller counts as provided; do not ask for it again. Some\n    reviewers cannot open URLs, so before the first round save the raw page of\n    each URL as a new file in the working directory (or your harness's artifact\n    directory) and pass its absolute path instead. If a page cannot be saved,\n    ask the user for a local copy and end your turn; if no one can answer,\n    as in a headless run, leave it out, tell the user, and keep going.\n\n## Path & Standard Resolution Logic\n\nWhen resolving names in `Reviewers` and `Standards`:\n\n*   **Reviewer Shortnames**: Map reviewer shortname (e.g., `design_critic`,\n    `structural`, `style`, `implementation_readiness`,\n    `codebase_details`, `comprehension`, `zoom_out`) to `agents/{name}.md`.\n    The persona file defines the reviewer's core mandates, audit vectors, and\n    output format.\n*   **Standard Shortnames**: Map standard shortname (e.g., `feature-spec-standard`,\n    `implementation-readiness-standard`, `zoom-out-standard`, `heilmeier-standard`,\n    `re-implementation-standard`) to `resources/document_standards/{name}.md`.\n*   **Custom Paths**: If the name contains a slash (`/`), treat it as an\n    absolute or workspace-relative path and read it directly.\n\n## Execution Workflow\n\n### Step 1: Intake & Configuration UX\n\nEvaluate the provided inputs (`TargetFile`, `SemanticTarget`, `Reviewers`,\n`Standards`, `GoldfishContext`).\n\n1.  **Identify Missing Inputs**: Determine which of the required parameters are\n    missing.\n2.  **Interactive Onboarding**:\n    *   If **all** inputs are present, proceed to Step 2.\n    *   If **some or all** inputs are missing, interactively prompt the user\n        **only for the missing inputs**, one at a time via chat messages.\n3.  **Reviewer Recommendations**:\n    *   *Feature Specs*: Recommend `design_critic` (mapped to\n        `resources/document_standards/feature-spec-standard.md`) and\n        `structural` (mapped to `resources/document_standards/feature-spec-standard.md`).\n    *   *Implementation Plans*: Recommend `implementation_readiness`\n        (mapped to `resources/document_standards/implementation-readiness-standard.md`)\n        and `codebase_details`.\n4.  **Confirm Configuration**: Display the consolidated plan (Target, Reviewers,\n    and mapped Standards) and ask the user to confirm before proceeding.\n\n### Step 2: The Sharpening Loop (Iterative Cycle)\n\nExecute the following sequence in a continuous loop:\n\n#### 2.1 Unconditional Target Resolution\n\nBefore every iteration, unconditionally re-scan `TargetFile` by reading it\nand using the stable `SemanticTarget` string (e.g., locating the target header) to\ndynamically determine the updated absolute start and end line numbers. This\nensures absolute accuracy even if the file was edited in prior rounds. (If `full\nfile` mode is specified, confirm full-file line bounds).\n\n#### 2.2 Review Swarm Execution\n\n1.  **Launch Subagent Swarm**:\n    Spawn subagents to execute the review:\n    *   **Hierarchical Dispatch (Synthesizer)**: Spawn the intermediate\n        synthesizer subagent (`agents/synthesizer.md` / `egm-synthesizer`).\n        The synthesizer spawns the Goldfish review swarm in\n        parallel, deduplicates findings, writes the report artifact, and\n        returns a single summary message to avoid context pollution in the root\n        conversation. Pass it the Failed Reviewers rule below and\n        `GoldfishContext`, and tell it to give those files to each reviewer.\n        Its summary must give a status, `completed` or `not run`, for each\n        requested reviewer.\n    *   **Direct Dispatch (Flat Swarm)**: Alternatively, spawn each requested\n        reviewer subagent in `Reviewers` directly.\n        Instruct each subagent to first read its persona definition in\n        `agents/{name}.md`, then audit `TargetFile` at the resolved line range\n        against its designated standard in `resources/document_standards/`,\n        supplying `GoldfishContext`.\n    *   Each reviewer produces findings with severity (🔴 Blocker, 🟡 Major, 🟢\n        Nit), line numbers, discrepancy descriptions, and rationales.\n2.  **Consolidate Findings**: Collect all findings across reviewers into a single\n    flat `FindingsList`. Give each finding a stable id\n    (`<reviewer>-<round>-<n>`) and record its reviewer, severity, and affected\n    scope.\n3.  **Failed Reviewers**: A reviewer that times out, fails, or returns no report\n    did not review. Retry it once. If it fails again, record it as **not run**\n    in the report. Never count it as a reviewer with zero findings. If the\n    synthesizer summary has no status for a requested reviewer, record that\n    reviewer as not run.\n\n#### 2.3 Aggregated Resolution Hand-off\n\n1.  Pass `TargetFile`, the active line range, and the aggregated `FindingsList`\n    to the **`egm-resolve`** workflow.\n2.  Execute the resolution workflow in the primary Elephant context:\n    *   Categorize findings into `CONTEST` vs. `PROPOSE FIX`.\n    *   Save `goldfish_review_report.md` with your file-writing tool.\n    *   Present the interactive decision gate (Auto accept, Continue, Interactive\n        breakdown).\n    *   Apply approved text repairs to `TargetFile` using your file-editing too",
+      "card": null
+    },
+    {
+      "skill_path": "skills/egm-review/SKILL.md",
+      "blob_sha": "cf7adae0473d566687b39617aacac8946d68f28d",
+      "source_url": "https://github.com/google/elephant-goldfish-model/blob/270b10326bf366d823bc76fd662cf83808d5781e/skills/egm-review/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "egm-review",
+        "description": "Orchestrates the EGM Goldfish Review Protocol. Used as part of the EGM process to perform design document reviews. Executes five review phases: Initial Zoom Out Review, Comprehension Review, Design Critique, Intermediate Zoom Out Review, and Implementation Readiness."
+      },
+      "excerpt": "---\nname: egm-review\nlicense: Apache-2.0\ndisable-model-invocation: true\ndescription: >-\n  Orchestrates the EGM Goldfish Review Protocol. Used as part of the EGM\n  process to perform design document reviews. Executes five review phases:\n  Initial Zoom Out Review, Comprehension Review, Design Critique, Intermediate\n  Zoom Out Review, and Implementation Readiness.\n---\n\n# Review, Validation & Automated Remediation\n\nWhen running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md).\nIn Claude Code or Cowork, read `${CLAUDE_PLUGIN_ROOT}/docs/claude.md` first.\n\nReviews and validates a design document through specialized reviewer personas.\n\n## Delegation\n\nA Goldfish runs in a fresh context with no conversation history. Spawn each\nsubagent with your harness's subagent tool (Antigravity: `invoke_subagent`; Claude Code: `Agent`; Codex: `spawn_agent`). Each subagent is defined in `agents/<file>.md`, and its\nfrontmatter `name` (for example `egm-zoom-out`) is the subagent type to request\nwhere your harness registers named subagents. Otherwise spawn a general-purpose\nsubagent and tell it to read that persona file first. Pass the prompt verbatim\nand wait for the report. If your harness cannot nest subagents,\nuse direct dispatch instead of the synthesizer. See `docs/harnesses.md`.\nIf your harness has no subagent tool, stop and tell the user: a review in the same context is not a Goldfish review.\n\n## Execution Constraints (CRITICAL)\n\n1.  **Artifact-First Delivery (MANDATORY)**: You are **STRICTLY FORBIDDEN** from\n    presenting large proposals, drafts, summaries, or plans directly in the chat\n    pane. You **MUST** write them to the working directory (or your harness's\n    artifact directory, if it has one) using your file-writing tool and then\n    tell the user in chat the file path and ask for review. This applies to the\n    Discussion Summary, Design Drafts, and all review reports.\n2.  **Plain-English Standard**: You **MUST** write all concepts briefs,\n    summaries, and communications in simple, direct, jargon-free plain English.\n    Explain technical mechanisms directly. Do not summarize away substance or\n    rely on buzzwords. Do not use ungrounded promotional adjectives (e.g.,\n    *seamless*, *robust*, *blazingly fast*) or decorative adverbs (e.g.,\n    *seamlessly*, *effortlessly*, *literally*, *drastically*, *obviously*).\n3.  **Default to Stress-Testing**: Never agree by default. Your primary\n    directive is to stress-test ideas, strategies, and opinions. Find the\n    weakest points, edge cases, and blind spots before affirming anything.\n4.  **No Glazing**: Eliminate sycophancy. Do not call ideas \"great,\"\n    \"brilliant,\" or \"smart.\" Compliments without substance are noise.\n5.  **Critique First**: Even when an idea is strong, lead with what is wrong,\n    missing, or risky before highlighting its merits.\n6.  **Reject Echo-Chamber Framing**: Never parrot framing back to the user. If a\n    conclusion is asserted, do not validate it reflexively.\n7.  **Generate Counter-Arguments**: For every strategy proposed, actively\n    outline: What is the user not seeing? What is the strongest\n    counter-argument? Is the opposing view justified?\n8.  **Earn Your Agreement**: Only agree when the idea has survived rigorous,\n    objective scrutiny.\n9.  **Banned Adjectives (No Flattery)**: You are strictly prohibited from using\n    validating adjectives like \"brilliant,\" \"great,\" \"smart,\" \"correct,\"\n    \"perfect,\" \"excellent,\" or \"spot-on\" when referring to the user's inputs,\n    corrections, or decisions.\n10. **Banned Apologies**: You MUST NOT output polite apologies (e.g., \"I\n    apologize,\" \"I am sorry,\" \"Forgive me\") when challenged or corrected.\n    Instead, outline the corrected technical logic or trade-offs directly.\n11. **Interaction Invariants**: All interactive gates (structured question tools\n    such as `ask_question`, if your harness has one, or plain chat) MUST contain\n    strictly one question (`len(questions) == 1`), be the sole tool call in the\n    turn, and provide clear, action-oriented options without `(Recommended)`\n    prefixes.\n\n## Inputs\n\n*   **`TargetFile`**: Absolute or relative path to the design document.\n*   **`GoldfishContext`** (Optional): Reading list to establish the system\n    baseline. If omitted, it holds only the linked files that Step 1.3 adds.\n*   **`Step` (Optional)**: Specific pipeline preset or stage to run (e.g.\n    `interactive`, `uninterrupted`, `feature_spec`, `implementation`, or an\n    individual stage `5`, `6`, `7`, `8`, `9`). If omitted, the user is prompted.\n\n## Workflow\n\n### Step 1: Intake & Setup\n\n1.  Verify if `TargetFile` is provided. If missing:\n    *   Explain to the user that the target design document path is required to\n        analyze its structure and discover the semantic split.\n    *   Prompt the user in chat for the path via a regular text message (do NOT\n        use structured question tools such as `ask_question`, as providing an\n        arbitrary file path is an open-ended text input, not a choice between\n        fixed options) and end your turn.\n2.  Once `TargetFile` is provided, verify if `GoldfishContext` is provided (an\n    empty list counts as provided, as does the user explicitly stating in their\n    prompt to proceed with no additional context). If missing:\n    *   Explain to the user that goldfish context (reading list of files) is\n        optional, but can establish baseline knowledge for reviewers.\n    *   Clarify that linked files inside the working directory are added\n        automatically, and that other links and URLs need approval.\n    *   Prompt the user in chat via regular text if they wish to provide\n        additional context files. Do NOT use structured question tools for\n        open-ended file paths.\n3.  **Linked Files (run later)**: Do not run this during intake. Run it once,\n    after the Step 2 preset is chosen and right before the first stage that\n    takes `GoldfishContext` (any stage but Stage 6), in any flow including\n    `uninterrupted`. Read `TargetFile`, skip anchor-only links (`#...`), drop\n    the `#fragment` from other links, and resolve each relative link against\n    the design document's folder. Add each link whose real path (after\n    following symbolic links) stays inside the working directory to\n    `GoldfishContext`, skipping files that do not exist. If any link resolves\n    outside the working directory or is a URL, list those links in chat as\n    regular text, ask which to include, and end your turn; if no one can\n    answer, as in a headless run, leave them all out and keep going. Add only\n    approved ones and tell the user which were left out. Some reviewers cannot\n    open URLs, so save the raw page of each URL in `GoldfishContext` as a new\n    file in the working directory (or your harness's artifact directory) and\n    pass its absolute path instead. If a page cannot be saved, ask the user for\n    a local copy and end your turn; if no one can answer, as in a headless run,\n    leave it out, tell the user, and keep going. Pass\n    `GoldfishContext` to every stage except Stage 6, which reads the document\n    alone; tell any synthesizer to give these files to each reviewer.\n\n### Step 2: Curated Pipeline Preset Selection\n\n1.  **Preset Gate Check**:\n    *   If `Step` parameter was explicitly provided during invocation (e.g.\n        `interactive`, `uninterrupted`, `feature_spec`, `implementation`, or an\n        individual stage `5`, `6`, `7`, `8`, `9`), map to the corresponding\n        preset or subflow and bypass the interactive preset selection gate.\n    *   Otherwise (if `Step` was omitted), you **MUST** present the Curated\n        Pipeline Presets single-select gate to the user (using a structured\n        question tool such as `ask_question` if your harness has one, or plain\n        chat).\n2.  **Modal Invariants & Wire Payload**:\n\n    *   The question payload **MUST** contain strictly one question object\n        (`len(questions) == 1`). Multi-",
+      "card": {
+        "title_zh": "EGM金鱼设计评审",
+        "purpose_zh": "按EGM金鱼评审协议，用独立子代理对设计文档执行五阶段评审：初始缩放、理解、设计批判、中间缩放与实现就绪。",
+        "does": [
+          "校验目标设计文档路径与可选阅读清单上下文",
+          "解析文档语义分界，区分功能规格与实现计划范围",
+          "提供交互式、合并报告、仅功能规格、仅实现计划四种预设",
+          "按预设顺序执行阶段5至9并设交互检查点",
+          "将评审报告等大段内容写入工作目录文件而非聊天窗",
+          "以压力测试、批判优先、禁奉承的规则约束评审输出"
+        ],
+        "inputs": [
+          "TargetFile：设计文档的绝对或相对路径",
+          "GoldfishContext：可选阅读清单，用于建立系统基线",
+          "Step：可选流水线预设或单个阶段（5至9）"
+        ],
+        "outputs": [
+          "写入工作目录的评审报告文件（如 consolidated_review_report.md）",
+          "各阶段评审结果与讨论摘要文件",
+          "聊天中告知文件路径并请求审阅"
+        ],
+        "scenarios": [
+          "评审设计文档的功能规格部分",
+          "评估设计文档的实现就绪程度",
+          "对设计文档做完整五阶段批判性评审",
+          "以合并报告方式一次性完成全部评审"
+        ],
+        "prerequisites": [
+          "宿主需具备子代理工具，否则应停止并告知用户",
+          "运行前需按宿主阅读对应集成文档（如 Codex 或 Claude 文档）",
+          "需提供目标设计文档路径"
+        ],
+        "limits": [
+          "子代理须在全新上下文中运行，无对话历史",
+          "同一上下文内的评审不视为金鱼评审",
+          "禁止在聊天窗直接呈现大段提案、草稿、摘要或计划",
+          "交互门每次只能包含一个问题且为当轮唯一工具调用",
+          "多选清单被禁止以保护阶段间拓扑依赖",
+          "仅当宿主无子代理工具时改用直接派发"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "代码审查",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Orchestrates the EGM Goldfish Review Protocol. Used as part of the EGM process to perform design document reviews."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Executes five review phases: Initial Zoom Out Review, Comprehension Review, Design Critique, Intermediate Zoom Out Review, and Implementation Readiness."
+          },
+          {
+            "field": "does",
+            "quote": "Verify if `TargetFile` is provided."
+          },
+          {
+            "field": "does",
+            "quote": "You **MUST** write them to the working directory (or your harness's artifact directory, if it has one) using your file-writing tool and then tell the user in chat the file path and ask for review."
+          },
+          {
+            "field": "inputs",
+            "quote": "**`TargetFile`**: Absolute or relative path to the design document."
+          },
+          {
+            "field": "inputs",
+            "quote": "**`GoldfishContext`** (Optional): Reading list to establish the system baseline."
+          },
+          {
+            "field": "inputs",
+            "quote": "**`Step` (Optional)**: Specific pipeline preset or stage to run"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If your harness has no subagent tool, stop and tell the user: a review in the same context is not a Goldfish review."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "When running in Codex or ChatGPT Work, first read [Codex integration](../../docs/codex.md)."
+          },
+          {
+            "field": "limits",
+            "quote": "A Goldfish runs in a fresh context with no conversation history."
+          },
+          {
+            "field": "limits",
+            "quote": "You are **STRICTLY FORBIDDEN** from presenting large proposals, drafts, summaries, or plans directly in the chat pane."
+          }
+        ]
+      }
+    }
+  ]
+}

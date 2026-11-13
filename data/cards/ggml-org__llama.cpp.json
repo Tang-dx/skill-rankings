@@ -1,0 +1,382 @@
+{
+  "schema": 1,
+  "repo": "ggml-org/llama.cpp",
+  "tree_sha": "0ad8761d5782d1bda54b405c7ccdd6772fcb4925",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/add-new-model/SKILL.md",
+      "blob_sha": "3e4d178ebeb77dd878d43e8320d3f0a7806cca44",
+      "source_url": "https://github.com/ggml-org/llama.cpp/blob/951d465f5c7c16fb486ff45bb14d99984e68c6db/skills/add-new-model/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "add-new-model",
+        "description": "Guided workflow for adding a new model architecture to llama.cpp. Use when the user wants to add/port a new model architecture."
+      },
+      "excerpt": "---\nname: add-new-model\ndescription: Guided workflow for adding a new model architecture to llama.cpp. Use when the user wants to add/port a new model architecture.\n---\n\n# Add a new model architecture to llama.cpp\n\nThis skill walks a contributor through adding a new model architecture. AI-generated code is permitted in this project, so you may write full implementations for the steps below rather than only pointing at patterns - but follow `AGENTS.md`'s AI usage policy throughout:\n\n- The contributor is 100% responsible for every line, however it was produced. They must be able to explain and defend any part of it to a reviewer. Check in with them as you go (don't silently generate everything and hand over a finished diff) so they actually absorb what was written.\n- Before writing code, make sure the contributor owns the design choices for this architecture (which reference model to follow, how non-standard bits like RoPE variants or MoE routing should be handled) - AI accelerates a design the contributor has already made, it doesn't make the design for them.\n- Disclosure is mandatory: any AI-meaningful contribution must be disclosed per the PR template. Remind the contributor of this before they open the PR.\n- Never write the PR description, commit message, GitHub issue/discussion post, or reviewer replies - those must come from the contributor. If asked to commit on their behalf, use `Assisted-by:` (never `Co-authored-by:`) and only after explicit confirmation.\n- If the requested change looks large or introduces a new pattern not covered here, pause and tell the user this kind of change is likely to need prior discussion with maintainers before a PR.\n- Keep the PR self-contained. If the work would require a lot of unconventional changes outside the new model file(s) (e.g. touching shared graph-building code, the sampler, or core APIs in ways other models don't), STOP and tell the contributor to open a discussion/issue first - invasive or excessive changes get closed without full review.\n- Do not bundle unrelated work into this PR - see Step 4 and Step 5 below for the specifics on multimodal and chat-template/parsing work.\n- Never hack around RoPE with a custom sin/cos implementation. Several past PRs tried this and were closed. If the existing `ggml_rope_ext` (see Step 2's RoPE tips) genuinely cannot express what this model needs, the contributor should open an issue to discuss it with maintainers first - not send a PR with a custom RoPE implementation.\n\nBefore starting, read `CONTRIBUTING.md`, `AGENTS.md` and `docs/development/HOWTO-add-model.md` if they are not already in context. Also run `git log --oneline -- src/models` and look at at least 3 recent PRs that added a model (their merge commits/diffs) - this shows current convention more reliably than the docs, which can lag behind.\n\n## Step 0 - Scope and dedup check\n\nAsk the contributor:\n1. Which model (HF repo id or name)? Is it text-only or does it have a multimodal (vision/audio) encoder?\n2. Do they already have the HF `config.json`/weights available locally?\n3. Have they checked for an existing PR/issue on this model? Suggest `gh search issues \"<model name>\"` and `gh search prs \"<model name>\"` in the `ggml-org/llama.cpp` repo. If an existing PR covers it, the contributor should comment there and collaborate rather than open a duplicate (per CONTRIBUTING.md's AI Usage Policy).\n4. What existing supported architecture is this model closest to (e.g. \"Llama-like with sliding window\", \"MoE like DBRX\", \"BERT-style encoder\")?\n\nIf the contributor doesn't know the closest reference architecture, you may grep `conversion/*.py` and `src/models/*.cpp` for architectures with a similar config shape (layer count, head count, MoE expert count, norm placement) and suggest 1-2 candidates - but let the contributor confirm the choice rather than picking one yourself; this choice is a design decision they need to own.\n\nDo not proceed to Step 1 until the contributor has answered these and named a reference architecture.\n\n## Step 1 - Convert the model to GGUF\n\nFollow HOWTO-add-model.md section 1 for the actual touch points (conversion class registration, `constants.py`, `tensor_mapping.py`, etc.) - don't re-derive them here, read them from the doc.\n\nSkill-specific addition: for each touch point, show the contributor the equivalent code in the reference architecture they named in Step 0 before writing the new version, and check that they understand what's different about their model (e.g. non-standard tensor shapes, extra hparams) rather than just copying the pattern silently.\n\n## Step 2 - Define the architecture in llama.cpp\n\nFollow HOWTO-add-model.md section 2 for the actual touch points (`llm_arch` enum, `LLM_ARCH_NAMES`, hparam loading, RoPE type case, etc.), including its \"Tips and tricks\" section for `ggml_rope_ext` gotchas.\n\nSkill-specific addition: never hack around RoPE with a custom sin/cos implementation - see the RoPE rule above.\n\n## Step 3 - Build the GGML graph\n\nFollow HOWTO-add-model.md section 3 for the actual touch points (`src/models/<name>.cpp` struct, `llama_model_mapping` registration, etc.).\n\nSkill-specific addition: before writing `src/models/<name>.cpp`, read at least 10 other files under `src/models/` (pick a mix, not just the one reference architecture) to confirm the struct layout, naming, and style you're about to write actually matches current convention - the pattern drifts over time and the HOWTO doc can lag behind it.\n\n## Step 4 - Optional: multimodal encoder\n\nOnly do this if the contributor flagged a vision/audio encoder in Step 0. Follow HOWTO-add-model.md section 4 and `docs/multimodal.md` for the actual touch points (`MmprojModel` subclass, `mtmd-model.cpp`, `mtmd-subcontext.cpp`, `mtmd.cpp`, encoder graph in `tools/mtmd/models`, etc.).\n\nSkill-specific addition, and read this carefully: **whether the multimodal encoder can be bundled into the same PR as the base text-model support depends on how conventional the change is.** It's OK to bundle it if the encoder support is conventional - i.e. no new infra or logic is needed, it's just a new cgraph reusing existing preprocessing/projector machinery (e.g. siglip/pixtral/qwen with just a new projector). If it requires anything beyond that - a new preprocessor, non-standard projector logic, or changes to shared `libmtmd` infra/logic - STOP, tell the contributor this is non-conventional, and have them land the text model first with the encoder as a dedicated follow-up PR. Do not let this decision pass silently - call it out explicitly to the contributor before writing any `clip.cpp`/`mtmd.cpp` code.\n\n## Step 5 - Optional: chat template / parsing support\n\nOnly do this if the model needs a new built-in chat template (`src/llama-chat.cpp`) or a new output parser (see `docs/development/parsing.md` and `docs/autoparser.md`). If either is needed beyond what a user-supplied Jinja template already covers, treat it as its own dedicated follow-up PR, not part of the base model-support PR - call this out explicitly to the contributor rather than silently bundling it in.\n\n## Common pitfalls (from past PR reviews)\n\nThese recur often enough in review comments on past add-model PRs that they're worth checking proactively, not just waiting for a reviewer to catch them:\n\n- Don't validate the same hparam/config assumption in both the Python conversion script and the C++ load path - pick one layer to own the check, duplicating it just adds maintenance surface.\n- Optional hparams that are genuinely absent from some configs (e.g. a shared-expert count) should be read with an explicit optional/fallback accessor, not assumed present.\n- Hparams that are actually load-bearing (the model produces wrong output or crashes without them, e.g. `sliding_window_pattern`, norm-eps) must hard-error if missing, not silently fall back to a default.\n- Don't bake a default chat template into the C++ binary - inject it into the GGUF at conversion time instead, since one `llm",
+      "card": {
+        "title_zh": "llama.cpp 新模型架构接入",
+        "purpose_zh": "引导贡献者向 llama.cpp 添加新模型架构，覆盖去重、GGUF 转换、架构定义、GGML 图构建、可选多模态与聊天模板，并强调 AI 使用政策与验证。",
+        "does": [
+          "按步骤引导贡献者完成新模型架构接入流程",
+          "要求先做范围确认与重复 PR/issue 检查",
+          "指导 GGUF 转换、llm_arch 定义与 src/models 图构建",
+          "说明多模态编码器与聊天模板/解析是否应拆分 PR",
+          "列出常见评审陷阱与验证清单（logits、量化、困惑度、多后端）",
+          "强调 AI 生成代码的披露与贡献者责任"
+        ],
+        "inputs": [
+          "模型 HF repo id 或名称",
+          "本地 HF config.json 与权重",
+          "最接近的已支持参考架构",
+          "现有 PR/issue 检索结果",
+          "CONTRIBUTING.md、AGENTS.md、HOWTO-add-model.md 等文档"
+        ],
+        "outputs": [
+          "新模型架构的转换与 C++ 实现改动",
+          "GGUF 转换与验证结果",
+          "符合规范的 PR 拆分建议"
+        ],
+        "scenarios": [
+          "为 llama.cpp 移植新模型架构",
+          "评估多模态编码器是否可并入同一 PR",
+          "排查 add-model PR 的常见评审问题"
+        ],
+        "prerequisites": [
+          "已阅读 CONTRIBUTING.md、AGENTS.md 与 HOWTO-add-model.md",
+          "运行 git log 并查看至少 3 个近期加模型 PR",
+          "贡献者已确定参考架构与设计选择"
+        ],
+        "limits": [
+          "不代替贡献者撰写 PR 描述、提交信息或评审回复",
+          "非常规改动需先与维护者讨论再提 PR",
+          "禁止自定义 sin/cos 绕过 RoPE",
+          "未验证的投机解码脚手架不得随基础 PR 提交",
+          "非 CPU 后端可作为后续 PR"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "后端",
+          "文档",
+          "代码审查",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill walks a contributor through adding a new model architecture."
+          },
+          {
+            "field": "does",
+            "quote": "Follow HOWTO-add-model.md section 1 for the actual touch points (conversion class registration, `constants.py`, `tensor_mapping.py`, etc.)"
+          },
+          {
+            "field": "does",
+            "quote": "Follow HOWTO-add-model.md section 2 for the actual touch points (`llm_arch` enum, `LLM_ARCH_NAMES`, hparam loading, RoPE type case, etc.)"
+          },
+          {
+            "field": "does",
+            "quote": "Follow HOWTO-add-model.md section 3 for the actual touch points (`src/models/<name>.cpp` struct, `llama_model_mapping` registration, etc.)."
+          },
+          {
+            "field": "does",
+            "quote": "Only do this if the contributor flagged a vision/audio encoder in Step 0."
+          },
+          {
+            "field": "does",
+            "quote": "Only do this if the model needs a new built-in chat template (`src/llama-chat.cpp`) or a new output parser"
+          },
+          {
+            "field": "does",
+            "quote": "These recur often enough in review comments on past add-model PRs that they're worth checking proactively"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before starting, read `CONTRIBUTING.md`, `AGENTS.md` and `docs/development/HOWTO-add-model.md` if they are not already in context."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Also run `git log --oneline -- src/models` and look at at least 3 recent PRs that added a model"
+          },
+          {
+            "field": "limits",
+            "quote": "Never write the PR description, commit message, GitHub issue/discussion post, or reviewer replies - those must come from the contributor."
+          },
+          {
+            "field": "limits",
+            "quote": "Never hack around RoPE with a custom sin/cos implementation."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Suggest `gh search issues \"<model name>\"` and `gh search prs \"<model name>\"` in the `ggml-org/llama.cpp` repo."
+          },
+          {
+            "field": "hosts",
+            "quote": "description: Guided workflow for adding a new model architecture to llama.cpp."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/code-review/SKILL.md",
+      "blob_sha": "d72b46712cb9f9ef8c1d15e7afecb97803e26eb3",
+      "source_url": "https://github.com/ggml-org/llama.cpp/blob/951d465f5c7c16fb486ff45bb14d99984e68c6db/skills/code-review/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "code-review",
+        "description": "Review llama.cpp changes against project conventions and common reviewer pitfalls before a PR. Use when the user wants to review a diff, branch, or PR."
+      },
+      "excerpt": "---\nname: code-review\ndescription: Review llama.cpp changes against project conventions and common reviewer pitfalls before a PR. Use when the user wants to review a diff, branch, or PR.\n---\n\n# Review llama.cpp changes\n\nThis skill reviews changes against llama.cpp's conventions and the pitfalls that reviewers flag most often, so the contributor can fix them before a maintainer has to. It has two modes:\n\n- **Self-review (default):** review the contributor's own local changes (uncommitted work, or a branch vs `master`) as a pre-PR pass. Ask which if it's ambiguous; default to `git diff master...HEAD` plus any uncommitted changes.\n- **Read-only review of a PR/file:** if the user points at a PR number or specific files (including code they didn't write), review those and report findings.\n\nIn both modes the output is **private review notes for the user to read and act on** - it is never something to post. This is a hard rule from `AGENTS.md`: an agent must NEVER write, or help write, a PR comment, a review comment, or a reply to a reviewer, by any means including `gh`. Do not offer to. If the user asks you to post the notes, refuse and point them at that rule. Present findings in the conversation only.\n\nBefore starting, read `AGENTS.md` and `CONTRIBUTING.md` if not already in context - the \"Coding guidelines\", \"Naming guidelines\", and AI usage sections are the baseline this review enforces. For a diff that adds a new model architecture, also read `docs/development/HOWTO-add-model.md` and consider the dedicated `add-new-model` skill.\n\n## Step 0 - Scope the diff and pick the checklists\n\nIdentify what actually changed and which area checklists below apply. Run `git diff --stat` (or `gh pr view <n> --json files` for PR mode) and bucket the touched paths:\n\n- `conversion/`, `gguf-py/`, `src/models/`, `src/llama-arch.*` -> **New model / architecture**\n- `ggml/` (any backend, op, or `ggml.h`) -> **ggml / backend**\n- `include/llama.h` and other public headers -> **Public API**\n- `tools/server/` -> **Server**\n- `tools/ui/` (or the legacy `tools/server/webui/`) -> **WebUI**\n- `tests/`, `tools/server/tests/`, or any other added/changed test -> **Tests**\n- anything else, plus all of the above -> **General** (always runs)\n\nAlways run the **Scope and quick-reject gate**, the **Security review**, and the **General** checklist. Run each area checklist whose paths were touched. Additionally, if the diff introduces a new component, subsystem, or piece of infrastructure (a new file/class/module, a new abstraction, or hand-rolled machinery), run the **Approach and design** review. Tell the user which checklists you're running and why.\n\n## Scope and quick-reject gate (always)\n\nThese are the patterns that get PRs closed without a full review. Check them first - a finding here is more important than any code nit, because it can mean the change shouldn't be a PR in its current form at all.\n\n- Is there a prior issue/discussion for this? Features are supposed to start as an issue, not a PR (`CONTRIBUTING.md`). If this is a nontrivial feature with no linked issue, flag it and suggest opening one first.\n- Is it a duplicate of existing/in-flight work? Suggest `gh search prs` / `gh search issues` for the feature. Many closed PRs were duplicates of something already queued.\n- Is it self-contained and single-purpose? Multiple unrelated changes/optimizations bundled together get sent back to be split. Flag unrelated changes and suggest separate PRs.\n- Does it touch multiple ggml backends at once? Initial support should be CPU-only, other backends as follow-ups (`CONTRIBUTING.md`). Flag CUDA/Metal/Vulkan/etc. changes bundled into a feature's first PR.\n- Does it add a new `ggml_type` / quantization type? That carries a disproportionate maintenance burden and needs the full justification package (GGUF sample upload, perplexity vs FP16/BF16 and similar sizes, KL-divergence data, CPU perf numbers). Absent that, it will be rejected regardless of code quality.\n- Is it invasive - new subsystem, core-API reshaping, changes to shared graph/sampler code that other models don't need? Flag it and suggest a discussion with maintainers before investing further.\n- Does it add a model-specific CLI argument to any binary (`common/arg.cpp`, tools, examples) or conversion script (`convert_*.py`)? Not allowed - model-specific behavior must come from GGUF metadata or be detected automatically, not from a per-model flag.\n- Is it niche/vendor-specific in a way that adds a maintenance burden nobody will own long-term? Flag the maintenance-ownership question.\n- Is the change semantically correct, or a plausible-looking \"fix\" that misunderstands the code? Sanity-check the actual behavior, not just that it compiles.\n- AI-disclosure: if AI meaningfully contributed, is the PR template's disclosure section filled in? Remind the user. Never suggest writing the PR description or commit message for them.\n\n## Security review (mandatory)\n\nMandatory on every review; any finding here is **blocking**. Rule of thumb: GGUF metadata, tensor shapes, tokenizer/grammar input, and all server/RPC fields are attacker-controlled - bound them before use.\n\n- **Sizes/counts from tensor dims:** validate before allocating. Products like `ne[i]*nb[i]`/nbytes can overflow on crafted dims into an undersized alloc then heap overflow. Overflow checks must run BEFORE the arithmetic they guard - padding/alignment macros wrap to 0 near `SIZE_MAX`, so a guard after the pad passes.\n- **GGUF strings/arrays:** cap declared lengths and element counts before using them to size a loop or buffer; validate element type and length before casting an array to a pointer or reading fixed indices (`[i+1]`, `[0..2]`).\n- **Element-type confusion:** casting `gguf_get_arr_data()` or `tensor->data` to `float *`/`int32_t *` needs an element-type check first (`gguf_get_kv_type() == GGUF_TYPE_ARRAY` then `gguf_get_arr_type()`; `type == GGML_TYPE_F32` for tensors). A `UINT8` array or `I8` tensor passes every length check, then gets read 4 bytes per element - a nearby length check is not a type check.\n- **Loaders:** `GGML_ASSERT` on a file-derived value aborts the process; throw instead where the caller already catches (vocab, model loader, clip).\n- **File-supplied counts indexing fixed arrays:** bound any count (e.g. layer/block count into a `LLAMA_MAX_*` array) before indexing; watch checks that only fire when an optional key is present.\n- **Declared vs actual array length:** check the declared length of a GGUF array against the count actually read, not just against a buffer size.\n- **Bounds comparisons:** flag narrowing casts (`size_t`->`int32_t`) and signed/unsigned mixing that can bypass a length check and copy past a buffer.\n- **Parsed/derived indices:** range-check `stoi`/`atoi` results and catch parse throws; never use a default or derived token id (EOS/BOS/...) as an index without a bounds check.\n- **Reused/reserved buffers:** recheck bounds after a buffer is shrunk or reused; watch `reserve()` then index-by-assumed-size, and header fields read before their length is checked.\n- **Server JSON ints:** clamp client-supplied integers (token/discard counts, offsets) to non-negative and an upper bound before they reach index/pointer arithmetic.\n- **RPC-deserialized fields:** treat every field (type/buffer/data/ne/nb/op_params) as hostile - validate before use. Null/zero buffers skipping validation, attacker data pointers, out-of-range type indices, and negative strides sign-extending past a corner-only assert all give arbitrary read/write.\n- **Recursion on untrusted input:** a function that recurses once per level (or per char) of request JSON, model output, a grammar, a template or a regex pattern overflows the stack - the HTTP threads have 512 KB on macOS, so a few hundred levels are enough. Every such function needs its own depth bound, checked in the function itself, not a pre-walk at a caller (the next caller skips it): libcommon uses `COMMON_RECURSIVE_LIMIT` (`co",
+      "card": {
+        "title_zh": "llama.cpp 代码审查",
+        "purpose_zh": "在提交 PR 前，按 llama.cpp 项目规范与常见审查陷阱审查本地改动、分支或指定 PR/文件，输出仅供用户自己阅读处理的私有审查笔记。",
+        "does": [
+          "区分自审模式（未提交改动或分支对比 master）与只读审查 PR/文件模式",
+          "按改动路径选择新模型、ggml/后端、公共 API、Server、WebUI、测试等检查清单",
+          "始终执行范围与快速拒绝门禁、安全审查和通用检查清单",
+          "对新增组件或基础设施额外做方案与设计审查",
+          "检查 GGUF 元数据、张量维度、RPC 字段等攻击者可控输入的安全问题",
+          "在对话中呈现发现，拒绝代写或发布 PR 评论、审查评论及回复"
+        ],
+        "inputs": [
+          "用户指向的 diff、分支、PR 编号或具体文件",
+          "仓库中的 AGENTS.md 与 CONTRIBUTING.md",
+          "新增模型架构时参考 docs/development/HOWTO-add-model.md"
+        ],
+        "outputs": [
+          "对话中呈现的私有审查笔记与发现",
+          "所运行检查清单及其原因说明"
+        ],
+        "scenarios": [
+          "贡献者在提交 PR 前自查本地未提交改动",
+          "审查分支相对 master 的差异",
+          "只读审查指定 PR 编号或文件（包括他人代码）",
+          "审查新增模型架构或后端改动",
+          "审查涉及安全敏感解析与内存处理的改动"
+        ],
+        "prerequisites": [
+          "已阅读 AGENTS.md 与 CONTRIBUTING.md 中的编码、命名与 AI 使用规范",
+          "PR 模式下可获取 PR 文件列表（如 gh pr view）",
+          "新增模型架构时阅读 HOWTO-add-model.md"
+        ],
+        "limits": [
+          "输出仅为私有审查笔记，绝不发布或代写 PR 评论、审查评论及回复",
+          "不得建议代写 PR 描述或提交信息",
+          "禁止为模型添加模型专属 CLI 参数",
+          "新增 ggml_type/量化类型需完整论证材料，否则会被拒绝",
+          "初始后端支持应仅 CPU，其他后端作为后续工作"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "代码审查",
+          "安全",
+          "后端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill reviews changes against llama.cpp's conventions and the pitfalls that reviewers flag most often, so the contributor can fix them before a maintainer has to."
+          },
+          {
+            "field": "does",
+            "quote": "**Self-review (default):** review the contributor's own local changes (uncommitted work, or a branch vs `master`) as a pre-PR pass."
+          },
+          {
+            "field": "does",
+            "quote": "**Read-only review of a PR/file:** if the user points at a PR number or specific files (including code they didn't write), review those and report findings."
+          },
+          {
+            "field": "does",
+            "quote": "Always run the **Scope and quick-reject gate**, the **Security review**, and the **General** checklist."
+          },
+          {
+            "field": "does",
+            "quote": "if the diff introduces a new component, subsystem, or piece of infrastructure (a new file/class/module, a new abstraction, or hand-rolled machinery), run the **Approach and design** review."
+          },
+          {
+            "field": "does",
+            "quote": "Mandatory on every review; any finding here is **blocking**."
+          },
+          {
+            "field": "does",
+            "quote": "Present findings in the conversation only."
+          },
+          {
+            "field": "outputs",
+            "quote": "In both modes the output is **private review notes for the user to read and act on** - it is never something to post."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before starting, read `AGENTS.md` and `CONTRIBUTING.md` if not already in context"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "For a diff that adds a new model architecture, also read `docs/development/HOWTO-add-model.md`"
+          },
+          {
+            "field": "limits",
+            "quote": "an agent must NEVER write, or help write, a PR comment, a review comment, or a reply to a reviewer, by any means including `gh`."
+          },
+          {
+            "field": "limits",
+            "quote": "Never suggest writing the PR description or commit message for them."
+          },
+          {
+            "field": "limits",
+            "quote": "Does it add a model-specific CLI argument to any binary (`common/arg.cpp`, tools, examples) or conversion script (`convert_*.py`)? Not allowed"
+          },
+          {
+            "field": "limits",
+            "quote": "Does it add a new `ggml_type` / quantization type? That carries a disproportionate maintenance burden and needs the full justification package"
+          },
+          {
+            "field": "limits",
+            "quote": "Initial support should be CPU-only, other backends as follow-ups (`CONTRIBUTING.md`)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run `git diff --stat` (or `gh pr view <n> --json files` for PR mode)"
+          },
+          {
+            "field": "hosts",
+            "quote": "---\nname: code-review\ndescription: Review llama.cpp changes against project conventions and common reviewer pitfalls before a PR."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/slice-model/SKILL.md",
+      "blob_sha": "f19564f90bd3a45da2ec475a272e7de2cdd20edd",
+      "source_url": "https://github.com/ggml-org/llama.cpp/blob/951d465f5c7c16fb486ff45bb14d99984e68c6db/skills/slice-model/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "slice-model",
+        "description": "Build a small test \"slice\" of a HF model (fewer layers/experts) by downloading only the needed tensors via HTTP range requests. Use when the user needs a small version of a big model to test conversion or inference."
+      },
+      "excerpt": "---\nname: slice-model\ndescription: Build a small test \"slice\" of a HF model (fewer layers/experts) by downloading only the needed tensors via HTTP range requests. Use when the user needs a small version of a big model to test conversion or inference.\n---\n\n# Slice a HF model for testing\n\n[slice_model.py](slice_model.py) is a **reference** implementation. Read it first: its docstring and `--help` explain how it works and what it does. Its heuristics only cover common layouts, and new models often have tensor names, shapes or config keys it does not handle. Do not run it blindly. If the model needs special handling, copy it to `tmp/slice_<model>.py` and adapt the copy, or write a new script with the same approach.\n\n## Steps\n\n1. Ask the user for the repo, what the slice must exercise (e.g. a MoE layer, each layer type of a hybrid model, MTP, the vision encoder), the size budget and the output dir.\n2. Inspect the model: run the script with `--inspect`, read `config.json`, and read the HF modeling code if anything is unclear. Check the plan against the pitfalls below.\n3. Build the slice, then read the config patches in the log and check each one.\n4. Verify: load the slice in transformers (no missing/unexpected weight warnings, no NaN logits), then convert it with `convert_hf_to_gguf.py` and run it. For numerical checks, see `examples/model-conversion/`.\n\n## Pitfalls\n\n- Layer counts in nested or unknown config keys, or several towers with the same layer count.\n- Hybrid layer patterns (`layer_types`, `full_attention_interval`, ...): keep at least one layer of each type, and check the patched config still matches the kept layers.\n- Dense leading layers (`first_k_dense_replace`) and MTP/nextn layers numbered after the regular layers.\n- Every per-expert tensor must be sliced to the same expert count: experts, router weight and biases. Tensors with the expert dim not at dim 0 are not contiguous.\n- Routing constraints: top-k, expert groups, shared experts, zero-compute experts.\n- Quantized weights (FP8, MXFP4): slice the scale tensors in the same way as their weight.\n- Sizes derived in modeling code instead of stored in the config: follow the exact formula if you shrink them.\n- Slicing the vocab without the tokenizer breaks conversion.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/update-fusion-table/SKILL.md",
+      "blob_sha": "4d545418db7e31968a77ba64d6e578c15048e29f",
+      "source_url": "https://github.com/ggml-org/llama.cpp/blob/951d465f5c7c16fb486ff45bb14d99984e68c6db/skills/update-fusion-table/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "update-fusion-table",
+        "description": "Regenerate a per-device test-fusion baseline (tests/fusion/MTL.csv, ...) after fusion patterns or the dummy-model set change. Use when test-fusion --check fails."
+      },
+      "excerpt": "---\nname: update-fusion-table\ndescription: Regenerate a per-device test-fusion baseline (tests/fusion/MTL.csv, ...) after fusion patterns or the dummy-model set change. Use when test-fusion --check fails.\n---\n\n# Update a fusion baseline\n\n`tests/fusion/<BACKEND>.csv` is the `test-fusion` golden baseline: `arch,moe,mode,label,count`,\nwhere `count` is how many times a fusion label matched per graph run. See `tests/fusion/README.md`.\n\nRe-record only when the counts moved for the reason the contributor intended. A row failing on\n`nmse_fus` (> 1e-4) is a fused-vs-unfused correctness bug, not baseline drift - fix it, never\nrecord it away.\n\n## Steps\n\n```sh\ncmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_METAL=ON       # enable the target backend\ncmake --build build --config Release --target test-llama-archs --target test-fusion -j\n\nrm -rf build-ci-models && mkdir -p build-ci-models              # always regenerate\n./build/bin/test-llama-archs -o build-ci-models\n\nD=MTL0; B=tests/fusion/MTL.csv; T=/tmp/$(basename $B)   # keep the target backend/device in sync\n./build/bin/test-fusion --models build-ci-models --device $D --check $B   # read the FAIL rows\n./build/bin/test-fusion --models build-ci-models --device $D --record $T\ndiff $B $T\ncp $T $B\n./build/bin/test-fusion --models build-ci-models --device $D --check $B   # 0 failed, exit 0\n```\n\n- Read the diff before applying it. Every added, removed or changed row must be explainable by the\n  change under review; an unexplained row means the run picked up something unintended.\n- `expected 0` in a FAIL row = no baseline row for that label (new arch, or a fusion newly\n  firing); non-zero `expected` = count changed; `fusion ... is no longer matched` = row stopped\n  firing.\n- `--record` rewrites the whole file, so never record a partial run (`--model FILE`, a filtered\n  models dir) - it drops the rows of every architecture that was not run.\n- `--record` marks every row `ok`; only the `--check` run validates.\n",
+      "card": null
+    },
+    {
+      "skill_path": "tools/ui/src/lib/components/app/SKILL.md",
+      "blob_sha": "7453954abb18f7fb098d9001cc25e0c97e0979c6",
+      "source_url": "https://github.com/ggml-org/llama.cpp/blob/951d465f5c7c16fb486ff45bb14d99984e68c6db/tools/ui/src/lib/components/app/SKILL.md",
+      "fetched_at": "2026-11-13T10:52:31.151Z",
+      "generated_at": "2026-11-13T10:52:31.151Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "app",
+        "description": "Opinionated app components building on top of ./ui primitives"
+      },
+      "excerpt": "---\nname: app\ndescription: Opinionated app components building on top of ./ui primitives\n---\n\n- Can include business logic and state management\n- Can include data fetching and caching logic\n- Should use original spelling for HTML-native events and `camelCase` for custom events\n- Props and markup attributes should be listed alphabetically\n- Use JS Objects and Arrays for CSS classes and styles when they are dynamic\n- Whenever there can be repetition in the component's markup, if it's too small to be decoupled as a separate component — use Svelte 5's `{#snippet}` + `{@render}`\n",
+      "card": {
+        "title_zh": "应用组件规范",
+        "purpose_zh": "为基于 ./ui 基础组件构建的应用组件提供有倾向性的编写约定，涵盖业务逻辑、状态管理、数据获取与缓存、事件命名、属性排序、动态样式及 Svelte 5 片段复用。",
+        "does": [
+          "规定应用组件可包含业务逻辑与状态管理",
+          "规定应用组件可包含数据获取与缓存逻辑",
+          "要求 HTML 原生事件保留原始拼写、自定义事件用 camelCase",
+          "要求 props 与标记属性按字母顺序排列",
+          "要求动态 CSS 类与样式使用 JS 对象和数组",
+          "标记重复过多且不宜拆分时使用 Svelte 5 的 {#snippet} 与 {@render}"
+        ],
+        "inputs": [],
+        "outputs": [],
+        "scenarios": [
+          "编写基于 ./ui 基础组件的应用层组件",
+          "为组件添加业务逻辑或状态管理",
+          "为组件添加数据获取与缓存",
+          "定义组件事件命名与属性排列",
+          "在组件标记中处理重复片段复用"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "仅为编写约定，未给出具体实现步骤或示例代码",
+          "未说明适用范围之外的框架或平台"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "前端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Opinionated app components building on top of ./ui primitives"
+          },
+          {
+            "field": "does",
+            "quote": "Can include business logic and state management"
+          },
+          {
+            "field": "does",
+            "quote": "Can include data fetching and caching logic"
+          },
+          {
+            "field": "does",
+            "quote": "Should use original spelling for HTML-native events and `camelCase` for custom events"
+          },
+          {
+            "field": "does",
+            "quote": "Props and markup attributes should be listed alphabetically"
+          },
+          {
+            "field": "does",
+            "quote": "Use JS Objects and Arrays for CSS classes and styles when they are dynamic"
+          },
+          {
+            "field": "does",
+            "quote": "use Svelte 5's `{#snippet}` + `{@render}`"
+          }
+        ]
+      }
+    }
+  ]
+}
