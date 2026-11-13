@@ -284,7 +284,7 @@ class BackfillDeferred extends Error {}
 export async function buildSkillCards(output, options = {}) {
   const {
     token = process.env.GITHUB_TOKEN, model = process.env.SUMMARY_MODEL || 'deepseek-flash',
-    now = new Date().toISOString(), request = github, generate, budgetMs = 360000,
+    now = new Date().toISOString(), request = github, generate, budgetMs = 360000, pendingOnly = false,
   } = options;
   const signal = AbortSignal.timeout(budgetMs);
   let rateLimited = false;
@@ -333,10 +333,16 @@ export async function buildSkillCards(output, options = {}) {
   const resumeFile = previous.resume_from == null ? '' : repoFile(previous.resume_from);
   const start = Math.max(0, repos.findIndex(([file]) => file === resumeFile));
   const rotated = [...repos.slice(start), ...repos.slice(0, start)];
-  const work = [
-    ...rotated.filter(([file]) => pendingBefore.has(file)),
-    ...rotated.filter(([file]) => !pendingBefore.has(file)),
-  ];
+  const pending = rotated.filter(([file]) => pendingBefore.has(file));
+  const remaining = rotated.filter(([file]) => !pendingBefore.has(file));
+  // A manual continuation drains the published queue before rechecking completed repos.
+  const continuing = pendingOnly && pendingBefore.size > 0;
+  const work = continuing ? pending : [...pending, ...remaining];
+  if (continuing) {
+    const workFiles = new Set(work.map(([file]) => file));
+    index.repos.push(...previous.repos.filter(row => !workFiles.has(row.file)));
+    index.failures.push(...previous.failures.filter(item => !workFiles.has(repoFile(item.repo))));
+  }
   const failure = (repo, path, stage) => {
     index.failures.push({ repo, path, stage, error: messages[stage] });
     return messages[stage];
@@ -453,6 +459,8 @@ export async function buildSkillCards(output, options = {}) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const index = await buildSkillCards(resolve(process.argv[2] ?? 'data'));
+  const index = await buildSkillCards(resolve(process.argv[2] ?? 'data'), {
+    pendingOnly: process.argv.includes('--pending-only'),
+  });
   console.log(JSON.stringify({ repositories: index.repos.length, pending: index.pending, failures: index.failures.length }));
 }

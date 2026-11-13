@@ -264,3 +264,35 @@ test('shared GitHub client distinguishes quota headers from ordinary forbidden r
     await assert.rejects(github('/repos/owner/a', ''), GitHubRateLimitError);
   }
 });
+
+test('cards-only backfill resumes pending repositories without scanning completed ones', async t => {
+  const repositories = {
+    'owner/a': [entry('SKILL.md')],
+    'owner/b': [entry('SKILL.md', SOURCE + '\nNeeds backfill.')],
+    'owner/c': [entry('SKILL.md', SOURCE + '\nAlso needs backfill.')],
+  };
+  const root = await setup(t, repositories);
+  const get = fakeGithub(repositories);
+  const generate = async () => card();
+  const first = await buildSkillCards(root, {
+    now: NOW,
+    request: path => path.startsWith('/repos/owner/b')
+      ? Promise.reject(new GitHubRateLimitError(403))
+      : get(path),
+    generate,
+  });
+  assert.equal(first.pending, 2);
+  const requests = [];
+  const finished = await buildSkillCards(root, {
+    now: LATER,
+    pendingOnly: true,
+    request: async path => { requests.push(path); return get(path); },
+    generate,
+  });
+  assert.equal(finished.pending, 0);
+  assert.deepEqual(finished.repos.map(row => row.repo), ['owner/a', 'owner/b', 'owner/c']);
+  assert.equal(finished.repos[0].updated_at, NOW);
+  assert(!requests.some(path => path.startsWith('/repos/owner/a')));
+  assert(requests.some(path => path.startsWith('/repos/owner/b')));
+  await verifyCardPublication(root);
+});
