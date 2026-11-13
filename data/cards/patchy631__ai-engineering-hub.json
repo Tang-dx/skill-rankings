@@ -1,0 +1,794 @@
+{
+  "schema": 1,
+  "repo": "patchy631/ai-engineering-hub",
+  "tree_sha": "2e2fe660b0f70042af15cb38f55cc7b471e091ab",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "grpo-finetuning-qwen3/agent-skill/grpo-finetune/SKILL.md",
+      "blob_sha": "2a8f6d242f5a010e17fb12dd99cd6dee0fb2be51",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/grpo-finetuning-qwen3/agent-skill/grpo-finetune/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "grpo-finetune",
+        "description": "Fine-tune a model with GRPO on Fireworks-managed GPUs from a plain-English task description and a dataset. Use this skill whenever the user wants to fine-tune, RL-tune, or GRPO-train a model on their own data — or says things like \"train a model to extract/classify/score X\", \"fine-tune on this dataset\", \"set up a GRPO run\", or describes a task plus a dataset plus a notion of what a good output looks like. Trigger even when the user does not name GRPO or Fireworks explicitly."
+      },
+      "excerpt": "---\nname: grpo-finetune\ndescription: >\n  Fine-tune a model with GRPO on Fireworks-managed GPUs from a plain-English\n  task description and a dataset. Use this skill whenever the user wants to\n  fine-tune, RL-tune, or GRPO-train a model on their own data — or says things\n  like \"train a model to extract/classify/score X\", \"fine-tune on this dataset\",\n  \"set up a GRPO run\", or describes a task plus a dataset plus a notion of what\n  a good output looks like. Trigger even when the user does not name GRPO or\n  Fireworks explicitly.\n---\n\n# GRPO Fine-Tune Skill\n\nKeys (`FIREWORKS_API_KEY`, `FIREWORKS_ACCOUNT_ID`, `OPENROUTER_API_KEY`) are\nloaded from `.env` in the current directory. No extra setup needed if the\nnotebook already ran.\n\n## What you do when this skill triggers\n\n### 1. Understand the task\nRead the user's description. Sample 3-5 rows from their dataset (`head` the\n`.jsonl`) to see the prompt format and whether rows carry a gold answer field.\n\n### 2. Write reward.py\n\nUse this exact reward — schema-only, same as the notebook. Do not add value\nmatching, ground_truth comparison, or field-level scoring. Do not modify it.\n\n```python\nimport json\nfrom jsonschema import validate, ValidationError\n\nSCHEMA = {\n    \"type\": \"object\",\n    \"required\": [\"vendor\", \"date\", \"amount\", \"currency\"],\n    \"properties\": {\n        \"vendor\":   {\"type\": \"string\"},\n        \"date\":     {\"type\": \"string\"},\n        \"amount\":   {\"type\": \"number\"},\n        \"currency\": {\"type\": \"string\"},\n    },\n    \"additionalProperties\": False,\n}\n\ndef score(completion: str, row=None) -> float:\n    try:\n        parsed = json.loads(completion.strip())\n    except (json.JSONDecodeError, ValueError):\n        return 0.0\n    try:\n        validate(instance=parsed, schema=SCHEMA)\n        return 1.0\n    except ValidationError:\n        return 0.5\n\nSELF_TESTS = [\n    ('{\"vendor\": \"Acme\", \"date\": \"2024-01-15\", \"amount\": 1250.0, \"currency\": \"USD\"}', None, 1.0),\n    ('{\"vendor\": \"Acme\", \"date\": \"2024-01-15\"}', None, 0.5),\n    (\"not json\", None, 0.0),\n]\n```\n\nThe score contract is: 1.0 = valid JSON with correct schema, 0.5 = valid JSON\nwrong shape, 0.0 = not JSON. This is the only reward logic needed.\n\n### 3. Show it and offer the edit\nShow the user `reward.py` and say: this is what training will optimize for —\nedit it if your notion of \"good\" differs. Wait for their go-ahead.\n\n### 4. Validate\n```bash\n$PYTHON agent-skill/grpo-finetune/generate_reward.py --validate reward.py\n```\nMust print `PASS` before proceeding.\n\n### 5. Run the pipeline\n```bash\n$PYTHON agent-skill/grpo-finetune/run_pipeline.py \\\n    --train <path-to-train.jsonl> \\\n    --eval  <path-to-eval.jsonl> \\\n    --task  <short-task-name> \\\n    --output-id <model-id>\n```\n\nRun this in the background immediately. Relay each checkpoint to the user as it\nlands — print it directly in your response, do not wait to batch them:\n\n- `>>> Dataset ready  ·  200 prompts`\n- `>>> Training started on Fireworks GPUs`\n- `>>> Training complete  ·  model deployed to ...`\n- `>>> Fine-tuned model  ·  X% accuracy`\n\nThe pipeline automatically runs the agent demo on sample invoices at the end.\n\n**Important:** training takes 30-60+ minutes. Use a timeout of at least 7200\nseconds. Do not use the default 10 minute timeout.\n",
+      "card": {
+        "title_zh": "GRPO微调技能",
+        "purpose_zh": "根据纯英文任务描述和数据集，在Fireworks托管的GPU上用GRPO微调模型，并生成、校验奖励函数、运行训练流水线、汇报检查点。",
+        "does": [
+          "读取用户任务描述，用head查看.jsonl数据集3-5行，了解提示格式与是否存在标准答案字段",
+          "按固定模板编写reward.py，仅做JSON schema校验评分，不比对标准答案",
+          "向用户展示reward.py并说明训练优化目标，等待用户确认",
+          "用generate_reward.py --validate校验reward.py，须输出PASS",
+          "后台运行run_pipeline.py，传入训练集、评估集、任务名和模型ID",
+          "逐条向用户转述数据集就绪、训练开始、训练完成、准确率等检查点"
+        ],
+        "inputs": [
+          "纯英文任务描述",
+          "训练集jsonl路径",
+          "评估集jsonl路径",
+          "简短任务名",
+          "模型ID",
+          "当前目录.env中的FIREWORKS_API_KEY、FIREWORKS_ACCOUNT_ID、OPENROUTER_API_KEY"
+        ],
+        "outputs": [
+          "reward.py奖励函数文件",
+          "校验输出PASS",
+          "Fireworks GPU上的GRPO训练运行",
+          "部署后的微调模型",
+          "准确率等检查点信息",
+          "流水线末尾对样例发票运行的agent演示"
+        ],
+        "scenarios": [
+          "用户想用自己的数据微调或RL微调模型",
+          "用户要求搭建GRPO训练",
+          "用户描述抽取、分类、打分任务并提供数据集和好输出标准",
+          "用户未明确提及GRPO或Fireworks但表达了微调意图"
+        ],
+        "prerequisites": [
+          "当前目录.env中已配置FIREWORKS_API_KEY、FIREWORKS_ACCOUNT_ID、OPENROUTER_API_KEY",
+          "notebook已运行过，无需额外设置",
+          "数据集为jsonl格式",
+          "reward.py校验须先输出PASS"
+        ],
+        "limits": [
+          "奖励逻辑固定为schema-only，禁止加入值匹配、标准答案比对或字段级评分，且不得修改",
+          "训练耗时30-60分钟以上，超时须至少设为7200秒，不能用默认10分钟",
+          "reward.py校验未输出PASS不得继续",
+          "原文未说明模型规模、数据集大小上限或费用"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "自动化",
+          "后端",
+          "数据分析"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Fine-tune a model with GRPO on Fireworks-managed GPUs from a plain-English task description and a dataset."
+          },
+          {
+            "field": "does",
+            "quote": "Sample 3-5 rows from their dataset (`head` the `.jsonl`) to see the prompt format and whether rows carry a gold answer field."
+          },
+          {
+            "field": "does",
+            "quote": "Use this exact reward — schema-only, same as the notebook. Do not add value matching, ground_truth comparison, or field-level scoring. Do not modify it."
+          },
+          {
+            "field": "does",
+            "quote": "Show the user `reward.py` and say: this is what training will optimize for — edit it if your notion of \"good\" differs. Wait for their go-ahead."
+          },
+          {
+            "field": "does",
+            "quote": "$PYTHON agent-skill/grpo-finetune/generate_reward.py --validate reward.py"
+          },
+          {
+            "field": "does",
+            "quote": "Run this in the background immediately. Relay each checkpoint to the user as it lands"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Keys (`FIREWORKS_API_KEY`, `FIREWORKS_ACCOUNT_ID`, `OPENROUTER_API_KEY`) are loaded from `.env` in the current directory. No extra setup needed if the notebook already ran."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Must print `PASS` before proceeding."
+          },
+          {
+            "field": "limits",
+            "quote": "training takes 30-60+ minutes. Use a timeout of at least 7200 seconds. Do not use the default 10 minute timeout."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not add value matching, ground_truth comparison, or field-level scoring. Do not modify it."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "$PYTHON agent-skill/grpo-finetune/run_pipeline.py \\\n    --train <path-to-train.jsonl> \\\n    --eval  <path-to-eval.jsonl> \\\n    --task  <short-task-name> \\\n    --output-id <model-id>"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Keys (`FIREWORKS_API_KEY`, `FIREWORKS_ACCOUNT_ID`, `OPENROUTER_API_KEY`) are loaded from `.env` in the current directory."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Training started on Fireworks GPUs"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/brightdata-web-mcp/SKILL.md",
+      "blob_sha": "4964a76518144784acb4003c4d1e1d5d6913eb67",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/brightdata-web-mcp/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "brightdata-web-mcp",
+        "description": "Search the web, scrape websites, extract structured data from URLs, and automate browsers using Bright Data's Web MCP. Use when fetching live web content, bypassing blocks/CAPTCHAs, getting product data from Amazon/eBay, social media posts, or when standard requests fail."
+      },
+      "excerpt": "---\r\nname: brightdata-web-mcp\r\ndescription: Search the web, scrape websites, extract structured data from URLs, and automate browsers using Bright Data's Web MCP. Use when fetching live web content, bypassing blocks/CAPTCHAs, getting product data from Amazon/eBay, social media posts, or when standard requests fail.\r\n---\r\n\r\n# Bright Data Web MCP\r\n\r\nUse this skill for **reliable web access** in MCP-compatible agents. Handles anti-bot measures, CAPTCHAs, and dynamic content automatically.\r\n\r\n## Quick Start\r\n\r\n### Search the web\r\n\r\n```\r\nTool: search_engine\r\nInput: { \"query\": \"latest AI news\", \"engine\": \"google\" }\r\n```\r\n\r\nReturns JSON for Google, Markdown for Bing/Yandex. Use `cursor` parameter for pagination.\r\n\r\n### Scrape a page to Markdown\r\n\r\n```\r\nTool: scrape_as_markdown\r\nInput: { \"url\": \"https://example.com/article\" }\r\n```\r\n\r\n### Extract structured data (Pro/advanced_scraping)\r\n\r\n```\r\nTool: extract\r\nInput: { \r\n  \"url\": \"https://example.com/product\",\r\n  \"prompt\": \"Extract: name, price, description, availability\"\r\n}\r\n```\r\n\r\n## When to Use\r\n\r\n| Scenario | Tool | Mode |\r\n|----------|------|------|\r\n| Web search results | `search_engine` | Rapid (Free) |\r\n| Clean page content | `scrape_as_markdown` | Rapid (Free) |\r\n| Parallel searches (up to 10) | `search_engine_batch` | Pro/advanced_scraping |\r\n| Multiple URLs at once | `scrape_batch` | Pro/advanced_scraping |\r\n| HTML structure needed | `scrape_as_html` | Pro/advanced_scraping |\r\n| AI JSON extraction | `extract` | Pro/advanced_scraping |\r\n| Dynamic/JS-heavy sites | `scraping_browser_*` | Pro/browser |\r\n| Amazon/LinkedIn/social data | `web_data_*` | Pro |\r\n\r\n## Setup\r\n\r\n**Remote (recommended) - No installation required:**\r\n\r\nSSE Endpoint:\r\n```\r\nhttps://mcp.brightdata.com/sse?token=YOUR_API_TOKEN\r\n```\r\n\r\nStreamable HTTP Endpoint:\r\n```\r\nhttps://mcp.brightdata.com/mcp?token=YOUR_API_TOKEN\r\n```\r\n\r\n**Local:**\r\n```bash\r\nAPI_TOKEN=<token> npx @brightdata/mcp\r\n```\r\n\r\n## Modes & Configuration\r\n\r\n### Rapid Mode (Free - Default)\r\n- **5,000 requests/month free**\r\n- Tools: `search_engine`, `scrape_as_markdown`\r\n\r\n### Pro Mode\r\n- All Rapid tools + 60+ advanced tools\r\n- Remote: add `&pro=1` to URL\r\n- Local: set `PRO_MODE=true`\r\n\r\n### Tool Groups\r\nSelect specific tool bundles instead of all Pro tools:\r\n- Remote: `&groups=ecommerce,social`\r\n- Local: `GROUPS=ecommerce,social`\r\n\r\n| Group | Description | Featured Tools |\r\n|-------|-------------|----------------|\r\n| `ecommerce` | Retail & marketplace data | `web_data_amazon_product`, `web_data_walmart_product` |\r\n| `social` | Social media insights | `web_data_linkedin_posts`, `web_data_instagram_profiles` |\r\n| `browser` | Browser automation | `scraping_browser_*` |\r\n| `business` | Company intelligence | `web_data_crunchbase_company`, `web_data_zoominfo_company_profile` |\r\n| `finance` | Financial data | `web_data_yahoo_finance_business` |\r\n| `research` | News & dev data | `web_data_github_repository_file`, `web_data_reuter_news` |\r\n| `app_stores` | App store data | `web_data_google_play_store`, `web_data_apple_app_store` |\r\n| `travel` | Travel information | `web_data_booking_hotel_listings` |\r\n| `advanced_scraping` | Batch & AI extraction | `scrape_batch`, `extract`, `search_engine_batch` |\r\n\r\n### Custom Tools\r\nCherry-pick individual tools:\r\n- Remote: `&tools=scrape_as_markdown,web_data_linkedin_person_profile`\r\n- Local: `TOOLS=scrape_as_markdown,web_data_linkedin_person_profile`\r\n\r\n> Note: `GROUPS` or `TOOLS` override `PRO_MODE` when specified.\r\n\r\n## Core Tools Reference\r\n\r\n### Search & Scraping (Rapid Mode)\r\n- `search_engine` - Google/Bing/Yandex SERP results (JSON for Google, Markdown for others)\r\n- `scrape_as_markdown` - Clean Markdown from any URL with anti-bot bypass\r\n\r\n### Advanced Scraping (Pro/advanced_scraping)\r\n- `search_engine_batch` - Up to 10 parallel searches\r\n- `scrape_batch` - Up to 10 URLs in one request\r\n- `scrape_as_html` - Full HTML response\r\n- `extract` - AI-powered JSON extraction with custom prompt\r\n- `session_stats` - Monitor tool usage during session\r\n\r\n### Browser Automation (Pro/browser)\r\nFor JavaScript-rendered content or user interactions:\r\n\r\n| Tool | Description |\r\n|------|-------------|\r\n| `scraping_browser_navigate` | Open URL in browser session |\r\n| `scraping_browser_go_back` | Navigate back |\r\n| `scraping_browser_go_forward` | Navigate forward |\r\n| `scraping_browser_snapshot` | Get ARIA snapshot with element refs |\r\n| `scraping_browser_click_ref` | Click element by ref |\r\n| `scraping_browser_type_ref` | Type into input (optional submit) |\r\n| `scraping_browser_screenshot` | Capture page image |\r\n| `scraping_browser_wait_for_ref` | Wait for element visibility |\r\n| `scraping_browser_scroll` | Scroll to bottom |\r\n| `scraping_browser_scroll_to_ref` | Scroll element into view |\r\n| `scraping_browser_get_text` | Get page text content |\r\n| `scraping_browser_get_html` | Get full HTML |\r\n| `scraping_browser_network_requests` | List network requests |\r\n\r\n### Structured Data (Pro)\r\nPre-built extractors for popular platforms:\r\n\r\n**E-commerce:**\r\n- `web_data_amazon_product`, `web_data_amazon_product_reviews`, `web_data_amazon_product_search`\r\n- `web_data_walmart_product`, `web_data_walmart_seller`\r\n- `web_data_ebay_product`, `web_data_google_shopping`\r\n- `web_data_homedepot_products`, `web_data_bestbuy_products`, `web_data_etsy_products`, `web_data_zara_products`\r\n\r\n**Social Media:**\r\n- `web_data_linkedin_person_profile`, `web_data_linkedin_company_profile`, `web_data_linkedin_job_listings`, `web_data_linkedin_posts`, `web_data_linkedin_people_search`\r\n- `web_data_instagram_profiles`, `web_data_instagram_posts`, `web_data_instagram_reels`, `web_data_instagram_comments`\r\n- `web_data_facebook_posts`, `web_data_facebook_marketplace_listings`, `web_data_facebook_company_reviews`, `web_data_facebook_events`\r\n- `web_data_tiktok_profiles`, `web_data_tiktok_posts`, `web_data_tiktok_shop`, `web_data_tiktok_comments`\r\n- `web_data_x_posts`\r\n- `web_data_youtube_videos`, `web_data_youtube_profiles`, `web_data_youtube_comments`\r\n- `web_data_reddit_posts`\r\n\r\n**Business & Finance:**\r\n- `web_data_google_maps_reviews`, `web_data_crunchbase_company`, `web_data_zoominfo_company_profile`\r\n- `web_data_zillow_properties_listing`, `web_data_yahoo_finance_business`\r\n\r\n**Other:**\r\n- `web_data_github_repository_file`, `web_data_reuter_news`\r\n- `web_data_google_play_store`, `web_data_apple_app_store`\r\n- `web_data_booking_hotel_listings`\r\n\r\n## Workflow Patterns\r\n\r\n### Basic Research Flow\r\n1. **Search** → `search_engine` to find relevant URLs\r\n2. **Scrape** → `scrape_as_markdown` to get content\r\n3. **Extract** → `extract` for structured JSON (if needed)\r\n\r\n### E-commerce Analysis\r\n1. Use `web_data_amazon_product` for structured product data\r\n2. Use `web_data_amazon_product_reviews` for review analysis\r\n3. Flatten nested data for token-efficient processing\r\n\r\n### Social Media Monitoring\r\n1. Use platform-specific `web_data_*` tools for structured extraction\r\n2. For unsupported platforms, use `scrape_as_markdown` + `extract`\r\n\r\n### Dynamic Site Automation\r\n1. `scraping_browser_navigate` → open URL\r\n2. `scraping_browser_snapshot` → get element refs\r\n3. `scraping_browser_click_ref` / `scraping_browser_type_ref` → interact\r\n4. `scraping_browser_screenshot` → capture results\r\n\r\n## Environment Variables (Local)\r\n\r\n| Variable | Description | Default |\r\n|----------|-------------|---------|\r\n| `API_TOKEN` | Bright Data API token (required) | - |\r\n| `PRO_MODE` | Enable all Pro tools | `false` |\r\n| `GROUPS` | Comma-separated tool groups | - |\r\n| `TOOLS` | Comma-separated individual tools | - |\r\n| `RATE_LIMIT` | Request rate limit | `100/1h` |\r\n| `WEB_UNLOCKER_ZONE` | Custom zone for scraping | `mcp_unlocker` |\r\n| `BROWSER_ZONE` | Custom zone for browser | `mcp_browser` |\r\n\r\n## Best Practices\r\n\r\n### Tool Selection\r\n- Use structured `web_data_*` tools when available (faster, more reliable)\r\n- Fall back to `scrape_as_markdown` + `extract` for unsupported sites\r\n- Use browser automation only when Jav",
+      "card": null
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/hugging-face-cli/SKILL.md",
+      "blob_sha": "b5c3370862aab555f7ed04a3a42bcaa55464146e",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/hugging-face-cli/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hugging-face-cli",
+        "description": "Execute Hugging Face Hub operations using the `hf` CLI. Use when the user needs to download models/datasets/spaces, upload files to Hub repositories, create repos, manage local cache, or run compute jobs on HF infrastructure. Covers authentication, file transfers, repository creation, cache operations, and cloud compute."
+      },
+      "excerpt": "---\r\nname: hugging-face-cli\r\ndescription: Execute Hugging Face Hub operations using the `hf` CLI. Use when the user needs to download models/datasets/spaces, upload files to Hub repositories, create repos, manage local cache, or run compute jobs on HF infrastructure. Covers authentication, file transfers, repository creation, cache operations, and cloud compute.\r\n---\r\n\r\n# Hugging Face CLI\r\n\r\nThe `hf` CLI provides direct terminal access to the Hugging Face Hub for downloading, uploading, and managing repositories, cache, and compute resources.\r\n\r\n## Quick Command Reference\r\n\r\n| Task | Command |\r\n|------|---------|\r\n| Login | `hf auth login` |\r\n| Download model | `hf download <repo_id>` |\r\n| Download to folder | `hf download <repo_id> --local-dir ./path` |\r\n| Upload folder | `hf upload <repo_id> . .` |\r\n| Create repo | `hf repo create <name>` |\r\n| Create tag | `hf repo tag create <repo_id> <tag>` |\r\n| Delete files | `hf repo-files delete <repo_id> <files>` |\r\n| List cache | `hf cache ls` |\r\n| Remove from cache | `hf cache rm <repo_or_revision>` |\r\n| List models | `hf models ls` |\r\n| Get model info | `hf models info <model_id>` |\r\n| List datasets | `hf datasets ls` |\r\n| Get dataset info | `hf datasets info <dataset_id>` |\r\n| List spaces | `hf spaces ls` |\r\n| Get space info | `hf spaces info <space_id>` |\r\n| List endpoints | `hf endpoints ls` |\r\n| Run GPU job | `hf jobs run --flavor a10g-small <image> <cmd>` |\r\n| Environment info | `hf env` |\r\n\r\n## Core Commands\r\n\r\n### Authentication\r\n```bash\r\nhf auth login                    # Interactive login\r\nhf auth login --token $HF_TOKEN  # Non-interactive\r\nhf auth whoami                   # Check current user\r\nhf auth list                     # List stored tokens\r\nhf auth switch                   # Switch between tokens\r\nhf auth logout                   # Log out\r\n```\r\n\r\n### Download\r\n```bash\r\nhf download <repo_id>                              # Full repo to cache\r\nhf download <repo_id> file.safetensors             # Specific file\r\nhf download <repo_id> --local-dir ./models         # To local directory\r\nhf download <repo_id> --include \"*.safetensors\"    # Filter by pattern\r\nhf download <repo_id> --repo-type dataset          # Dataset\r\nhf download <repo_id> --revision v1.0              # Specific version\r\n```\r\n\r\n### Upload\r\n```bash\r\nhf upload <repo_id> . .                            # Current dir to root\r\nhf upload <repo_id> ./models /weights              # Folder to path\r\nhf upload <repo_id> model.safetensors              # Single file\r\nhf upload <repo_id> . . --repo-type dataset        # Dataset\r\nhf upload <repo_id> . . --create-pr                # Create PR\r\nhf upload <repo_id> . . --commit-message=\"msg\"     # Custom message\r\n```\r\n\r\n### Repository Management\r\n```bash\r\nhf repo create <name>                              # Create model repo\r\nhf repo create <name> --repo-type dataset          # Create dataset\r\nhf repo create <name> --private                    # Private repo\r\nhf repo create <name> --repo-type space --space_sdk gradio  # Gradio space\r\nhf repo delete <repo_id>                           # Delete repo\r\nhf repo move <from_id> <to_id>                     # Move repo to new namespace\r\nhf repo settings <repo_id> --private true          # Update repo settings\r\nhf repo list --repo-type model                     # List repos\r\nhf repo branch create <repo_id> release-v1         # Create branch\r\nhf repo branch delete <repo_id> release-v1         # Delete branch\r\nhf repo tag create <repo_id> v1.0                  # Create tag\r\nhf repo tag list <repo_id>                         # List tags\r\nhf repo tag delete <repo_id> v1.0                  # Delete tag\r\n```\r\n\r\n### Delete Files from Repo\r\n```bash\r\nhf repo-files delete <repo_id> folder/             # Delete folder\r\nhf repo-files delete <repo_id> \"*.txt\"             # Delete with pattern\r\n```\r\n\r\n### Cache Management\r\n```bash\r\nhf cache ls                      # List cached repos\r\nhf cache ls --revisions          # Include individual revisions\r\nhf cache rm model/gpt2           # Remove cached repo\r\nhf cache rm <revision_hash>      # Remove cached revision\r\nhf cache prune                   # Remove detached revisions\r\nhf cache verify gpt2             # Verify checksums from cache\r\n```\r\n\r\n### Browse Hub\r\n```bash\r\n# Models\r\nhf models ls                                        # List top trending models\r\nhf models ls --search \"MiniMax\" --author MiniMaxAI  # Search models\r\nhf models ls --filter \"text-generation\" --limit 20  # Filter by task\r\nhf models info MiniMaxAI/MiniMax-M2.1               # Get model info\r\n\r\n# Datasets\r\nhf datasets ls                                      # List top trending datasets\r\nhf datasets ls --search \"finepdfs\" --sort downloads # Search datasets\r\nhf datasets info HuggingFaceFW/finepdfs             # Get dataset info\r\n\r\n# Spaces\r\nhf spaces ls                                        # List top trending spaces\r\nhf spaces ls --filter \"3d\" --limit 10               # Filter by 3D modeling spaces\r\nhf spaces info enzostvs/deepsite                    # Get space info\r\n```\r\n\r\n### Jobs (Cloud Compute)\r\n```bash\r\nhf jobs run python:3.12 python script.py           # Run on CPU\r\nhf jobs run --flavor a10g-small <image> <cmd>      # Run on GPU\r\nhf jobs run --secrets HF_TOKEN <image> <cmd>       # With HF token\r\nhf jobs ps                                         # List jobs\r\nhf jobs logs <job_id>                              # View logs\r\nhf jobs cancel <job_id>                            # Cancel job\r\n```\r\n\r\n### Inference Endpoints\r\n```bash\r\nhf endpoints ls                                     # List endpoints\r\nhf endpoints deploy my-endpoint \\\r\n  --repo openai/gpt-oss-120b \\\r\n  --framework vllm \\\r\n  --accelerator gpu \\\r\n  --instance-size x4 \\\r\n  --instance-type nvidia-a10g \\\r\n  --region us-east-1 \\\r\n  --vendor aws\r\nhf endpoints describe my-endpoint                   # Show endpoint details\r\nhf endpoints pause my-endpoint                      # Pause endpoint\r\nhf endpoints resume my-endpoint                     # Resume endpoint\r\nhf endpoints scale-to-zero my-endpoint              # Scale to zero\r\nhf endpoints delete my-endpoint --yes               # Delete endpoint\r\n```\r\n**GPU Flavors:** `cpu-basic`, `cpu-upgrade`, `cpu-xl`, `t4-small`, `t4-medium`, `l4x1`, `l4x4`, `l40sx1`, `l40sx4`, `l40sx8`, `a10g-small`, `a10g-large`, `a10g-largex2`, `a10g-largex4`, `a100-large`, `h100`, `h100x8`\r\n\r\n## Common Patterns\r\n\r\n### Download and Use Model Locally\r\n```bash\r\n# Download to local directory for deployment\r\nhf download meta-llama/Llama-3.2-1B-Instruct --local-dir ./model\r\n\r\n# Or use cache and get path\r\nMODEL_PATH=$(hf download meta-llama/Llama-3.2-1B-Instruct --quiet)\r\n```\r\n\r\n### Publish Model/Dataset\r\n```bash\r\nhf repo create my-username/my-model --private\r\nhf upload my-username/my-model ./output . --commit-message=\"Initial release\"\r\nhf repo tag create my-username/my-model v1.0\r\n```\r\n\r\n### Sync Space with Local\r\n```bash\r\nhf upload my-username/my-space . . --repo-type space \\\r\n  --exclude=\"logs/*\" --delete=\"*\" --commit-message=\"Sync\"\r\n```\r\n\r\n### Check Cache Usage\r\n```bash\r\nhf cache ls                      # See all cached repos and sizes\r\nhf cache rm model/gpt2           # Remove a repo from cache\r\n```\r\n\r\n## Key Options\r\n\r\n- `--repo-type`: `model` (default), `dataset`, `space`\r\n- `--revision`: Branch, tag, or commit hash\r\n- `--token`: Override authentication\r\n- `--quiet`: Output only essential info (paths/URLs)\r\n\r\n## References\r\n\r\n- **Complete command reference**: See [references/commands.md](references/commands.md)\r\n- **Workflow examples**: See [references/examples.md](references/examples.md)\r\n",
+      "card": {
+        "title_zh": "Hugging Face CLI 操作",
+        "purpose_zh": "通过 hf 命令行工具操作 Hugging Face Hub，完成模型、数据集、Space 的下载上传、仓库创建与管理、本地缓存管理以及云端计算任务和推理端点操作。",
+        "does": [
+          "使用 hf auth 登录、查看当前用户、列出与切换令牌、登出",
+          "下载模型、数据集或 Space 到缓存或本地目录，支持文件过滤与指定版本",
+          "上传文件或文件夹到 Hub 仓库，支持创建 PR、自定义提交信息",
+          "创建、删除、移动仓库，管理分支、标签与仓库文件",
+          "查看与清理本地缓存，校验校验和",
+          "浏览模型、数据集、Space 列表与详情，运行云端 GPU 任务，部署与管理推理端点"
+        ],
+        "inputs": [
+          "仓库 ID、模型/数据集/Space ID",
+          "本地文件或目录路径",
+          "HF 令牌（HF_TOKEN 或 --token）",
+          "仓库类型、版本、文件过滤模式等命令选项",
+          "云端任务镜像与命令、端点部署参数"
+        ],
+        "outputs": [
+          "下载到本地或缓存的文件与路径",
+          "上传/创建/删除等操作结果",
+          "模型、数据集、Space、端点、任务的列表与详情信息",
+          "任务日志与缓存列表"
+        ],
+        "scenarios": [
+          "下载模型到本地用于部署",
+          "发布模型或数据集到 Hub 并打标签",
+          "将本地目录同步到 Space 仓库",
+          "查看并清理本地缓存占用",
+          "在 HF 云端运行 GPU 计算任务或部署推理端点"
+        ],
+        "prerequisites": [
+          "需安装并可使用 hf CLI",
+          "上传、创建仓库、运行任务等操作需先通过 hf auth login 或 HF_TOKEN 完成认证"
+        ],
+        "limits": [
+          "原文未说明具体版本要求、配额或权限限制",
+          "删除仓库、删除文件、删除端点等操作具有破坏性，原文未提供额外保护说明"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "运维部署",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "The `hf` CLI provides direct terminal access to the Hugging Face Hub for downloading, uploading, and managing repositories, cache, and compute resources."
+          },
+          {
+            "field": "does",
+            "quote": "hf auth login                    # Interactive login"
+          },
+          {
+            "field": "does",
+            "quote": "hf download <repo_id> --local-dir ./models         # To local directory"
+          },
+          {
+            "field": "does",
+            "quote": "hf upload <repo_id> . . --create-pr                # Create PR"
+          },
+          {
+            "field": "does",
+            "quote": "hf repo create <name> --repo-type space --space_sdk gradio  # Gradio space"
+          },
+          {
+            "field": "does",
+            "quote": "hf cache verify gpt2             # Verify checksums from cache"
+          },
+          {
+            "field": "does",
+            "quote": "hf jobs run --flavor a10g-small <image> <cmd>      # Run on GPU"
+          },
+          {
+            "field": "does",
+            "quote": "hf endpoints deploy my-endpoint \\"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "hf auth login --token $HF_TOKEN  # Non-interactive"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "hf repo delete <repo_id>                           # Delete repo"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "hf repo-files delete <repo_id> \"*.txt\"             # Delete with pattern"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "hf jobs run --secrets HF_TOKEN <image> <cmd>       # With HF token"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "hf endpoints delete my-endpoint --yes               # Delete endpoint"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/hugging-face-datasets/SKILL.md",
+      "blob_sha": "124e3a92298a2c853e7a1b4232b89bb683fdc751",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/hugging-face-datasets/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hugging-face-datasets",
+        "description": "Create and manage datasets on Hugging Face Hub. Supports initializing repos, defining configs/system prompts, streaming row updates, and SQL-based dataset querying/transformation. Designed to work alongside HF MCP server for comprehensive dataset workflows."
+      },
+      "excerpt": "---\r\nname: hugging-face-datasets\r\ndescription: Create and manage datasets on Hugging Face Hub. Supports initializing repos, defining configs/system prompts, streaming row updates, and SQL-based dataset querying/transformation. Designed to work alongside HF MCP server for comprehensive dataset workflows.\r\n---\r\n\r\n# Overview\r\nThis skill provides tools to manage datasets on the Hugging Face Hub with a focus on creation, configuration, content management, and SQL-based data manipulation. It is designed to complement the existing Hugging Face MCP server by providing dataset editing and querying capabilities.\r\n\r\n## Integration with HF MCP Server\r\n- **Use HF MCP Server for**: Dataset discovery, search, and metadata retrieval\r\n- **Use This Skill for**: Dataset creation, content editing, SQL queries, data transformation, and structured data formatting\r\n\r\n# Version\r\n2.1.0\r\n\r\n# Dependencies\r\n- huggingface_hub\r\n- duckdb (for SQL queries)\r\n- datasets (for pushing query results to Hub)\r\n- json (built-in)\r\n- time (built-in)\r\n\r\n# Core Capabilities\r\n\r\n## 1. Dataset Lifecycle Management\r\n- **Initialize**: Create new dataset repositories with proper structure\r\n- **Configure**: Store detailed configuration including system prompts and metadata\r\n- **Stream Updates**: Add rows efficiently without downloading entire datasets\r\n\r\n## 2. SQL-Based Dataset Querying (NEW)\r\nQuery any Hugging Face dataset using DuckDB SQL via `scripts/sql_manager.py`:\r\n- **Direct Queries**: Run SQL on datasets using the `hf://` protocol\r\n- **Schema Discovery**: Describe dataset structure and column types\r\n- **Data Sampling**: Get random samples for exploration\r\n- **Aggregations**: Count, histogram, unique values analysis\r\n- **Transformations**: Filter, join, reshape data with SQL\r\n- **Export & Push**: Save results locally or push to new Hub repos\r\n\r\n## 3. Multi-Format Dataset Support\r\nSupports diverse dataset types through template system:\r\n- **Chat/Conversational**: Chat templating, multi-turn dialogues, tool usage examples\r\n- **Text Classification**: Sentiment analysis, intent detection, topic classification\r\n- **Question-Answering**: Reading comprehension, factual QA, knowledge bases\r\n- **Text Completion**: Language modeling, code completion, creative writing\r\n- **Tabular Data**: Structured data for regression/classification tasks\r\n- **Custom Formats**: Flexible schema definition for specialized needs\r\n\r\n## 4. Quality Assurance Features\r\n- **JSON Validation**: Ensures data integrity during uploads\r\n- **Batch Processing**: Efficient handling of large datasets\r\n- **Error Recovery**: Graceful handling of upload failures and conflicts\r\n\r\n# Usage Instructions\r\n\r\nThe skill includes two Python scripts:\r\n- `scripts/dataset_manager.py` - Dataset creation and management\r\n- `scripts/sql_manager.py` - SQL-based dataset querying and transformation\r\n\r\n### Prerequisites\r\n- `huggingface_hub` library: `uv add huggingface_hub`\r\n- `duckdb` library (for SQL): `uv add duckdb`\r\n- `datasets` library (for pushing): `uv add datasets`\r\n- `HF_TOKEN` environment variable must be set with a Write-access token\r\n- Activate virtual environment: `source .venv/bin/activate`\r\n\r\n---\r\n\r\n# SQL Dataset Querying (sql_manager.py)\r\n\r\nQuery, transform, and push Hugging Face datasets using DuckDB SQL. The `hf://` protocol provides direct access to any public dataset (or private with token).\r\n\r\n## Quick Start\r\n\r\n```bash\r\n# Query a dataset\r\npython scripts/sql_manager.py query \\\r\n  --dataset \"cais/mmlu\" \\\r\n  --sql \"SELECT * FROM data WHERE subject='nutrition' LIMIT 10\"\r\n\r\n# Get dataset schema\r\npython scripts/sql_manager.py describe --dataset \"cais/mmlu\"\r\n\r\n# Sample random rows\r\npython scripts/sql_manager.py sample --dataset \"cais/mmlu\" --n 5\r\n\r\n# Count rows with filter\r\npython scripts/sql_manager.py count --dataset \"cais/mmlu\" --where \"subject='nutrition'\"\r\n```\r\n\r\n## SQL Query Syntax\r\n\r\nUse `data` as the table name in your SQL - it gets replaced with the actual `hf://` path:\r\n\r\n```sql\r\n-- Basic select\r\nSELECT * FROM data LIMIT 10\r\n\r\n-- Filtering\r\nSELECT * FROM data WHERE subject='nutrition'\r\n\r\n-- Aggregations\r\nSELECT subject, COUNT(*) as cnt FROM data GROUP BY subject ORDER BY cnt DESC\r\n\r\n-- Column selection and transformation\r\nSELECT question, choices[answer] AS correct_answer FROM data\r\n\r\n-- Regex matching\r\nSELECT * FROM data WHERE regexp_matches(question, 'nutrition|diet')\r\n\r\n-- String functions\r\nSELECT regexp_replace(question, '\\n', '') AS cleaned FROM data\r\n```\r\n\r\n## Common Operations\r\n\r\n### 1. Explore Dataset Structure\r\n```bash\r\n# Get schema\r\npython scripts/sql_manager.py describe --dataset \"cais/mmlu\"\r\n\r\n# Get unique values in column\r\npython scripts/sql_manager.py unique --dataset \"cais/mmlu\" --column \"subject\"\r\n\r\n# Get value distribution\r\npython scripts/sql_manager.py histogram --dataset \"cais/mmlu\" --column \"subject\" --bins 20\r\n```\r\n\r\n### 2. Filter and Transform\r\n```bash\r\n# Complex filtering with SQL\r\npython scripts/sql_manager.py query \\\r\n  --dataset \"cais/mmlu\" \\\r\n  --sql \"SELECT subject, COUNT(*) as cnt FROM data GROUP BY subject HAVING cnt > 100\"\r\n\r\n# Using transform command\r\npython scripts/sql_manager.py transform \\\r\n  --dataset \"cais/mmlu\" \\\r\n  --select \"subject, COUNT(*) as cnt\" \\\r\n  --group-by \"subject\" \\\r\n  --order-by \"cnt DESC\" \\\r\n  --limit 10\r\n```\r\n\r\n### 3. Create Subsets and Push to Hub\r\n```bash\r\n# Query and push to new dataset\r\npython scripts/sql_manager.py query \\\r\n  --dataset \"cais/mmlu\" \\\r\n  --sql \"SELECT * FROM data WHERE subject='nutrition'\" \\\r\n  --push-to \"username/mmlu-nutrition-subset\" \\\r\n  --private\r\n\r\n# Transform and push\r\npython scripts/sql_manager.py transform \\\r\n  --dataset \"ibm/duorc\" \\\r\n  --config \"ParaphraseRC\" \\\r\n  --select \"question, answers\" \\\r\n  --where \"LENGTH(question) > 50\" \\\r\n  --push-to \"username/duorc-long-questions\"\r\n```\r\n\r\n### 4. Export to Local Files\r\n```bash\r\n# Export to Parquet\r\npython scripts/sql_manager.py export \\\r\n  --dataset \"cais/mmlu\" \\\r\n  --sql \"SELECT * FROM data WHERE subject='nutrition'\" \\\r\n  --output \"nutrition.parquet\" \\\r\n  --format parquet\r\n\r\n# Export to JSONL\r\npython scripts/sql_manager.py export \\\r\n  --dataset \"cais/mmlu\" \\\r\n  --sql \"SELECT * FROM data LIMIT 100\" \\\r\n  --output \"sample.jsonl\" \\\r\n  --format jsonl\r\n```\r\n\r\n### 5. Working with Dataset Configs/Splits\r\n```bash\r\n# Specify config (subset)\r\npython scripts/sql_manager.py query \\\r\n  --dataset \"ibm/duorc\" \\\r\n  --config \"ParaphraseRC\" \\\r\n  --sql \"SELECT * FROM data LIMIT 5\"\r\n\r\n# Specify split\r\npython scripts/sql_manager.py query \\\r\n  --dataset \"cais/mmlu\" \\\r\n  --split \"test\" \\\r\n  --sql \"SELECT COUNT(*) FROM data\"\r\n\r\n# Query all splits\r\npython scripts/sql_manager.py query \\\r\n  --dataset \"cais/mmlu\" \\\r\n  --split \"*\" \\\r\n  --sql \"SELECT * FROM data LIMIT 10\"\r\n```\r\n\r\n### 6. Raw SQL with Full Paths\r\nFor complex queries or joining datasets:\r\n```bash\r\npython scripts/sql_manager.py raw --sql \"\r\n  SELECT a.*, b.* \r\n  FROM 'hf://datasets/dataset1@~parquet/default/train/*.parquet' a\r\n  JOIN 'hf://datasets/dataset2@~parquet/default/train/*.parquet' b\r\n  ON a.id = b.id\r\n  LIMIT 100\r\n\"\r\n```\r\n\r\n## Python API Usage\r\n\r\n```python\r\nfrom sql_manager import HFDatasetSQL\r\n\r\nsql = HFDatasetSQL()\r\n\r\n# Query\r\nresults = sql.query(\"cais/mmlu\", \"SELECT * FROM data WHERE subject='nutrition' LIMIT 10\")\r\n\r\n# Get schema\r\nschema = sql.describe(\"cais/mmlu\")\r\n\r\n# Sample\r\nsamples = sql.sample(\"cais/mmlu\", n=5, seed=42)\r\n\r\n# Count\r\ncount = sql.count(\"cais/mmlu\", where=\"subject='nutrition'\")\r\n\r\n# Histogram\r\ndist = sql.histogram(\"cais/mmlu\", \"subject\")\r\n\r\n# Filter and transform\r\nresults = sql.filter_and_transform(\r\n    \"cais/mmlu\",\r\n    select=\"subject, COUNT(*) as cnt\",\r\n    group_by=\"subject\",\r\n    order_by=\"cnt DESC\",\r\n    limit=10\r\n)\r\n\r\n# Push to Hub\r\nurl = sql.push_to_hub(\r\n    \"cais/mmlu\",\r\n    \"username/nutrition-subset\",\r\n    sql=\"SELECT * FROM data WHERE subject='nutrition'\",\r\n    private=True\r\n)\r\n\r\n# Export locally\r\nsql.export_to_parquet(\"cais/mmlu\", \"output.parquet\", sql=\"SELECT * FROM data LIMIT 100\")\r\n\r\nsql.close()\r\n```\r\n\r\n## HF Path Format\r\n\r\nD",
+      "card": {
+        "title_zh": "HF数据集管理",
+        "purpose_zh": "在 Hugging Face Hub 上创建和管理数据集，支持初始化仓库、定义配置与系统提示、流式追加行，以及用 DuckDB SQL 查询和转换数据集。",
+        "does": [
+          "初始化 Hugging Face 数据集仓库并配置系统提示与元数据",
+          "按 chat、classification、qa、completion、tabular 等模板校验并流式添加数据行",
+          "用 DuckDB SQL 通过 hf:// 协议查询数据集，支持 describe、sample、count、unique、histogram",
+          "用 SQL 过滤、聚合、连接、转换数据，并将结果推送为新 Hub 仓库或导出为 Parquet/JSONL",
+          "提供 Python API（HFDatasetSQL）执行查询、转换、推送与本地导出"
+        ],
+        "inputs": [
+          "数据集 repo_id 及可选的 private 标志",
+          "模板类型与 JSON 格式的数据行",
+          "SQL 语句、数据集 ID、config、split 参数",
+          "HF_TOKEN 环境变量（写权限令牌）",
+          "导出路径与格式（parquet/jsonl）"
+        ],
+        "outputs": [
+          "Hugging Face Hub 上的新数据集仓库或子集仓库",
+          "本地导出的 Parquet 或 JSONL 文件",
+          "SQL 查询结果、数据集 schema、采样与统计结果"
+        ],
+        "scenarios": [
+          "为训练或评测创建结构化数据集并推送到 Hub",
+          "用 SQL 探索公开数据集的 schema、分布与样本",
+          "从大型数据集中筛选子集并发布为新仓库",
+          "将数据集查询结果导出为本地 Parquet/JSONL 文件"
+        ],
+        "prerequisites": [
+          "安装 huggingface_hub、duckdb、datasets 库（如 uv add）",
+          "设置 HF_TOKEN 环境变量为写权限令牌",
+          "激活虚拟环境（source .venv/bin/activate）",
+          "数据集发现与搜索需配合 HF MCP Server 使用"
+        ],
+        "limits": [
+          "数据集发现、搜索和元数据检索不在本技能范围，需用 HF MCP Server",
+          "SQL 查询依赖 DuckDB 与 hf:// 协议及 @~parquet 自动转换版本",
+          "推送与私有数据集访问需要写权限令牌",
+          "原文未说明离线使用或非 Hugging Face 平台的兼容性"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "数据分析",
+          "自动化",
+          "文档",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Create and manage datasets on Hugging Face Hub. Supports initializing repos, defining configs/system prompts, streaming row updates, and SQL-based dataset querying/transformation."
+          },
+          {
+            "field": "does",
+            "quote": "Query any Hugging Face dataset using DuckDB SQL via `scripts/sql_manager.py`"
+          },
+          {
+            "field": "does",
+            "quote": "from sql_manager import HFDatasetSQL"
+          },
+          {
+            "field": "inputs",
+            "quote": "`HF_TOKEN` environment variable must be set with a Write-access token"
+          },
+          {
+            "field": "inputs",
+            "quote": "--push-to \"username/mmlu-nutrition-subset\" \\\r\n  --private"
+          },
+          {
+            "field": "outputs",
+            "quote": "--output \"nutrition.parquet\" \\\r\n  --format parquet"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Create Subsets and Push to Hub"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`huggingface_hub` library: `uv add huggingface_hub`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Activate virtual environment: `source .venv/bin/activate`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/hugging-face-evaluation/SKILL.md",
+      "blob_sha": "b34559402de4c971c8764a86040f85d298300640",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/hugging-face-evaluation/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hugging-face-evaluation",
+        "description": "Add and manage evaluation results in Hugging Face model cards. Supports extracting eval tables from README content, importing scores from Artificial Analysis API, and running custom model evaluations with vLLM/lighteval. Works with the model-index metadata format."
+      },
+      "excerpt": "---\r\nname: hugging-face-evaluation\r\ndescription: Add and manage evaluation results in Hugging Face model cards. Supports extracting eval tables from README content, importing scores from Artificial Analysis API, and running custom model evaluations with vLLM/lighteval. Works with the model-index metadata format.\r\n---\r\n\r\n# Overview\r\nThis skill provides tools to add structured evaluation results to Hugging Face model cards. It supports multiple methods for adding evaluation data:\r\n- Extracting existing evaluation tables from README content\r\n- Importing benchmark scores from Artificial Analysis\r\n- Running custom model evaluations with vLLM or accelerate backends (lighteval/inspect-ai)\r\n\r\n## Integration with HF Ecosystem\r\n- **Model Cards**: Updates model-index metadata for leaderboard integration\r\n- **Artificial Analysis**: Direct API integration for benchmark imports\r\n- **Papers with Code**: Compatible with their model-index specification\r\n- **Jobs**: Run evaluations directly on Hugging Face Jobs with `uv` integration\r\n- **vLLM**: Efficient GPU inference for custom model evaluation\r\n- **lighteval**: HuggingFace's evaluation library with vLLM/accelerate backends\r\n- **inspect-ai**: UK AI Safety Institute's evaluation framework\r\n\r\n# Version\r\n1.3.0\r\n\r\n# Dependencies\r\n\r\n## Core Dependencies\r\n- huggingface_hub>=0.26.0\r\n- markdown-it-py>=3.0.0\r\n- python-dotenv>=1.2.1\r\n- pyyaml>=6.0.3\r\n- requests>=2.32.5\r\n- re (built-in)\r\n\r\n## Inference Provider Evaluation\r\n- inspect-ai>=0.3.0\r\n- inspect-evals\r\n- openai\r\n\r\n## vLLM Custom Model Evaluation (GPU required)\r\n- lighteval[accelerate,vllm]>=0.6.0\r\n- vllm>=0.4.0\r\n- torch>=2.0.0\r\n- transformers>=4.40.0\r\n- accelerate>=0.30.0\r\n\r\nNote: vLLM dependencies are installed automatically via PEP 723 script headers when using `uv run`.\r\n\r\n# IMPORTANT: Using This Skill\r\n\r\n## ⚠️ CRITICAL: Check for Existing PRs Before Creating New Ones\r\n\r\n**Before creating ANY pull request with `--create-pr`, you MUST check for existing open PRs:**\r\n\r\n```bash\r\nuv run scripts/evaluation_manager.py get-prs --repo-id \"username/model-name\"\r\n```\r\n\r\n**If open PRs exist:**\r\n1. **DO NOT create a new PR** - this creates duplicate work for maintainers\r\n2. **Warn the user** that open PRs already exist\r\n3. **Show the user** the existing PR URLs so they can review them\r\n4. Only proceed if the user explicitly confirms they want to create another PR\r\n\r\nThis prevents spamming model repositories with duplicate evaluation PRs.\r\n\r\n---\r\n\r\n**Use `--help` for the latest workflow guidance.** Works with plain Python or `uv run`:\r\n```bash\r\nuv run scripts/evaluation_manager.py --help\r\nuv run scripts/evaluation_manager.py inspect-tables --help\r\nuv run scripts/evaluation_manager.py extract-readme --help\r\n```\r\nKey workflow (matches CLI help):\r\n\r\n1) `get-prs` → check for existing open PRs first\r\n2) `inspect-tables` → find table numbers/columns  \r\n3) `extract-readme --table N` → prints YAML by default  \r\n4) add `--apply` (push) or `--create-pr` to write changes\r\n\r\n# Core Capabilities\r\n\r\n## 1. Inspect and Extract Evaluation Tables from README\r\n- **Inspect Tables**: Use `inspect-tables` to see all tables in a README with structure, columns, and sample rows\r\n- **Parse Markdown Tables**: Accurate parsing using markdown-it-py (ignores code blocks and examples)\r\n- **Table Selection**: Use `--table N` to extract from a specific table (required when multiple tables exist)\r\n- **Format Detection**: Recognize common formats (benchmarks as rows, columns, or comparison tables with multiple models)\r\n- **Column Matching**: Automatically identify model columns/rows; prefer `--model-column-index` (index from inspect output). Use `--model-name-override` only with exact column header text.\r\n- **YAML Generation**: Convert selected table to model-index YAML format\r\n- **Task Typing**: `--task-type` sets the `task.type` field in model-index output (e.g., `text-generation`, `summarization`)\r\n\r\n## 2. Import from Artificial Analysis\r\n- **API Integration**: Fetch benchmark scores directly from Artificial Analysis\r\n- **Automatic Formatting**: Convert API responses to model-index format\r\n- **Metadata Preservation**: Maintain source attribution and URLs\r\n- **PR Creation**: Automatically create pull requests with evaluation updates\r\n\r\n## 3. Model-Index Management\r\n- **YAML Generation**: Create properly formatted model-index entries\r\n- **Merge Support**: Add evaluations to existing model cards without overwriting\r\n- **Validation**: Ensure compliance with Papers with Code specification\r\n- **Batch Operations**: Process multiple models efficiently\r\n\r\n## 4. Run Evaluations on HF Jobs (Inference Providers)\r\n- **Inspect-AI Integration**: Run standard evaluations using the `inspect-ai` library\r\n- **UV Integration**: Seamlessly run Python scripts with ephemeral dependencies on HF infrastructure\r\n- **Zero-Config**: No Dockerfiles or Space management required\r\n- **Hardware Selection**: Configure CPU or GPU hardware for the evaluation job\r\n- **Secure Execution**: Handles API tokens safely via secrets passed through the CLI\r\n\r\n## 5. Run Custom Model Evaluations with vLLM (NEW)\r\n\r\n⚠️ **Important:** This approach is only possible on devices with `uv` installed and sufficient GPU memory.\r\n**Benefits:** No need to use `hf_jobs()` MCP tool, can run scripts directly in terminal\r\n**When to use:** User working in local device directly  when GPU is available\r\n\r\n### Before running the script\r\n\r\n- check the script path\r\n- check uv is installed\r\n- check gpu is available with `nvidia-smi`\r\n\r\n### Running the script\r\n\r\n```bash\r\nuv run scripts/train_sft_example.py\r\n```\r\n### Features\r\n\r\n- **vLLM Backend**: High-performance GPU inference (5-10x faster than standard HF methods)\r\n- **lighteval Framework**: HuggingFace's evaluation library with Open LLM Leaderboard tasks\r\n- **inspect-ai Framework**: UK AI Safety Institute's evaluation library\r\n- **Standalone or Jobs**: Run locally or submit to HF Jobs infrastructure\r\n\r\n# Usage Instructions\r\n\r\nThe skill includes Python scripts in `scripts/` to perform operations.\r\n\r\n### Prerequisites\r\n- Preferred: use `uv run` (PEP 723 header auto-installs deps)\r\n- Or install manually: `pip install huggingface-hub markdown-it-py python-dotenv pyyaml requests`\r\n- Set `HF_TOKEN` environment variable with Write-access token\r\n- For Artificial Analysis: Set `AA_API_KEY` environment variable\r\n- `.env` is loaded automatically if `python-dotenv` is installed\r\n\r\n### Method 1: Extract from README (CLI workflow)\r\n\r\nRecommended flow (matches `--help`):\r\n```bash\r\n# 1) Inspect tables to get table numbers and column hints\r\nuv run scripts/evaluation_manager.py inspect-tables --repo-id \"username/model\"\r\n\r\n# 2) Extract a specific table (prints YAML by default)\r\nuv run scripts/evaluation_manager.py extract-readme \\\r\n  --repo-id \"username/model\" \\\r\n  --table 1 \\\r\n  [--model-column-index <column index shown by inspect-tables>] \\\r\n  [--model-name-override \"<column header/model name>\"]  # use exact header text if you can't use the index\r\n\r\n# 3) Apply changes (push or PR)\r\nuv run scripts/evaluation_manager.py extract-readme \\\r\n  --repo-id \"username/model\" \\\r\n  --table 1 \\\r\n  --apply       # push directly\r\n# or\r\nuv run scripts/evaluation_manager.py extract-readme \\\r\n  --repo-id \"username/model\" \\\r\n  --table 1 \\\r\n  --create-pr   # open a PR\r\n```\r\n\r\nValidation checklist:\r\n- YAML is printed by default; compare against the README table before applying.\r\n- Prefer `--model-column-index`; if using `--model-name-override`, the column header text must be exact.\r\n- For transposed tables (models as rows), ensure only one row is extracted.\r\n\r\n### Method 2: Import from Artificial Analysis\r\n\r\nFetch benchmark scores from Artificial Analysis API and add them to a model card.\r\n\r\n**Basic Usage:**\r\n```bash\r\nAA_API_KEY=\"your-api-key\" python scripts/evaluation_manager.py import-aa \\\r\n  --creator-slug \"anthropic\" \\\r\n  --model-name \"claude-sonnet-4\" \\\r\n  --repo-id \"username/model-name\"\r\n```\r\n\r\n**With Environment File:**\r\n```bash\r\n# Create .env file\r\necho \"A",
+      "card": null
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/hugging-face-jobs/SKILL.md",
+      "blob_sha": "89afe1723124cd73a52cc6446639e7a544f2e08c",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/hugging-face-jobs/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hugging-face-jobs",
+        "description": "This skill should be used when users want to run any workload on Hugging Face Jobs infrastructure. Covers UV scripts, Docker-based jobs, hardware selection, cost estimation, authentication with tokens, secrets management, timeout configuration, and result persistence. Designed for general-purpose compute workloads including data processing, inference, experiments, batch jobs, and any Python-based tasks. Should be invoked for tasks involving cloud compute, GPU workloads, or when users mention run"
+      },
+      "excerpt": "---\r\nname: hugging-face-jobs\r\ndescription: This skill should be used when users want to run any workload on Hugging Face Jobs infrastructure. Covers UV scripts, Docker-based jobs, hardware selection, cost estimation, authentication with tokens, secrets management, timeout configuration, and result persistence. Designed for general-purpose compute workloads including data processing, inference, experiments, batch jobs, and any Python-based tasks. Should be invoked for tasks involving cloud compute, GPU workloads, or when users mention running jobs on Hugging Face infrastructure without local setup.\r\nlicense: Complete terms in LICENSE.txt\r\n---\r\n\r\n# Running Workloads on Hugging Face Jobs\r\n\r\n## Overview\r\n\r\nRun any workload on fully managed Hugging Face infrastructure. No local setup required—jobs run on cloud CPUs, GPUs, or TPUs and can persist results to the Hugging Face Hub.\r\n\r\n**Common use cases:**\r\n- **Data Processing** - Transform, filter, or analyze large datasets\r\n- **Batch Inference** - Run inference on thousands of samples\r\n- **Experiments & Benchmarks** - Reproducible ML experiments\r\n- **Model Training** - Fine-tune models (see `model-trainer` skill for TRL-specific training)\r\n- **Synthetic Data Generation** - Generate datasets using LLMs\r\n- **Development & Testing** - Test code without local GPU setup\r\n- **Scheduled Jobs** - Automate recurring tasks\r\n\r\n**For model training specifically:** See the `model-trainer` skill for TRL-based training workflows.\r\n\r\n## When to Use This Skill\r\n\r\nUse this skill when users want to:\r\n- Run Python workloads on cloud infrastructure\r\n- Execute jobs without local GPU/TPU setup\r\n- Process data at scale\r\n- Run batch inference or experiments\r\n- Schedule recurring tasks\r\n- Use GPUs/TPUs for any workload\r\n- Persist results to the Hugging Face Hub\r\n\r\n## Key Directives\r\n\r\nWhen assisting with jobs:\r\n\r\n1. **ALWAYS use `hf_jobs()` MCP tool** - Submit jobs using `hf_jobs(\"uv\", {...})` or `hf_jobs(\"run\", {...})`. The `script` parameter accepts Python code directly. Do NOT save to local files unless the user explicitly requests it. Pass the script content as a string to `hf_jobs()`.\r\n\r\n2. **Always handle authentication** - Jobs that interact with the Hub require `HF_TOKEN` via secrets. See Token Usage section below.\r\n\r\n3. **Provide job details after submission** - After submitting, provide job ID, monitoring URL, estimated time, and note that the user can request status checks later.\r\n\r\n4. **Set appropriate timeouts** - Default 30min may be insufficient for long-running tasks.\r\n\r\n## Prerequisites Checklist\r\n\r\nBefore starting any job, verify:\r\n\r\n### ✅ **Account & Authentication**\r\n- Hugging Face Account with [Pro](https://hf.co/pro), [Team](https://hf.co/enterprise), or [Enterprise](https://hf.co/enterprise) plan (Jobs require paid plan)\r\n- Authenticated login: Check with `hf_whoami()`\r\n- **HF_TOKEN for Hub Access** ⚠️ CRITICAL - Required for any Hub operations (push models/datasets, download private repos, etc.)\r\n- Token must have appropriate permissions (read for downloads, write for uploads)\r\n\r\n### ✅ **Token Usage** (See Token Usage section for details)\r\n\r\n**When tokens are required:**\r\n- Pushing models/datasets to Hub\r\n- Accessing private repositories\r\n- Using Hub APIs in scripts\r\n- Any authenticated Hub operations\r\n\r\n**How to provide tokens:**\r\n```python\r\n{\r\n    \"secrets\": {\"HF_TOKEN\": \"$HF_TOKEN\"}  # Recommended: automatic token\r\n}\r\n```\r\n\r\n**⚠️ CRITICAL:** The `$HF_TOKEN` placeholder is automatically replaced with your logged-in token. Never hardcode tokens in scripts.\r\n\r\n## Token Usage Guide\r\n\r\n### Understanding Tokens\r\n\r\n**What are HF Tokens?**\r\n- Authentication credentials for Hugging Face Hub\r\n- Required for authenticated operations (push, private repos, API access)\r\n- Stored securely on your machine after `hf auth login`\r\n\r\n**Token Types:**\r\n- **Read Token** - Can download models/datasets, read private repos\r\n- **Write Token** - Can push models/datasets, create repos, modify content\r\n- **Organization Token** - Can act on behalf of an organization\r\n\r\n### When Tokens Are Required\r\n\r\n**Always Required:**\r\n- Pushing models/datasets to Hub\r\n- Accessing private repositories\r\n- Creating new repositories\r\n- Modifying existing repositories\r\n- Using Hub APIs programmatically\r\n\r\n**Not Required:**\r\n- Downloading public models/datasets\r\n- Running jobs that don't interact with Hub\r\n- Reading public repository information\r\n\r\n### How to Provide Tokens to Jobs\r\n\r\n#### Method 1: Automatic Token (Recommended)\r\n\r\n```python\r\nhf_jobs(\"uv\", {\r\n    \"script\": \"your_script.py\",\r\n    \"secrets\": {\"HF_TOKEN\": \"$HF_TOKEN\"}  # ✅ Automatic replacement\r\n})\r\n```\r\n\r\n**How it works:**\r\n- `$HF_TOKEN` is a placeholder that gets replaced with your actual token\r\n- Uses the token from your logged-in session (`hf auth login`)\r\n- Most secure and convenient method\r\n- Token is encrypted server-side when passed as a secret\r\n\r\n**Benefits:**\r\n- No token exposure in code\r\n- Uses your current login session\r\n- Automatically updated if you re-login\r\n- Works seamlessly with MCP tools\r\n\r\n#### Method 2: Explicit Token (Not Recommended)\r\n\r\n```python\r\nhf_jobs(\"uv\", {\r\n    \"script\": \"your_script.py\",\r\n    \"secrets\": {\"HF_TOKEN\": \"hf_abc123...\"}  # ⚠️ Hardcoded token\r\n})\r\n```\r\n\r\n**When to use:**\r\n- Only if automatic token doesn't work\r\n- Testing with a specific token\r\n- Organization tokens (use with caution)\r\n\r\n**Security concerns:**\r\n- Token visible in code/logs\r\n- Must manually update if token rotates\r\n- Risk of token exposure\r\n\r\n#### Method 3: Environment Variable (Less Secure)\r\n\r\n```python\r\nhf_jobs(\"uv\", {\r\n    \"script\": \"your_script.py\",\r\n    \"env\": {\"HF_TOKEN\": \"hf_abc123...\"}  # ⚠️ Less secure than secrets\r\n})\r\n```\r\n\r\n**Difference from secrets:**\r\n- `env` variables are visible in job logs\r\n- `secrets` are encrypted server-side\r\n- Always prefer `secrets` for tokens\r\n\r\n### Using Tokens in Scripts\r\n\r\n**In your Python script, tokens are available as environment variables:**\r\n\r\n```python\r\n# /// script\r\n# dependencies = [\"huggingface-hub\"]\r\n# ///\r\n\r\nimport os\r\nfrom huggingface_hub import HfApi\r\n\r\n# Token is automatically available if passed via secrets\r\ntoken = os.environ.get(\"HF_TOKEN\")\r\n\r\n# Use with Hub API\r\napi = HfApi(token=token)\r\n\r\n# Or let huggingface_hub auto-detect\r\napi = HfApi()  # Automatically uses HF_TOKEN env var\r\n```\r\n\r\n**Best practices:**\r\n- Don't hardcode tokens in scripts\r\n- Use `os.environ.get(\"HF_TOKEN\")` to access\r\n- Let `huggingface_hub` auto-detect when possible\r\n- Verify token exists before Hub operations\r\n\r\n### Token Verification\r\n\r\n**Check if you're logged in:**\r\n```python\r\nfrom huggingface_hub import whoami\r\nuser_info = whoami()  # Returns your username if authenticated\r\n```\r\n\r\n**Verify token in job:**\r\n```python\r\nimport os\r\nassert \"HF_TOKEN\" in os.environ, \"HF_TOKEN not found!\"\r\ntoken = os.environ[\"HF_TOKEN\"]\r\nprint(f\"Token starts with: {token[:7]}...\")  # Should start with \"hf_\"\r\n```\r\n\r\n### Common Token Issues\r\n\r\n**Error: 401 Unauthorized**\r\n- **Cause:** Token missing or invalid\r\n- **Fix:** Add `secrets={\"HF_TOKEN\": \"$HF_TOKEN\"}` to job config\r\n- **Verify:** Check `hf_whoami()` works locally\r\n\r\n**Error: 403 Forbidden**\r\n- **Cause:** Token lacks required permissions\r\n- **Fix:** Ensure token has write permissions for push operations\r\n- **Check:** Token type at https://huggingface.co/settings/tokens\r\n\r\n**Error: Token not found in environment**\r\n- **Cause:** `secrets` not passed or wrong key name\r\n- **Fix:** Use `secrets={\"HF_TOKEN\": \"$HF_TOKEN\"}` (not `env`)\r\n- **Verify:** Script checks `os.environ.get(\"HF_TOKEN\")`\r\n\r\n**Error: Repository access denied**\r\n- **Cause:** Token doesn't have access to private repo\r\n- **Fix:** Use token from account with access\r\n- **Check:** Verify repo visibility and your permissions\r\n\r\n### Token Security Best Practices\r\n\r\n1. **Never commit tokens** - Use `$HF_TOKEN` placeholder or environment variables\r\n2. **Use secrets, not env** - Secrets are encrypted server-side\r\n3. **Rotate tokens regularly** - Generate new toke",
+      "card": {
+        "title_zh": "HF Jobs 云端任务运行",
+        "purpose_zh": "指导在 Hugging Face Jobs 托管基础设施上运行任意计算负载，涵盖 UV 脚本、Docker 任务、硬件选择、成本估算、令牌认证、密钥管理、超时配置与结果持久化。",
+        "does": [
+          "通过 hf_jobs MCP 工具以 uv 或 run 方式提交云端任务",
+          "支持内联 Python 脚本或 URL 作为脚本来源",
+          "配置硬件 flavor、超时时间与 Python 版本",
+          "通过 secrets 传入 HF_TOKEN 进行 Hub 认证",
+          "将结果推送持久化到 Hugging Face Hub",
+          "提供令牌类型、权限与常见认证错误处理说明"
+        ],
+        "inputs": [
+          "Python 脚本内容（内联字符串或 URL）",
+          "硬件 flavor 如 cpu-basic、a10g-large",
+          "超时时间如 30m",
+          "secrets 中的 HF_TOKEN 占位符",
+          "可选自定义 Docker 镜像",
+          "可选 Python 版本"
+        ],
+        "outputs": [
+          "任务 ID",
+          "监控 URL",
+          "预估运行时间",
+          "推送至 Hugging Face Hub 的数据集或模型"
+        ],
+        "scenarios": [
+          "大规模数据处理与转换",
+          "批量推理",
+          "可复现的 ML 实验与基准测试",
+          "无本地 GPU 的代码开发测试",
+          "定时重复任务自动化"
+        ],
+        "prerequisites": [
+          "Hugging Face 账户需 Pro、Team 或 Enterprise 付费计划",
+          "已通过 hf auth login 登录并可用 hf_whoami() 验证",
+          "涉及 Hub 操作时需提供具相应权限的 HF_TOKEN"
+        ],
+        "limits": [
+          "Jobs 需要付费计划",
+          "MCP 工具下 script 不能为本地文件路径，仅支持内联代码或 URL",
+          "env 变量会暴露在日志中，令牌应使用 secrets",
+          "默认 30 分钟超时可能不足以支撑长任务",
+          "模型训练细节需参考 model-trainer 技能"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "运维部署",
+          "自动化",
+          "后端",
+          "数据分析"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Run any workload on fully managed Hugging Face infrastructure. No local setup required—jobs run on cloud CPUs, GPUs, or TPUs and can persist results to the Hugging Face Hub."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Covers UV scripts, Docker-based jobs, hardware selection, cost estimation, authentication with tokens, secrets management, timeout configuration, and result persistence."
+          },
+          {
+            "field": "does",
+            "quote": "The `$HF_TOKEN` placeholder is automatically replaced with your logged-in token. Never hardcode tokens in scripts."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Hugging Face Account with [Pro](https://hf.co/pro), [Team](https://hf.co/enterprise), or [Enterprise](https://hf.co/enterprise) plan (Jobs require paid plan)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Authenticated login: Check with `hf_whoami()`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/hugging-face-model-trainer/SKILL.md",
+      "blob_sha": "8142fb898f44455590c2242c5222a0866ba5f63e",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/hugging-face-model-trainer/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hugging-face-model-trainer",
+        "description": "This skill should be used when users want to train or fine-tune language models using TRL (Transformer Reinforcement Learning) on Hugging Face Jobs infrastructure. Covers SFT, DPO, GRPO and reward modeling training methods, plus GGUF conversion for local deployment. Includes guidance on the TRL Jobs package, UV scripts with PEP 723 format, dataset preparation and validation, hardware selection, cost estimation, Trackio monitoring, Hub authentication, and model persistence. Should be invoked for "
+      },
+      "excerpt": "---\r\nname: hugging-face-model-trainer\r\ndescription: This skill should be used when users want to train or fine-tune language models using TRL (Transformer Reinforcement Learning) on Hugging Face Jobs infrastructure. Covers SFT, DPO, GRPO and reward modeling training methods, plus GGUF conversion for local deployment. Includes guidance on the TRL Jobs package, UV scripts with PEP 723 format, dataset preparation and validation, hardware selection, cost estimation, Trackio monitoring, Hub authentication, and model persistence. Should be invoked for tasks involving cloud GPU training, GGUF conversion, or when users mention training on Hugging Face Jobs without local GPU setup.\r\nlicense: Complete terms in LICENSE.txt\r\n---\r\n\r\n# TRL Training on Hugging Face Jobs\r\n\r\n## Overview\r\n\r\nTrain language models using TRL (Transformer Reinforcement Learning) on fully managed Hugging Face infrastructure. No local GPU setup required—models train on cloud GPUs and results are automatically saved to the Hugging Face Hub.\r\n\r\n**TRL provides multiple training methods:**\r\n- **SFT** (Supervised Fine-Tuning) - Standard instruction tuning\r\n- **DPO** (Direct Preference Optimization) - Alignment from preference data\r\n- **GRPO** (Group Relative Policy Optimization) - Online RL training\r\n- **Reward Modeling** - Train reward models for RLHF\r\n\r\n**For detailed TRL method documentation:**\r\n```python\r\nhf_doc_search(\"your query\", product=\"trl\")\r\nhf_doc_fetch(\"https://huggingface.co/docs/trl/sft_trainer\")  # SFT\r\nhf_doc_fetch(\"https://huggingface.co/docs/trl/dpo_trainer\")  # DPO\r\n# etc.\r\n```\r\n\r\n**See also:** `references/training_methods.md` for method overviews and selection guidance\r\n\r\n## When to Use This Skill\r\n\r\nUse this skill when users want to:\r\n- Fine-tune language models on cloud GPUs without local infrastructure\r\n- Train with TRL methods (SFT, DPO, GRPO, etc.)\r\n- Run training jobs on Hugging Face Jobs infrastructure\r\n- Convert trained models to GGUF for local deployment (Ollama, LM Studio, llama.cpp)\r\n- Ensure trained models are permanently saved to the Hub\r\n- Use modern workflows with optimized defaults\r\n\r\n## Key Directives\r\n\r\nWhen assisting with training jobs:\r\n\r\n1. **ALWAYS use `hf_jobs()` MCP tool** - Submit jobs using `hf_jobs(\"uv\", {...})`, NOT bash `trl-jobs` commands. The `script` parameter accepts Python code directly. Do NOT save to local files unless the user explicitly requests it. Pass the script content as a string to `hf_jobs()`. If user asks to \"train a model\", \"fine-tune\", or similar requests, you MUST create the training script AND submit the job immediately using `hf_jobs()`.\r\n\r\n2. **Always include Trackio** - Every training script should include Trackio for real-time monitoring. Use example scripts in `scripts/` as templates.\r\n\r\n3. **Provide job details after submission** - After submitting, provide job ID, monitoring URL, estimated time, and note that the user can request status checks later.\r\n\r\n4. **Use example scripts as templates** - Reference `scripts/train_sft_example.py`, `scripts/train_dpo_example.py`, etc. as starting points.\r\n\r\n## Local Script Dependencies\r\n\r\nTo run scripts locally (like `estimate_cost.py`), install dependencies:\r\n```bash\r\npip install -r requirements.txt\r\n```\r\n\r\n## Prerequisites Checklist\r\n\r\nBefore starting any training job, verify:\r\n\r\n### ✅ **Account & Authentication**\r\n- Hugging Face Account with [Pro](https://hf.co/pro), [Team](https://hf.co/enterprise), or [Enterprise](https://hf.co/enterprise) plan (Jobs require paid plan)\r\n- Authenticated login: Check with `hf_whoami()`\r\n- **HF_TOKEN for Hub Push** ⚠️ CRITICAL - Training environment is ephemeral, must push to Hub or ALL training results are lost\r\n- Token must have write permissions  \r\n- **MUST pass `secrets={\"HF_TOKEN\": \"$HF_TOKEN\"}` in job config** to make token available (the `$HF_TOKEN` syntax\r\n  references your actual token value)\r\n\r\n### ✅ **Dataset Requirements**\r\n- Dataset must exist on Hub or be loadable via `datasets.load_dataset()`\r\n- Format must match training method (SFT: \"messages\"/text/prompt-completion; DPO: chosen/rejected; GRPO: prompt-only)\r\n- **ALWAYS validate unknown datasets** before GPU training to prevent format failures (see Dataset Validation section below)\r\n- Size appropriate for hardware (Demo: 50-100 examples on t4-small; Production: 1K-10K+ on a10g-large/a100-large)\r\n\r\n### ⚠️ **Critical Settings**\r\n- **Timeout must exceed expected training time** - Default 30min is TOO SHORT for most training. Minimum recommended: 1-2 hours. Job fails and loses all progress if timeout is exceeded.\r\n- **Hub push must be enabled** - Config: `push_to_hub=True`, `hub_model_id=\"username/model-name\"`; Job: `secrets={\"HF_TOKEN\": \"$HF_TOKEN\"}`\r\n\r\n## Asynchronous Job Guidelines\r\n\r\n**⚠️ IMPORTANT: Training jobs run asynchronously and can take hours**\r\n\r\n### Action Required\r\n\r\n**When user requests training:**\r\n1. **Create the training script** with Trackio included (use `scripts/train_sft_example.py` as template)\r\n2. **Submit immediately** using `hf_jobs()` MCP tool with script content inline - don't save to file unless user requests\r\n3. **Report submission** with job ID, monitoring URL, and estimated time\r\n4. **Wait for user** to request status checks - don't poll automatically\r\n\r\n### Ground Rules\r\n- **Jobs run in background** - Submission returns immediately; training continues independently\r\n- **Initial logs delayed** - Can take 30-60 seconds for logs to appear\r\n- **User checks status** - Wait for user to request status updates\r\n- **Avoid polling** - Check logs only on user request; provide monitoring links instead\r\n\r\n### After Submission\r\n\r\n**Provide to user:**\r\n- ✅ Job ID and monitoring URL\r\n- ✅ Expected completion time\r\n- ✅ Trackio dashboard URL\r\n- ✅ Note that user can request status checks later\r\n\r\n**Example Response:**\r\n```\r\n✅ Job submitted successfully!\r\n\r\nJob ID: abc123xyz\r\nMonitor: https://huggingface.co/jobs/username/abc123xyz\r\n\r\nExpected time: ~2 hours\r\nEstimated cost: ~$10\r\n\r\nThe job is running in the background. Ask me to check status/logs when ready!\r\n```\r\n\r\n## Quick Start: Three Approaches\r\n\r\n**💡 Tip for Demos:** For quick demos on smaller GPUs (t4-small), omit `eval_dataset` and `eval_strategy` to save ~40% memory. You'll still see training loss and learning progress.\r\n\r\n### Sequence Length Configuration\r\n\r\n**TRL config classes use `max_length` (not `max_seq_length`)** to control tokenized sequence length:\r\n\r\n```python\r\n# ✅ CORRECT - If you need to set sequence length\r\nSFTConfig(max_length=512)   # Truncate sequences to 512 tokens\r\nDPOConfig(max_length=2048)  # Longer context (2048 tokens)\r\n\r\n# ❌ WRONG - This parameter doesn't exist\r\nSFTConfig(max_seq_length=512)  # TypeError!\r\n```\r\n\r\n**Default behavior:** `max_length=1024` (truncates from right). This works well for most training.\r\n\r\n**When to override:**\r\n- **Longer context**: Set higher (e.g., `max_length=2048`)\r\n- **Memory constraints**: Set lower (e.g., `max_length=512`)\r\n- **Vision models**: Set `max_length=None` (prevents cutting image tokens)\r\n\r\n**Usually you don't need to set this parameter at all** - the examples below use the sensible default.\r\n\r\n### Approach 1: UV Scripts (Recommended—Default Choice)\r\n\r\nUV scripts use PEP 723 inline dependencies for clean, self-contained training. **This is the primary approach for Claude Code.**\r\n\r\n```python\r\nhf_jobs(\"uv\", {\r\n    \"script\": \"\"\"\r\n# /// script\r\n# dependencies = [\"trl>=0.12.0\", \"peft>=0.7.0\", \"trackio\"]\r\n# ///\r\n\r\nfrom datasets import load_dataset\r\nfrom peft import LoraConfig\r\nfrom trl import SFTTrainer, SFTConfig\r\nimport trackio\r\n\r\ndataset = load_dataset(\"trl-lib/Capybara\", split=\"train\")\r\n\r\n# Create train/eval split for monitoring\r\ndataset_split = dataset.train_test_split(test_size=0.1, seed=42)\r\n\r\ntrainer = SFTTrainer(\r\n    model=\"Qwen/Qwen2.5-0.5B\",\r\n    train_dataset=dataset_split[\"train\"],\r\n    eval_dataset=dataset_split[\"test\"],\r\n    peft_config=LoraConfig(r=16, lora_alpha=32),\r\n    args=SFTConfig(\r\n        output_dir=\"my-model\",\r\n        push_t",
+      "card": {
+        "title_zh": "HF Jobs TRL 模型训练",
+        "purpose_zh": "指导在 Hugging Face Jobs 云 GPU 上用 TRL 训练或微调语言模型，涵盖 SFT、DPO、GRPO、奖励建模及 GGUF 转换，并强调结果推送 Hub 与 Trackio 监控。",
+        "does": [
+          "用 hf_jobs 提交 UV 脚本在云 GPU 上运行 TRL 训练任务",
+          "支持 SFT、DPO、GRPO 与奖励建模等训练方法",
+          "提供 TRL 官方脚本与 UV 脚本两种运行方式",
+          "指导数据集格式校验与硬件、超时、成本设置",
+          "要求训练脚本集成 Trackio 实时监控",
+          "将训练结果推送至 Hugging Face Hub 并支持 GGUF 转换"
+        ],
+        "inputs": [
+          "训练脚本内容（内联代码或公开 URL）",
+          "数据集（Hub 上或可 load_dataset 加载）",
+          "HF_TOKEN 密钥",
+          "GPU 规格 flavor 与超时时间",
+          "模型名与 hub_model_id 等训练配置"
+        ],
+        "outputs": [
+          "异步训练任务及 Job ID",
+          "监控 URL 与 Trackio 仪表盘链接",
+          "推送至 Hugging Face Hub 的模型",
+          "预计完成时间与成本估算"
+        ],
+        "scenarios": [
+          "无本地 GPU 时在云端微调语言模型",
+          "用 SFT/DPO/GRPO 方法训练模型",
+          "将训练好的模型转换为 GGUF 供本地部署",
+          "对未知数据集做训练前格式校验"
+        ],
+        "prerequisites": [
+          "Hugging Face 付费计划（Pro/Team/Enterprise）",
+          "已登录并通过 hf_whoami 验证",
+          "具备写权限的 HF_TOKEN 并以 secrets 传入",
+          "数据集格式与训练方法匹配",
+          "超时时间需超过预计训练时长"
+        ],
+        "limits": [
+          "本地文件路径不能作为脚本参数",
+          "默认 30 分钟超时对多数训练过短",
+          "训练环境临时，不推送 Hub 则结果丢失",
+          "任务异步运行，初始日志延迟 30-60 秒",
+          "不应自动轮询状态，需用户请求"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "学习辅导",
+          "自动化",
+          "运维部署"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Train language models using TRL (Transformer Reinforcement Learning) on fully managed Hugging Face infrastructure."
+          },
+          {
+            "field": "does",
+            "quote": "**TRL provides multiple training methods:**"
+          },
+          {
+            "field": "does",
+            "quote": "1. **ALWAYS use `hf_jobs()` MCP tool** - Submit jobs using `hf_jobs(\"uv\", {...})`, NOT bash `trl-jobs` commands."
+          },
+          {
+            "field": "does",
+            "quote": "2. **Always include Trackio** - Every training script should include Trackio for real-time monitoring."
+          },
+          {
+            "field": "does",
+            "quote": "- Convert trained models to GGUF for local deployment (Ollama, LM Studio, llama.cpp)"
+          },
+          {
+            "field": "inputs",
+            "quote": "**MUST pass `secrets={\"HF_TOKEN\": \"$HF_TOKEN\"}` in job config** to make token available"
+          },
+          {
+            "field": "outputs",
+            "quote": "- ✅ Job ID and monitoring URL"
+          },
+          {
+            "field": "outputs",
+            "quote": "- ✅ Trackio dashboard URL"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- Fine-tune language models on cloud GPUs without local infrastructure"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Hugging Face Account with [Pro](https://hf.co/pro), [Team](https://hf.co/enterprise), or [Enterprise](https://hf.co/enterprise) plan (Jobs require paid plan)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "- Authenticated login: Check with `hf_whoami()`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "- **Timeout must exceed expected training time** - Default 30min is TOO SHORT for most training."
+          },
+          {
+            "field": "limits",
+            "quote": "- **Initial logs delayed** - Can take 30-60 seconds for logs to appear"
+          },
+          {
+            "field": "limits",
+            "quote": "- **Avoid polling** - Check logs only on user request; provide monitoring links instead"
+          },
+          {
+            "field": "hosts",
+            "quote": "**This is the primary approach for Claude Code.**"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "pip install -r requirements.txt"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/hugging-face-paper-publisher/SKILL.md",
+      "blob_sha": "12400389cbbfe0ba41c926e4d74d9604333b0f25",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/hugging-face-paper-publisher/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hugging-face-paper-publisher",
+        "description": "Publish and manage research papers on Hugging Face Hub. Supports creating paper pages, linking papers to models/datasets, claiming authorship, and generating professional markdown-based research articles."
+      },
+      "excerpt": "---\r\nname: hugging-face-paper-publisher\r\ndescription: Publish and manage research papers on Hugging Face Hub. Supports creating paper pages, linking papers to models/datasets, claiming authorship, and generating professional markdown-based research articles.\r\n---\r\n\r\n# Overview\r\nThis skill provides comprehensive tools for AI engineers and researchers to publish, manage, and link research papers on the Hugging Face Hub. It streamlines the workflow from paper creation to publication, including integration with arXiv, model/dataset linking, and authorship management.\r\n\r\n## Integration with HF Ecosystem\r\n- **Paper Pages**: Index and discover papers on Hugging Face Hub\r\n- **arXiv Integration**: Automatic paper indexing from arXiv IDs\r\n- **Model/Dataset Linking**: Connect papers to relevant artifacts through metadata\r\n- **Authorship Verification**: Claim and verify paper authorship\r\n- **Research Article Template**: Generate professional, modern scientific papers\r\n\r\n# Version\r\n1.0.0\r\n\r\n# Dependencies\r\n- huggingface_hub>=0.26.0\r\n- pyyaml>=6.0.3\r\n- requests>=2.32.5\r\n- markdown>=3.5.0\r\n- python-dotenv>=1.2.1\r\n\r\n# Core Capabilities\r\n\r\n## 1. Paper Page Management\r\n- **Index Papers**: Add papers to Hugging Face from arXiv\r\n- **Claim Authorship**: Verify and claim authorship on published papers\r\n- **Manage Visibility**: Control which papers appear on your profile\r\n- **Paper Discovery**: Find and explore papers in the HF ecosystem\r\n\r\n## 2. Link Papers to Artifacts\r\n- **Model Cards**: Add paper citations to model metadata\r\n- **Dataset Cards**: Link papers to datasets via README\r\n- **Automatic Tagging**: Hub auto-generates arxiv:<PAPER_ID> tags\r\n- **Citation Management**: Maintain proper attribution and references\r\n\r\n## 3. Research Article Creation\r\n- **Markdown Templates**: Generate professional paper formatting\r\n- **Modern Design**: Clean, readable research article layouts\r\n- **Dynamic TOC**: Automatic table of contents generation\r\n- **Section Structure**: Standard scientific paper organization\r\n- **LaTeX Math**: Support for equations and technical notation\r\n\r\n## 4. Metadata Management\r\n- **YAML Frontmatter**: Proper model/dataset card metadata\r\n- **Citation Tracking**: Maintain paper references across repositories\r\n- **Version Control**: Track paper updates and revisions\r\n- **Multi-Paper Support**: Link multiple papers to single artifacts\r\n\r\n# Usage Instructions\r\n\r\nThe skill includes Python scripts in `scripts/` for paper publishing operations.\r\n\r\n### Prerequisites\r\n- Install dependencies: `uv add huggingface_hub pyyaml requests markdown python-dotenv`\r\n- Set `HF_TOKEN` environment variable with Write-access token\r\n- Activate virtual environment: `source .venv/bin/activate`\r\n\r\n### Method 1: Index Paper from arXiv\r\n\r\nAdd a paper to Hugging Face Paper Pages from arXiv.\r\n\r\n**Basic Usage:**\r\n```bash\r\npython scripts/paper_manager.py index \\\r\n  --arxiv-id \"2301.12345\"\r\n```\r\n\r\n**Check If Paper Exists:**\r\n```bash\r\npython scripts/paper_manager.py check \\\r\n  --arxiv-id \"2301.12345\"\r\n```\r\n\r\n**Direct URL Access:**\r\nYou can also visit `https://huggingface.co/papers/{arxiv-id}` directly to index a paper.\r\n\r\n### Method 2: Link Paper to Model/Dataset\r\n\r\nAdd paper references to model or dataset README with proper YAML metadata.\r\n\r\n**Add to Model Card:**\r\n```bash\r\npython scripts/paper_manager.py link \\\r\n  --repo-id \"username/model-name\" \\\r\n  --repo-type \"model\" \\\r\n  --arxiv-id \"2301.12345\"\r\n```\r\n\r\n**Add to Dataset Card:**\r\n```bash\r\npython scripts/paper_manager.py link \\\r\n  --repo-id \"username/dataset-name\" \\\r\n  --repo-type \"dataset\" \\\r\n  --arxiv-id \"2301.12345\"\r\n```\r\n\r\n**Add Multiple Papers:**\r\n```bash\r\npython scripts/paper_manager.py link \\\r\n  --repo-id \"username/model-name\" \\\r\n  --repo-type \"model\" \\\r\n  --arxiv-ids \"2301.12345,2302.67890,2303.11111\"\r\n```\r\n\r\n**With Custom Citation:**\r\n```bash\r\npython scripts/paper_manager.py link \\\r\n  --repo-id \"username/model-name\" \\\r\n  --repo-type \"model\" \\\r\n  --arxiv-id \"2301.12345\" \\\r\n  --citation \"$(cat citation.txt)\"\r\n```\r\n\r\n#### How Linking Works\r\n\r\nWhen you add an arXiv paper link to a model or dataset README:\r\n1. The Hub extracts the arXiv ID from the link\r\n2. A tag `arxiv:<PAPER_ID>` is automatically added to the repository\r\n3. Users can click the tag to view the Paper Page\r\n4. The Paper Page shows all models/datasets citing this paper\r\n5. Papers are discoverable through filters and search\r\n\r\n### Method 3: Claim Authorship\r\n\r\nVerify your authorship on papers published on Hugging Face.\r\n\r\n**Start Claim Process:**\r\n```bash\r\npython scripts/paper_manager.py claim \\\r\n  --arxiv-id \"2301.12345\" \\\r\n  --email \"your.email@institution.edu\"\r\n```\r\n\r\n**Manual Process:**\r\n1. Navigate to your paper's page: `https://huggingface.co/papers/{arxiv-id}`\r\n2. Find your name in the author list\r\n3. Click your name and select \"Claim authorship\"\r\n4. Wait for admin team verification\r\n\r\n**Check Authorship Status:**\r\n```bash\r\npython scripts/paper_manager.py check-authorship \\\r\n  --arxiv-id \"2301.12345\"\r\n```\r\n\r\n### Method 4: Manage Paper Visibility\r\n\r\nControl which verified papers appear on your public profile.\r\n\r\n**List Your Papers:**\r\n```bash\r\npython scripts/paper_manager.py list-my-papers\r\n```\r\n\r\n**Toggle Visibility:**\r\n```bash\r\npython scripts/paper_manager.py toggle-visibility \\\r\n  --arxiv-id \"2301.12345\" \\\r\n  --show true\r\n```\r\n\r\n**Manage in Settings:**\r\nNavigate to your account settings → Papers section to toggle \"Show on profile\" for each paper.\r\n\r\n### Method 5: Create Research Article\r\n\r\nGenerate a professional markdown-based research paper using modern templates.\r\n\r\n**Create from Template:**\r\n```bash\r\npython scripts/paper_manager.py create \\\r\n  --template \"standard\" \\\r\n  --title \"Your Paper Title\" \\\r\n  --output \"paper.md\"\r\n```\r\n\r\n**Available Templates:**\r\n- `standard` - Traditional scientific paper structure\r\n- `modern` - Clean, web-friendly format inspired by Distill\r\n- `arxiv` - arXiv-style formatting\r\n- `ml-report` - Machine learning experiment report\r\n\r\n**Generate Complete Paper:**\r\n```bash\r\npython scripts/paper_manager.py create \\\r\n  --template \"modern\" \\\r\n  --title \"Fine-Tuning Large Language Models with LoRA\" \\\r\n  --authors \"Jane Doe, John Smith\" \\\r\n  --abstract \"$(cat abstract.txt)\" \\\r\n  --output \"paper.md\"\r\n```\r\n\r\n**Convert to HTML:**\r\n```bash\r\npython scripts/paper_manager.py convert \\\r\n  --input \"paper.md\" \\\r\n  --output \"paper.html\" \\\r\n  --style \"modern\"\r\n```\r\n\r\n### Paper Template Structure\r\n\r\n**Standard Research Paper Sections:**\r\n```markdown\r\n---\r\ntitle: Your Paper Title\r\nauthors: Jane Doe, John Smith\r\naffiliations: University X, Lab Y\r\ndate: 2025-01-15\r\narxiv: 2301.12345\r\ntags: [machine-learning, nlp, fine-tuning]\r\n---\r\n\r\n# Abstract\r\nBrief summary of the paper...\r\n\r\n# 1. Introduction\r\nBackground and motivation...\r\n\r\n# 2. Related Work\r\nPrevious research and context...\r\n\r\n# 3. Methodology\r\nApproach and implementation...\r\n\r\n# 4. Experiments\r\nSetup, datasets, and procedures...\r\n\r\n# 5. Results\r\nFindings and analysis...\r\n\r\n# 6. Discussion\r\nInterpretation and implications...\r\n\r\n# 7. Conclusion\r\nSummary and future work...\r\n\r\n# References\r\n```\r\n\r\n**Modern Template Features:**\r\n- Dynamic table of contents\r\n- Responsive design for web viewing\r\n- Code syntax highlighting\r\n- Interactive figures and charts\r\n- Math equation rendering (LaTeX)\r\n- Citation management\r\n- Author affiliation linking\r\n\r\n### Commands Reference\r\n\r\n**Index Paper:**\r\n```bash\r\npython scripts/paper_manager.py index --arxiv-id \"2301.12345\"\r\n```\r\n\r\n**Link to Repository:**\r\n```bash\r\npython scripts/paper_manager.py link \\\r\n  --repo-id \"username/repo-name\" \\\r\n  --repo-type \"model|dataset|space\" \\\r\n  --arxiv-id \"2301.12345\" \\\r\n  [--citation \"Full citation text\"] \\\r\n  [--create-pr]\r\n```\r\n\r\n**Claim Authorship:**\r\n```bash\r\npython scripts/paper_manager.py claim \\\r\n  --arxiv-id \"2301.12345\" \\\r\n  --email \"your.email@edu\"\r\n```\r\n\r\n**Manage Visibility:**\r\n```bash\r\npython scripts/paper_manager.py toggle-visibility \\\r\n  --arxiv-id \"2301.12345\" \\\r\n  --show true|false\r\n```\r\n\r\n**Create Research Article:**\r\n```",
+      "card": null
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/hugging-face-tool-builder/SKILL.md",
+      "blob_sha": "3dc0448416abcc320cb209c5cdc4f2cfdbaf1d7b",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/hugging-face-tool-builder/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hugging-face-tool-builder",
+        "description": "Use this skill when the user wants to build tool/scripts or achieve a task where using data from the Hugging Face API would help. This is especially useful when chaining or combining API calls or the task will be repeated/automated. This Skill creates a reusable script to fetch, enrich or process data."
+      },
+      "excerpt": "---\r\nname: hugging-face-tool-builder\r\ndescription: Use this skill when the user wants to build tool/scripts or achieve a task where using data from the Hugging Face API would help. This is especially useful when chaining or combining API calls or the task will be repeated/automated. This Skill creates a reusable script to fetch, enrich or process data.\r\n---\r\n\r\n# Hugging Face API Tool Builder\r\n\r\nYour purpose is now is to create reusable command line scripts and utilities for using the Hugging Face API, allowing chaining, piping and intermediate processing where helpful. You can access the API directly, as well as use the `hf` command line tool. Model and Dataset cards can be accessed from repositories directly.\r\n\r\n## Script Rules\r\n\r\nMake sure to follow these rules:\r\n - Scripts must take a `--help` command line argument to describe their inputs and outputs\r\n - Non-destructive scripts should be tested before handing over to the User\r\n - Shell scripts are preferred, but use Python or TSX if complexity or user need requires it.\r\n - IMPORTANT: Use the `HF_TOKEN` environment variable as an Authorization header. For example: `curl -H \"Authorization: Bearer ${HF_TOKEN}\" https://huggingface.co/api/`. This provides higher rate limits and appropriate authorization for data access.\r\n - Investigate the shape of the API results before commiting to a final design; make use of piping and chaining where composability would be an advantage - prefer simple solutions where possible.\r\n - Share usage examples once complete.\r\n\r\nBe sure to confirm User preferences where there are questions or clarifications needed.\r\n\r\n## Sample Scripts\r\n\r\nPaths below are relative to this skill directory.\r\n\r\nReference examples:\r\n- `references/hf_model_papers_auth.sh` — uses `HF_TOKEN` automatically and chains trending → model metadata → model card parsing with fallbacks; it demonstrates multi-step API usage plus auth hygiene for gated/private content.\r\n- `references/find_models_by_paper.sh` — optional `HF_TOKEN` usage via `--token`, consistent authenticated search, and a retry path when arXiv-prefixed searches are too narrow; it shows resilient query strategy and clear user-facing help.\r\n- `references/hf_model_card_frontmatter.sh` — uses the `hf` CLI to download model cards, extracts YAML frontmatter, and emits NDJSON summaries (license, pipeline tag, tags, gated prompt flag) for easy filtering.\r\n\r\nBaseline examples (ultra-simple, minimal logic, raw JSON output with `HF_TOKEN` header):\r\n- `references/baseline_hf_api.sh` — bash\r\n- `references/baseline_hf_api.py` — python\r\n- `references/baseline_hf_api.tsx` — typescript executable\r\n\r\nComposable utility (stdin → NDJSON):\r\n- `references/hf_enrich_models.sh` — reads model IDs from stdin, fetches metadata per ID, emits one JSON object per line for streaming pipelines.\r\n\r\nComposability through piping (shell-friendly JSON output):\r\n- `references/baseline_hf_api.sh 25 | jq -r '.[].id' | references/hf_enrich_models.sh | jq -s 'sort_by(.downloads) | reverse | .[:10]'`\r\n- `references/baseline_hf_api.sh 50 | jq '[.[] | {id, downloads}] | sort_by(.downloads) | reverse | .[:10]'`\r\n- `printf '%s\\n' openai/gpt-oss-120b meta-llama/Meta-Llama-3.1-8B | references/hf_model_card_frontmatter.sh | jq -s 'map({id, license, has_extra_gated_prompt})'`\r\n\r\n## High Level Endpoints\r\n\r\nThe following are the main API endpoints available at `https://huggingface.co`\r\n\r\n```\r\n/api/datasets\r\n/api/models\r\n/api/spaces\r\n/api/collections\r\n/api/daily_papers\r\n/api/notifications\r\n/api/settings\r\n/api/whoami-v2\r\n/api/trending\r\n/oauth/userinfo\r\n```\r\n\r\n## Accessing the API\r\n\r\nThe API is documented with the OpenAPI standard at `https://huggingface.co/.well-known/openapi.json`.\r\n\r\n**IMPORTANT:** DO NOT ATTEMPT to read `https://huggingface.co/.well-known/openapi.json` directly as it is too large to process. \r\n\r\n**IMPORTANT** Use `jq` to query and extract relevant parts. For example, \r\n\r\n Command to Get All 160 Endpoints\r\n\r\n```bash\r\ncurl -s \"https://huggingface.co/.well-known/openapi.json\" | jq '.paths | keys | sort'\r\n```\r\n\r\nModel Search Endpoint Details\r\n\r\n```bash\r\ncurl -s \"https://huggingface.co/.well-known/openapi.json\" | jq '.paths[\"/api/models\"]'\r\n```\r\n\r\nYou can also query endpoints to see the shape of the data. When doing so constrain results to low numbers to make them easy to process, yet representative.\r\n\r\n## Using the HF command line tool\r\n\r\nThe `hf` command line tool gives you further access to Hugging Face repository content and infrastructure. \r\n\r\n```bash\r\n❯ hf --help\r\nUsage: hf [OPTIONS] COMMAND [ARGS]...\r\n\r\n  Hugging Face Hub CLI\r\n\r\nOptions:\r\n  --help                Show this message and exit.\r\n\r\nCommands:\r\n  auth                 Manage authentication (login, logout, etc.).\r\n  cache                Manage local cache directory.\r\n  download             Download files from the Hub.\r\n  endpoints            Manage Hugging Face Inference Endpoints.\r\n  env                  Print information about the environment.\r\n  jobs                 Run and manage Jobs on the Hub.\r\n  repo                 Manage repos on the Hub.\r\n  repo-files           Manage files in a repo on the Hub.\r\n  upload               Upload a file or a folder to the Hub.\r\n  upload-large-folder  Upload a large folder to the Hub.\r\n  version              Print information about the hf version.\r\n```\r\n\r\nThe `hf` CLI command has replaced the now deprecated `huggingface_hub` CLI command.\r\n",
+      "card": null
+    },
+    {
+      "skill_path": "hugging-face-skills/skills/hugging-face-trackio/SKILL.md",
+      "blob_sha": "11955168d519d2803818f70a782297a0752976a9",
+      "source_url": "https://github.com/patchy631/ai-engineering-hub/blob/042aeb5067384981eeba6a07fa882f436bb1660d/hugging-face-skills/skills/hugging-face-trackio/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hugging-face-trackio",
+        "description": "Track and visualize ML training experiments with Trackio. Use when logging metrics during training (Python API) or retrieving/analyzing logged metrics (CLI). Supports real-time dashboard visualization, HF Space syncing, and JSON output for automation."
+      },
+      "excerpt": "---\r\nname: hugging-face-trackio\r\ndescription: Track and visualize ML training experiments with Trackio. Use when logging metrics during training (Python API) or retrieving/analyzing logged metrics (CLI). Supports real-time dashboard visualization, HF Space syncing, and JSON output for automation.\r\n---\r\n\r\n# Trackio - Experiment Tracking for ML Training\r\n\r\nTrackio is an experiment tracking library for logging and visualizing ML training metrics. It syncs to Hugging Face Spaces for real-time monitoring dashboards.\r\n\r\n## Two Interfaces\r\n\r\n| Task | Interface | Reference |\r\n|------|-----------|-----------|\r\n| **Logging metrics** during training | Python API | [references/logging_metrics.md](references/logging_metrics.md) |\r\n| **Retrieving metrics** after/during training | CLI | [references/retrieving_metrics.md](references/retrieving_metrics.md) |\r\n\r\n## When to Use Each\r\n\r\n### Python API → Logging\r\n\r\nUse `import trackio` in your training scripts to log metrics:\r\n\r\n- Initialize tracking with `trackio.init()`\r\n- Log metrics with `trackio.log()` or use TRL's `report_to=\"trackio\"`\r\n- Finalize with `trackio.finish()`\r\n\r\n**Key concept**: For remote/cloud training, pass `space_id` — metrics sync to a Space dashboard so they persist after the instance terminates.\r\n\r\n→ See [references/logging_metrics.md](references/logging_metrics.md) for setup, TRL integration, and configuration options.\r\n\r\n### CLI → Retrieving\r\n\r\nUse the `trackio` command to query logged metrics:\r\n\r\n- `trackio list projects/runs/metrics` — discover what's available\r\n- `trackio get project/run/metric` — retrieve summaries and values\r\n- `trackio show` — launch the dashboard\r\n- `trackio sync` — sync to HF Space\r\n\r\n**Key concept**: Add `--json` for programmatic output suitable for automation and LLM agents.\r\n\r\n→ See [references/retrieving_metrics.md](references/retrieving_metrics.md) for all commands, workflows, and JSON output formats.\r\n\r\n## Minimal Logging Setup\r\n\r\n```python\r\nimport trackio\r\n\r\ntrackio.init(project=\"my-project\", space_id=\"username/trackio\")\r\ntrackio.log({\"loss\": 0.1, \"accuracy\": 0.9})\r\ntrackio.log({\"loss\": 0.09, \"accuracy\": 0.91})\r\ntrackio.finish()\r\n```\r\n\r\n### Minimal Retrieval\r\n\r\n```bash\r\ntrackio list projects --json\r\ntrackio get metric --project my-project --run my-run --metric loss --json\r\n```\r\n",
+      "card": {
+        "title_zh": "Trackio实验追踪",
+        "purpose_zh": "用Trackio记录并可视化机器学习训练指标，支持Python API写日志、CLI查询指标、实时仪表盘与HF Space同步。",
+        "does": [
+          "通过Python API初始化追踪并记录训练指标",
+          "支持TRL以report_to=trackio方式集成",
+          "用CLI列出项目、运行与指标并获取数值摘要",
+          "启动仪表盘查看指标可视化",
+          "同步指标到Hugging Face Space以持久保存",
+          "以--json输出便于自动化与LLM代理使用"
+        ],
+        "inputs": [
+          "训练脚本中的trackio.init/log/finish调用",
+          "项目名、运行名、指标名等查询参数",
+          "可选的space_id用于同步到HF Space"
+        ],
+        "outputs": [
+          "记录的训练指标日志",
+          "CLI查询返回的指标摘要与数值",
+          "JSON格式输出",
+          "实时监控仪表盘",
+          "同步到HF Space的指标数据"
+        ],
+        "scenarios": [
+          "训练过程中记录loss、accuracy等指标",
+          "训练后或训练中查询分析已记录指标",
+          "远程或云端训练时同步指标到Space持久保存",
+          "自动化流程或LLM代理读取JSON指标"
+        ],
+        "prerequisites": [
+          "安装并使用trackio库",
+          "Python训练脚本环境",
+          "使用CLI需可执行trackio命令",
+          "同步到Space需提供space_id"
+        ],
+        "limits": [
+          "原文未说明支持的指标类型上限",
+          "原文未说明并发或数据量限制",
+          "原文未说明离线使用限制"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "数据分析",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Trackio is an experiment tracking library for logging and visualizing ML training metrics. It syncs to Hugging Face Spaces for real-time monitoring dashboards."
+          },
+          {
+            "field": "does",
+            "quote": "Use `import trackio` in your training scripts to log metrics"
+          },
+          {
+            "field": "does",
+            "quote": "Log metrics with `trackio.log()` or use TRL's `report_to=\"trackio\"`"
+          },
+          {
+            "field": "does",
+            "quote": "Use the `trackio` command to query logged metrics"
+          },
+          {
+            "field": "does",
+            "quote": "`trackio show` — launch the dashboard"
+          },
+          {
+            "field": "does",
+            "quote": "`trackio sync` — sync to HF Space"
+          },
+          {
+            "field": "does",
+            "quote": "Add `--json` for programmatic output suitable for automation and LLM agents."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "trackio.init(project=\"my-project\", space_id=\"username/trackio\")"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "trackio list projects --json"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "It syncs to Hugging Face Spaces for real-time monitoring dashboards."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "For remote/cloud training, pass `space_id` — metrics sync to a Space dashboard so they persist after the instance terminates."
+          }
+        ]
+      }
+    }
+  ]
+}

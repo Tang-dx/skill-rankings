@@ -270,7 +270,7 @@
       "skill_path": "src/skillevaluator/tier3/reference_skills/calculator/SKILL.md",
       "blob_sha": "8ef553c5fac53b867881c42143c50db5fbe574e6",
       "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/src/skillevaluator/tier3/reference_skills/calculator/SKILL.md",
-      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -287,7 +287,7 @@
       "skill_path": "src/skillevaluator/tier3/reference_skills/create-custom-grader/SKILL.md",
       "blob_sha": "01bada3d4ceb7a7b71f1fdc3c895e5739bb07033",
       "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/src/skillevaluator/tier3/reference_skills/create-custom-grader/SKILL.md",
-      "fetched_at": "2026-11-13T11:11:48.516Z",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -304,18 +304,365 @@
       "skill_path": "src/skillevaluator/tier3/reference_skills/task-list/SKILL.md",
       "blob_sha": "de1668dbda33c113e117282e25cbc00399432708",
       "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/src/skillevaluator/tier3/reference_skills/task-list/SKILL.md",
-      "fetched_at": "2026-11-13T11:11:48.516Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "task-list",
         "description": "Required for 4+ step requests; add tasks at start and update status after each step."
       },
       "excerpt": "---\nname: task-list\ndescription: Required for 4+ step requests; add tasks at start and update status after each step.\nmetadata:\n  author: SkillEvaluator Maintainers <maintainers@example.com>\n---\n\n# Task List Skill\n\nTrack multi-step tasks to ensure nothing is forgotten.\n\n## When to use\n\n- The request requires 4 or more distinct steps\n- You need to perform several operations in sequence\n\n## Instructions\n\n1. Add tasks before starting multi-step work.\n2. Mark exactly one task in progress while working.\n3. Update task status as each step completes.\n4. Keep task text concise and action-oriented.\n\n## How to use\n\nUse the `tasks` tool directly. Do NOT use run_code, execute, or write_file for task management.\n\n### 1. Add tasks at the start\n```\ntasks(operation=\"add_multiple\", content=\"Step one; Step two; Step three\")\n```\nThis clears any previous tasks. Each request starts fresh.\n\n## Examples\n\n```python\ntasks(operation=\"add_multiple\", content=\"Inspect repo; Run tests; Summarize findings\")\ntasks(operation=\"start\", task_id=\"task_1\")\ntasks(operation=\"complete\", task_id=\"task_1\")\n```\n\n### 2. Start a task before working on it\n```\ntasks(operation=\"start\", task_id=\"task_1\")\n```\n\n### 3. Complete a task when done\n```\ntasks(operation=\"complete\", task_id=\"task_1\")\n```\n\n### 4. Check what's next\n```\ntasks(operation=\"next\")\n```\n\n## All operations\n\n| Operation | Args | Description |\n|-----------|------|-------------|\n| `add_multiple` | `content=\"t1; t2; t3\"` | Add tasks (clears previous) |\n| `start` | `task_id=\"task_1\"` | Mark in_progress |\n| `complete` | `task_id=\"task_1\"` | Mark completed |\n| `cancel` | `task_id=\"task_1\"` | Cancel a task |\n| `list` | (none) | Show all tasks |\n| `next` | (none) | Get next pending task |\n\n## Rules\n\n- One task in_progress at a time\n- Start before working, complete when done\n- Do not leave tasks hanging\n",
+      "card": {
+        "title_zh": "任务清单管理",
+        "purpose_zh": "为需要四步以上的请求建立任务清单，在开始前添加任务，并在每步完成后更新状态，避免遗漏。",
+        "does": [
+          "在开始多步工作前添加任务",
+          "工作时标记恰好一个任务为进行中",
+          "每步完成后更新任务状态",
+          "保持任务文本简洁且面向行动",
+          "通过 tasks 工具执行添加、开始、完成、取消、列出和获取下一项操作"
+        ],
+        "inputs": [
+          "任务内容字符串（分号分隔）",
+          "任务 ID"
+        ],
+        "outputs": [
+          "任务清单及状态",
+          "下一项待办任务"
+        ],
+        "scenarios": [
+          "请求包含四个或更多不同步骤",
+          "需要按顺序执行多项操作"
+        ],
+        "prerequisites": [
+          "可使用 tasks 工具"
+        ],
+        "limits": [
+          "同一时间只能有一个任务处于进行中",
+          "添加任务会清除之前的任务",
+          "不得用 run_code、execute 或 write_file 管理任务",
+          "不应让任务悬而未决"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Track multi-step tasks to ensure nothing is forgotten."
+          },
+          {
+            "field": "does",
+            "quote": "Add tasks before starting multi-step work."
+          },
+          {
+            "field": "does",
+            "quote": "Mark exactly one task in progress while working."
+          },
+          {
+            "field": "does",
+            "quote": "Update task status as each step completes."
+          },
+          {
+            "field": "does",
+            "quote": "Keep task text concise and action-oriented."
+          },
+          {
+            "field": "does",
+            "quote": "Use the `tasks` tool directly. Do NOT use run_code, execute, or write_file for task management."
+          },
+          {
+            "field": "inputs",
+            "quote": "tasks(operation=\"add_multiple\", content=\"Step one; Step two; Step three\")"
+          },
+          {
+            "field": "inputs",
+            "quote": "tasks(operation=\"start\", task_id=\"task_1\")"
+          },
+          {
+            "field": "outputs",
+            "quote": "| `list` | (none) | Show all tasks |"
+          },
+          {
+            "field": "outputs",
+            "quote": "| `next` | (none) | Get next pending task |"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- The request requires 4 or more distinct steps"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- You need to perform several operations in sequence"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use the `tasks` tool directly."
+          },
+          {
+            "field": "limits",
+            "quote": "- One task in_progress at a time"
+          },
+          {
+            "field": "limits",
+            "quote": "This clears any previous tasks. Each request starts fresh."
+          },
+          {
+            "field": "limits",
+            "quote": "- Do not leave tasks hanging"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "src/skillevaluator/tier3/reference_skills/text-analyzer/SKILL.md",
+      "blob_sha": "bec9385582afb154d1152cca7cb0ce7c68fef1db",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/src/skillevaluator/tier3/reference_skills/text-analyzer/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "text-analyzer",
+        "description": "Analyze text content and produce statistics including word count, line count, character count, most frequent words, and readability metrics. Works on any plain text input provided inline or from a file path."
+      },
+      "excerpt": "---\nname: text-analyzer\ndescription: Analyze text content and produce statistics including word count, line count, character count, most frequent words, and readability metrics. Works on any plain text input provided inline or from a file path.\ncompatibility: Python 3.10+, no external dependencies\nmetadata:\n  author: SkillEvaluator Maintainers <maintainers@example.com>\n---\n\n# Text Analyzer\n\nAnalyze text and produce structured statistics.\n\n## Purpose\n\nProvide quick text analytics — word counts, line counts, character counts,\ntop frequent words, average word length, and sentence count — for any\nplain-text input.\n\n## Agent Instructions\n\n1. Read this SKILL.md to understand capabilities.\n2. Run `scripts/analyze_text.py` with the appropriate arguments.\n3. Return the analysis results to the user.\n\n## Examples\n\n### Usage\n\n```bash\n# Analyze inline text\npython scripts/analyze_text.py --text \"Your text content here\"\n\n# Analyze a file\npython scripts/analyze_text.py --file /path/to/file.txt\n\n# JSON output (default is human-readable)\npython scripts/analyze_text.py --text \"Hello world\" --json\n```\n\n### Output\n\nThe script prints a structured report with:\n- **Word count** — total words\n- **Line count** — total lines\n- **Character count** — total characters (including whitespace)\n- **Sentence count** — estimated sentence count\n- **Average word length** — mean characters per word\n- **Top 5 words** — most frequent words and their counts\n\n## Limitations\n\n- Sentence detection uses simple period/question/exclamation splitting;\n  may be inaccurate for abbreviations (e.g., \"U.S.A.\").\n- Non-UTF-8 files will be read with errors replaced.\n\n## Troubleshooting\n\n| Problem | Fix |\n|---------|-----|\n| `FileNotFoundError` | Check the `--file` path exists |\n| Empty output | Ensure `--text` or `--file` is provided |\n",
       "card": null
+    },
+    {
+      "skill_path": "tests/fixtures/skills/lookup-code/SKILL.md",
+      "blob_sha": "bd5af2945c7788930adb3076eecbf98a865c73c9",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/tests/fixtures/skills/lookup-code/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "lookup-code",
+        "description": "Look up the private sample code for a color using the bundled lookup script. Use only for sample-code lookup requests, not arithmetic."
+      },
+      "excerpt": "---\nname: lookup-code\ndescription: Look up the private sample code for a color using the bundled lookup script. Use only for sample-code lookup requests, not arithmetic.\n---\n\n# Sample code lookup\n\nRun `python scripts/lookup.py COLOR` from this skill's directory. Report the\ncode printed by the script. Do not guess codes when the lookup is unavailable.\n",
+      "card": {
+        "title_zh": "示例色号查询",
+        "purpose_zh": "按颜色名运行随附脚本查询私有示例色号，并报告脚本输出的色号；仅用于色号查询，不用于算术。",
+        "does": [
+          "运行随附的 lookup.py 脚本并传入颜色参数",
+          "报告脚本打印出的色号",
+          "查询不可用时不做猜测"
+        ],
+        "inputs": [
+          "颜色名（作为脚本参数 COLOR）"
+        ],
+        "outputs": [
+          "脚本打印的色号"
+        ],
+        "scenarios": [
+          "需要查询某个颜色对应的私有示例色号时"
+        ],
+        "prerequisites": [
+          "具备本 skill 目录下的 scripts/lookup.py 脚本",
+          "可运行 python 命令"
+        ],
+        "limits": [
+          "仅用于示例色号查询，不处理算术",
+          "查询不可用时不得猜测色号"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Look up the private sample code for a color using the bundled lookup script. Use only for sample-code lookup requests, not arithmetic."
+          },
+          {
+            "field": "does",
+            "quote": "Run `python scripts/lookup.py COLOR` from this skill's directory. Report the\ncode printed by the script."
+          },
+          {
+            "field": "does",
+            "quote": "Do not guess codes when the lookup is unavailable."
+          },
+          {
+            "field": "inputs",
+            "quote": "Run `python scripts/lookup.py COLOR` from this skill's directory."
+          },
+          {
+            "field": "outputs",
+            "quote": "Report the\ncode printed by the script."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run `python scripts/lookup.py COLOR` from this skill's directory."
+          },
+          {
+            "field": "limits",
+            "quote": "Use only for sample-code lookup requests, not arithmetic."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not guess codes when the lookup is unavailable."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run `python scripts/lookup.py COLOR` from this skill's directory."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "tests/fixtures/skills/simple/SKILL.md",
+      "blob_sha": "25996489ea3992371fff8a5f9ce74577f7b95b75",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/tests/fixtures/skills/simple/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "simple",
+        "description": "Summarize short user notes into clear action items."
+      },
+      "excerpt": "---\nname: simple\ndescription: Summarize short user notes into clear action items.\nmetadata:\n  author: Simple Skill Author <skill-author@example.com>\n---\n\n# Simple\n\n## Instructions\n\nRead the user's note and return a concise list of action items. If the note has no clear action, say that no action item was found.\n\n## Examples\n\nUser: \"Follow up with Maya tomorrow about the launch checklist.\"\n\nAssistant: \"Action item: Follow up with Maya tomorrow about the launch checklist.\"\n",
+      "card": {
+        "title_zh": "简短笔记行动项整理",
+        "purpose_zh": "读取用户的简短笔记，返回简洁的行动项列表；若笔记中没有明确行动，则说明未找到行动项。",
+        "does": [
+          "读取用户提供的简短笔记",
+          "将笔记整理为简洁的行动项列表",
+          "当笔记中没有明确行动时，说明未找到行动项"
+        ],
+        "inputs": [
+          "用户的简短笔记文本"
+        ],
+        "outputs": [
+          "简洁的行动项列表",
+          "未找到行动项的说明"
+        ],
+        "scenarios": [
+          "把会议或待办笔记整理成行动项",
+          "从简短备忘中提取后续要做的事"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "仅面向简短笔记，原文未说明处理长文本或复杂文档的能力",
+          "原文未说明除行动项整理外的其他功能"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "办公文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Read the user's note and return a concise list of action items. If the note has no clear action, say that no action item was found."
+          },
+          {
+            "field": "does",
+            "quote": "Read the user's note and return a concise list of action items."
+          },
+          {
+            "field": "does",
+            "quote": "If the note has no clear action, say that no action item was found."
+          },
+          {
+            "field": "inputs",
+            "quote": "User: \"Follow up with Maya tomorrow about the launch checklist.\""
+          },
+          {
+            "field": "outputs",
+            "quote": "Assistant: \"Action item: Follow up with Maya tomorrow about the launch checklist.\""
+          },
+          {
+            "field": "title_zh",
+            "quote": "Summarize short user notes into clear action items."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "tests/fixtures/skillspector-2.13.3-reference-caveat/SKILL.md",
+      "blob_sha": "b02334a6a9a701bb9a4841a63e7878f0a3b709f8",
+      "source_url": "https://github.com/NVIDIA/SkillEvaluator/blob/738448a1429334827d64dcb2b93827dbeba16516/tests/fixtures/skillspector-2.13.3-reference-caveat/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "reference-caveat-example",
+        "description": "Explain configuration examples without executing code."
+      },
+      "excerpt": "---\nname: reference-caveat-example\ndescription: Explain configuration examples without executing code.\nmetadata:\n  author: Example Maintainer <maintainer@example.com>\n  version: \"1.0\"\n---\n\n# Reference example\n\nExplain how another project can create `examples/config.yaml` at runtime.\nThe example package version is `1.2.3`.\nDo not run commands or claim the other project was inspected.\n",
+      "card": {
+        "title_zh": "配置示例说明",
+        "purpose_zh": "说明其他项目如何在运行时创建配置文件示例，并给出示例包版本，不执行命令。",
+        "does": [
+          "说明其他项目如何在运行时创建 examples/config.yaml",
+          "给出示例包版本 1.2.3",
+          "要求不运行命令",
+          "要求不声称已检查其他项目"
+        ],
+        "inputs": [],
+        "outputs": [],
+        "scenarios": [
+          "向读者解释配置示例的生成方式"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "不执行命令",
+          "不声称已检查其他项目"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Explain how another project can create `examples/config.yaml` at runtime."
+          },
+          {
+            "field": "does",
+            "quote": "The example package version is `1.2.3`."
+          },
+          {
+            "field": "does",
+            "quote": "Do not run commands or claim the other project was inspected."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not run commands or claim the other project was inspected."
+          }
+        ]
+      }
     }
   ]
 }

@@ -1,0 +1,435 @@
+{
+  "schema": 1,
+  "repo": "phuryn/product-engineering",
+  "tree_sha": "99e37c2b3104941450f874325380f61d32e3a0c0",
+  "truncated_paths": 32,
+  "skills": [
+    {
+      "skill_path": "agent-harness/skills/agent-instructions/SKILL.md",
+      "blob_sha": "c0cf0712d2fd10a2f7aeb252da3600395197a330",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-harness/skills/agent-instructions/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agent-instructions",
+        "description": "Writing or restructuring AGENTS.md or CLAUDE.md, adding a rule ('remember this'), or after an agent ignored a rule it had: make each rule get met when it applies."
+      },
+      "excerpt": "---\nname: agent-instructions\ndescription: \"Writing or restructuring AGENTS.md or CLAUDE.md, adding a rule ('remember this'), or after an agent ignored a rule it had: make each rule get met when it applies.\"\n---\n\n# Agent instructions — rules met at the moment they apply\n\n**Meet each rule at the moment it applies.** A rule written down is not yet a rule an agent follows. This skill writes and maintains an app repository's instruction file as the product grows.\n\n**Use the entry file to route every session's context.** The entry file is `AGENTS.md`, `CLAUDE.md`, or both. It is where every session enters and what routes the rest. The method is stack-independent; examples come from repositories named by kind.\n\n1. **The entry file routes; the depth lives where the moment sends you.** A rule the agent is not looking at when it acts does not exist for that act.\n2. **Make rules that depend on memory at decisive moments into code paths.** Use a test, script or required argument, because prose loses that contest.\n3. **Maintain the file at every release and fix every mistake with its receipt.** Maintain it rather than accumulating rules.\n\n## The shape: a chain, not a manual\n\n**Root routes to entry points; entry points route to operative files; operative files link to evidence.** Each layer points down; none restates the layer below.\n\n```\nentry file (loaded every session)   — routes; holds only what every session needs\n └─ router rows: \"when you are…\"    — the rule that is easy to miss, and what to open\n     └─ operative files (docs/, skills) — the procedure, the depth, the gotchas\n         └─ evidence                — receipts, tables, postmortems, case studies\n```\n\n- **Route, don't summarize.** A summary of a doc in the entry file is a second copy that drifts. Carry the one sentence that must be met at the moment (the rule that is easy to miss) and its pointer.\n- **No workflow content duplicates upward.** When a procedure appears in two layers, the upper copy is wrong within a month.\n- **Make every file reachable from the entry file the day it is created.** `scripts/check_reachable.py` holds this (§ Files).\n\n## The entry file: two sections\n\n**Separate reusable building mechanics from the choices for this app.** The preamble explains the two sections in a few lines and names where the longer material lives. It tells the agent to find its moment in the router before starting.\n\n- **Put the mechanics of building any app in Section 1.** Include ownership and authorization, threat model, stack and its choices, testing and delivery, working rules, router and file maintenance. Reuse these mechanics in the next product; replace its owner's choices and installed-pack inventory.\n- **Put this app's identity and constraints in Section 2.** Include what it is, its users, its shape, who can do what, scope, data constraints and three lines of status. Replace this section per product; the `app-lifecycle` skill has its skeleton.\n- **Section 1 wins on mechanics; Section 2 wins on product.** What neither says follows skill defaults. Where those are silent too, decide and say so in the summary.\n- **When a library's default conflicts with the file, the file wins.** Say this in the file wherever a vendored skill or quickstart would teach otherwise.\n\n**Record the owner's departures from skill defaults once, dated and in their words.** Put product choices in a short entry-file section beside testing and working rules. Put choices for every product in user-level instructions. Record model, builder, reviewer and fallback, review bar, what requires go, design taste and voice.\n\n**Precedence: current session owner instruction > product entry file > user-level instructions > skill defaults.** Design detail can stay in the kit README, with an entry-file pointer; apply the `ui-design` skill.\n\n**Give every reviewer a fallback, never “none”.** Apply the `independent-review` skill for reviewer choices. Rewrite “a model never reviews its own family's work” as “prefer another family”. Use a fresh session of the builder's family when no other can run.\n\n**Graduate standing choices to the file immediately.** Memory in one agent does not reach another vendor's builder or reviewer (`references/maintenance.md`). Copy `references/agents-md-skeleton.md` for a starter file.\n\n**After installing packs, record choices, a docs index and their router rows once.** Route a product's screens, or a mock of one, to applying `ui-design`. For existing code, read every installed skill that touches it against the code. Add the missing tests the skills name.\n\n## Make sure it loads\n\n**Keep one master instruction file and verify every agent reads it.** A file that did not load fails silently.\n\n- **Keep no `CLAUDE.md`, or make its first line `@AGENTS.md`.** Claude Code reads `AGENTS.md` when no `CLAUDE.md` exists; a `CLAUDE.md` or `CLAUDE.local.md` without `@AGENTS.md` silently stops `AGENTS.md` loading (observed on Claude Code 2.1.292, `2026-10-10`). Codex, Cursor and Grok read `AGENTS.md`.\n- **Frameworks write into these files.** Next.js 16's `next dev` appends to `AGENTS.md` and writes a `CLAUDE.md` (observed `2026-08-27`). Set `agentRules: false` in `next.config.ts` to stop it. A generated `CLAUDE.md` holding only `@AGENTS.md` is harmless; anything else is a second, unowned instruction file.\n- **After changing either file, ask a fresh session to quote its unique rule.** Choose a rule only the entry file holds.\n\n## The router — what opens when\n\n**Key router rows by the task the agent is doing.** Put a three-column table in Section 1: “When you are…” · “The rule that applies” · “Open”. The agent matches its moment, not a table of contents.\n\n- **Use the words a user would use, never a topic label.** For example: “pushing a branch that deploys (*just push it* is this row)”, “fixing a bug”, “touching sign-in, roles or a permission”.\n- **Put the rule that is easy to miss in the rule column.** Keep it to one or two lines; the file holds the depth.\n- **The open column names the file — and the section — to read before acting.** Several rows can hold at once; open every one that matches.\n- **Every new task opens its rows again.** Find the moment and reread every file its rows open, even one read earlier in the session. After compaction or a long session, that earlier read is gone or stale.\n- **Give every rule placed in a doc a row, with one exception.** It needs none if it lives in the file the agent is already editing when it applies.\n- **File a rule at the fire point, not at its topic home.** Put it in the task's chain where it must change a decision. The topically natural file keeps the durable record and a pointer. Reachable in the wrong task is unreachable.\n- **Index material with no moment in the docs' own index.** Worked examples and release history belong there, not in the router.\n\nRead `references/router.md` for the pattern in depth and a starter router for an app repository.\n\n## Where each thing goes\n\n| What | Where it lives |\n|---|---|\n| needed in every session, with no trigger that would send the agent looking | the entry file, Section 1 or 2 |\n| needed only when touching one area | that area's file: the doc its router row already opens, or a new one where there is none, routed the day it is made; re-read at the start of every task that touches it |\n| reusable method | the installed skill; product docs, checks and automation stay in the product's repository, reachable from the entry file |\n| product procedures, gotchas, depth | the product doc the row opens; a procedure run by hand a second time becomes a product script, with its command in the matching router row |\n| receipts, data tables, postmortems behind a rule | an evidence file, opened only when revisiting the rule |\n| the current status | the product's plan (its stages, each with what it produces and the test of done, and where each stands); at most three lines in the entry file |\n| what a release shipped, what its rounds and gates found | the release history ",
+      "card": null
+    },
+    {
+      "skill_path": "agent-harness/skills/flight-deck/SKILL.md",
+      "blob_sha": "4f687874d31a5b9c6be35fb3f71db4f6f6656506",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-harness/skills/flight-deck/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "flight-deck",
+        "description": "'What's the status', 'where were we', a progress report or status deck; long work that must survive compaction: multi-hour runs, background jobs, waiting on a decision."
+      },
+      "excerpt": "---\nname: flight-deck\ndescription: \"'What's the status', 'where were we', a progress report or status deck; long work that must survive compaction: multi-hour runs, background jobs, waiting on a decision.\"\n---\n\n# Flight Deck — surviving your own context window\n\n**Write state down where it cannot be summarized.** In a long session, tool output scrolls away and context becomes a plausible narrative with operational details sanded off. The work keeps running while your model of it goes stale. Then you re-run a paid job, report a number from memory, or forget that something is blocked.\n\n**The flight deck is `STATUS.md`, `LOG.md` and the owner's page.** When the Artifact tool exists, build the page in the first pass as an artifact with a database (`capabilities: {db: {}}`). Use `assets/owner-page.html`, following `references/owner-page.md`; use `OWNER.md` only when the tool does not exist. A test run, or one with nothing for the owner to decide yet, still builds the page. It carries status too, and a test exercises it. A scheduled pass with no chat never builds or publishes a page; it checks the one its prompt names.\n\n## The two files (per area, not per repo)\n\n**Rewrite `STATUS.md` in place to describe only what is true now.** Never append to it, because a growing status file leaves the reader unsure which line is still true. Use these sections where they earn their place:\n\n- **Put RESUME first, with the work's location and how to resume.** Name the repository or folder and branch, then the last few sessions that touched it. Give each a date and one-line summary, dropping the oldest. Resume by opening the agent in that folder and having it read `STATUS.md` first. Reopening an old session is the fallback, because its memory is stale.\n- **List RUNNING NOW with process ids, log paths and each wait.** Say what each thing is waiting on.\n- **Keep QUEUED in order so the next task needs no judgement.**\n- **Name why each BLOCKED item is blocked and what unblocks it.**\n- **List HELD work deliberately not shipped and who owes the decision.** The work is finished.\n- **Put questions you cannot answer yourself under AWAITING <person>.**\n- **Keep DONE to one line each, enough to prevent redoing it.**\n- **Record EVIDENCE as measurements with their actual numbers.** See § Write down evidence, not just tasks.\n- **List STANDING RULES a fresh reader would otherwise violate.**\n\n**Use the same sections for work that isn't code.** `references/other-work.md` says how they map.\n\n**Append decisions and their reasoning to `LOG.md`, never rewrite its history.** Include corrections and dead ends. Status answers \"where are we\"; the log answers \"how did we get here, and what did we already rule out\". Both are needed, in separate files.\n\n**Optionally commit a how-it-works doc when the machinery is non-obvious.** Status and log are volatile; this durable doc belongs in version control and your routing file.\n\n## The owner's page\n\n**Give the owner a short status and only asks that need them.** `STATUS.md` and `LOG.md` are for you. The page serves someone who isn't watching the session, so they never need the transcript to find the status or what you need. They open it, answer, save, and you read the answers at your next check-in. It makes `STATUS.md`'s AWAITING section answerable. Without the Artifact tool, use `OWNER.md` with the same shape.\n\n**Keep a proposal's or plan's open decisions on the proposal's page.** The owner's page links there and doesn't ask them; apply the `propose` skill, § 7.\n\n**Before building it, open `references/owner-page.md` (the data, publishing, the loop) and `assets/owner-page.html` (the page you copy).**\n\n**A progress report starts here.** Asked for \"where we are\", a status report, \"what's done and what's next\" or a progress deck, update `STATUS.md` and the owner's page first. Project the report from them; a deck is a view of the flight deck, never a separate account of the work.\n\n### What is on it\n\n**Project a short status from `STATUS.md`, rather than every detail.** A status block nobody reads to the end is no status.\n\n- **Put the phase and milestones first, marking the current milestone.** For example, \"3 of 5\". Follow with at most three lines each of what was just built, what's in progress and what's next. Include how many things wait on the owner.\n- **Several areas share one page with Overview and an area tab each.** Give each area a board of 5 to 10 key work items, separate from the owner's asks. See `references/owner-page.md` for the data and migration.\n- **Ask only for a decision, a go or an owner-only task.** A go is for a one-way door. Never put status, receipts, finished work, or anything you could do yourself among the asks.\n- **Each item carries everything needed to answer it.** Say what you need, where (the link, file or setting), why only they can, your preselected recommendation, and what happens after they answer. Never use a pointer to the chat, since it may be gone after a compaction.\n- **Check every step against the product before it goes on the page.**\n- **Never collect a secret.** Name the file or setting the key goes into.\n- **A go typed on the page doesn't clear your harness's permission check for a one-way door.** The page asks; the go is typed in the chat.\n\n### Reading and consuming answers\n\n**Delete the item and answer once you have read the answer.** A gate stays until the go is typed in chat; a note on it deletes only the answer. Leave no reply on the page, no \"settled\" list, and nothing showing their feedback was processed. Work in this order:\n\n1. **Record the decision before deleting the item and its answer.** Use the product's decision log, `STATUS.md` QUEUED for work it creates, and `LOG.md` for the why, with the answer's id and `at`. An answer whose id and `at` `LOG.md` already holds is not recorded or queued again.\n2. **Delete the item and its answer in one write.** For a gate, delete only the answer; the gate stays until the go is typed in chat.\n3. **Act only after recording the answer and deleting what should go.** On a gate, act only once the go is in chat.\n4. **Confirm in chat, in one line.**\n\n**Consume answers before acting, so answered items don't remain during work.** Acting first leaves them on the page for as long as the work takes.\n\n**On a page with several areas, consume only your own area's answers.** Other areas' answers wait on the page for their own sessions.\n\n**A run with no chat does steps 1 and 2 only.** This scheduled pass does none of the work and never passes a gate. Put its confirmation in `STATUS.md` for the next session to repeat in chat.\n\n**Check at fixed points, because nothing notifies you when they save.** Check at each stage boundary, while a build or review runs, before ending a turn, after a compaction, and whenever they say they answered.\n\n**An idle session with items waiting schedules its own check.** Use a cron or loop where the harness has one, rather than waiting for the next message. For hours when no session runs, a scheduled headless pass checks instead (`references/owner-page.md` § A scheduled check without a session).\n\n**An answer given in chat closes its item too.** A gate closes only when the answer is the go.\n\n**Make Save trustworthy.** The page says Save is what you read and that nothing notifies you. On first use, quote one saved answer back. Put the link in every chat message that mentions the page.\n\n## The rule that makes it work\n\n**Update `STATUS.md` on every state change.** Do it when a job starts, finishes, fails or gets published, a decision lands, or something becomes blocked. Not \"at the end\", not \"when asked\": the moment it changes. A status file that is 80% true is worse than none, because it is trusted.\n\n**Keep status short enough to stay true.** If maintaining it is a burden, it is too detailed.\n\n## Write down evidence, not just tasks\n\n**Record measurements with their numbers and verdict, not the conclusion alone.** The highest-value lines are probe results, benchmark",
+      "card": {
+        "title_zh": "飞行甲板状态管理",
+        "purpose_zh": "为跨上下文窗口的长任务维护可恢复的工作状态：用STATUS.md记录当前真实状态、LOG.md记录决策历史，并生成面向负责人的状态页以收集其决策。",
+        "does": [
+          "重写STATUS.md以只描述当前真实状态，包含RESUME、RUNNING NOW、QUEUED、BLOCKED、HELD、AWAITING、DONE、EVIDENCE、STANDING RULES等分区",
+          "向LOG.md追加决策及其理由、纠正与死胡同，不重写历史",
+          "构建或维护负责人页面（Artifact工具存在时用assets/owner-page.html，否则用OWNER.md），只呈现简短状态与需负责人决定的事项",
+          "读取并消费负责人页面上的答复：先记录决策，再删除条目与答复，最后行动并在聊天中一行确认",
+          "在阶段边界、构建或审查运行中、回合结束前、压缩后等固定点检查答复",
+          "压缩后先读STATUS.md再浏览LOG.md最近决策，并核实运行中的进程是否真的在运行"
+        ],
+        "inputs": [
+          "当前工作状态与进程信息（进程id、日志路径、等待对象）",
+          "决策及其理由、纠正与死胡同记录",
+          "负责人页面上的答复（含id与at）",
+          "任务所在仓库或文件夹、分支及最近会话摘要"
+        ],
+        "outputs": [
+          "STATUS.md（原地重写的当前状态文件）",
+          "LOG.md（追加式决策日志）",
+          "负责人状态页（Artifact或OWNER.md）",
+          "聊天中的一行确认"
+        ],
+        "scenarios": [
+          "多小时的长时间运行任务",
+          "后台作业与队列管理",
+          "等待负责人决策的阻塞工作",
+          "上下文压缩后恢复工作状态",
+          "被要求提供进度报告或状态汇报"
+        ],
+        "prerequisites": [
+          "存在可写的临时或工作目录以存放STATUS.md与LOG.md",
+          "若使用负责人页面，需Artifact工具或改用OWNER.md",
+          "首次使用页面时需向负责人说明Save即读取且无通知"
+        ],
+        "limits": [
+          "短会话、单次任务和单上下文窗口工作不适用",
+          "状态文件须保持简短，维护负担过重说明过于详细",
+          "页面上的go不能替代harness对单向门的权限检查，go须在聊天中输入",
+          "无聊天会话的定时检查只执行记录与删除两步，不做实际工作也不通过门",
+          "不能信任文件胜过现实，需先核对再修正文件",
+          "不得在页面上收集密钥，只指明密钥应放入的文件或设置"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "自动化",
+          "产品规划",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Write state down where it cannot be summarized."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "The flight deck is `STATUS.md`, `LOG.md` and the owner's page."
+          },
+          {
+            "field": "does",
+            "quote": "Rewrite `STATUS.md` in place to describe only what is true now."
+          },
+          {
+            "field": "does",
+            "quote": "Append decisions and their reasoning to `LOG.md`, never rewrite its history."
+          },
+          {
+            "field": "does",
+            "quote": "Give the owner a short status and only asks that need them."
+          },
+          {
+            "field": "does",
+            "quote": "Record the decision before deleting the item and its answer."
+          },
+          {
+            "field": "does",
+            "quote": "Check at each stage boundary, while a build or review runs, before ending a turn, after a compaction, and whenever they say they answered."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "When the Artifact tool exists, build the page in the first pass as an artifact with a database (`capabilities: {db: {}}`)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Without the Artifact tool, use `OWNER.md` with the same shape."
+          },
+          {
+            "field": "limits",
+            "quote": "A go typed on the page doesn't clear your harness's permission check for a one-way door."
+          },
+          {
+            "field": "limits",
+            "quote": "A run with no chat does steps 1 and 2 only."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Rewrite `STATUS.md` in place to describe only what is true now."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "agent-harness/skills/guardrail-hooks/SKILL.md",
+      "blob_sha": "2da079e5863ba920546186edea91b6fa6e57ad2b",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-harness/skills/guardrail-hooks/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "guardrail-hooks",
+        "description": "An agent keeps breaking a rule ('it did it again', 'make this impossible', 'add a hook', 'my hook didn't fire'): make it a hook, permission rule or script."
+      },
+      "excerpt": "---\nname: guardrail-hooks\ndescription: \"An agent keeps breaking a rule ('it did it again', 'make this impossible', 'add a hook', 'my hook didn't fire'): make it a hook, permission rule or script.\"\n---\n\n# Guardrail hooks — rules held by code\n\n**Make rules that depend on memory at decisive moments into code paths.** Prose loses that contest to everything else the agent has read. Apply the `agent-instructions` skill for the principle, evidence and test question in its prose-vs-code reference. This skill covers choosing the code path, writing a hook without noise, and two hooks to adapt.\n\n## Pick the smallest code path that holds the rule\n\n**Choose the smallest code path that holds the rule.** A permission rule beats a hook. A refusal inside your own tool beats both, because it holds for every agent and every human running it.\n\n| The rule is about | Hold it with | Example |\n|---|---|---|\n| a command the agent may run, recognisable by its prefix | a permission rule in settings: `permissions.ask: [\"Bash(gh repo delete *)\"]`, or `permissions.deny` | checked against every subcommand, inside `$()` and loop bodies too, and still prompts in auto mode (read `2026-10-24`). No script to maintain |\n| what a command does when its text alone can't tell: code in a heredoc, a script it runs, the value of an argument | a PreToolUse hook | `scripts/guard_one_way_doors.py`, `scripts/block_wrong_identity.py` |\n| how your own tool may be used | a required argument, or a refusal inside the tool | a search-analytics tool: pulls paginate and write a manifest of the exact window, and the report refuses to run without one |\n| what a commit may contain | a git pre-commit hook in the repository, switched on per clone (`git config core.hooksPath .githooks`, set by a session-start hook) | refusing a commit that empties or halves a bookkeeping file |\n| what must be true before the agent says it is done | a Stop hook returning `decision: \"block\"` with the reason | tests ran; the release log has every step |\n| what the agent must know when it starts | a SessionStart hook returning `additionalContext` | git state checked by code: a shallow clone deepened before any ancestry check; a warning when the session started on a machine-named branch |\n| a derived file that must track its source | a PostToolUse hook that runs the sync | a one-way mirror of the skills folder for agents that read another path, re-synced on every write; it always exits 0 so a sync hiccup never blocks a tool |\n\n**For instruction-file rules held by code, state enforcement and its limits.** For example: “Bash is held by a hook; MCP tools and browser clicks are not covered, so the rule still binds there”.\n\n## Writing a guard that holds without becoming noise\n\nEach rule came from a receipt.\n\n1. **Gate only what the owner would actually want to click for.** Asking too often trains a reflexive yes, which is worse than no guard. The one-way-door guard here gates public deletes and publishes.\n2. **Match what runs, not what is mentioned.** Cut heredoc bodies out before matching command rules: text written to a file is not a command. Inside code, match the API call (`.delete_post(`), never a CLI string a docstring might quote. `scripts/block_wrong_identity.py` matches per command segment and only on `commit` for `--author`. It allows `git log --author=<address>` and tests whose JSON merely contains the address.\n3. **Look inside what the command runs.** A command-text guard is blind to `python cleanup.py`. Open local scripts the command runs, and heredoc bodies fed to an interpreter, and scan them with the code rules. A delete can be callable from any inline script.\n4. **Choose the verdict on purpose.** `ask` forces a human prompt even in auto mode, and denies in non-interactive runs where nobody can answer. `deny` refuses and tells the agent why. Exit 2 refuses and is the one form Claude Code, Codex and Cursor all honor. Address the agent in the reason too: “Agent: never approve this on the owner's behalf”. A prompt it can talk the owner through is a formality.\n5. **The go for a one-way door is typed in the conversation, never on a side page.** Approval on a decisions page, doc or ticket arrives as a tool result, which the harness check does not read. Claude Code's auto-mode classifier sees user messages and agent tool calls, with tool results stripped so file or page content cannot steer it (permission-modes docs, read `2026-10-25`). A message clears a block only when it names the action and its specifics, such as the branch of a force push (permission-modes docs, read `2026-10-25`). The verb alone is insufficient. A prompt forced by an ask rule or hook needs the click whatever was said. If the owner answered on a side page, ask for the go in conversation, naming the action and target.\n6. **Never block the way out.** A spend fuse exempts its own management commands, so disarming works when the session is over budget. A guard blocking the command that clears it has to be removed by hand.\n7. **Decide which way it fails.** By default, a hook that cannot start, crashes, exits 1 or times out lets the action through. For policy hooks, set `\"onFailure\": \"block\"` (Claude Code 2.1.295 or later) and use exit 2, never 1, to block. Watch the first run for a `hook error` notice. A mistyped settings path means the hook never runs and nothing else says so.\n8. **Keep stdout to one JSON object.** Anything else, such as a shell profile's greeting, makes the decision unreadable. An unreadable decision is a non-blocking error.\n9. **Test it like a program, before wiring it.** A command hook reads JSON on stdin and answers with an exit code and stdout. Pipe in samples that must trigger and look-alikes that must not. `scripts/test_hooks.py` does this, testing the guards in its own folder: run the copy beside the hooks you installed, and replace its cases when you replace the rules.\n10. **Know what a hook can't see.** `PreToolUse` fires on tool calls only, not files the user `@`-mentions. A `Bash` matcher doesn't cover an MCP tool or browser doing the same thing. Codex's docs say some tool paths opt out of hooks entirely. A hook is a guardrail, not a sandbox.\n11. **To stop a run, use `Stop`.** `continue: false` from a `Stop` hook stops the agent and takes precedence over event-specific “continue” decisions. This lets a spend fuse beat `/goal`, itself a Stop hook (precedence confirmed in docs, read `2026-10-24`). A blocking `Stop` hook must check `stop_hook_active`; Claude Code ends the turn after 8 consecutive continuations anyway.\n\n## The scripts\n\n**The scripts use standard-library Python and read and write UTF-8 explicitly.** On Windows, Python otherwise decodes the pipe with the ANSI code page. Configure them in a top-level `CONFIG` block, a JSON file or environment variables. They read `tool_input.command` for Claude Code and Codex, or top-level `command` for Cursor's `beforeShellExecution`.\n\n**Block an address that must never author a commit, and still allow searching for it.**\n\n| File | Does | Configure |\n|---|---|---|\n| `scripts/guard_one_way_doors.py` | asks (or denies, or exits 2) before an irreversible or public action: command rules on what the shell runs with heredocs cut out; code rules inside heredoc bodies and local scripts the command runs by path (`python cleanup.py`); it does not see, among others, `python -c` or `node -e` code, a script run after a `cd`, `./script`, `python -m`, `uv run x.py`, piped code or a path with spaces, so a delete reached that way runs unasked; it always answers `true guard-canary` | `command_rules`, `code_rules`, `skip_scripts`, `mode` in `CONFIG`; or `--config <file>` / `ONE_WAY_DOORS_CONFIG` (keys replace CONFIG's); `ONE_WAY_DOORS_MODE=ask\\|deny\\|block` |\n| `scripts/block_wrong_identity.py` | exits 2 when a forbidden address is set as a git identity (`user.email`, `-c user.email=`, `GIT_AUTHOR_EMAIL=` and friends) or passed as a commit's `--author`; searching for it is allowed | `blocked_emails` in `C",
+      "card": null
+    },
+    {
+      "skill_path": "agent-harness/skills/handover/SKILL.md",
+      "blob_sha": "73db5baba82b3d651322be4bdcfe9be2af9fb3ce",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-harness/skills/handover/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "handover",
+        "description": "Write the handover a fresh session starts from: the objective, what is true now, the evidence actually obtained, what is left, the open decisions and the next concrete action, reconciled with the disk first. Started by name only: /agent-harness:handover in Claude Code, $agent-harness:handover in Codex."
+      },
+      "excerpt": "---\nname: handover\ndescription: \"Write the handover a fresh session starts from: the objective, what is true now, the evidence actually obtained, what is left, the open decisions and the next concrete action, reconciled with the disk first. Started by name only: /agent-harness:handover in Claude Code, $agent-harness:handover in Codex.\"\nargument-hint: \"<optional: what the next session will do>\"\ndisable-model-invocation: true\n---\n\n# Handover — what the next session starts from\n\n**Write the one note the next session reads first.** The session is ending, or its context is; work continues tomorrow, in a fresh session, or with another agent. Start that session from what is true rather than what this session remembers.\n\n## Invocation\n\n```\n/agent-harness:handover                          Claude Code, plugin installed\n/agent-harness:handover the next session finishes the billing stage\n$agent-harness:handover                          Codex, plugin installed\n/handover   ·   $handover                        the skill folder copied into a repository\n```\n\n## Steps\n\n### 1. Reconcile with reality first\n\n**Check what this session believes against reality before writing a word.**\n\n- **Check the disk and name uncommitted work as uncommitted.** Read `git status`, the branch, commits made this session, and files the work touched.\n- **Check every background job, server, watcher and build this session started.** Each is still running, finished with its exit code read from its log, or gone.\n- **Correct project state files where the disk contradicts them.** Check the plan's status, status board, backlog and earlier handover; correct those lines rather than copying them.\n\n**An inherited report is a claim, this session's own memory included.**\n\n### 2. Write what the next session needs\n\n| Section | Holds |\n|---|---|\n| Objective | what the work is for, in a line, and who asked |\n| Where it stands | what is true now: built, committed, pushed, deployed, each said plainly |\n| Evidence | what was actually run and observed: the command, its exit code, the number, the verdict. Not what was intended. Anything unverified says so |\n| Left to do | in order, each small enough to start on |\n| Open decisions | each with its options, a recommendation, and whose decision it is |\n| Where things are | branches, worktrees, files, logs, URLs, processes still running and how to stop them |\n| Next action | one concrete first step: a command to run, a file to open. Never \"continue\" |\n\n**Keep it short enough to stay true, preserving the evidence.** Evidence costs most to lose. A re-run experiment costs money; restating a number from memory is how a wrong one reaches the owner.\n\n### 3. Put it where the project keeps such things\n\n**Use the project's own handover convention before creating a new file.** Use its status board, plan's status lines or existing handoff file. With none, keep one `HANDOVER.md` at the repository root, rewritten in place each time. It says what is true now, not the history.\n\n**Use the `flight-deck` skill for hours, multiple sessions or background jobs.** That work wants its status board and log instead of a single note. A few lines are enough for a short session.\n\n**Name where secrets are kept without putting them in the handover.** No keys, tokens, passwords or connection strings.\n\n### 4. Tell the owner how to start the next session\n\n**End with the next session's starting line and anything left running.** For example: *Read `HANDOVER.md` and start from its next action.*\n\nEach rule's origin, the case that taught it, is in `receipts.md` beside this file; read it when a rule's edge is unclear.\n\n## How you can tell it worked\n\nA fresh session given only the note can say what the work is for, what is verified and what is not, and run the next action without asking what happened.\n",
+      "card": {
+        "title_zh": "会话交接笔记",
+        "purpose_zh": "为下一个全新会话撰写交接笔记：先核对磁盘与后台任务等真实状态，再记录目标、当前进展、实际证据、待办、待决策事项与下一步具体动作。",
+        "does": [
+          "先核对现实：查看 git status、分支、本次提交与改动文件，把未提交工作标为未提交",
+          "检查本次启动的后台任务、服务器、监听进程与构建，确认仍在运行、已结束或已消失",
+          "磁盘与项目状态文件矛盾时，直接修正计划状态、状态板、待办与旧交接中的相应行",
+          "按目标、现状、证据、待办、待决策、位置、下一步动作等栏目撰写交接内容",
+          "优先沿用项目既有交接惯例，否则在仓库根目录维护单一 HANDOVER.md 并原地重写",
+          "结尾给出下一会话的起始指令，并说明仍在运行的事项及停止方式"
+        ],
+        "inputs": [
+          "可选参数：下一会话要做什么",
+          "项目现有状态板、计划状态行或旧交接文件",
+          "git 状态、分支、提交与改动文件信息",
+          "本次会话启动的后台任务、服务器、监听进程与构建日志"
+        ],
+        "outputs": [
+          "一份供下一会话首先阅读的交接笔记（如 HANDOVER.md 或项目既有交接文件）",
+          "下一会话的起始指令与仍在运行事项的说明"
+        ],
+        "scenarios": [
+          "会话结束或上下文将满，工作需在明天或新会话继续",
+          "把工作移交给另一个代理继续",
+          "长时段、多会话或含后台任务的工作需要状态板与日志",
+          "需要区分已验证事实与仅凭记忆的说法"
+        ],
+        "prerequisites": [
+          "已安装插件或已将技能文件夹复制进仓库",
+          "能读取 git 状态与相关日志",
+          "项目有既有交接惯例时需先了解"
+        ],
+        "limits": [
+          "交接中不得写入密钥、令牌、密码或连接字符串，只写存放位置",
+          "证据须为实际运行观察到的命令、退出码、数字与结论，未验证须注明",
+          "笔记应短到足以保持真实，同时保留证据",
+          "多会话或后台任务场景应改用 flight-deck 技能",
+          "规则边界不清时可查阅同目录 receipts.md"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Write the one note the next session reads first."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Start that session from what is true rather than what this session remembers."
+          },
+          {
+            "field": "does",
+            "quote": "Check every background job, server, watcher and build this session started."
+          },
+          {
+            "field": "does",
+            "quote": "Correct project state files where the disk contradicts them."
+          },
+          {
+            "field": "does",
+            "quote": "With none, keep one `HANDOVER.md` at the repository root, rewritten in place each time."
+          },
+          {
+            "field": "does",
+            "quote": "End with the next session's starting line and anything left running."
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"<optional: what the next session will do>\""
+          },
+          {
+            "field": "outputs",
+            "quote": "A fresh session given only the note can say what the work is for, what is verified and what is not, and run the next action without asking what happened."
+          },
+          {
+            "field": "scenarios",
+            "quote": "The session is ending, or its context is; work continues tomorrow, in a fresh session, or with another agent."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "/agent-harness:handover                          Claude Code, plugin installed"
+          },
+          {
+            "field": "limits",
+            "quote": "Use the `flight-deck` skill for hours, multiple sessions or background jobs."
+          },
+          {
+            "field": "hosts",
+            "quote": "$agent-harness:handover                          Codex, plugin installed"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Read `git status`, the branch, commits made this session, and files the work touched."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "keep one `HANDOVER.md` at the repository root, rewritten in place each time"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "agent-harness/skills/retro/SKILL.md",
+      "blob_sha": "233279e8e9ddb3137b6ef9de01a16e5d6f620b9c",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-harness/skills/retro/SKILL.md",
+      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "generated_at": "2026-11-13T11:18:42.880Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "retro",
+        "description": "Build a session's learnings into the setup: its friction, what went wrong and why, then an improved instruction, route, hook or script, verified, or 'no setup change warranted'. Started by name only: /agent-harness:retro in Claude Code, $agent-harness:retro in Codex."
+      },
+      "excerpt": "---\nname: retro\ndescription: \"Build a session's learnings into the setup: its friction, what went wrong and why, then an improved instruction, route, hook or script, verified, or 'no setup change warranted'. Started by name only: /agent-harness:retro in Claude Code, $agent-harness:retro in Codex.\"\nargument-hint: \"<optional: the friction you noticed>\"\ndisable-model-invocation: true\n---\n\n# Retro — a session's learnings, built into your setup\n\n**Build the session's learnings into the setup before its context goes.** At the end of a session, find what slowed it down or went wrong, why, and what setup change stops it happening again. The output is fixes made and checked, not a list of lessons.\n\n## Invocation\n\n```\n/agent-harness:retro                             Claude Code, plugin installed\n/agent-harness:retro it ran the tests against the wrong server twice\n$agent-harness:retro                             Codex, plugin installed\n/retro   ·   $retro                              the skill folder copied into a repository\n```\n\n## Steps\n\n### 1. List what actually happened\n\n**List only this session's friction, with the moment each item happened.**\n\n- the owner corrected the agent (quote the correction);\n- the agent missed a rule it had;\n- work was done twice, or undone;\n- an assumption turned out wrong;\n- a tool, script or command failed, or needed a workaround;\n- the owner waited on something the agent could have done.\n\n**Leave out successes and guesses about the future.** List evidence, not new rules: an item with no moment behind it is not one.\n\n### 2. Find the cause of each\n\n| Cause | What it looks like | The fix goes in |\n|---|---|---|\n| Missing | nothing told the agent | the entry file when every session needs it; otherwise the file the agent reads at the moment the rule must change a decision, with a router row for that moment (§ 3) |\n| Present but not met | the rule existed and the agent didn't apply it when it mattered | the route to it (the instructions' index of what to read when), or code |\n| A tool gap | a script, check or wrapper was missing or wrong | the tool |\n| A skill's advice | a skill from a plugin or a collection said something wrong, or left a step out | the project's own agent instructions, naming the skill and what to do instead (§ 3) |\n| A one-off | it won't recur | nowhere: say so |\n\n### 3. Fix it, code first\n\n**Prefer code, then an improved instruction or route, then a new rule.** Use this order:\n\n1. **Hold the fix in code wherever code can hold it.** Use a script, hook, validation, required argument or test. Prose loses when compliance depends on an agent remembering a sentence at the moment it matters. Apply the `guardrail-hooks` skill for hooks and permission rules.\n2. **Improve an existing instruction or route before adding another rule.** Reword the misread rule, or move it where the agent will see it when it applies. Replace or tighten before adding. Removing a rule's text is the owner's decision. Tighten wording without dropping a condition, exception or receipt, or move the rule to its fire point with a pointer left behind. A move is not a removal. You can also add the test or hook that holds it, and propose removal. Apply the `agent-instructions` skill for how instruction files are shaped.\n3. **Add a new rule only when this session gave it a receipt.** Include the date and what happened.\n\n**Put each learning where it must change a decision.** The entry file (`AGENTS.md`, or the project's own name) holds what every session needs. Put the rest at its fire point, not its topic home, usually in the file for the area that task touches. Add an entry-file index line saying when to read it.\n\n**Re-read an area's file at the start of every task touching it.** The index must require this, not once a session. After compaction or a long session, the earlier read is gone. If the router doesn't yet say to re-read at every task, add that sentence. Each file stays within its word budget, and the rule carries its receipt and a review date (`agent-instructions`, budgets).\n\n**Make reversible repository fixes and verify each where it applies.** Pipe a sample payload that must trigger into a hook, and one that must not; for a new or rewired hook, also run its canary in a live session where it has one (the `guardrail-hooks` templates do); otherwise report the wiring unchecked. Never run a real one-way door to test it. Open the route where the agent will read it; run the script. Report an unchecked fix as unchecked. Propose changes outside the repository with exact text; don't make them unless the owner says so. This includes the user's own settings and global instructions.\n\n**Keep a skill's correction in the project's own agent instructions.** Put it where the agent reads it while that skill is in use. Use the router row for when the skill runs, or the entry file if it can fire in any task. An installed plugin copy sits outside the repository; a copied skill is overwritten by its next update, so edits to either are lost.\n\n**Draft skill corrections for the source repository for the owner to file.** Use the repository its plugin or copy came from. Include what the skill says, what happened (the receipt), and replacement text, for the owner to file as an issue there. Follow that repository's skill style: name the product by kind. Include no session names, ids, hostnames, paths, account names or values, since the repository is usually public.\n\n### 4. Report\n\n**Report each item's incident, cause, fix and verification in one line.** When nothing deserves a change, \"no setup change warranted\" is valid and better than a rule that will never fire.\n\n**Don't gate what the owner wouldn't want to click for.** A guard that asks too often trains a reflexive yes.\n\nEach rule's origin, the case that taught it, is in `receipts.md` beside this file; read it when a rule's edge is unclear.\n\n## How you can tell it worked\n\nEach fix names the moment it came from and was checked where it applies, and the next session doesn't hit the same friction.\n",
+      "card": {
+        "title_zh": "会话复盘改进配置",
+        "purpose_zh": "在会话结束前，把本次会话中出现的摩擦、错误及其原因，转化为对指令、路由、钩子或脚本的改进并验证，或判定无需改动配置。",
+        "does": [
+          "列出本次会话实际发生的摩擦及发生时刻，排除成功与猜测",
+          "为每项摩擦判定原因：缺失、有规则未遵守、工具缺口、技能建议错误、一次性问题",
+          "按代码优先、其次改进指令或路由、最后新增规则的顺序实施修复",
+          "把学习点放到能改变决策的位置，并补充入口文件索引与复读要求",
+          "对可逆的仓库修复做验证，未验证的如实标注为未验证",
+          "逐项报告事件、原因、修复与验证，或给出无需改动配置的结论"
+        ],
+        "inputs": [
+          "可选：用户注意到的摩擦描述（argument-hint）",
+          "本次会话的过程记录"
+        ],
+        "outputs": [
+          "已实施并验证的配置修复",
+          "逐项一行式报告：事件、原因、修复、验证",
+          "必要时：仓库外改动的精确建议文本",
+          "必要时：供上游仓库提交的技能修正草稿"
+        ],
+        "scenarios": [
+          "会话结束时复盘并固化经验",
+          "反复出现的同类错误需要加钩子或脚本防再犯",
+          "发现某技能建议有误或漏步骤需在项目内纠正",
+          "判断某次摩擦是否值得改配置"
+        ],
+        "prerequisites": [
+          "已安装 agent-harness 插件，或把技能目录复制进仓库",
+          "仓库内存在入口文件（如 AGENTS.md）与指令路由",
+          "涉及钩子时需参照 guardrail-hooks 技能"
+        ],
+        "limits": [
+          "不列出成功项与对未来的猜测",
+          "删除规则文本须由所有者决定",
+          "仓库外改动（含用户设置与全局指令）只提建议不直接改",
+          "不得运行真实的一次性不可逆操作来测试",
+          "插件安装副本与复制技能会被更新覆盖，不能直接改",
+          "技能修正草稿不得含会话名、ID、主机名、路径、账号名或值"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex"
+        ],
+        "risk_flags": [
+          "writes_files",
+          "shell"
+        ],
+        "tags": [
+          "自动化",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Build the session's learnings into the setup before its context goes."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "find what slowed it down or went wrong, why, and what setup change stops it happening again. The output is fixes made and checked, not a list of lessons."
+          },
+          {
+            "field": "does",
+            "quote": "List only this session's friction, with the moment each item happened."
+          },
+          {
+            "field": "does",
+            "quote": "Leave out successes and guesses about the future."
+          },
+          {
+            "field": "does",
+            "quote": "Prefer code, then an improved instruction or route, then a new rule."
+          },
+          {
+            "field": "does",
+            "quote": "Put each learning where it must change a decision."
+          },
+          {
+            "field": "does",
+            "quote": "Make reversible repository fixes and verify each where it applies."
+          },
+          {
+            "field": "does",
+            "quote": "Report each item's incident, cause, fix and verification in one line."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "/agent-harness:retro                             Claude Code, plugin installed"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "$agent-harness:retro                             Codex, plugin installed"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Apply the `guardrail-hooks` skill for hooks and permission rules."
+          },
+          {
+            "field": "limits",
+            "quote": "Removing a rule's text is the owner's decision."
+          },
+          {
+            "field": "limits",
+            "quote": "Propose changes outside the repository with exact text; don't make them unless the owner says so."
+          },
+          {
+            "field": "limits",
+            "quote": "Never run a real one-way door to test it."
+          },
+          {
+            "field": "limits",
+            "quote": "a copied skill is overwritten by its next update, so edits to either are lost."
+          },
+          {
+            "field": "limits",
+            "quote": "Include no session names, ids, hostnames, paths, account names or values, since the repository is usually public."
+          },
+          {
+            "field": "hosts",
+            "quote": "/retro   ·   $retro                              the skill folder copied into a repository"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Open the route where the agent will read it; run the script."
+          }
+        ]
+      }
+    }
+  ]
+}
