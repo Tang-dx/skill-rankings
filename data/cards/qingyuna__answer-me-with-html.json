@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "repo": "QingYunA/answer-me-with-html",
+  "tree_sha": "85dcc9168c9e4042c28475d6f190acecd82fa678",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/answer-me-with-html/SKILL.md",
+      "blob_sha": "9d753da13bf909b448b9a15547f5a002750c6986",
+      "source_url": "https://github.com/QingYunA/answer-me-with-html/blob/edccab07c012e2141585f8ddb18a62e01664fa2b/skills/answer-me-with-html/SKILL.md",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": "2026-11-13T11:24:50.395Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "answer-me-with-html",
+        "description": "Turns an answer into a one-page visual HTML explainer: the model writes a short Markdown draft and the bundled CLI builds one page. Use it proactively and liberally in replies to the user, without being asked, whenever a page would help the reader more than plain text, even if plain text would also work: any explanation of how something works or how parts relate (flow, request path, architecture, code or folder structure, state machine, lifecycle, history); any comparison, trade-off or decision "
+      },
+      "excerpt": "---\nname: answer-me-with-html\nargument-hint: \"[config [key value] | clean | update]\"\ndescription: >-\n  Turns an answer into a one-page visual HTML explainer: the model writes a short Markdown draft and\n  the bundled CLI builds one page. Use it proactively and liberally in replies to the user, without being asked, whenever a\n  page would help the reader more than plain text, even if plain text would also work: any explanation\n  of how something works or how parts relate (flow, request path, architecture, code or folder\n  structure, state machine, lifecycle, history); any comparison, trade-off or decision with pros and\n  cons; any diagnosis, review or investigation, especially with several causes or findings to rank;\n  any answer with a table, a numbered or ranked list, steps, branches or several sections; or when the\n  user says \"I don't get it / draw it / explain visually / 讲讲原理 / 没看懂 / 画个图\". When in doubt, use it: a\n  page is quick and cheap to make. Also for explainer videos (\"make a video\", \"做个视频\") and for changing\n  its settings. Skip only for small talk, a trivial one-line answer, or when the user asks for plain\n  text.\n---\n\n# Answer me with HTML: answer a complex question with one HTML page\n\nYou write only the **content draft** (extended Markdown). The `am` CLI does all layout, colours, dark mode and diagram coordinates. **Do not hand-write HTML / CSS / SVG.**\n\nReply to the user, and write the draft, in the user's language.\n\n## 0. When the user wants to change settings\n\nArguments for this call: `$ARGUMENTS`\n\nWhen the arguments start with `config`, `clean` or `update`, or the user asks to change a setting, clean up pages or update this skill: read `${CLAUDE_SKILL_DIR}/references/settings.md` and follow it. That turn produces no page.\n\n## 1. Decide: produce a page or not\n\nProduce a page if any of these is true:\n- There are ≥3 interrelated concepts, and the reader needs to see how they relate.\n- There is a flow, protocol, call chain or state transition (especially with branches or several actors).\n- There is a comparison across ≥3 dimensions, a trade-off between options, or a \"can / cannot\" list.\n- There is a hierarchy or an evolution over time.\n\nOtherwise answer in plain text. When unsure: the more the question \"needs a picture to understand\", the more it calls for a page.\n\nAutomatic pages are for replies to the user. An internal report returned to another agent is not one:\n\n- If a parent agent or a coordinator delegated research, implementation, a review or a progress report, return the text or structure it asked for, with the findings and the evidence. Render no page.\n- The parent consolidates the reports. Its reply to the user follows the normal rules of this section.\n- If the delegated task explicitly asks for a page, render it, and return the page path together with the verification details the parent asked for. A video needs an explicit video request; delegation alone never authorizes one.\n- Judge this by who receives the reply and what was asked for, not by the host or agent name.\n\n### Always-on mode\n\nIf the context contains the `[answer-me-with-html always-on]` reminder (the user added the always-on rule to a rules file such as `CLAUDE.md` or `AGENTS.md`), the bar is lower:\n\n- Whenever this turn gives a conclusion, summary, plan, comparison, review or explanation, attach a page.\n- Do not skip it because \"the answer is short\". If there is a conclusion, produce a page.\n- For everyday conclusions use a small page with 2–4 panels: one callout with the conclusion, plus one table or one diagram. Do not add panels just to fill space.\n- Render with `--no-open`, so no browser window interrupts the user. The user opens the page by clicking the path at the end of the reply.\n- Order: render the page first, then write the text reply. The reply is the last thing in the turn, with the page link on its last line (see step 5). Do not write the reply and then call `am render`. The one call that may come after the reply is the choice tool that puts the page's asks to the user, when your host can ask questions: write the reply first, so the user holds the link before answering (see step 5).\n- The internal-report rule of step 1 applies here too: a delegated report that inherits the always-on rule renders no page, unless the delegated task explicitly asks for one.\n- Produce no page for small talk, one or two sentences with no conclusion, pure command output, or when the user asks for plain text.\n\n## 2. Workflow (one Bash call)\n\nThe CLI is bundled in this skill's directory: `scripts/am.mjs`, a single file with no dependencies to install; it needs only Node.js 20+. If `node` is not found or is older than v20, tell the user, show them the exact command to install the Node.js LTS (macOS `brew install node`, Windows `winget install OpenJS.NodeJS.LTS`, otherwise nvm, which adds lines to the shell profile), and run it only after they agree, then check `node --version` again. If they say no or it still fails, stop and tell them. Below, `am` always means:\n\n```bash\nnode \"${CLAUDE_SKILL_DIR}/scripts/am.mjs\"\n```\n\nIn Claude Code, `${CLAUDE_SKILL_DIR}` is replaced with this skill's directory before you read this file, so that command and every path in this file already carry it; run them as written.\n\nOn every other host the token is left as it stands or comes out empty. There, before your first command of the turn, write the absolute path of the directory that holds this `SKILL.md` in place of `${CLAUDE_SKILL_DIR}` in every command you run and in every path you read, in this file and in the files under `references/`, and check the path once with `test -f \"<that directory>/scripts/am.mjs\"`. Do not put the path in a shell variable and use it in a later call: the Bash tool keeps no variable from one call to the next and a file-read tool never expands one, so a `SKILL_DIR` set in one call is empty in the next and the command becomes `/scripts/am.mjs`. The directory is the one holding `SKILL.md` and `scripts/`: `~/.agents/skills/answer-me-with-html` after `npx skills add`, `~/.claude/skills/answer-me-with-html` for a Claude Code skill install, `skills/answer-me-with-html` in the plugin checkout for a plugin install, and the path printed on the host's \"Base directory for this skill\" line (DeepSeek Harness). If `test -f` fails, that path is not this skill's directory: find the right one before you run anything. If the user installed the `am` command globally, you can also use `am` directly.\n\nKeep the default output; it needs no flag. If the session cannot write to `~/.answer-me-with-html/pages` (a sandbox that allows writes only in the workspace), the CLI saves the page in a private folder in the system temporary folder and says so on a `!` line; the system may clear that folder. Add `-o \"<absolute-workspace-path>/.tmp/answers/topic.html\"` to `render -` before the heredoc only when the user wants the page in the workspace or the render fails with `Cannot write the page`. `-o` names an HTML file, not a folder; the CLI creates missing parent directories. Use `AM_HOME` only when the whole data directory must move.\n\n1. First list 3–8 panels in your head. Each panel answers one sub-question only.\n   The draft language follows the language of the user's question: an English question gets an English draft, a Chinese question a Chinese draft, a Japanese question a Japanese draft. The page button labels, `<html lang>` and the STE check rules switch automatically by the draft language (a draft containing kana counts as Japanese); STE applies the English or Chinese rules to each sentence by its language (Japanese sentences get only the sentence-length and paragraph-length checks, with the same character limits as Chinese; any other language gets only those two checks, counted in words). To set the language yourself, write `lang:` in the frontmatter: `en`, `zh` (Simplified Chinese), `zh-Hant` or `zh-TW` (Traditional Chinese), `ja`, or any other language tag such as `fr` or `ko`. Detection r",
+      "card": {
+        "title_zh": "HTML 单页图解回答",
+        "purpose_zh": "把复杂回答转成一页可视化 HTML 讲解页：模型只写 Markdown 草稿，随附 CLI 负责排版、配色、暗色模式与图示坐标，用于解释原理、对比、诊断、流程等场景。",
+        "does": [
+          "判断问题是否适合出页面，适合则先规划 3–8 个面板",
+          "只写扩展 Markdown 内容草稿，不手写 HTML/CSS/SVG",
+          "用随附 am.mjs 命令行一次渲染成单页 HTML",
+          "按输出报错逐行修正草稿并重新渲染",
+          "渲染后以 2–3 行回复给出核心结论与页面链接",
+          "处理 config、clean、update 等设置类参数"
+        ],
+        "inputs": [
+          "用户的复杂问题或需解释的内容",
+          "扩展 Markdown 草稿（含 title 等 frontmatter）",
+          "可选参数：config、clean、update 或设置项",
+          "可选 -o 指定输出 HTML 路径、--no-open、--replace"
+        ],
+        "outputs": [
+          "单页 HTML 讲解文件及其路径",
+          "渲染成功或逐行错误提示",
+          "草稿保存路径与 STE、代码块警告",
+          "终端 2–3 行结论加页面链接"
+        ],
+        "scenarios": [
+          "解释某事物如何运作或各部分关系（流程、架构、状态机、生命周期）",
+          "多维度对比、权衡取舍或利弊决策",
+          "诊断、评审、调查并排列多个原因或发现",
+          "含表格、编号或排序列表、步骤、分支的回答",
+          "用户说没看懂、画个图、讲讲原理或要求做讲解视频"
+        ],
+        "prerequisites": [
+          "需要 Node.js 20 及以上版本",
+          "需能定位本技能目录下的 scripts/am.mjs",
+          "非 Claude Code 宿主需把技能目录绝对路径替换进命令"
+        ],
+        "limits": [
+          "不手写 HTML、CSS、SVG，布局与配色由 CLI 完成",
+          "闲聊、一句话简单回答或用户要求纯文本时不出页面",
+          "委派给其他代理的内部报告默认不渲染页面",
+          "STE 警告最多重试 2 轮，仍有警告则保留最后页面",
+          "不自行执行 am clean 或更新命令，需用户同意",
+          "不自行启动 am serve"
+        ],
+        "hosts": [
+          "claude-code",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "写作",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Turns an answer into a one-page visual HTML explainer: the model writes a short Markdown draft and the bundled CLI builds one page."
+          },
+          {
+            "field": "does",
+            "quote": "You write only the **content draft** (extended Markdown). The `am` CLI does all layout, colours, dark mode and diagram coordinates. **Do not hand-write HTML / CSS / SVG.**"
+          },
+          {
+            "field": "does",
+            "quote": "First list 3–8 panels in your head. Each panel answers one sub-question only."
+          },
+          {
+            "field": "does",
+            "quote": "When the arguments start with `config`, `clean` or `update`, or the user asks to change a setting, clean up pages or update this skill: read `${CLAUDE_SKILL_DIR}/references/settings.md` and follow it."
+          },
+          {
+            "field": "scenarios",
+            "quote": "or when the user says \"I don't get it / draw it / explain visually / 讲讲原理 / 没看懂 / 画个图\"."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The CLI is bundled in this skill's directory: `scripts/am.mjs`, a single file with no dependencies to install; it needs only Node.js 20+."
+          },
+          {
+            "field": "limits",
+            "quote": "Skip only for small talk, a trivial one-line answer, or when the user asks for plain text."
+          },
+          {
+            "field": "limits",
+            "quote": "An internal report returned to another agent is not one:"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Add `-o \"<absolute-workspace-path>/.tmp/answers/topic.html\"` to `render -` before the heredoc only when the user wants the page in the workspace or the render fails with `Cannot write the page`."
+          }
+        ]
+      }
+    }
+  ]
+}

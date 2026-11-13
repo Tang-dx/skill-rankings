@@ -8,7 +8,7 @@
       "skill_path": "agent-harness/skills/agent-instructions/SKILL.md",
       "blob_sha": "c0cf0712d2fd10a2f7aeb252da3600395197a330",
       "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-harness/skills/agent-instructions/SKILL.md",
-      "fetched_at": "2026-11-13T11:18:42.880Z",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -147,18 +147,114 @@
       "skill_path": "agent-harness/skills/guardrail-hooks/SKILL.md",
       "blob_sha": "2da079e5863ba920546186edea91b6fa6e57ad2b",
       "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-harness/skills/guardrail-hooks/SKILL.md",
-      "fetched_at": "2026-11-13T11:18:42.880Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": "2026-11-13T11:24:50.395Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "guardrail-hooks",
         "description": "An agent keeps breaking a rule ('it did it again', 'make this impossible', 'add a hook', 'my hook didn't fire'): make it a hook, permission rule or script."
       },
       "excerpt": "---\nname: guardrail-hooks\ndescription: \"An agent keeps breaking a rule ('it did it again', 'make this impossible', 'add a hook', 'my hook didn't fire'): make it a hook, permission rule or script.\"\n---\n\n# Guardrail hooks — rules held by code\n\n**Make rules that depend on memory at decisive moments into code paths.** Prose loses that contest to everything else the agent has read. Apply the `agent-instructions` skill for the principle, evidence and test question in its prose-vs-code reference. This skill covers choosing the code path, writing a hook without noise, and two hooks to adapt.\n\n## Pick the smallest code path that holds the rule\n\n**Choose the smallest code path that holds the rule.** A permission rule beats a hook. A refusal inside your own tool beats both, because it holds for every agent and every human running it.\n\n| The rule is about | Hold it with | Example |\n|---|---|---|\n| a command the agent may run, recognisable by its prefix | a permission rule in settings: `permissions.ask: [\"Bash(gh repo delete *)\"]`, or `permissions.deny` | checked against every subcommand, inside `$()` and loop bodies too, and still prompts in auto mode (read `2026-10-24`). No script to maintain |\n| what a command does when its text alone can't tell: code in a heredoc, a script it runs, the value of an argument | a PreToolUse hook | `scripts/guard_one_way_doors.py`, `scripts/block_wrong_identity.py` |\n| how your own tool may be used | a required argument, or a refusal inside the tool | a search-analytics tool: pulls paginate and write a manifest of the exact window, and the report refuses to run without one |\n| what a commit may contain | a git pre-commit hook in the repository, switched on per clone (`git config core.hooksPath .githooks`, set by a session-start hook) | refusing a commit that empties or halves a bookkeeping file |\n| what must be true before the agent says it is done | a Stop hook returning `decision: \"block\"` with the reason | tests ran; the release log has every step |\n| what the agent must know when it starts | a SessionStart hook returning `additionalContext` | git state checked by code: a shallow clone deepened before any ancestry check; a warning when the session started on a machine-named branch |\n| a derived file that must track its source | a PostToolUse hook that runs the sync | a one-way mirror of the skills folder for agents that read another path, re-synced on every write; it always exits 0 so a sync hiccup never blocks a tool |\n\n**For instruction-file rules held by code, state enforcement and its limits.** For example: “Bash is held by a hook; MCP tools and browser clicks are not covered, so the rule still binds there”.\n\n## Writing a guard that holds without becoming noise\n\nEach rule came from a receipt.\n\n1. **Gate only what the owner would actually want to click for.** Asking too often trains a reflexive yes, which is worse than no guard. The one-way-door guard here gates public deletes and publishes.\n2. **Match what runs, not what is mentioned.** Cut heredoc bodies out before matching command rules: text written to a file is not a command. Inside code, match the API call (`.delete_post(`), never a CLI string a docstring might quote. `scripts/block_wrong_identity.py` matches per command segment and only on `commit` for `--author`. It allows `git log --author=<address>` and tests whose JSON merely contains the address.\n3. **Look inside what the command runs.** A command-text guard is blind to `python cleanup.py`. Open local scripts the command runs, and heredoc bodies fed to an interpreter, and scan them with the code rules. A delete can be callable from any inline script.\n4. **Choose the verdict on purpose.** `ask` forces a human prompt even in auto mode, and denies in non-interactive runs where nobody can answer. `deny` refuses and tells the agent why. Exit 2 refuses and is the one form Claude Code, Codex and Cursor all honor. Address the agent in the reason too: “Agent: never approve this on the owner's behalf”. A prompt it can talk the owner through is a formality.\n5. **The go for a one-way door is typed in the conversation, never on a side page.** Approval on a decisions page, doc or ticket arrives as a tool result, which the harness check does not read. Claude Code's auto-mode classifier sees user messages and agent tool calls, with tool results stripped so file or page content cannot steer it (permission-modes docs, read `2026-10-25`). A message clears a block only when it names the action and its specifics, such as the branch of a force push (permission-modes docs, read `2026-10-25`). The verb alone is insufficient. A prompt forced by an ask rule or hook needs the click whatever was said. If the owner answered on a side page, ask for the go in conversation, naming the action and target.\n6. **Never block the way out.** A spend fuse exempts its own management commands, so disarming works when the session is over budget. A guard blocking the command that clears it has to be removed by hand.\n7. **Decide which way it fails.** By default, a hook that cannot start, crashes, exits 1 or times out lets the action through. For policy hooks, set `\"onFailure\": \"block\"` (Claude Code 2.1.295 or later) and use exit 2, never 1, to block. Watch the first run for a `hook error` notice. A mistyped settings path means the hook never runs and nothing else says so.\n8. **Keep stdout to one JSON object.** Anything else, such as a shell profile's greeting, makes the decision unreadable. An unreadable decision is a non-blocking error.\n9. **Test it like a program, before wiring it.** A command hook reads JSON on stdin and answers with an exit code and stdout. Pipe in samples that must trigger and look-alikes that must not. `scripts/test_hooks.py` does this, testing the guards in its own folder: run the copy beside the hooks you installed, and replace its cases when you replace the rules.\n10. **Know what a hook can't see.** `PreToolUse` fires on tool calls only, not files the user `@`-mentions. A `Bash` matcher doesn't cover an MCP tool or browser doing the same thing. Codex's docs say some tool paths opt out of hooks entirely. A hook is a guardrail, not a sandbox.\n11. **To stop a run, use `Stop`.** `continue: false` from a `Stop` hook stops the agent and takes precedence over event-specific “continue” decisions. This lets a spend fuse beat `/goal`, itself a Stop hook (precedence confirmed in docs, read `2026-10-24`). A blocking `Stop` hook must check `stop_hook_active`; Claude Code ends the turn after 8 consecutive continuations anyway.\n\n## The scripts\n\n**The scripts use standard-library Python and read and write UTF-8 explicitly.** On Windows, Python otherwise decodes the pipe with the ANSI code page. Configure them in a top-level `CONFIG` block, a JSON file or environment variables. They read `tool_input.command` for Claude Code and Codex, or top-level `command` for Cursor's `beforeShellExecution`.\n\n**Block an address that must never author a commit, and still allow searching for it.**\n\n| File | Does | Configure |\n|---|---|---|\n| `scripts/guard_one_way_doors.py` | asks (or denies, or exits 2) before an irreversible or public action: command rules on what the shell runs with heredocs cut out; code rules inside heredoc bodies and local scripts the command runs by path (`python cleanup.py`); it does not see, among others, `python -c` or `node -e` code, a script run after a `cd`, `./script`, `python -m`, `uv run x.py`, piped code or a path with spaces, so a delete reached that way runs unasked; it always answers `true guard-canary` | `command_rules`, `code_rules`, `skip_scripts`, `mode` in `CONFIG`; or `--config <file>` / `ONE_WAY_DOORS_CONFIG` (keys replace CONFIG's); `ONE_WAY_DOORS_MODE=ask\\|deny\\|block` |\n| `scripts/block_wrong_identity.py` | exits 2 when a forbidden address is set as a git identity (`user.email`, `-c user.email=`, `GIT_AUTHOR_EMAIL=` and friends) or passed as a commit's `--author`; searching for it is allowed | `blocked_emails` in `C",
-      "card": null
+      "card": {
+        "title_zh": "护栏钩子规则代码化",
+        "purpose_zh": "把依赖记忆的规则转成代码路径：优先权限规则，其次钩子或工具内拒绝；并给出编写、配置、测试与安装护栏钩子的方法。",
+        "does": [
+          "按规则类型选择最小代码路径：权限规则、PreToolUse钩子、工具内拒绝、git pre-commit、Stop、SessionStart、PostToolUse",
+          "提供两个可改编脚本：单向门动作拦截与禁止身份提交",
+          "提供测试脚本，用样例载荷校验退出码与决策",
+          "说明钩子编写原则：只拦值得确认的动作、匹配实际执行内容、选对裁决、失败方向、stdout单JSON",
+          "给出Claude Code、Codex、Cursor的接线与canary验证步骤",
+          "列出Windows下Git Bash反斜杠、PowerShell与UTF-8输出等注意事项"
+        ],
+        "inputs": [
+          "钩子读取的JSON（stdin），含tool_input.command或Cursor顶层command",
+          "CONFIG配置块、--config指定的JSON文件或环境变量（如ONE_WAY_DOORS_CONFIG、ONE_WAY_DOORS_MODE、BLOCKED_GIT_EMAILS）",
+          "settings中的hooks配置（matcher、command、args、onFailure）",
+          "测试用的样例载荷与仿冒样例"
+        ],
+        "outputs": [
+          "钩子决策：ask提示、deny拒绝、exit 2拒绝或放行",
+          "Stop钩子返回decision: block及原因",
+          "SessionStart钩子返回additionalContext",
+          "测试脚本的退出码与决策校验结果"
+        ],
+        "scenarios": [
+          "代理反复违反同一条规则，需要让规则由代码强制执行",
+          "需要拦截不可逆或公开动作（如公开删除、发布）",
+          "需要禁止某地址作为git提交身份或--author",
+          "需要在代理声称完成前校验测试已跑、发布日志完整",
+          "需要在会话开始时检查git状态并补充上下文"
+        ],
+        "prerequisites": [
+          "使用标准库Python编写脚本，显式读写UTF-8",
+          "Claude Code需将脚本放入.claude/hooks/或~/.claude/hooks/并在settings中接线",
+          "Codex需在.codex/hooks.json接线并设mode为block，且每次编辑后在/hooks信任钩子",
+          "Cursor需在beforeShellExecution注册钩子",
+          "策略钩子建议设置onFailure为block并使用exit 2",
+          "安装后运行test_hooks.py直至通过，并用canary验证"
+        ],
+        "limits": [
+          "钩子只是护栏不是沙箱：PreToolUse只对工具调用生效，不覆盖用户@提及的文件",
+          "Bash matcher不覆盖MCP工具或浏览器执行的同类动作",
+          "guard_one_way_doors.py看不到python -c、node -e、cd后脚本、./script、python -m、uv run x.py、管道代码或含空格路径，删除可能未经询问执行",
+          "Codex解析ask但不支持，会标记运行失败并放行",
+          "钩子无法启动、崩溃、exit 1或超时时默认放行",
+          "设置路径写错时钩子不会运行且无提示",
+          "厂商事实有时效，需定期复核"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "cursor"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "安全",
+          "自动化",
+          "代码审查",
+          "运维部署"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Make rules that depend on memory at decisive moments into code paths."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "This skill covers choosing the code path, writing a hook without noise, and two hooks to adapt."
+          },
+          {
+            "field": "does",
+            "quote": "scripts/guard_one_way_doors.py"
+          },
+          {
+            "field": "does",
+            "quote": "scripts/block_wrong_identity.py"
+          },
+          {
+            "field": "does",
+            "quote": "scripts/test_hooks.py"
+          },
+          {
+            "field": "scenarios",
+            "quote": "An agent keeps breaking a rule ('it did it again', 'make this impossible', 'add a hook', 'my hook didn't fire'): make it a hook, permission rule or script."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The scripts use standard-library Python and read and write UTF-8 explicitly."
+          },
+          {
+            "field": "limits",
+            "quote": "A hook is a guardrail, not a sandbox."
+          }
+        ]
+      }
     },
     {
       "skill_path": "agent-harness/skills/handover/SKILL.md",
@@ -430,6 +526,601 @@
           }
         ]
       }
+    },
+    {
+      "skill_path": "agent-harness/skills/windows-agent-shell/SKILL.md",
+      "blob_sha": "ca3c0725aea0a2b5add4399146e18734b75f66ad",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-harness/skills/windows-agent-shell/SKILL.md",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": "2026-11-13T11:24:50.395Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "windows-agent-shell",
+        "description": "A coding agent on Windows: Git Bash path rewriting, PowerShell quoting and encoding, CRLF. Use when output comes back garbled, or it works here and breaks there."
+      },
+      "excerpt": "---\nname: windows-agent-shell\ndescription: \"A coding agent on Windows: Git Bash path rewriting, PowerShell quoting and encoding, CRLF. Use when output comes back garbled, or it works here and breaks there.\"\n---\n\n# Windows agent shell — traps, and the works-here-breaks-there class\n\n**When something works here and breaks there, suspect the environment you did not measure.** A Windows coding agent runs through Git Bash, PowerShell or cmd. Each splits arguments, expands characters, converts paths and decodes text differently. A command right in one can pass with a different meaning in another.\n\n**Hold the invocation constant before attributing a change to configuration.** The shell, CLI version, path spelling and line endings are part of the invocation. Every version-specific line carries its version and observation date. Vendors change these monthly; `§ Re-verify` explains how to retest.\n\n## First, know which shell runs the command\n\n- **Claude Code's Bash tool on Windows uses Git Bash when installed.** Git Bash is MSYS2. Without Git for Windows it uses PowerShell instead (2.1.120), and with the PowerShell tool enabled PowerShell becomes primary (2.1.126; changelog, read `2026-10-24`).\n- **Shell-form hooks use Git Bash, or PowerShell when Git Bash is missing.** Cursor runs hook commands through PowerShell; Codex takes a separate `commandWindows`. Apply the `guardrail-hooks` skill for the hook side.\n- **PowerShell 7 is a separate install and is often absent.** Windows PowerShell 5.1 (`powershell.exe`) ships with Windows; PowerShell 7 uses `pwsh`. A script or instruction saying `pwsh` fails where it is absent.\n- **Measure the same arguments in the same shell, rather than reasoning.** Run `python <skill dir>/scripts/probe_argv.py <the same arguments>`. It prints exactly what the program receives and which encodings its pipes use.\n\n## Paths\n\n1. **Forward slashes, always, in anything a bash shell will read.** Bash treats `\\` as an escape. Write `C:/Python313/python.exe`; Windows accepts it. Backslashes also fed Claude Code's Windows command analyser and caused permission prompts (observed `2026-08-16`).\n2. **Uppercase the drive letter for any tool that takes its root from the working directory.** Use `C:/work/app` rather than `c:/work/app` with `npm --prefix`. On Vitest, a lowercase drive can give `No test suite found`, zero tests and exit 1 (observed `2026-08-22`). Keep the command shape constant when comparing runs: changed shapes can look like a worker-count cliff or a broken suite.\n3. **Prevent Git Bash from rewriting leading-slash arguments passed to native programs.** It rewrites any argument starting with `/` into a Windows path before the program sees it. `gh api /repos/owner/name` fails with `invalid API endpoint: \"C:/Program Files/Git/repos/owner/name\"`. `--flag=/etc/x` arrives as `--flag=C:/Program Files/Git/etc/x` (verified and observed `2026-10-24`, Git 2.49.0, gh 2.100.0). Drop the leading slash (`gh api repos/owner/name`) or set `MSYS_NO_PATHCONV=1` for that command.\n4. **Convert Git Bash's `/c/x` paths before Windows programs open them.** Git Bash spells `C:/x` as `/c/x`, which Windows programs can't open. Convert paths read from commands (`/c/x` → `C:/x`). Claude Code hook-input file paths arrive with backslashes even under Git Bash (docs, read `2026-10-24`); normalize before comparing.\n5. **A generated file written with the host's separators must not be tracked.** Untrack it, don't commit one OS's copy. A sync-generated package manifest can use native separators that the other platform's compiler rejects as invalid escapes. The trap is tracking the generated file at all.\n6. **A junction makes a delete reach somewhere else.** `npm --prefix <worktree> install` can create a package junction to another checkout when run from a checkout supplying a package the worktree depends on. Recursive deletion of `node_modules`, or `git worktree remove --force`, goes through that junction. Run installs with the target as the process's working directory. List `node_modules` for junctions before deleting; remove the junction itself first. `rmdir` on the link doesn't follow it. Then run `git worktree remove` without `--force`.\n\n## Arguments and quoting\n\n1. **Backticks inside `git commit -m \"...\"` are command substitution.** Backticked words execute and are replaced by their output, usually nothing, without warning. See § Commit messages for the safe spelling.\n2. **PowerShell splits a bare `-c.foo=bar` token in two.** Windows PowerShell 5.1 does this too (reproduced and observed `2026-10-24`, 5.1.26100): `[\"-c\", \".a.b=c\"]` bare, `[\"-c.a.b=c\"]` quoted. Quote it, and pin the quoted spelling with a test. A matrix can half-break and look finished: check the assets, not the run. A flag that has never been passed before has never been tested.\n3. **Judge native PowerShell calls by `$LASTEXITCODE`, with stderr non-fatal around them.** Under `$ErrorActionPreference = \"Stop\"`, Windows PowerShell 5.1 turns redirected native stderr into a terminating error. Reproduced `2026-10-24` (5.1.26100): an exit-0 program writing one warning, called with `2>&1`, ended the script with `NativeCommandError`.\n4. **In PowerShell, an environment variable set to an empty string is deleted.** `$env:DATABASE_URL = \"\"` removes it, so a loader such as dotenv fills it back in from `.env`; a supposedly database-free run reaches the configured database. Bash's `DATABASE_URL= cmd` passes an empty value instead (reproduced and observed `2026-10-25`, 5.1.26100). Set a single space when the code trims values to absent, or pass an explicit flag. When an attempt may have touched a real system, say so in the handoff.\n5. **Long PowerShell scripts: launch them from the Bash tool.** Claude Code's PowerShell tool capped a call at 10 minutes (observed `2026-09-25`), which can kill a release between the tag and the installers. Use `powershell.exe -NoProfile -ExecutionPolicy Bypass -File <script>` from the Bash tool with a long timeout. This has carried 16-minute runs without interruption.\n\n## Encoding and line endings\n\n1. **Never edit a UTF-8 file through Windows PowerShell 5.1's `Get-Content`.** It decodes with the ANSI code page. `(Get-Content f -Raw) -replace 'a','b' | Set-Content f -Encoding utf8` gives each `§` a stray `Â`. It turns every `—` into `â` `€` `”`; `-Encoding utf8` makes the write look safe, but the damage is on the read. Reproduced and observed `2026-10-24` (5.1.26100): the write also adds a UTF-8 BOM and trailing CRLF.\n   - **Edit with the agent's own tool and pass CLI text as a file.** Use `--body-file` or `-F body=@file`, which reads bytes.\n   - **Detect encoding damage and line endings with `check_text.py`.** Run `python <skill dir>/scripts/check_text.py <files>` to flag mojibake, BOM, CRLF and invalid UTF-8.\n   - **Restore the last good version and redo the edit.** Use `git checkout <good-ref> -- <file>`. Don't reverse double encoding: CP1252's 0x80–0x9F range doesn't round-trip, so reversal loses characters.\n2. **Configure Python's piped text as UTF-8 explicitly on Windows.** Python otherwise reads and writes pipes in locale-dependent `cp1250` or `cp1252`. `PYTHONUTF8=1` uses `utf-8` (observed `2026-10-24`, Python 3.13.1). In piped scripts, reconfigure stdout and stderr to UTF-8 and decode stdin as UTF-8 bytes, or set `PYTHONUTF8=1`.\n3. **A tool or a delegate can rewrite line endings behind a clean diff.** `core.autocrlf` can normalize CRLF on commit while leaving the working tree wrong despite `.gitattributes` specifying `eol=lf`. Source-anchored tests can fail in a file the batch never touched, misleading a delegate into blaming the checkout.\n   - **Check tracked working copies with `git ls-files --eol | grep w/crlf`.** It lists endings differing from the index. Use `check_text.py` for untracked files; `grep -c $'\\r'` is not reliable under Git Bash.\n   - **Fix CRLF with `check_text.py --fix-crlf <files>`, which changes nothing else.**\n\n## Claude Code auto mode on Windows Git Bash: v",
+      "card": {
+        "title_zh": "Windows代理Shell陷阱指南",
+        "purpose_zh": "说明Windows上编码代理经Git Bash、PowerShell或cmd执行命令时的路径改写、参数拆分、引号、编码与换行差异，帮助排查此处正常彼处失败的问题。",
+        "does": [
+          "区分命令实际由Git Bash、PowerShell还是cmd执行",
+          "说明Git Bash对前导斜杠参数的路径改写及规避方式",
+          "说明PowerShell参数拆分、退出码判断与环境变量置空行为",
+          "说明Windows PowerShell 5.1读写UTF-8文件的编码损坏风险",
+          "提供检测乱码、BOM、CRLF与修复换行的脚本用法",
+          "记录Claude Code自动模式在Windows Git Bash下的命令写法限制"
+        ],
+        "inputs": [
+          "待排查的命令及其参数",
+          "待检查的文本文件路径",
+          "代理所在Windows环境与shell类型",
+          "Claude Code等工具的版本号"
+        ],
+        "outputs": [
+          "命令实际收到的参数与管道编码信息",
+          "文本文件的乱码、BOM、CRLF、非法UTF-8检测结果",
+          "修复CRLF后的文件",
+          "按版本记录的规避写法与复测结论"
+        ],
+        "scenarios": [
+          "命令在此机器正常、在另一环境失败时定位环境差异",
+          "Git Bash下调用gh等原生程序时参数被改写",
+          "PowerShell脚本中stderr或环境变量行为异常",
+          "提交信息或文档出现乱码、多余BOM或CRLF",
+          "Claude Code自动模式频繁弹出权限确认"
+        ],
+        "prerequisites": [
+          "运行环境为Windows，且涉及Git Bash、PowerShell或cmd",
+          "需要时可运行skill目录下的probe_argv.py与check_text.py",
+          "排查Claude Code问题时需知道其具体版本"
+        ],
+        "limits": [
+          "版本相关结论均标注观察日期，厂商每月可能变化，需按§Re-verify复测",
+          "部分规避写法仅在特定版本（如2.1.232/2.1.233）测得",
+          "双编码损坏无法可靠逆转，只能回退到上一良好版本重做",
+          "autoMode配置只从用户设置读取，项目设置无效"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "codex"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "运维部署",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A Windows coding agent runs through Git Bash, PowerShell or cmd. Each splits arguments, expands characters, converts paths and decodes text differently."
+          },
+          {
+            "field": "does",
+            "quote": "It rewrites any argument starting with `/` into a Windows path before the program sees it."
+          },
+          {
+            "field": "does",
+            "quote": "Run `python <skill dir>/scripts/probe_argv.py <the same arguments>`. It prints exactly what the program receives and which encodings its pipes use."
+          },
+          {
+            "field": "does",
+            "quote": "Run `python <skill dir>/scripts/check_text.py <files>` to flag mojibake, BOM, CRLF and invalid UTF-8."
+          },
+          {
+            "field": "does",
+            "quote": "Fix CRLF with `check_text.py --fix-crlf <files>`, which changes nothing else."
+          },
+          {
+            "field": "does",
+            "quote": "In PowerShell, an environment variable set to an empty string is deleted."
+          },
+          {
+            "field": "does",
+            "quote": "Judge native PowerShell calls by `$LASTEXITCODE`, with stderr non-fatal around them."
+          },
+          {
+            "field": "inputs",
+            "quote": "Run `python <skill dir>/scripts/check_text.py <files>`"
+          },
+          {
+            "field": "outputs",
+            "quote": "It prints exactly what the program receives and which encodings its pipes use."
+          },
+          {
+            "field": "outputs",
+            "quote": "to flag mojibake, BOM, CRLF and invalid UTF-8"
+          },
+          {
+            "field": "scenarios",
+            "quote": "When something works here and breaks there, suspect the environment you did not measure."
+          },
+          {
+            "field": "scenarios",
+            "quote": "`gh api /repos/owner/name` fails with `invalid API endpoint: \"C:/Program Files/Git/repos/owner/name\"`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**PowerShell 7 is a separate install and is often absent.**"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Every version-specific line carries its version and observation date."
+          },
+          {
+            "field": "limits",
+            "quote": "Vendors change these monthly; `§ Re-verify` explains how to retest."
+          },
+          {
+            "field": "limits",
+            "quote": "Don't reverse double encoding: CP1252's 0x80–0x9F range doesn't round-trip, so reversal loses characters."
+          },
+          {
+            "field": "hosts",
+            "quote": "Cursor runs hook commands through PowerShell; Codex takes a separate `commandWindows`."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`(Get-Content f -Raw) -replace 'a','b' | Set-Content f -Encoding utf8` gives each `§` a stray `Â`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "agent-teams/skills/claude-agents/SKILL.md",
+      "blob_sha": "13ad794bfc90b43a12dfcfbfa2f971707c679af0",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-teams/skills/claude-agents/SKILL.md",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": "2026-11-13T11:24:50.395Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "claude-agents",
+        "description": "'Ask Claude', 'have Claude build or review this': drive Claude Code headless (claude -p) from another agent as a peer, builder or fresh reviewer."
+      },
+      "excerpt": "---\nname: claude-agents\ndescription: \"'Ask Claude', 'have Claude build or review this': drive Claude Code headless (claude -p) from another agent as a peer, builder or fresh reviewer.\"\n---\n\n# Claude agents — Claude Code headless as a partner\n\n**Run headless Claude Code as a peer, builder or fresh reviewer.** Any agent can run `claude -p` for a full session: the repository's instructions, its tools and a conversation that can continue. It is a partner with the same standing as its caller. A peer argues a decision through, a builder takes a stage, and a reviewer has never seen the build. This skill covers briefs, modes and mechanics through `<skill dir>/scripts/claude_agent.py`.\n\n## The partner discipline (compact)\n\n**Apply the `delegation` skill for the full partner discipline.** These rules must hold even when this folder is copied alone.\n\n1. **A delegate gets the why, not just the what.** Give the goal in the owner's terms, the decision it feeds and the facts. Include reasoning behind non-obvious choices, binding constraints, traps a smart newcomer would walk into, and how the result will be proved. Never a keystroke script: no prescribed paths, filenames, libraries or steps unless they are hard constraints. A brief containing the goal gets judgement; instructions alone get compliance that is wrong in the larger system.\n2. **Treat the delegate as a peer, not a tool.** Its view is not binding, and neither is yours. A choice you would not have made is a disagreement to surface, not a defect.\n3. **Bring the partner in early, while the framing is open.** The cheapest wins concern the angle, the load-bearing claim and what to cut. A late sign-off is the least valuable use.\n4. **Iterate.** Continue the conversation after the first draft comes back. Three to eight turns is normal. Stopping at turn 1 treats a partner as a one-shot generator.\n5. **Converge before surfacing.** The human arbitrates intent and taste, not trade-offs two agents could argue through. Bring one result, or a disagreement stated cleanly.\n6. **A delegated diff is unreviewed code, and the session that wrote it never clears it.** Read it, check the disk and re-run the gate yourself. The independent review is a fresh session; apply `independent-review`.\n7. **Keep product decisions, real systems and final judgement with you.** Decide what the product should do, accept or reject review findings, perform final verification and judge whether a stage is done. Keep anything touching a real system, development included, such as deploys, migrations applied to any database, server secrets and live settings. The builder makes each real-system step one command and names it; you run it.\n8. **Write the diff yourself when the brief would be nearly as long.** Judge delegation by size, not time.\n\n## Peer, builder or reviewer\n\n| Role | Mode | What it can do | Session |\n|---|---|---|---|\n| Peer — argue a framing, pressure-test a claim, a second opinion on a plan | `consult` (default) | Read, Grep, Glob and the read-only shell (`git log`, `git diff`, `git status`); every write is denied | continued turn after turn |\n| Builder — a stage with a goal, its binding decisions and how to prove it | `build` | Edits, shell, tests; a classifier reviews each action (auto mode) | continued within the stage |\n| Reviewer — fresh eyes on an artifact, a plan, a change | `review` | Read, Grep, Glob only; no settings, hooks, plugins, MCP, project instructions or memory | always new, never saved |\n\n- **A review needs a fresh session.** Never resume or fork the building thread, or use its subagent. `--fork-session` copies the builder's beliefs with its transcript. `--mode review` always starts a fresh session and never saves it.\n- **Route reviews of commits through the `independent-review` skill's wrapper.** Review mode has no shell and cannot read a git range. The wrapper's `--reviewer claude` uses this same fresh headless session for a change before a push or a release. It writes the range's log and diffs to a file the reviewer pages through, and fails short rounds loudly. It loops until nothing introduced is above Low and no High or Critical of any age is open. Don't give review mode git commands instead: `Bash(git diff:*)` also allows `git diff --output=<file>` to write.\n- **When the caller is itself Claude, a headless Claude is the same model family.** A consult still buys fresh context and different reasoning, but blind spots are shared. For an independent review, prefer another family: Grok, the `independent-review` wrapper's default, as `grok-agents` describes. Without Grok, that wrapper's accepted fallback is this same fresh headless session.\n- **In consult and build the delegate reads what you read.** It loads the repository's `CLAUDE.md`, or `AGENTS.md` when no `CLAUDE.md` exists, and the user's `~/.claude/CLAUDE.md`. The project's auto-memory, hooks and skills load too. This suits a builder but makes it dependent on those instructions, which review mode excludes.\n\n## The opening brief\n\n**Give the brief what the repository's instructions do not contain.** Consult and build read those instructions themselves. Supply the decision at hand, conversation so far, and what you have already tried and rejected.\n\n| | What | Example |\n|---|---|---|\n| TARGET | What we are producing or deciding, and for whom | \"a call on whether retries belong in the client or the queue\", \"stage 3: the export endpoint\" |\n| RESEARCH | What is actually known | logs, measurements, the source quote, what the owner said, prior attempts |\n| DRAFT | The current version and the variants considered | paste the artifact, not a description of it |\n| REASONING | Why you are stuck, or what binds the build | what you rejected and why; the trap (\"the same string feeds another spawn path, so not in the argument builder\"); how it will be proved |\n\n**Name the binding-spec files in a review brief.** Review mode reads nothing on its own.\n\n**Put long briefs in a file and read them from there.** The wrapper sends every prompt on stdin, never as an argument.\n\n```bash\npython <skill dir>/scripts/claude_agent.py --new --cwd <repo> --read <brief file>\npython <skill dir>/scripts/claude_agent.py --new --mode build --cwd <worktree> --read <stage brief>\npython <skill dir>/scripts/claude_agent.py --mode review --cwd <repo> --read <review brief>\n```\n\n**Run a partner on the strongest model the account offers.** `--model opus` tracks the newest Opus; `best` picks Fable where the account has it. The wrapper sends `xhigh` effort by default and `max` for a review. Without an explicit level, Opus, Sonnet and Haiku 5.5 run at `medium` (model configuration docs, read 2026-10-24).\n\n## Follow-up turns\n\n**React like a colleague and continue the conversation already under way.** Agree where it is right, push back where it is wrong, ask why where it surprises you, and name what it missed. Do not re-package the goal as a new structured prompt. Rewriting the goal in turn 3 leaves the conversation.\n\n```bash\npython <skill dir>/scripts/claude_agent.py --cwd <repo> \"agree on the queue, but a poison message would block the shard — doesn't that kill it?\"\n```\n\nA plain call continues the session the wrapper last opened in that directory, in the same mode, on the same model and effort.\n\n**Keep iterating while a critique, disputed choice or unexplored option remains.** This includes a critique you haven't voiced and a choice you don't buy but haven't pushed on. The temptation to ask the human “which of these two?” also signals unfinished work. You have converged when you would defend the result against your critique, neither partner finds new angles, and only taste remains. Surface genuine deadlock, ambiguity about what the human wants, or a fact only they have.\n\n## Resume or start fresh\n\n- **Within a stage or a conversation, resume.** This is the default.\n- **A new stage or a new question starts fresh, with `--new`.** Project knowledge belongs in its docs and the brief. A long thread carries assumpt",
+      "card": {
+        "title_zh": "Claude无头代理协作",
+        "purpose_zh": "把无头 Claude Code（claude -p）当作同伴、构建者或全新审查者来驱动，通过包装脚本发送简报、切换模式并延续会话。",
+        "does": [
+          "以同伴模式（consult）只读运行，可读文件、搜索并执行只读 shell 命令",
+          "以构建者模式（build）在阶段内编辑、运行 shell 与测试",
+          "以审查者模式（review）用全新会话只读审查产物或计划",
+          "通过脚本发送简报文件、延续会话、按 id 恢复或强制新会话",
+          "设置模型、推理强度、预算、最大轮次、超时与日志",
+          "用 JSON Schema 输出结构化结果"
+        ],
+        "inputs": [
+          "简报文本或简报文件（--read）",
+          "工作目录（--cwd）与额外目录（--add-dir）",
+          "模式（--mode consult/build/review）",
+          "模型（--model）与推理强度（--effort）",
+          "会话 id（--session）或 --new",
+          "预算、最大轮次、超时、日志、JSON Schema 等参数"
+        ],
+        "outputs": [
+          "stdout 上的回答文本",
+          "stderr 上的一行状态（会话 id、模式、权限模式、模型、成本等）",
+          "可选的结构化输出（structured_output）",
+          "可选的原始 stream-json 事件日志",
+          "会话状态文件，供后续续接"
+        ],
+        "scenarios": [
+          "让另一个代理就某个决策或方案提出反驳与第二意见",
+          "把某个开发阶段交给构建者代理完成并验证",
+          "在推送或发布前用全新会话独立审查改动",
+          "并行构建时为每个 worktree 各开一个会话",
+          "对长简报或长构建过程做日志跟踪"
+        ],
+        "prerequisites": [
+          "本机可用的 Claude Code CLI 与可用的账号额度",
+          "Python 标准库环境，脚本以绝对路径调用",
+          "审查提交范围需经由 independent-review 技能的包装器"
+        ],
+        "limits": [
+          "consult 模式禁止一切写入",
+          "review 模式无 shell，不能读取 git 范围，且不保存会话",
+          "review 模式不加载设置、钩子、插件、MCP、项目指令或记忆",
+          "同一目录只保留一个会话，多会话需分别指定状态文件",
+          "用量上限或缺少 CLI 时运行以非零退出失败",
+          "会话记录默认保留 30 天"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "自动化",
+          "后端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Run headless Claude Code as a peer, builder or fresh reviewer."
+          },
+          {
+            "field": "does",
+            "quote": "Read, Grep, Glob and the read-only shell (`git log`, `git diff`, `git status`); every write is denied"
+          },
+          {
+            "field": "does",
+            "quote": "Edits, shell, tests; a classifier reviews each action (auto mode)"
+          },
+          {
+            "field": "does",
+            "quote": "Read, Grep, Glob only; no settings, hooks, plugins, MCP, project instructions or memory"
+          },
+          {
+            "field": "does",
+            "quote": "python <skill dir>/scripts/claude_agent.py --new --cwd <repo> --read <brief file>"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Route reviews of commits through the `independent-review` skill's wrapper."
+          },
+          {
+            "field": "limits",
+            "quote": "Review mode has no shell and cannot read a git range."
+          },
+          {
+            "field": "limits",
+            "quote": "`--mode review` always starts a fresh session and never saves it."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`Bash(git diff:*)` also allows `git diff --output=<file>` to write."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Edits, shell, tests; a classifier reviews each action (auto mode)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "agent-teams/skills/codex-agents/SKILL.md",
+      "blob_sha": "3959123c28ab7c167a2042127b574d80731166f7",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-teams/skills/codex-agents/SKILL.md",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": "2026-11-13T11:24:50.395Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "codex-agents",
+        "description": "'Ask Codex', 'check with Codex', handing Codex a build or review, or stuck between two framings: the Codex CLI as peer, builder or fresh reviewer."
+      },
+      "excerpt": "---\nname: codex-agents\ndescription: \"'Ask Codex', 'check with Codex', handing Codex a build or review, or stuck between two framings: the Codex CLI as peer, builder or fresh reviewer.\"\n---\n\n# Codex agents — the Codex CLI as peer, builder and reviewer\n\n**Treat Codex as a peer with the same standing as Claude.** Not a formatter, not a gate, not an authority. Run it on the newest model the Codex CLI offers, at its highest reasoning effort: `xhigh`, the wrapper's default on every turn.\n\n**It can build, and what it builds is reviewed by someone else.** Hand it a build stage with the goal, binding decisions and files it will touch. Read its diff before believing it; a delegated diff is unreviewed code. The session that wrote code never clears it. An independent review does, through `independent-review` or whatever the project uses. Codex can review code it didn't write (§ Reviewer).\n\n**Keep product decisions, real systems and stage-completion judgement with the session agent.** This includes accepting or rejecting review findings and anything touching a real system, development included. Any database, even one only you use, a server and a setting count. Say so in the brief, asking for each real-system step as one command the session agent runs. Without the Codex CLI, or while it is out of usage (§ Resume or start fresh), the session agent builds the stage itself.\n\n**Delegate only what is worth the hand-off; the test is size, not time.** If the brief would be nearly as long as the diff, write the diff. A stage small enough to describe precisely is small enough to write, and handing it over only buys a wait. Stop a build round that has made no writes on a small change; twelve minutes on a fifteen-line change is enough. Check `git status`. Kill its leftover process and write the change in-session. The session agent keeps the same responsibilities, and its diff still gets independent review.\n\n**Manage Codex with the goal, context and room for judgement.** Use the way the human manages Claude: avoid step-by-step direction, trust judgement and push back on disagreement.\n\n**Ask for the deliverable's actual format, including an image when needed.** Codex can write code and generate images directly through multimodal output. If the goal is a PNG, say that. Don't translate it to \"an HTML file we'll screenshot.\"\n\n## Core discipline (read before every session)\n\n1. **Treat Codex as a peer, not a tool.** It has the same standing as Claude. Trust its judgement on path, structure, format, fonts, dimensions and libraries. A choice you wouldn't have made is a useful disagreement to surface, not a defect. Its view is not binding; push back where warranted.\n2. **Bring Codex in at ideation and framing, before a sign-off.** The cheapest wins concern the angle, load-bearing claim and what to cut. Late peer review is the least valuable use; don't use it only as a pre-publish gate.\n3. **Give the goal, facts and reasoning behind non-obvious choices.** Do not prescribe paths, filenames, fonts, dimensions, libraries, chart types or step-by-step procedures unless they are hard requirements.\n4. **Iterate.** Continue iterating after Codex produces the first draft. About 3–8 turns is normal. Stopping at turn 1 treats Codex as a one-shot generator; the value comes from the back-and-forth.\n5. **Converge before surfacing.** The human arbitrates intent and taste, not editorial trade-offs two agents can resolve. Default to one result after convergence.\n\n## When to invoke (proactively, not just on explicit request)\n\n**Invoke Codex for explicit requests and decisions that need a peer.** Explicit requests include \"check with Codex\", \"iterate with Codex\", \"ideate with Codex\" and \"ask Codex\". Claude should also reach for this skill without being asked in these situations:\n\n- **Consult Codex when stuck between two reasonable framings or angles.** Do this before punting the choice to the human.\n- **Pressure-test a load-bearing claim, structure or hook before committing.**\n- **Argue options through before asking the human to choose.** Use this when two agents could resolve the choice.\n- **Work through an unvoiced critique of a draft with Codex.**\n- **Use a fresh model when its misses would matter on an important deliverable.** A different model has different blind spots.\n\n**Do not invoke Codex for routine work Claude confidently handles in-session.** This includes routine drafting, formatting and mechanical tasks. This is a peer-agent skill, not a text-formatter API.\n\n## Opening turn — the four things Codex needs\n\n**Give Codex the target, research, draft and specific uncertainty.**\n\n| | What | Example |\n|---|---|---|\n| TARGET | What we're producing or deciding | \"X reply to <link>\", \"framing for <topic>\", \"call on <trade-off>\" |\n| RESEARCH | What's actually known | Parent tweet, source quotes, verified facts, what the other party actually said, audience size, prior posts |\n| DRAFT | Current version + variants considered | Paste the artifact, not a description of it |\n| REASONING | Why you're stuck | What you've rejected and why; name the specific load-bearing question. Not \"give me feedback\" — name the genuine uncertainty |\n\n**Put long opening briefs in a scratch file and use `--read`.** Use system temp, project scratch or whatever the working directory's convention is.\n\n```bash\npython <skill dir>/scripts/codex.py --new --read <scratch_file>\n```\n\n**Pass it on every build dispatch, not only the ones you think are new sessions.** Add `--sandbox workspace-write` when Codex needs to write files or pull data. Add `--cwd <repo>` to scope the session to its repository. The sandbox defaults to `read-only`, and its flag applies only to new sessions. An expected resume that starts new silently lands read-only. The resulting reasoned report argues a verdict and notes real defects while changing nothing, with nothing failing. It reads exactly like a round that worked. Check `git status` and file mtimes before believing a build round happened.\n\n**Leave sandboxed builds uncommitted and ask for a commit-message handoff.** On Codex CLI 0.159, Windows 11, `workspace-write` could neither commit nor run git in another checkout (observed 2026-10-25). All three restrictions below were reproduced in scratch repositories. Other platforms were not tested here. The sandbox keeps `.git` read-only: `git add` fails creating `.git/index.lock` with `Permission denied`. A linked worktree's index lives in the main checkout's `.git/worktrees/<name>/` and fails the same way. Adding that `.git` with `--add-dir` did not lift the restriction. Windows also runs sandbox commands as a separate local user, so git refuses other repositories as \"dubious ownership\". Read the diff and commit it yourself. If a brief sends Codex to another repository for prior art, tell it to read files from disk.\n\n**Name `$app-stack:ui-design` in a build that adds or changes screens.** Name the `ui-design` skill with that invocation and carry its jobs-map rows in the brief. Codex loads a skill only from a pack installed in Codex. Before the first such brief, run `codex plugin list` and check `app-stack@product-engineering` is installed and enabled. If absent, run `codex plugin marketplace add phuryn/product-engineering`, then `codex plugin add app-stack@product-engineering`. Loading `$app-stack:ui-design` in a headless `codex exec` was observed on codex-cli 0.166.0, 2026-11-03.\n\n**Budget real-database integration tests in the build brief.** Include the session agent's integration-fix pass when the sandbox cannot run them. Apply `test-harness`'s round-trip budget (§ Tests and docs are part of the change). State the target's measured latency and which checks the session agent runs.\n\n## Follow-up turns — conversational, short, peer-to-peer\n\n**React like a colleague without rewriting the goal or numbering points.** Agree where it's right, push back where it's wrong, ask why where it's surprising, and name what it missed. Don't re-package the goal as a new structur",
+      "card": {
+        "title_zh": "Codex 同行协作代理",
+        "purpose_zh": "把 Codex CLI 当作与 Claude 同等的同行代理，用于构思、构建与独立评审；通过包装脚本发起会话、多轮迭代，并在收敛后再交给人。",
+        "does": [
+          "以同行身份调用 Codex CLI，用最高推理强度进行构思、构建与评审",
+          "用脚本新建会话并通过 --read 传入长开场简报",
+          "按目录自动续接会话，进行简短对话式多轮迭代",
+          "在需要写文件或取数据时加 --sandbox workspace-write 并限定 --cwd",
+          "要求 Codex 直接产出目标格式，包括多模态生成的图片",
+          "构建后检查 git status 与文件时间，自行阅读 diff 并提交"
+        ],
+        "inputs": [
+          "目标（要产出或决定的内容）",
+          "研究材料与已核实事实",
+          "当前草稿或候选版本原文",
+          "具体的不确定点与已否决理由",
+          "构建简报：目标、约束决策、将触及的文件",
+          "临时简报文件路径、仓库目录、沙箱参数"
+        ],
+        "outputs": [
+          "Codex 的推理报告与评审意见",
+          "代码改动（diff，需人工阅读后提交）",
+          "直接生成的图片等目标格式产物",
+          "提交信息交接内容"
+        ],
+        "scenarios": [
+          "在两个合理框架或角度之间卡住时咨询 Codex",
+          "在定稿前压力测试核心论点、结构或钩子",
+          "让 Codex 承担一个构建阶段并交独立评审",
+          "与 Codex 一起梳理对草稿未说出口的批评",
+          "重要交付物需要不同模型的盲点互补"
+        ],
+        "prerequisites": [
+          "已安装 Codex CLI 并可使用其最新模型",
+          "包装脚本 scripts/codex.py 可用",
+          "构建需写文件时须显式传 --sandbox workspace-write",
+          "涉及界面改动需在 Codex 中安装并启用 app-stack 插件"
+        ],
+        "limits": [
+          "常规起草、格式化与机械任务不应调用",
+          "简报长度接近 diff 时应自己写而非委派",
+          "小改动长时间无写入应终止并自行完成",
+          "沙箱默认只读，且该参数仅对新会话生效",
+          "Codex 的 diff 属未评审代码，须独立评审",
+          "产品决策、真实系统操作与阶段完成判断留在会话代理",
+          "并行构建需各自 worktree、会话与标记，标记文件每用户仅一个"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "代码审查",
+          "自动化",
+          "产品规划",
+          "写作"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Treat Codex as a peer with the same standing as Claude."
+          },
+          {
+            "field": "does",
+            "quote": "Run it on the newest model the Codex CLI offers, at its highest reasoning effort: `xhigh`, the wrapper's default on every turn."
+          },
+          {
+            "field": "does",
+            "quote": "python <skill dir>/scripts/codex.py --new --read <scratch_file>"
+          },
+          {
+            "field": "does",
+            "quote": "Add `--sandbox workspace-write` when Codex needs to write files or pull data. Add `--cwd <repo>` to scope the session to its repository."
+          },
+          {
+            "field": "does",
+            "quote": "Codex can write code and generate images directly through multimodal output."
+          },
+          {
+            "field": "does",
+            "quote": "Read the diff and commit it yourself."
+          },
+          {
+            "field": "inputs",
+            "quote": "**Give Codex the target, research, draft and specific uncertainty.**"
+          },
+          {
+            "field": "inputs",
+            "quote": "Hand it a build stage with the goal, binding decisions and files it will touch."
+          },
+          {
+            "field": "outputs",
+            "quote": "The resulting reasoned report argues a verdict and notes real defects while changing nothing, with nothing failing."
+          },
+          {
+            "field": "outputs",
+            "quote": "a delegated diff is unreviewed code"
+          },
+          {
+            "field": "scenarios",
+            "quote": "**Consult Codex when stuck between two reasonable framings or angles.**"
+          },
+          {
+            "field": "scenarios",
+            "quote": "**Pressure-test a load-bearing claim, structure or hook before committing.**"
+          },
+          {
+            "field": "scenarios",
+            "quote": "**It can build, and what it builds is reviewed by someone else.**"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before the first such brief, run `codex plugin list` and check `app-stack@product-engineering` is installed and enabled."
+          },
+          {
+            "field": "limits",
+            "quote": "**Do not invoke Codex for routine work Claude confidently handles in-session.**"
+          },
+          {
+            "field": "limits",
+            "quote": "The sandbox defaults to `read-only`, and its flag applies only to new sessions."
+          },
+          {
+            "field": "limits",
+            "quote": "**Keep product decisions, real systems and stage-completion judgement with the session agent.**"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "agent-teams/skills/delegation/SKILL.md",
+      "blob_sha": "aa2f6d8f2bacb174cb562273ef52829c8c454da9",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-teams/skills/delegation/SKILL.md",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "delegation",
+        "description": "Before spawning a subagent or dispatching a build, review or research, and before trusting its report: the brief, the delegate, parallel runs, the handoff."
+      },
+      "excerpt": "---\nname: delegation\ndescription: \"Before spawning a subagent or dispatching a build, review or research, and before trusting its report: the brief, the delegate, parallel runs, the handoff.\"\n---\n\n# Delegation — a delegate is a partner\n\n**A delegate knows only what you hand it, so brief the goal.** Say what you are trying to achieve and for whom. Name the constraints that bind, the traps a smart newcomer would walk into, and how the result will be proved.\n\n**A brief with the goal in it comes back with judgement.** \"Change X to Y\" gets Y, even when Y is wrong. A delegate that knows the goal can answer \"this step is redundant, here is why\", and that answer often changes what ships. That is the return on a brief's length: not compliance, judgement.\n\n**Manage a delegate the way a good owner manages you.** Give it the goal and context, then trust its judgement on the means instead of prescribing steps. Push back where you disagree; its view doesn't bind you.\n\n**Apply the delegate's own skill for its mechanics.** Apply `codex-agents`, `grok-agents` or `claude-agents` for a headless CLI peer, builder or reviewer. Apply `independent-review` for the unsteered review loop, normally through Grok or a fresh headless Claude session. This skill covers their shared discipline.\n\n## What never delegates\n\n- **Decide what the product should do yourself.** Keep the thesis, scope, taste and interpretation of the owner's wishes with you.\n- **Accept or reject review findings yourself.** Treat the finding and its severity as claims (`independent-review` § Triage).\n- **Run every step that touches a real system yourself.** Keep deploys, promotions, applied migrations, servers, workers, secrets, live configuration and drills with you, including development and databases only you use. Ask the delegate to make each step one command and name those commands; you run them.\n- **Perform final verification yourself.** Run the tests, typecheck, gate and smoke, inspecting their results to check the delegate's passing claim.\n- **Judge whether a stage is done yourself.** A delegate's handoff supplies evidence for that judgement.\n\n## When it is worth handing off: size, not time\n\n**If the brief would be nearly as long as the diff, write the diff.** A delegate must rediscover the file, conventions and surrounding code before changing anything.\n\n| Situation | Who |\n|---|---|\n| You know the file and the line, and the change is mechanical | **you, directly** — no brief, no round trip |\n| It needs exploration, or you are unsure of the mechanism | a delegate |\n| It needs real test coverage | a delegate, or one focused test you write yourself |\n| A naive fix would walk into a trap | a delegate, **with the trap in the brief** — this is where a long brief earns out |\n\n- **A build round that has made no writes on a small change is stopped.** Kill its leftover process and write the change in-session, keeping your responsibilities and the requirement for independent review.\n- **Use the parallelism or don't pay for it.** Work while the background delegate runs. Waiting pays delegation's latency without gaining its throughput.\n- **Keep work whose reasoning you need yourself.** Also keep synthesis that needs everything held in one head.\n\n## The brief\n\nThree things, and the first is the one most often skipped:\n\n1. **Explain what you are trying to achieve and why.** Name the decision this handoff feeds. In the owner's terms, \"we are choosing between A and B\" lets a delegate suggest a third option or challenge the question. A delegate told \"research A and B\" cannot.\n2. **State the constraints that bind, including the do-nots.** Explain traps that would make a plausible local fix wrong in the larger system. For example: \"Keep this out of the argument builder; the same string feeds another spawn path.\"\n3. **Define proof for this handoff, including checks you must run.** Name the tests, gate and handoff's done-when, keeping that narrower than the stage's whenever completion needs real systems. Say what the sandbox cannot reach, such as a database, browser, Docker or network, and assign those checks: \"Write them; I run them.\" Ask for a code handoff with checks marked \"written, not run\", rather than invented counts or a stage marked done.\n\n**Ask it to exercise every existing page and function the stage touches, not only its own.** Ask for this explicitly in the brief, including code the delegate did not write.\n\n- **Compress the evidence, not the context.** Three log lines beat twenty lines explaining how you reached your conclusion. Keep the goal, binding constraints and traps at full length. A terse brief can produce a locally correct change that fails in the larger system.\n- **The brief is the delegate's entire reality.** Ask it to confirm or refute every consequential claim against primary sources. Treat absence claims such as \"none of them shipped X\" as extraordinary. Engagement numbers, link lists and filenames do not establish product reality. When a fact changes mid-build, append a dated \"Added while you build\" section to the brief file. Keep that file complete rather than relying on a side message.\n- **A feature that guesses from real-world input starts from evidence.** Run unchanged code on a real corpus first, citing its numbers for each binding decision. After the build, pin a live golden set that runs on demand, outside the gate. Treat a research-based decision as a hypothesis the live run may reverse, and record any reversal with its measurement.\n- **Don't prescribe the means.** Leave paths, filenames, libraries and structure to the delegate unless they are hard constraints. For those choices, \"the existing system uses X\" gives context without requiring X. Surface a choice you disagree with as a disagreement, rather than calling it a defect.\n- **Long briefs go in a file.** Pass them by path or stdin, rather than as a long inline argument. Long inline arguments trip permission classifiers and shell quoting.\n- **Name ranges, not commits, in a brief you will reuse.** A pinned SHA can send the next round back to an already reviewed commit. Use `git log --oneline <last-reviewed>..HEAD` to fail loudly when the range is stale.\n- **Use the brief template and request its handoff.** Start from `references/brief-template.md`, asking for what it built, choices where the brief was silent, spec corrections, blockers and validation actually run. It also names commands for you and what must be redeployed after the push.\n\n## Choosing the delegate\n\n| Delegate | Strong at | Watch for |\n|---|---|---|\n| **A Claude subagent** (the Agent tool) | Work that needs this repository's context: it loads the project instructions automatically | Fresh context: none of your conversation or tool results. It loads project instructions and your settings and inherits your framing, so it never reviews your work. A review starts from the repository and brief alone (`independent-review`). A subagent may have no Agent tool of its own (observed `2026-06-10`). |\n| **The Codex CLI** (`codex-agents`) | Building a stage to a brief; arguing a decision through as a peer over several turns | A new session is read-only unless told otherwise. A build that changed nothing can sound successful; check the disk. |\n| **The Grok CLI** (`grok-agents`) | A peer, builder or reviewer from a different model family; the independent review's default reviewer (`independent-review`) | A round that could not read exits 0 after a sentence; length is the tell. |\n| **Headless Claude Code** (`claude-agents`) | A session with none of your conversation: a builder or peer for a non-Claude agent, or a reviewer | Plain `-p` loads project and user instructions and auto-memory; only a restricted review starts from the repository alone. Resume keeps the model but drops effort, permission mode and tools unless re-sent (observed `2026-10-24`). |\n\n**The session that wrote the code never clears it.** Use a fresh reviewer who did not build the code. Prefer another model family, or",
+      "card": null
+    },
+    {
+      "skill_path": "agent-teams/skills/grok-agents/SKILL.md",
+      "blob_sha": "86566824e8c0638c0a77491a0652b5942f7915a8",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/agent-teams/skills/grok-agents/SKILL.md",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": "2026-11-13T11:24:50.395Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "grok-agents",
+        "description": "'Ask Grok', 'have Grok build or review this': drive the Grok CLI headless from another agent as a peer, builder or fresh reviewer."
+      },
+      "excerpt": "---\nname: grok-agents\ndescription: \"'Ask Grok', 'have Grok build or review this': drive the Grok CLI headless from another agent as a peer, builder or fresh reviewer.\"\n---\n\n# Grok agents — the Grok CLI headless as a partner\n\n**Run headless Grok as a peer, builder or fresh reviewer.** Any agent can get a full Grok session: tools, repository instructions where Grok reads them, and a conversation that can continue. It is a partner from another model family, with the same standing as its caller. A peer argues a decision through, a builder takes a stage, and a reviewer has never seen the build. This skill covers briefs, modes and commands.\n\nEverything here was read from `grok --help` and run on Grok CLI 1.0.70, 2026-11-02, unless stated otherwise. The CLI changes often; check `grok --help` before relying on a flag.\n\n## The partner discipline (compact)\n\n**Apply `delegation` for the full discipline of working with a partner.** These rules must hold even when this folder is copied alone.\n\n1. **A delegate gets the why, not just the what.** Give the goal in the owner's terms, the decision it feeds, facts and reasoning behind non-obvious choices. Include binding constraints, traps a smart newcomer would walk into, and how the result will be proved. Never a keystroke script.\n2. **Treat the delegate as a peer, not a tool.** Its view is not binding, and neither is yours. A choice you would not have made is a disagreement to surface, not a defect.\n3. **Bring the partner in at framing and keep iterating.** The cheapest wins are at framing; three to eight turns is normal.\n4. **Converge before surfacing.** Bring the human one result, or a disagreement stated cleanly.\n5. **A delegated diff is unreviewed code, and the session that wrote it never clears it.** Read it, check the disk and re-run the gate yourself. The independent review is a fresh session; apply `independent-review`.\n6. **Keep product decisions, real systems and final judgement with you.** Decide what the product should do, accept or reject review findings, perform final verification and judge whether a stage is done. Keep anything touching a real system, development included, such as deploys, migrations applied to any database, server secrets and live settings.\n\n## Three modes\n\n| Mode | What it is for | Tools | Session |\n|---|---|---|---|\n| Peer | a decision argued through, a draft pushed on, a framing checked | read-only: `--tools read_file,grep,list_dir`, no shell, no edits | continued with `--resume <id>` |\n| Builder | a stage with a goal, its binding decisions and how to prove it | every tool, approved: `--always-approve`, in a worktree of its own | continued within the stage |\n| Reviewer | fresh eyes on a change | read-only, isolated from memory and other tools' settings (§ Reviewer) | always new |\n\nEvery mode shares four rules, each from a run that went wrong:\n\n- **Put the prompt in a file through `--prompt-file <brief>`.** Never use inline `-p \"…\"`. A long inline prompt trips the calling agent's permission classifier and the call is refused.\n- **Pass `--cwd <repo>` and close stdin on every call.** This selects the repository you mean. Use `< /dev/null`, because open stdin waits for input forever. Bare `grok` without a prompt flag opens the interactive screen and hangs without output.\n- **Read the output format you asked for.** `--output-format json` returns one object with `text`, `stopReason`, `sessionId`, `num_turns` and `usage`, which suits a calling agent. `plain` returns text alone.\n- **Effort and model are stated.** Use `--reasoning-effort xhigh` for anything needing judgement; the CLI's default is lower. `grok models` lists models and the default, `grok-4.7` on 2026-11-02; `-m <id>` pins one.\n\n## Peer\n\n**Name the peer session and repeat its flags when resuming.**\n\n```bash\nSID=$(python -c \"import uuid; print(uuid.uuid4())\")       # name the session yourself\ngrok --prompt-file \"$S/turn-1.md\" --cwd <repo> --session-id \"$SID\" \\\n     --tools read_file,grep,list_dir --disallowed-tools search_tool,use_tool \\\n     --deny MCPTool --deny Bash --deny Edit --deny Write --disable-web-search \\\n     --always-approve --reasoning-effort xhigh --output-format json < /dev/null > \"$S/turn-1.json\"\n# the next turn continues it: every flag again, --resume in place of --session-id\ngrok --resume \"$SID\" --prompt-file \"$S/turn-2.md\" --cwd <repo> \\\n     --tools read_file,grep,list_dir --disallowed-tools search_tool,use_tool \\\n     --deny MCPTool --deny Bash --deny Edit --deny Write --disable-web-search \\\n     --always-approve --reasoning-effort xhigh --output-format json < /dev/null > \"$S/turn-2.json\"\n```\n\n- **Name the session with `--session-id <uuid>` and continue with `--resume <uuid>`.** Resume keeps its context: a word given in the first turn came back from the second (observed 2026-11-02). Save the id in a file beside the brief. Don't rely on `-c`: it continues whichever session ran most recently in the directory.\n- **`--always-approve` is what lets it read at all.** Without it, Grok can't approve its own reads and exits 0 after a sentence of preamble that reads like an answer. With the read-only allowlist above, approving everything approves only reading.\n- **Let a peer load the trusted folder's instructions and compatible skills.** In a folder Grok trusts, it reads the project's instruction files and skills found through Claude compatibility. `grok inspect` lists them. This suits a peer and is why the reviewer turns it off.\n\n## Builder\n\n**Give a builder its own worktree and keep real systems out.**\n\n```bash\ngrok --prompt-file \"$S/stage-brief.md\" --cwd <worktree> --session-id \"$SID\" \\\n     --always-approve --deny MCPTool --disable-web-search \\\n     --reasoning-effort xhigh --output-format json < /dev/null > \"$S/build-1.json\"\n```\n\n- **`--always-approve` approves every tool call, the shell included.** Use a git worktree of its own, never the tree you edit. The brief excludes every real system: no pushes, deploys, migrations or secrets (§ The partner discipline, 6). `--deny MCPTool` blocks the machine's connected MCP servers, including a database's.\n- **Check the disk before believing a run happened.** Read `git status` and the named files. A run unable to write returns a reasoned report that reads exactly like one that did.\n- **Do not treat `--sandbox <profile>` as a write boundary.** It enforces only on supporting platforms; on Windows a sandboxed run still created a file (observed 2026-10-10).\n- **Run a small build first and read the disk.** This mode's command comes from `grok --help` 1.0.70. It had not been run end to end when written on 2026-11-02, because the calling agent's classifier refused a fully approved Grok session.\n\n## Reviewer\n\n**Apply `independent-review` for scope, brief, triage and the stopping rule.** Its wrapper runs Grok this way by default. The bare call below explains the flags. The wrapper also sets the turn cap and writes the subject, range's log and diffs to a file. The reviewer has no shell and reads that file.\n\n```bash\nGROK_MEMORY=0 GROK_MANAGED_MCPS_ENABLED=false GROK_MANAGED_MCP_GATEWAY_TOOLS_ENABLED=false \\\nGROK_CODEX_SESSIONS_ENABLED=false <and GROK_{CLAUDE,CURSOR}_{AGENTS,RULES,SKILLS,HOOKS,MCPS,SESSIONS}_ENABLED=false> \\\ngrok --prompt-file \"$S/review-NNN-brief.md\" --cwd <repo> \\\n     --reasoning-effort xhigh \\\n     --tools read_file,grep,list_dir --disallowed-tools search_tool,use_tool \\\n     --deny MCPTool --deny Bash --deny Edit --deny Write --disable-web-search \\\n     --always-approve \\\n     --output-format plain < /dev/null > \"$S/review-NNN.md\" 2>&1\n```\n\nEvery part is load-bearing:\n\n- **Disable memory and compatibility sources for this review process.** The environment variables disable Grok memory, managed MCP servers and gateway tools, and reading of Codex sessions. They also disable every Claude and Cursor compatibility cell: instructions, rules, skills, hooks, MCP servers and sessions. Environment wins over Grok's config (measured with `grok inspect --json`, 1.0.70, 202",
+      "card": {
+        "title_zh": "Grok CLI 无头协作",
+        "purpose_zh": "把 Grok CLI 以无头方式当作同伴、构建者或全新审查者来驱动，提供简报、模式与命令。",
+        "does": [
+          "以同伴模式让 Grok 只读地推敲决策、草稿与框架，并可用 --resume 续接会话",
+          "以构建者模式在独立 worktree 中让 Grok 带全部工具执行一个阶段",
+          "以审查者模式用全新会话、只读工具和隔离环境审查改动",
+          "通过 --prompt-file、--cwd、关闭 stdin、--output-format json 等参数规范调用",
+          "用环境变量关闭 Grok 记忆、托管 MCP 与 Claude/Cursor 兼容来源",
+          "用 grok login --device-auth 无本地浏览器登录，用 grok usage 与 grok sessions list 查看用量和会话"
+        ],
+        "inputs": [
+          "写在文件中的简报（--prompt-file）",
+          "目标仓库或 worktree 路径（--cwd）",
+          "会话 id（--session-id / --resume）",
+          "模式与工具白名单、deny 规则、禁用网络搜索等命令行标志",
+          "推理强度与模型 id（--reasoning-effort、-m）"
+        ],
+        "outputs": [
+          "JSON 输出对象，含 text、stopReason、sessionId、num_turns、usage",
+          "plain 纯文本输出",
+          "磁盘上的构建改动（需自行用 git status 与文件核对）",
+          "审查报告，含仍加载的指令文件清单",
+          "grok usage 的 token 与费用用量、grok sessions list 的会话列表"
+        ],
+        "scenarios": [
+          "需要另一模型家族对某个决策或框架提出异议时",
+          "把一个构建阶段交给独立 worktree 中的 Grok 执行",
+          "对一处改动做从未见过构建过程的全新审查",
+          "在无本地浏览器的机器上完成 Grok 登录",
+          "核对某次 Grok 运行是否真的写入了磁盘"
+        ],
+        "prerequisites": [
+          "已安装并登录 Grok CLI（原文基于 1.0.70 阅读与运行）",
+          "调用前用 grok --help 核对标志，因 CLI 变化频繁",
+          "构建者模式需准备独立 git worktree",
+          "审查者模式需先把审查对象写到磁盘，因审查者无 shell"
+        ],
+        "limits": [
+          "构建者模式命令在写作时未端到端跑通，因调用方分类器拒绝了完全批准的会话",
+          "--sandbox 不能当作写入边界，Windows 上沙箱运行仍创建了文件",
+          "审查者无 shell，无法运行 git，需先写审查对象到磁盘",
+          "输出过短可能意味着被拒或额度耗尽，需按长度判断",
+          "已登录仍可能额度耗尽并返回 402",
+          "--tools 只覆盖内置工具，需另用 deny 与禁用网络搜索封堵 MCP 等访问"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "代码审查",
+          "自动化",
+          "后端",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Run headless Grok as a peer, builder or fresh reviewer."
+          },
+          {
+            "field": "does",
+            "quote": "Peer | a decision argued through, a draft pushed on, a framing checked"
+          },
+          {
+            "field": "does",
+            "quote": "Builder | a stage with a goal, its binding decisions and how to prove it"
+          },
+          {
+            "field": "does",
+            "quote": "Reviewer | fresh eyes on a change"
+          },
+          {
+            "field": "does",
+            "quote": "Put the prompt in a file through `--prompt-file <brief>`."
+          },
+          {
+            "field": "does",
+            "quote": "Disable memory and compatibility sources for this review process."
+          },
+          {
+            "field": "inputs",
+            "quote": "`--output-format json` returns one object with `text`, `stopReason`, `sessionId`, `num_turns` and `usage`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The CLI changes often; check `grok --help` before relying on a flag."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use a git worktree of its own, never the tree you edit."
+          },
+          {
+            "field": "limits",
+            "quote": "It had not been run end to end when written on 2026-11-02"
+          },
+          {
+            "field": "limits",
+            "quote": "on Windows a sandboxed run still created a file (observed 2026-10-10)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`--always-approve` approves every tool call, the shell included."
+          },
+          {
+            "field": "hosts",
+            "quote": "drive the Grok CLI headless from another agent as a peer, builder or fresh reviewer."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "ai-shipping/skills/code-review/SKILL.md",
+      "blob_sha": "14c7e488a56348e33adf7def9b4325ed10477fc1",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/ai-shipping/skills/code-review/SKILL.md",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "code-review",
+        "description": "'Review this', 'find bugs', 'is this fix safe': review code for defects that matter, correctness first, each finding refuted before it's reported."
+      },
+      "excerpt": "---\nname: code-review\ndescription: \"'Review this', 'find bugs', 'is this fix safe': review code for defects that matter, correctness first, each finding refuted before it's reported.\"\n---\n\n# Code Review\n\n## Purpose\n\n**Review for supported defects with concrete consequences and checked counterarguments.** Most review output is noise: unranked suspicions that cannot be acted on. Each finding here needs required behaviour, a feasible trigger, a concrete contradiction, an observable consequence and the strongest counterargument checked.\n\n**the defects reviewers miss are rarely visible inside one file.** They are disagreements between participants that each look reasonable alone. Examples include caller and callee, producer and consumer, writer and later reader, or branches that should establish the same state. A file-by-file checklist never holds both halves together. Review the agreement, not the file.\n\n## Structure: one engine, three anchors\n\n**Use correctness as the core, with performance and security as sub-cases.** Generic tooling covers correctness worst. Each sub-case uses the same engine, refutation discipline and report contract. Only its anchor and one or two extra rules differ.\n\n| Sub-case | Anchor | Where its rules live |\n|---|---|---|\n| Correctness *(core, default)* | Agreements between participants across a boundary | This file + `references/correctness-taxonomy.md` |\n| Performance | Workload → resource demand → growth or contention → consequence | `references/performance-review.md` |\n| Security | Source → trust boundary → sink, with an attacker controlling the source | `references/security-review.md` |\n\n**Read a sub-case's file only when that sub-case is selected.** Its short file states what differs; the rest of this file still applies. Sub-cases activate independently, not exclusively. Report one root cause once, with both impacts when it carries correctness and security impact.\n\n## Invocation\n\n**State the selected dimensions, the scope and the comparison baseline before investigating.** These are instruction arguments, not shell flags:\n\n```\n/ai-shipping:code-review\n/ai-shipping:code-review dimensions=correctness scope=changes\n/ai-shipping:code-review dimensions=performance,security\n/ai-shipping:code-review dimensions=all\n```\n\nClaude Code ships its own bundled `/code-review`. Use the plugin-qualified form above when you mean this one.\n\n- Bare \"review this\" or \"find bugs\" means correctness only.\n- An explicit list selects exactly those sub-cases; `all` selects three. Never silently reinterpret an unknown or empty selection — ask.\n- Use the scope asked for. Otherwise review working changes if present, else the repository.\n- When reviewing changes, follow dependencies beyond changed lines. Distinguish defects the change introduced from defects it merely revealed.\n- Review and report. Apply fixes only when asked.\n\n## Shared engine\n\n**Map the flow, establish an obligation and try to refute its violation.** Every sub-case uses this sequence; only its anchor and refutation rules differ:\n\nMap a flow → identify an obligation → inspect every participant → construct a violating execution → trace the consequence → attempt refutation → report.\n\nBuild one minimal map first: inputs, major execution flows, state owners, external dependencies and observable effects. Enrich it for each selected sub-case. Do not build three maps or make a security-only run wait on correctness mapping.\n\n## Correctness: the agreement engine\n\n**Track consequential agreements across semantic boundaries, not just file splits.** A boundary separates caller and callee, callbacks, executions of one function, producer and consumer, or a value written now and read later.\n\nFor each consequential agreement, hold these in working notes, not the report:\n\n```\nParticipants:\nValue, entity or effect exchanged:\nAuthority (who decides the real answer):\nIdentity and lifetime/version:\nRequired relationship:\nEvidence for that relationship:\nRelevant transitions or orderings:\nObservable consumer or consequence:\n```\n\n**Establish the obligation without inventing intent.** Use specifications, documented contracts, language or protocol semantics, tests encoding expectations, or a necessary producer/consumer relationship. A consumer's implementation alone does not prove the consumer is right. When participants disagree, explain why the outcome is wrong. The contradiction may be certain while which side should change remains open. Missing documentation is a limitation, not automatically a finding.\n\n**Start where agreements are most likely to break.** Inspect transformed or negotiated values, reassigned identities, asynchronous work, persisted and reloaded state, and several effects that must agree. Then inspect ordinary local decisions, arithmetic, boundaries and error branches. The anchor must not discard plain bugs.\n\n### Force a violating execution\n\n**Construct the execution that breaks a suspicion before calling it a finding.** Where the implementation permits:\n\n- make a requested value differ from the accepted or effective one;\n- keep two operations live at once and vary their completion order;\n- change the relevant identity or generation between observation and use;\n- compare distinct transitions that should end in equivalent state;\n- inject failure between effects, and interruption before completion;\n- exercise empty, exact-boundary and adjacent-boundary inputs.\n\nEstablish that each case is actually reachable. Do not assume it.\n\n### Two lenses that need a forced probe, not a mention\n\n**Probe authority reconciliation and identity correlation explicitly.** Strong agents almost never even report these two classes: they miss them at the look, not at the fix. Naming them in a checklist does not make agents inspect them.\n\n1. **Authority reconciliation.** Follow a proposed value through validation, normalisation, negotiation or commit. Find downstream state still derived from the proposal where the authority can return something different. A requested value is not an applied value. Force them apart and ask what still reads the request.\n2. **Identity and correlation.** Trace how an operation's result finds its originating entity. Establish that the key stays unique, stable and live long enough under overlap, reordering, removal and reuse. A label, position or arrival order is suspicious exactly when those properties can fail. Run two operations concurrently and complete them out of order.\n\nThe full thirteen diagnostic lenses, each with a detection tell, are in `references/correctness-taxonomy.md`. They overlap; they are not a quota to fill.\n\n## Refutation: the discipline that makes this worth running\n\n**Require all five elements before promoting a candidate to a finding.** Each finding needs:\n\n1. A supported obligation: what must hold, and on what evidence.\n2. A feasible execution: inputs, state and ordering the real system permits.\n3. A concrete contradiction: where the obligation fails.\n4. An observable consequence: wrong output, state, effect, completion or progress.\n5. An examined counterargument: the strongest mechanism that would prevent or repair it.\n\nActively hunt for the refutation. Look for an enclosing guarantee making the execution impossible, synchronisation excluding the interleaving, or reconciliation before any consequential read. Also check intentional contracts, input-excluding preconditions and a different responsible owner.\n\n| Outcome | Rule |\n|---|---|\n| Keep | Evidence establishes the defect; the checked counterargument does not prevent it. |\n| Drop | Cited evidence defeats the execution, obligation or consequence. |\n| Unresolved | An essential contract or runtime fact is unknown. List it separately from findings. |\n\n**A correctness defect can harm only the person who triggered it and still be serious.** Do not import security's attacker/victim test into correctness. \"Keep unless disproved\" is also too permissive: an ungrounded suspicion without a constructed execution is not a fin",
+      "card": null
+    },
+    {
+      "skill_path": "ai-shipping/skills/derive-tests/SKILL.md",
+      "blob_sha": "a3c0a21849a6173be3d881b46bac4d5d7f434d46",
+      "source_url": "https://github.com/phuryn/product-engineering/blob/bdb2389c7636f6615c37fd66dd8518986284ec01/ai-shipping/skills/derive-tests/SKILL.md",
+      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "derive-tests",
+        "description": "'What should we test' or a coverage map: derive the coverage map and missing tests from docs and code; check mode reports staleness."
+      },
+      "excerpt": "---\nname: derive-tests\ndescription: \"'What should we test' or a coverage map: derive the coverage map and missing tests from docs and code; check mode reports staleness.\"\nargument-hint: \"[check] <repo path or area; defaults to the whole repository>\"\n---\n\n\n# Derive tests -- Turn Intent Into Tests\n\n**Turn documented intent into test cases that keep gaps from reopening.** The docs say what the system should do; an audit finds where the code doesn't. Read that intent and turn each load-bearing rule into a concrete case. Sort cases into automated tests, guarded live runs, and manual checks. Recommend the repo's defined gate, or green-before-merge CI where it defines none.\n\n**Produce a coverage map and concrete cases, not a finished suite.** You or the next agent implement the deterministic cases. If the repo already keeps a test-coverage file, under any name, update that map instead of starting another. Apply the `shipping-artifacts` skill's Locations and names rule.\n\n## Invocation\n\n**Use check-only mode for a leading check or a map-currency question.** A request starting with `check`, or asking only whether the map is current, checks the scope that follows instead of running the workflow.\n\n```\n/ai-shipping:derive-tests                        Claude Code\n/ai-shipping:derive-tests the checkout flow\n$ai-shipping:derive-tests supabase/functions     Codex\n/ai-shipping:derive-tests check\n\"what should we test here\" · \"is our coverage map current\"   either agent, in plain words\n```\n\n## Prerequisite: documented intent\n\n**Write down intent before deriving tests from it.** If system docs are missing or thin, apply the `document-app` skill first. Use the repo's docs location, or `documentation/` by default. This skill reads `flows.md`, `permissions.md`, and `automation.md` most heavily. Where intent is absent, say so rather than inventing rules to test.\n\n## The workflow\n\n### 1. Read the intent — and the tests that already exist\n\n**Read the applicable system docs, treating their claims as unverified.** Read architecture, flows, permissions, variables, and any emails, cron, seo, and automation docs that exist. Apply the `shipping-artifacts` skill for each document's contents. Apply the `intended-vs-implemented` skill for the discipline of treating docs as claims to verify, not proof.\n\n**Inventory existing assertions before claiming any rule is covered.** Read the test files, what they actually assert, and what runs in CI today. Distinguish coverage that exists now from coverage you propose; otherwise, the map can claim rules are pinned when nothing checks them. If there are no tests, say so plainly: that is itself a finding.\n\n### 2. Extract the rules worth testing\n\n**Extract deterministic rules whose violation crosses a consequential boundary.** These are the load-bearing trust, data, money, tenant, or privacy rules:\n\n- authorization allow and deny cases, especially boundary crossings in `flows.md` and the matrix in `permissions.md`;\n- input validation and output encoding at each sink;\n- idempotency of jobs and dedup keys;\n- fail-closed defaults: error, timeout, cache-miss, and flag paths that must deny, not allow;\n- side-effect conditions: exactly when an email sends, a write commits, or a paid action fires;\n- public-data-only constraints on public or bot routes;\n- output-contract and tool-surface limits of any agent in `automation.md`.\n\n**Skip cosmetic behavior; test rules whose failure harms someone other than the actor.**\n\n### 3. Build the coverage map\n\n**Mark coverage existing only when a repository test asserts the rule today.** Build one row per use case:\n\nrule → expected behavior (including the negative case) → evidence source (doc + code) → test type → status (existing / proposed / none).\n\nUse these test types:\n\n- unit — pure and deterministic, no external services;\n- integration (deterministic) — real wiring against a dependency the product runs for its tests, such as a local or development database or mocked provider; same pass/fail result every time;\n- guarded live — a real external service the product does not run for its tests, such as an email provider, LLM, or third party; behind an explicit flag;\n- manual — UI/visual or judgment calls; reviewer checklist items, not automated tests.\n\n**Separate a test's dependencies from whether the repo makes it gate.** The repo's gate policy decides the latter (Step 5). A product may gate against its development database and identity provider's development instance, with real browser sessions, as in the `test-harness` skill. Those rows are deterministic there because the product owns the environments.\n\n**Where no gate is stated, require the deterministic unit and integration set.** These tests pass or fail the same way on every run; guarded-live and manual rows don't gate. Either way, prefer unit tests where decision logic can be isolated. Use integration when the rule lives in middleware, RLS, or auth-guard wiring that only a real dependency can exercise.\n\n**A pure helper complements testing real enforcement; it never replaces it.** When a rule can only be exercised live, you can extract its decision into a pure, unit-testable helper. That proves the helper's logic, not that the framework calls it. Wiring and policy enforcement still need an integration or guarded-live check: route middleware, DB row-level security, auth guards, and provider config. Otherwise, the helper can pass while the real path is unprotected.\n\n### 4. Propose the tests\n\n**Write a concrete case for every rule a deterministic test can pin.** For each unit or integration case, give its name, arrange/act/assert intent, and negative case it must reject. Group cases by the doc or flow they defend. Prefer the smallest test that pins the rule: one clear assertion per boundary, rather than an integration test that fails for ten reasons.\n\n### 5. Recommend the gate\n\n**Follow the repo's stated gate policy instead of proposing a replacement.** Start from its agent instructions, contributing guide, or release docs. They may define a local command plus human go, hosted CI, or another merge or release gate. Record that policy and its source in the coverage map, and check the deterministic set runs inside it. Don't recommend hosted CI or branch protection over the stated policy. If that gate omits the deterministic set, report a finding for the owner rather than proposing a different gate.\n\n**Where no policy exists, suggest CI matched to the repo's tooling.** Recommend it; don't silently install it. Match the repo's stack and existing tooling:\n\n- run the deterministic local set on every pull request: unit plus any integration test that runs without live services;\n- keep guarded-live tests opt-in, manual or scheduled, never blocking;\n- gate merges to `main` on green via a required status check plus branch protection.\n\nOutput the workflow file and branch-protection setting as a clearly labeled suggestion for user approval, not an applied change.\n\n### 6. Report coverage and gaps\n\n**Keep existing coverage, proposed tests, and unverified gaps in separate sections.** Write `tests.md` with:\n\n- Existing coverage — rules a test in the repo pins today, from the Step 1 inventory.\n- Proposed tests — recommended cases that don't exist yet, by type.\n- Gaps — documented rules with no verification at all, ranked by what crossing them exposes.\n\nThe gaps are the backlog, where the next AI edit can silently break a boundary. Proposed coverage is not existing coverage: a rule isn't covered until a test actually asserts it.\n\n## Check-only mode\n\n**Check the map without rewriting it or running the tests.** This lets a release check a map maintained by hand or by whoever runs the gate. Write no file: neither the map nor a report. Read the tests; don't run them. Don't apply the `document-app` skill when docs are thin; list them under Not checked.\n\n1. **Find the existing coverage map, and stop if there is none.** Follow the `shipping-artifacts` skill's Locations and names rule, as the",
+      "card": null
     }
   ]
 }
