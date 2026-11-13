@@ -53,12 +53,24 @@ export function buildFeed(state, now) {
     rising: rising.slice(0, 20), unranked, failures: [] };
 }
 
-async function github(path, token) {
+export class GitHubRateLimitError extends Error {
+  constructor(status) {
+    super('GitHub HTTP ' + status);
+    this.name = 'GitHubRateLimitError';
+  }
+}
+
+export async function github(path, token, signal) {
+  const timeout = AbortSignal.timeout(12000);
   const response = await fetch(`https://api.github.com${path}`, {
     headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'DevCockpit-Skill-Rankings',
       ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    redirect: 'error', signal: AbortSignal.timeout(12000),
+    redirect: 'error', signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
   });
+  if (response.status === 429 || (response.status === 403 &&
+      (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after')))) {
+    throw new GitHubRateLimitError(response.status);
+  }
   if (!response.ok) throw new Error(`GitHub HTTP ${response.status}`);
   return response.json();
 }

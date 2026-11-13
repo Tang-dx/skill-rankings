@@ -56,4 +56,13 @@ export function verifyFeed(feed) {
  }
  return {discovered:feed.coverage.discovered,counted:observed.size,excluded:feed.excluded.length,daily:feed.daily.length,rising:feed.rising.length,originalEvidenceVerified:true,allCandidatesAccountedFor:true,rankingRecomputed:true};
 }
-if(process.argv[1]?.endsWith('verify-feed.mjs')&&process.argv[2]) console.log(JSON.stringify(verifyFeed(JSON.parse(await readFile(process.argv[2],'utf8'))),null,2));
+if(process.argv[1]?.endsWith('verify-feed.mjs')&&process.argv[2]) {
+ if(process.argv[2]==='--cards-only') {
+  const {verifyCardPublication}=await import('./skill-cards.mjs');
+  const index=await verifyCardPublication(process.argv[3]??'data');
+  console.log(JSON.stringify({cardRepositories:index.repos.length,pending:index.pending}));
+ } else {
+  const result=verifyFeed(JSON.parse(await readFile(process.argv[2],'utf8')));
+  console.log(JSON.stringify(result,null,2));
+ }
+}
