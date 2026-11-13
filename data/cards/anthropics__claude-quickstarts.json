@@ -1,0 +1,508 @@
+{
+  "schema": 1,
+  "repo": "anthropics/claude-quickstarts",
+  "tree_sha": "4977edaea50658bcc7bc6306393081fa151b58b0",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "computer-use-best-practices/.claude/skills/first-run/SKILL.md",
+      "blob_sha": "ddecc09613e72ce273a171f13ca392923c2d2d45",
+      "source_url": "https://github.com/anthropics/claude-quickstarts/blob/4a4224bdf0e9cfb3332167b69c90457403813625/computer-use-best-practices/.claude/skills/first-run/SKILL.md",
+      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "generated_at": "2026-11-13T10:31:07.365Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "first-run",
+        "description": "Guide a new user through their first computer-use agent run (env check, safe browser-only task, then open the trajectory viewer)."
+      },
+      "excerpt": "---\nname: first-run\ndescription: Guide a new user through their first computer-use agent run (env check, safe browser-only task, then open the trajectory viewer).\n---\n\n# First run\n\nWalk the user through running this demo for the first time. Be conversational\nand pause for confirmation between phases; the goal is that they understand\nwhat each step does, not just that the commands succeed.\n\n## 0. Orient\n\nBriefly say what is about to happen: you will check their setup, run one safe\nbrowser-only task that does **not** touch their mouse or keyboard, and then\nopen the trajectory viewer so they can see what the model saw.\n\n## 1. Environment check\n\n> **Never read the contents of `.env`.** Do not `cat`, `grep` (without `-q`),\n> `Read`, or otherwise display it — the user's API key must never appear in\n> this conversation or in your context. Only check for its *presence*.\n\n- Confirm a virtual environment is active and dependencies are installed:\n  `python -c \"import computer_use, playwright; print('ok')\"`. If that import\n  fails, point them at the **Installation** section of `README.md` and stop.\n- Confirm `.env` exists and the API key is set without ever printing it:\n  `[ -f .env ] && grep -q '^ANTHROPIC_API_KEY=.' .env && echo 'API key: set' || echo 'API key: missing'`\n  If missing, copy `.env.example` to `.env` and ask the user to open it in\n  their own editor and paste their key into it (do **not** ask them to paste\n  the key into chat, and do not edit `.env` for them). Wait until they confirm.\n- Run the macOS permission preflight non-fatally:\n  `python -c \"from computer_use.preflight import check_and_warn; check_and_warn(require=False)\"`\n  and explain any warnings. These permissions are only needed for the desktop\n  `computer` tool, which the first task does not use, so it is fine to\n  continue without them for now.\n\n## 2. Run a safe browser-only task\n\nExplain that this task uses only the headless browser tool, so nothing on\ntheir screen will move. Then run:\n\n```bash\nCU_ENABLE_COMPUTER_USE_TOOLS=false python -m computer_use \\\n  \"Navigate to https://en.wikipedia.org/wiki/Special:Random three times, \\\n   take a screenshot each time, then summarize what you saw.\"\n```\n\nWhile it runs, narrate what the streamed output means (dim thinking text, the\ncyan tool-call lines, the yellow tool-result lines, the `[usage]` line). When\nit finishes, point out the `trajectory: runs/...` path that was printed.\n\n## 3. Open the trajectory viewer\n\n```bash\npython -m streamlit run dev_ui/trajectory_viewer/app.py\n```\n\nTell them to pick the newest run in the sidebar, expand the **System prompt**\nsection to see exactly what the model was told, and scroll through the turns\nto see each screenshot inline.\n\n## 4. Next steps\n\nOffer two follow-ups and let them choose:\n\n- **Try the desktop tool**: once Screen Recording and Accessibility are\n  granted, run `python -m computer_use \"open TextEdit and type hello world\"`.\n  Warn them again that this will move their real mouse and keyboard.\n- **Explore the dev UIs**: the tool panel at\n  `python -m uvicorn dev_ui.tool_panel.server:app --reload` lets them call\n  each tool by hand without the model in the loop.\n\nEnd by pointing at the **Configuration** and **Effective caching and context\npruning** sections of `README.md` for the deeper material.\n",
+      "card": {
+        "title_zh": "首次运行引导",
+        "purpose_zh": "引导新用户完成 computer-use 智能体的首次运行：检查环境、执行一次安全的纯浏览器任务，再打开轨迹查看器。",
+        "does": [
+          "分阶段引导用户完成首次运行，每阶段之间暂停等待确认",
+          "检查虚拟环境与依赖是否可用，并确认 .env 中 API key 已设置但不读取其内容",
+          "非致命地运行 macOS 权限预检并解释警告",
+          "执行一次仅用无头浏览器的安全任务：随机访问维基百科三次、截图并总结",
+          "讲解流式输出的含义并指出轨迹路径",
+          "启动 Streamlit 轨迹查看器，查看系统提示与各轮截图"
+        ],
+        "inputs": [
+          "用户确认与选择（如是否继续、是否尝试桌面工具）",
+          "已配置的 .env 文件与 ANTHROPIC_API_KEY",
+          "已安装的 computer_use、playwright 依赖"
+        ],
+        "outputs": [
+          "环境检查结果（依赖导入、API key 是否设置、权限警告）",
+          "一次浏览器任务的截图与总结",
+          "runs/ 下的轨迹目录",
+          "轨迹查看器界面"
+        ],
+        "scenarios": [
+          "新用户首次上手 computer-use 演示项目",
+          "排查环境与 API key 配置是否就绪",
+          "向用户展示模型在任务中看到的内容"
+        ],
+        "prerequisites": [
+          "虚拟环境已激活且依赖已安装",
+          "存在 .env 并已设置 ANTHROPIC_API_KEY",
+          "桌面工具所需的 macOS 屏幕录制与辅助功能权限（首次任务不需要）"
+        ],
+        "limits": [
+          "首次任务仅使用无头浏览器工具，不触碰鼠标键盘",
+          "桌面工具需先授予屏幕录制与辅助功能权限",
+          "权限预检为非致命，可带警告继续",
+          "禁止读取或显示 .env 内容，也不代用户编辑"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "自动化",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Guide a new user through their first computer-use agent run (env check, safe browser-only task, then open the trajectory viewer)."
+          },
+          {
+            "field": "does",
+            "quote": "Confirm a virtual environment is active and dependencies are installed:"
+          },
+          {
+            "field": "does",
+            "quote": "Confirm `.env` exists and the API key is set without ever printing it:"
+          },
+          {
+            "field": "does",
+            "quote": "Run the macOS permission preflight non-fatally:"
+          },
+          {
+            "field": "does",
+            "quote": "Explain that this task uses only the headless browser tool, so nothing on their screen will move."
+          },
+          {
+            "field": "does",
+            "quote": "python -m streamlit run dev_ui/trajectory_viewer/app.py"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If that import fails, point them at the **Installation** section of `README.md` and stop."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If missing, copy `.env.example` to `.env` and ask the user to open it in their own editor and paste their key into it"
+          },
+          {
+            "field": "limits",
+            "quote": "These permissions are only needed for the desktop `computer` tool, which the first task does not use, so it is fine to continue without them for now."
+          },
+          {
+            "field": "limits",
+            "quote": "**Never read the contents of `.env`.**"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`python -c \"import computer_use, playwright; print('ok')\"`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "copy `.env.example` to `.env`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "computer-use-demo/.claude/skills/verify/SKILL.md",
+      "blob_sha": "20e704b455b4c2087850063760429c1e02f4619f",
+      "source_url": "https://github.com/anthropics/claude-quickstarts/blob/4a4224bdf0e9cfb3332167b69c90457403813625/computer-use-demo/.claude/skills/verify/SKILL.md",
+      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "generated_at": "2026-11-13T10:31:07.365Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "verify",
+        "description": "Build the computer-use-demo image and drive the Streamlit UI headlessly to verify changes end-to-end."
+      },
+      "excerpt": "---\nname: verify\ndescription: Build the computer-use-demo image and drive the Streamlit UI headlessly to verify changes end-to-end.\n---\n\n# Verifying changes to this demo\n\nThe surface is the Streamlit app inside the container. Build the image from this directory, run it, and drive the UI with Playwright. `pytest`, `ruff`, and `pyright` are CI's job, not evidence.\n\n## Build and run\n\n```sh\ndocker build . -t computer-use-demo:verify\ndocker rm -f cu-verify 2>/dev/null\ndocker run -d --name cu-verify \\\n  -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY -e WIDTH=1024 -e HEIGHT=768 \\\n  -p 18501:8501 -p 18080:8080 -p 16080:6080 computer-use-demo:verify\nuntil curl -sf localhost:18501/_stcore/health >/dev/null; do sleep 1; done\n```\n\nA cold build takes several minutes (apt, LibreOffice, a pyenv Python compile). The `requirements.txt` layer is cached separately, so source-only changes rebuild in seconds.\n\nTo iterate without rebuilding, copy sources over the baked copy before the first browser session compiles the script:\n\n```sh\ndocker cp computer_use_demo/. cu-verify:/home/computeruse/computer_use_demo/\n```\n\nStreamlit's file watcher does not notice `docker cp` replacements once a session has run. Recreate the container instead of `docker restart`, which fails on a stale X lock (`tint2: could not open display`).\n\n## Drive the UI\n\nInstall Playwright in any venv (`pip install playwright && python -m playwright install chromium`) and run the script below. It sets the model, picks a tool version, optionally sets the thinking mode, sends a prompt, waits for the loop to go idle, then dumps the chat transcript and every HTTP exchange (request headers and JSON, response JSON) with auth headers redacted.\n\n```sh\nTHINKING=Adaptive python drive.py 18501 claude-sonnet-5 computer_toolset_20260801 \\\n  \"Take a screenshot, then zoom in on the taskbar and list the icons.\" out/ 240\n```\n\nPass `-` for model or tool version to keep the default. `THINKING=Off|Adaptive|Extended` clicks that radio. `TOKEN_EFFICIENT=1` ticks the beta checkbox.\n\nWhat to read afterwards:\n\n- `out/chat.txt`: the rendered conversation, including `Tool Use: <name>` lines and any error box with its traceback.\n- `out/exchange-NN.txt`: one file per API round trip. Check `tools`, `anthropic-beta`, and the `tool_use` / `tool_result` blocks here rather than trusting the chat rendering.\n- `out/02-chat.png`, `out/04-http-logs-expanded.png`: full-page screenshots.\n\nUseful probes: an older model with a newer tool version (expect a clean 400 in the error box, not a crash), toggling Thinking to Off before the first message, and switching models mid-session.\n\n```python\n\"\"\"drive.py <port> <model|-> <tool_version|-> <prompt> <outdir> [wait_secs]\"\"\"\n\nimport os\nimport re\nimport sys\nimport time\nfrom pathlib import Path\n\nfrom playwright.sync_api import sync_playwright\n\nport, model, tool_version, prompt, outdir = sys.argv[1:6]\nwait_secs = int(sys.argv[6]) if len(sys.argv) > 6 else 180\nout = Path(outdir)\nout.mkdir(parents=True, exist_ok=True)\nMAIN = \"[data-testid='stMain'], section.main, [data-testid='stAppViewContainer']\"\n\n\ndef log(msg: str) -> None:\n    print(f\"[{time.strftime('%H:%M:%S')}] {msg}\", flush=True)\n\n\nwith sync_playwright() as p:\n    browser = p.chromium.launch()\n    page = browser.new_page(viewport={\"width\": 1400, \"height\": 1600})\n    page.goto(f\"http://localhost:{port}\", wait_until=\"networkidle\", timeout=120_000)\n    page.wait_for_selector(\"text=Tool Versions\", timeout=120_000)\n    sidebar = page.locator(\"[data-testid='stSidebar']\")\n\n    model_input = page.get_by_label(\"Model\", exact=True)\n    if model != \"-\":\n        model_input.fill(model)\n        model_input.press(\"Enter\")  # commits the text_input and fires on_change\n        time.sleep(2)\n    if tool_version != \"-\":\n        sidebar.get_by_text(tool_version, exact=True).click()\n        time.sleep(2)\n    if thinking := os.environ.get(\"THINKING\"):\n        sidebar.get_by_text(thinking, exact=True).click()\n        time.sleep(2)\n    if os.environ.get(\"TOKEN_EFFICIENT\"):\n        sidebar.get_by_text(\"Enable token-efficient tools beta\", exact=True).click()\n        time.sleep(2)\n    log(f\"model={model_input.input_value()!r} tools={tool_version} thinking={thinking}\")\n    page.screenshot(path=str(out / \"01-sidebar.png\"), full_page=True)\n\n    chat = page.locator(\"textarea[data-testid='stChatInputTextArea']\")\n    chat.fill(prompt)\n    chat.press(\"Enter\")\n    log(\"prompt sent\")\n\n    # The status widget is present while the script (and so the sampling loop) runs.\n    deadline = time.time() + wait_secs\n    time.sleep(5)\n    while time.time() < deadline:\n        running = page.locator(\"[data-testid='stStatusWidget']\").count() > 0\n        msgs = page.locator(\"[data-testid='stChatMessage']\").count()\n        log(f\"running={running} chat_messages={msgs}\")\n        if not running and msgs >= 2:\n            time.sleep(4)\n            if page.locator(\"[data-testid='stStatusWidget']\").count() == 0:\n                break\n        time.sleep(5)\n\n    page.screenshot(path=str(out / \"02-chat.png\"), full_page=True)\n    (out / \"chat.txt\").write_text(page.locator(MAIN).first.inner_text(timeout=10_000))\n\n    page.get_by_role(\"tab\", name=\"HTTP Exchange Logs\").click()\n    time.sleep(3)\n    expanders = page.locator(\"[data-testid='stExpander']\")\n    for i in range(expanders.count()):\n        exp = expanders.nth(i)\n        exp.locator(\"summary\").click()\n        time.sleep(1.5)\n        txt = exp.inner_text(timeout=15_000)\n        txt = re.sub(r\"(?im)^(`?)(authorization|x-api-key): .*$\", r\"\\1\\2: [REDACTED]\", txt)\n        (out / f\"exchange-{i + 1:02d}.txt\").write_text(txt)\n    page.screenshot(path=str(out / \"04-http-logs-expanded.png\"), full_page=True)\n    log(f\"captured {expanders.count()} exchanges\")\n    browser.close()\n```\n\n## Gotchas\n\n- The sidebar requires a non-empty API key for the Anthropic provider before it renders the chat. `ANTHROPIC_API_KEY` in the container env pre-fills it.\n- Each Playwright run is a fresh Streamlit session, so the HTTP exchange log only contains that run's requests. Capture it in the same run.\n- If `PYTEST_DISABLE_PLUGIN_AUTOLOAD` is set in your shell, `pytest` silently skips every async test. Run with `-p pytest_asyncio` or unset it.\n",
+      "card": {
+        "title_zh": "计算机使用演示端到端验证",
+        "purpose_zh": "构建 computer-use-demo 镜像，以无头方式驱动 Streamlit 界面，对改动做端到端验证。",
+        "does": [
+          "用 docker build 构建 computer-use-demo 镜像并启动容器",
+          "轮询健康检查端点等待应用就绪",
+          "用 docker cp 覆盖源码免重建迭代",
+          "用 Playwright 脚本设置模型、工具版本、思考模式并发送提示",
+          "等待采样循环空闲后导出对话文本与截图",
+          "展开 HTTP 交换日志并脱敏认证头后落盘"
+        ],
+        "inputs": [
+          "ANTHROPIC_API_KEY 环境变量",
+          "端口、模型名、工具版本、提示词、输出目录、等待秒数等命令行参数",
+          "THINKING 与 TOKEN_EFFICIENT 环境变量开关",
+          "待验证的 computer_use_demo 源码"
+        ],
+        "outputs": [
+          "chat.txt 渲染后的对话文本",
+          "exchange-NN.txt 每次 API 往返的请求与响应记录",
+          "01-sidebar.png、02-chat.png、04-http-logs-expanded.png 截图"
+        ],
+        "scenarios": [
+          "验证演示应用改动后的端到端行为",
+          "检查请求中的 tools、anthropic-beta 与 tool_use/tool_result 块",
+          "测试旧模型配新工具版本是否返回干净的 400",
+          "测试首条消息前关闭思考模式或会话中切换模型"
+        ],
+        "prerequisites": [
+          "本机可运行 docker 构建与运行容器",
+          "安装 Playwright 及 chromium",
+          "容器环境提供 ANTHROPIC_API_KEY",
+          "侧边栏需非空 API key 才渲染聊天"
+        ],
+        "limits": [
+          "冷构建需数分钟（apt、LibreOffice、pyenv 编译 Python）",
+          "Streamlit 文件监视器察觉不到 docker cp 替换，需重建容器而非 docker restart",
+          "每次 Playwright 运行是新会话，HTTP 日志只含本次请求",
+          "若设置了 PYTEST_DISABLE_PLUGIN_AUTOLOAD，pytest 会静默跳过异步测试",
+          "pytest、ruff、pyright 属 CI 职责，不作为证据"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "测试",
+          "自动化",
+          "运维部署"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Build the computer-use-demo image and drive the Streamlit UI headlessly to verify changes end-to-end."
+          },
+          {
+            "field": "does",
+            "quote": "docker build . -t computer-use-demo:verify"
+          },
+          {
+            "field": "does",
+            "quote": "until curl -sf localhost:18501/_stcore/health >/dev/null; do sleep 1; done"
+          },
+          {
+            "field": "does",
+            "quote": "docker cp computer_use_demo/. cu-verify:/home/computeruse/computer_use_demo/"
+          },
+          {
+            "field": "does",
+            "quote": "Install Playwright in any venv (`pip install playwright && python -m playwright install chromium`) and run the script below."
+          },
+          {
+            "field": "does",
+            "quote": "It sets the model, picks a tool version, optionally sets the thinking mode, sends a prompt, waits for the loop to go idle, then dumps the chat transcript and every HTTP exchange"
+          },
+          {
+            "field": "does",
+            "quote": "txt = re.sub(r\"(?im)^(`?)(authorization|x-api-key): .*$\", r\"\\1\\2: [REDACTED]\", txt)"
+          },
+          {
+            "field": "outputs",
+            "quote": "`out/chat.txt`: the rendered conversation, including `Tool Use: <name>` lines and any error box with its traceback."
+          },
+          {
+            "field": "outputs",
+            "quote": "`out/exchange-NN.txt`: one file per API round trip."
+          },
+          {
+            "field": "outputs",
+            "quote": "`out/02-chat.png`, `out/04-http-logs-expanded.png`: full-page screenshots."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Useful probes: an older model with a newer tool version (expect a clean 400 in the error box, not a crash), toggling Thinking to Off before the first message, and switching models mid-session."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The sidebar requires a non-empty API key for the Anthropic provider before it renders the chat. `ANTHROPIC_API_KEY` in the container env pre-fills it."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Install Playwright in any venv (`pip install playwright && python -m playwright install chromium`)"
+          },
+          {
+            "field": "limits",
+            "quote": "A cold build takes several minutes (apt, LibreOffice, a pyenv Python compile)."
+          },
+          {
+            "field": "limits",
+            "quote": "Streamlit's file watcher does not notice `docker cp` replacements once a session has run. Recreate the container instead of `docker restart`"
+          },
+          {
+            "field": "limits",
+            "quote": "Each Playwright run is a fresh Streamlit session, so the HTTP exchange log only contains that run's requests."
+          },
+          {
+            "field": "limits",
+            "quote": "If `PYTEST_DISABLE_PLUGIN_AUTOLOAD` is set in your shell, `pytest` silently skips every async test."
+          },
+          {
+            "field": "limits",
+            "quote": "`pytest`, `ruff`, and `pyright` are CI's job, not evidence."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "managed-agents/copilot-kit-ag-ui/.claude/skills/verify/SKILL.md",
+      "blob_sha": "ea6e33b67f00a4c28caa76c39cef143a2f3bebba",
+      "source_url": "https://github.com/anthropics/claude-quickstarts/blob/4a4224bdf0e9cfb3332167b69c90457403813625/managed-agents/copilot-kit-ag-ui/.claude/skills/verify/SKILL.md",
+      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "generated_at": "2026-11-13T10:31:07.365Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "verify",
+        "description": "Build and drive the copilot-kit-ag-ui demo to verify changes end-to-end."
+      },
+      "excerpt": "---\nname: verify\ndescription: Build and drive the copilot-kit-ag-ui demo to verify changes end-to-end.\n---\n\n# Verifying changes to this demo\n\nBuild and drive the real server. `npm run typecheck` is CI's job, not evidence.\n\n## Without Anthropic credentials or provisioned agents\n\nThe server boots and serves everything except a live agent turn with stub IDs:\n\n```sh\nnpm install && npm run build\nANTHROPIC_API_KEY=sk-ant-test ANTHROPIC_ENVIRONMENT_ID=env_x \\\n  ANTHROPIC_AGENT_ID=agent_x ANTHROPIC_AGENT_VERSION=1 PORT=8799 npm start\n```\n\nProbes that exercise the wiring:\n\n- `GET :8799/` returns the built `web/dist/index.html` (there is no SPA catch-all, so unknown paths 404).\n- `GET :8799/api/copilotkit/info` lists the registered agents, confirming agent id and class registration without an API call.\n- `POST :8799/api/copilotkit/agent/financial-assistant/run` with an AG-UI body (`{\"threadId\":\"t1\",\"runId\":\"r1\",\"messages\":[{\"id\":\"m1\",\"role\":\"user\",\"content\":\"hi\"}],\"state\":{},\"tools\":[],\"context\":[],\"forwardedProps\":{}}`) reaches the AG-UI adapter and fails with a 401 from Anthropic. That 401 in the SSE `RUN_ERROR` proves the full route-to-SDK path.\n- CORS: send `OPTIONS` with an `Origin` header. With `ALLOWED_ORIGINS` set, allowed origins get `Access-Control-Allow-Origin` echoed and others get none.\n- `VITE_COPILOT_RUNTIME_URL=... npm run build` then grep `web/dist/assets` for the URL to confirm build-time baking.\n\n## With real credentials\n\n`ant apply agents environments` once, `npm run dev`, open http://localhost:5173, send a prompt that triggers a visual tool (\"show me a growth projection for $500/month at 7%\") and confirm the chart renders inline.\n\n## Gotchas\n\n- Boot requires agent identity: either `claude-lock.json` (from `ant apply agents environments`) or the three `ANTHROPIC_*` ID env vars. Missing both is a deliberate boot failure.\n- Static serving only activates when `web/dist` exists, so run `npm run build` before `npm start` probes.\n",
+      "card": {
+        "title_zh": "演示端到端验证",
+        "purpose_zh": "构建并驱动 copilot-kit-ag-ui 演示服务，端到端验证改动是否生效。",
+        "does": [
+          "安装依赖并构建项目",
+          "用占位 ID 启动服务并探测路由与静态页面",
+          "通过 AG-UI 请求体验证路由到 SDK 的完整链路",
+          "检查 CORS 允许来源回显行为",
+          "确认构建时注入的运行时 URL",
+          "用真实凭据运行开发服务器并验证图表内联渲染"
+        ],
+        "inputs": [
+          "ANTHROPIC_API_KEY 等三个 ANTHROPIC_* 环境变量或 claude-lock.json",
+          "PORT 端口号",
+          "ALLOWED_ORIGINS 允许来源配置",
+          "VITE_COPILOT_RUNTIME_URL 构建时变量",
+          "AG-UI 格式的请求体"
+        ],
+        "outputs": [
+          "构建产物 web/dist",
+          "HTTP 探测响应与状态码",
+          "SSE RUN_ERROR 中的 401 错误",
+          "内联渲染的图表"
+        ],
+        "scenarios": [
+          "改动后需要端到端验证演示服务",
+          "无真实凭据时验证服务接线",
+          "检查 CORS 与静态资源服务行为",
+          "验证构建时环境变量注入"
+        ],
+        "prerequisites": [
+          "已安装 Node 与 npm",
+          "启动前需执行 npm run build 生成 web/dist",
+          "启动需提供 claude-lock.json 或三个 ANTHROPIC_* ID 环境变量"
+        ],
+        "limits": [
+          "无凭据时无法完成真实 agent 轮次",
+          "缺少 agent 身份配置会故意启动失败",
+          "无 SPA 兜底路由，未知路径返回 404",
+          "typecheck 不作为验证证据"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "测试",
+          "自动化",
+          "后端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Build and drive the copilot-kit-ag-ui demo to verify changes end-to-end."
+          },
+          {
+            "field": "does",
+            "quote": "npm install && npm run build"
+          },
+          {
+            "field": "does",
+            "quote": "reaches the AG-UI adapter and fails with a 401 from Anthropic. That 401 in the SSE `RUN_ERROR` proves the full route-to-SDK path."
+          },
+          {
+            "field": "does",
+            "quote": "CORS: send `OPTIONS` with an `Origin` header."
+          },
+          {
+            "field": "does",
+            "quote": "`VITE_COPILOT_RUNTIME_URL=... npm run build` then grep `web/dist/assets` for the URL to confirm build-time baking."
+          },
+          {
+            "field": "does",
+            "quote": "send a prompt that triggers a visual tool (\"show me a growth projection for $500/month at 7%\") and confirm the chart renders inline."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Static serving only activates when `web/dist` exists, so run `npm run build` before `npm start` probes."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Boot requires agent identity: either `claude-lock.json` (from `ant apply agents environments`) or the three `ANTHROPIC_*` ID env vars."
+          },
+          {
+            "field": "limits",
+            "quote": "Missing both is a deliberate boot failure."
+          },
+          {
+            "field": "limits",
+            "quote": "there is no SPA catch-all, so unknown paths 404"
+          },
+          {
+            "field": "limits",
+            "quote": "`npm run typecheck` is CI's job, not evidence."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "ANTHROPIC_API_KEY=sk-ant-test ANTHROPIC_ENVIRONMENT_ID=env_x"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm install && npm run build"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "managed-agents/self-hosted-sandboxes/openshell-policy/sandbox/openshell-skills/policy-advisor/SKILL.md",
+      "blob_sha": "f05ba6a0be7812b073e523554f20dd2e9a5d19fb",
+      "source_url": "https://github.com/anthropics/claude-quickstarts/blob/4a4224bdf0e9cfb3332167b69c90457403813625/managed-agents/self-hosted-sandboxes/openshell-policy/sandbox/openshell-skills/policy-advisor/SKILL.md",
+      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "generated_at": "2026-11-13T10:31:07.365Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "openshell-policy-advisor",
+        "description": "Use when an OpenShell sandbox returns policy_denied, mentions policy.local, or needs a narrow network policy proposal."
+      },
+      "excerpt": "---\nname: openshell-policy-advisor\ndescription: Use when an OpenShell sandbox returns policy_denied, mentions policy.local, or needs a narrow network policy proposal.\n---\n\n# OpenShell Policy Advisor\n\nWhen a request fails with `policy_denied`, do not treat the denial as final if the user task still needs the request. Read `/etc/openshell/skills/policy_advisor.md`, inspect `http://policy.local/v1/policy/current`, submit the narrowest proposal to `http://policy.local/v1/proposals`, wait on `/v1/proposals/{chunk_id}/wait?timeout=300`, and retry only after approval with `policy_reloaded: true`.\n",
+      "card": {
+        "title_zh": "OpenShell策略顾问",
+        "purpose_zh": "当OpenShell沙箱返回policy_denied或涉及policy.local时，读取策略说明、查看当前策略、提交最窄网络策略提案并等待审批后重试。",
+        "does": [
+          "在请求失败为policy_denied且任务仍需该请求时，不把拒绝视为最终结果",
+          "读取/etc/openshell/skills/policy_advisor.md",
+          "查看http://policy.local/v1/policy/current当前策略",
+          "向http://policy.local/v1/proposals提交最窄的策略提案",
+          "在/v1/proposals/{chunk_id}/wait?timeout=300上等待审批",
+          "仅在审批通过且policy_reloaded为true后重试请求"
+        ],
+        "inputs": [
+          "触发policy_denied的失败请求",
+          "用户任务需求",
+          "/etc/openshell/skills/policy_advisor.md内容",
+          "当前策略接口返回内容"
+        ],
+        "outputs": [
+          "最窄网络策略提案",
+          "等待审批结果",
+          "审批通过后的重试请求"
+        ],
+        "scenarios": [
+          "OpenShell沙箱请求返回policy_denied",
+          "任务涉及policy.local",
+          "需要提出窄范围网络策略提案"
+        ],
+        "prerequisites": [
+          "存在OpenShell沙箱环境",
+          "可读取/etc/openshell/skills/policy_advisor.md",
+          "可访问policy.local相关接口"
+        ],
+        "limits": [
+          "仅在用户任务仍需该请求时才不把拒绝视为最终",
+          "提案必须是最窄范围",
+          "必须等待审批且policy_reloaded为true后才能重试"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "安全",
+          "运维部署",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use when an OpenShell sandbox returns policy_denied, mentions policy.local, or needs a narrow network policy proposal."
+          },
+          {
+            "field": "does",
+            "quote": "When a request fails with `policy_denied`, do not treat the denial as final if the user task still needs the request."
+          },
+          {
+            "field": "does",
+            "quote": "Read `/etc/openshell/skills/policy_advisor.md`"
+          },
+          {
+            "field": "does",
+            "quote": "inspect `http://policy.local/v1/policy/current`"
+          },
+          {
+            "field": "does",
+            "quote": "submit the narrowest proposal to `http://policy.local/v1/proposals`"
+          },
+          {
+            "field": "does",
+            "quote": "wait on `/v1/proposals/{chunk_id}/wait?timeout=300`"
+          },
+          {
+            "field": "does",
+            "quote": "retry only after approval with `policy_reloaded: true`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read `/etc/openshell/skills/policy_advisor.md`"
+          },
+          {
+            "field": "limits",
+            "quote": "submit the narrowest proposal"
+          },
+          {
+            "field": "limits",
+            "quote": "retry only after approval with `policy_reloaded: true`"
+          }
+        ]
+      }
+    }
+  ]
+}

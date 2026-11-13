@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "repo": "CNCKitchen/ScanRuler",
+  "tree_sha": "3ae08c4637a684d3f370bc1a558062586bd59885",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/scan-measuring/SKILL.md",
+      "blob_sha": "40d6b486165d6de4947c6be6894e4a35e0ba86da",
+      "source_url": "https://github.com/CNCKitchen/ScanRuler/blob/89ca713c0abe606bffd30e2f7ca9ff0a7d823358/skills/scan-measuring/SKILL.md",
+      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "scan-measuring",
+        "description": "Measure a 3D scan in ScanRuler through scanruler-mcp. Use when asked to measure dimensions, fit elements, run GD&T-like form, orientation or location checks, cut sections, compare a scan with a reference part (deviation) or check wall thickness."
+      },
+      "excerpt": "---\nname: scan-measuring\ndescription: Measure a 3D scan in ScanRuler through scanruler-mcp. Use when asked to measure dimensions, fit elements, run GD&T-like form, orientation or location checks, cut sections, compare a scan with a reference part (deviation) or check wall thickness.\n---\n\n<!-- SPDX-License-Identifier: AGPL-3.0-only -->\n\n# Measuring a 3D scan (ScanRuler)\n\nThe guide for this lives in ScanRuler itself, written for the build you are connected to — this file only points at it, so it is never out of date.\n\n1. `scanruler_status`; no page connected → `scanruler_open`.\n2. Read the guide, whole, before the first step: `guide_read { topic: \"measure\" }`.\n3. Follow it. It sends you to sections of `measure-reference` when you need them — `guide_read {}` lists every guide and section with what each costs.\n\nA page with no `guide_read` tool is a build from before the guides: say so, and work from the tools' own descriptions.\n",
+      "card": null
+    },
+    {
+      "skill_path": "plugins/reverse/skills/cad-stl-reverse-engineering/SKILL.md",
+      "blob_sha": "f3bd90c3fbbb24a6a4d5710cb050dd131f543b6c",
+      "source_url": "https://github.com/CNCKitchen/ScanRuler/blob/89ca713c0abe606bffd30e2f7ca9ff0a7d823358/plugins/reverse/skills/cad-stl-reverse-engineering/SKILL.md",
+      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "cad-stl-reverse-engineering",
+        "description": "Rebuild the exact CAD model and a STEP in ScanRuler from an STL that was exported from CAD software: a model downloaded from Printables, Thingiverse or GrabCAD, an old STL whose source file is lost, a part exported from an assembly, a print-in-place assembly, a threaded cap or bottle neck. Use it whenever someone wants the original design back from such an STL ('recreate the CAD from this STL', 'convert this STL to STEP exactly', 'make this STL editable / parametric again', 'get the design dimen"
+      },
+      "excerpt": "---\nname: cad-stl-reverse-engineering\ndescription: \"Rebuild the exact CAD model and a STEP in ScanRuler from an STL that was exported from CAD software: a model downloaded from Printables, Thingiverse or GrabCAD, an old STL whose source file is lost, a part exported from an assembly, a print-in-place assembly, a threaded cap or bottle neck. Use it whenever someone wants the original design back from such an STL ('recreate the CAD from this STL', 'convert this STL to STEP exactly', 'make this STL editable / parametric again', 'get the design dimensions out of this STL'), and also when they just say 'reverse engineer this STL' and the mesh turns out to be a clean CAD tessellation: vertices exactly on the surfaces, flat faces made of long slivers with no interior vertices, few distinct heights. Catches STLs that were scaled after export and parts left at an angle. If the mesh is a real 3D scan (noisy, bowed faces, rounded edges), use scan-reverse-engineering instead.\"\n---\n\n<!-- SPDX-License-Identifier: AGPL-3.0-only -->\n\n# CAD-exported STL → exact CAD (ScanRuler)\n\n**Read, don't fit.** A CAD export is not a measurement: every vertex lies on the true surface\n(float32, ~1e-5 mm; on a face's edges sometimes up to ~5e-3 mm where the exporter held the edge\nloosely). Faces are found by which surface their vertices lie on, profiles are read from the faces\nthemselves, and the model is checked against the mesh by volume, not by eye.\n\nThe scripts do the reading and write the features; you choose, look at what they drew, and fix\nwhat they flag. Each script runs in seconds (segmentation of a 10k-triangle part: 5–60 s). On the\nparts this was developed on the first automatic pass came within 0.03–3 % of the STL (volume of the\ndifference over the part's volume) — plates, brackets, gears, turned parts; harder parts (internal\ncavities, several build directions) need the trims of §4.\n\n| | 3D scan | CAD-exported STL |\n|---|---|---|\n| Vertices | noisy samples near the surface | on the surface |\n| Numbers | fit, then snap within a tolerance | read exactly, then recognise the design value |\n| Done when | deviation within T | `compare.py` difference ≲ 1 %, no cluster you cannot explain |\n| Frame | aligned to datums | kept: the STEP lands on the STL (turned back with one moveBody if needed) |\n\n## 0. Set up\n\n- Work folder next to the STL: `<part>_work/`, scripts copied from this skill's `scripts/` (or run\n  them from here). Python 3 with numpy, scipy, matplotlib. Keep paths short on Windows (260 chars).\n- ScanRuler: `scanruler_status` (or `scanruler_open`), `session_state`. Open the STL with\n  `scan_open` so the person sees it; the scripts read the STL file itself.\n- Never modify the original STL. Deliver `<part>_CAD.step`, `<part>_CAD.scanruler`, a short report.\n\n## 1. Analyze — is it a CAD export, and how is it built?\n\n```\npython scripts/analyze.py part.stl            # -> data/faces.pkl (+ faces.json, V/F/piece.npy)\n```\nRead from it:\n- **CAD or scan.** Planes with residual ~1e-6 and cylinders/cones with exact round radii mean CAD.\n  Thousands of \"freeform\" faces, bowed planes (residual > 1e-3), rings that fit no circle mean a\n  scan, or a remeshed/decimated CAD export: hand over to `scan-reverse-engineering` and say why.\n- **Its last line recommends how to build it**: `frame.py first`, `revolve.py --axis … --at …`,\n  or `slabs.py --axis …`. Follow it unless you see a reason not to.\n- **Frame.** If the faces are *not* square to the world axes (a part exported in its assembly\n  position, tilted on a bed): `python scripts/frame.py part.stl` writes `data/local.stl`, the mesh in\n  its own frame, and the `moveBody` that turns the result back. Run everything below on\n  `data/local.stl` (analyze again) and add that moveBody as the last feature.\n- **Per axis: caps + walls %.** The axis with the most area in caps square to it and walls along\n  it is the main build axis (a plate: its thickness axis; a bracket: often its extrusion axis, not Z).\n- **Axes.** Cylinders and cones grouped by axis line: holes (concave) with their chamfers and\n  counterbores, bosses, and which round faces share the main axis.\n- **Turned?** If most of the area is coaxial round faces and planes square to that axis (a spacer,\n  bushing, knob, pulley, collet), build the body as one revolve (§2b), not slabs.\n- Pieces: each connected piece becomes its own body.\n\n## 2. Main body\n\n### 2a. Prismatic parts: slabs along the main axis\n\n```\npython scripts/slabs.py --axis z --plot slabs_z.png    # -> data/slabs_z.json (steps)\n```\nEvery plane square to the axis is a level; between two levels is a slab, cut at the height its other\nfaces disturb least. Each wall face along the axis becomes its exact curve (plane → line, cylinder →\narc with its fitted centre and radius, a tangent chain → lines and arcs read once for all slabs, a\nspline wall → one spline through its vertices), corners at exact crossings. Faces of other\ndirections in the cut (a cross hole, a chamfer or round on an edge, a slot) are **healed**: the wall\nruns on past a hole, a blend's own wall comes back, and only where that fails are the cut's points\nkept (`UNHEALED`). Equal slabs merge into one extrude.\n\n**Look at the plot** (grey = the cut, blue = the profile, red = unhealed) and the text:\n- `material area: cut A, healed B <-- CHECK THE PLOT`: healing changed the area by > 10 %. Legitimate\n  when a hole of another axis was filled (it is cut again in §3); wrong when blue leaves the grey.\n- `note: … takes the profile of …`: a thin slab inside a chamfer band took a neighbour's profile.\n- `!! could not close a loop` / red pieces: a face the reading could not place.\nFixes: `--at=lo:h` cuts slab `lo` at height h; `--borrow=lo:lo2` gives slab `lo` the profile of the\nslab starting at `lo2` (the `=` is needed for negative numbers). Borrowing a *larger* profile and\nthen trimming along another axis (§4) is how a slab whose shape belongs to another axis is done:\nan R4 round along X under a Z-built block has no Z wall to heal to.\n\n### 2b. Turned parts: one revolve\n\n```\npython scripts/revolve.py --plot revolve.png          # axis found, or --axis z --at x0,y0\n```\nThe section through the axis, read from the coaxial faces (end faces and shoulders, diameters,\nchamfer cones, tori as arcs, spheres), half on one side, closed along the axis where solid. A\nturned face no primitive fits (a screw head's spline dome with its rim round, merged into one face)\nis read from its own vertices — each lies on the meridian — so it comes back as the arcs, lines or\nspline it is, not as chords of the cut. Faces that are not coaxial (flats, cross holes) are healed\nout; they come back in §3–4. A **socket on the axis** (hex, Torx, a slot across a head) is filled in\nthe revolve and cut as an extrude of its own outline, read square to the axis halfway down: the\nscript says `pocket on the axis … filled, and cut as \"Turned body socket\"`. The body is named\n\"Turned body\" (use that as BODY below).\n\n## 3. Holes along other axes\n\n```\npython scripts/holes.py --main z                       # -> data/holes.json\n```\nEach concave cylinder/cone group on an axis other than the main one is an exact revolve cut: counterbores,\nentry chamfers, drill points, ends open (run on just past the entry ring) or floored. `--all` also\ndoes holes along the main axis (slabs cut those as circles already, but not their chamfers or\ncounterbores). A hole at an angle (a set screw 4° off X) is drawn about the nearest world axis as a\nbody of its own, turned onto its axis with `moveBody` and cut from `--body` (default the first slab).\nFits under 0.15 mm radius are blends, not holes, and are left out.\n\n## 4. Build, compare, trim and fill\n\nRun the generated steps without pasting them: `scanruler_batch { \"file\": \"<abs>/data/slabs_z.json\" }`\n(then `holes.json`, trims, blends). The scripts ask for terse answers (`detail: \"none\"`); read the\nbatch's `failed` list. The first slab names the body: `Z slab 0` (or `Turned body`).\n\nThen measure:\n```\nre",
+      "card": null
+    },
+    {
+      "skill_path": "plugins/reverse/skills/scan-reverse-engineering/SKILL.md",
+      "blob_sha": "6a308379636221ae2c836a8fde6afc3457711681",
+      "source_url": "https://github.com/CNCKitchen/ScanRuler/blob/89ca713c0abe606bffd30e2f7ca9ff0a7d823358/plugins/reverse/skills/scan-reverse-engineering/SKILL.md",
+      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "generated_at": "2026-11-13T10:31:07.365Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "scan-reverse-engineering",
+        "description": "Reverse-engineer a 3D scan (STL/mesh) into a parametric CAD solid and STEP in ScanRuler. Use when asked to reverse engineer, model or rebuild a scanned part."
+      },
+      "excerpt": "---\nname: \"scan-reverse-engineering\"\ndescription: \"Reverse-engineer a 3D scan (STL/mesh) into a parametric CAD solid and STEP in ScanRuler. Use when asked to reverse engineer, model or rebuild a scanned part.\"\n---\n\n<!-- SPDX-License-Identifier: AGPL-3.0-only -->\n\n# Scan → CAD reverse engineering (ScanRuler)\n\nThe guide for this lives in ScanRuler itself, written for the build you are connected to — this file only points at it, so it is never out of date.\n\n1. `scanruler_status`; no page connected → `scanruler_open`.\n2. Read the guide, whole, before the first step: `guide_read { topic: [\"model\", \"scan-to-cad\"] }`.\n3. Follow it. It sends you to sections of `model-reference` when you need them — `guide_read {}` lists every guide and section with what each costs.\n\nA page with no `guide_read` tool is a build from before the guides: say so, and work from the tools' own descriptions.\n",
+      "card": {
+        "title_zh": "扫描逆向建模指引",
+        "purpose_zh": "在 ScanRuler 中把 3D 扫描件（STL/网格）逆向重建为参数化 CAD 实体和 STEP，并指引先读取内置指南再按步骤操作。",
+        "does": [
+          "检查 ScanRuler 连接状态，无页面连接时打开页面",
+          "在开始建模前完整读取 scan-to-cad 主题指南",
+          "按指南执行扫描件逆向重建为参数化 CAD 实体与 STEP",
+          "按需读取 model-reference 中的相关章节",
+          "列出全部指南与章节及其成本",
+          "对缺少 guide_read 工具的旧版本说明情况并改用工具自身描述"
+        ],
+        "inputs": [
+          "ScanRuler 页面连接",
+          "指南主题参数（如 model、scan-to-cad）",
+          "3D 扫描件（STL/网格）"
+        ],
+        "outputs": [
+          "参数化 CAD 实体",
+          "STEP 文件"
+        ],
+        "scenarios": [
+          "被要求逆向工程扫描件",
+          "重建或建模扫描零件"
+        ],
+        "prerequisites": [
+          "已连接 ScanRuler 页面，否则需先打开",
+          "开始第一步前完整读取 scan-to-cad 指南"
+        ],
+        "limits": [
+          "指南内容不在本文件内，需从 ScanRuler 读取",
+          "旧版本无 guide_read 工具时只能依据工具描述操作"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "设计/UI",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Reverse-engineer a 3D scan (STL/mesh) into a parametric CAD solid and STEP in ScanRuler."
+          },
+          {
+            "field": "does",
+            "quote": "`scanruler_status`; no page connected → `scanruler_open`."
+          },
+          {
+            "field": "does",
+            "quote": "Read the guide, whole, before the first step: `guide_read { topic: [\"model\", \"scan-to-cad\"] }`."
+          },
+          {
+            "field": "does",
+            "quote": "It sends you to sections of `model-reference` when you need them — `guide_read {}` lists every guide and section with what each costs."
+          },
+          {
+            "field": "does",
+            "quote": "A page with no `guide_read` tool is a build from before the guides: say so, and work from the tools' own descriptions."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the guide, whole, before the first step"
+          },
+          {
+            "field": "limits",
+            "quote": "The guide for this lives in ScanRuler itself, written for the build you are connected to — this file only points at it, so it is never out of date."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when asked to reverse engineer, model or rebuild a scanned part."
+          }
+        ]
+      }
+    }
+  ]
+}

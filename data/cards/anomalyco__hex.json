@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "repo": "anomalyco/hex",
+  "tree_sha": "aad37422e90ea64e383001b29a37cf25c3384972",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/hex-personal-commands/SKILL.md",
+      "blob_sha": "f4f70d4160d6a5a8f5b86551c5db1e8413f24742",
+      "source_url": "https://github.com/anomalyco/hex/blob/8f283abf1b996eafe74f64c43d3a0c7bad050cb7/skills/hex-personal-commands/SKILL.md",
+      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "generated_at": "2026-11-13T10:31:07.365Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hex-personal-commands",
+        "description": "Configure Hex personal deterministic transcript transformations in `~/.config/hex/hex.config.ts`. Use when the user wants to add or change custom text transformations for the Hex voice app."
+      },
+      "excerpt": "---\nname: hex-personal-commands\ndescription: Configure Hex personal deterministic transcript transformations in `~/.config/hex/hex.config.ts`. Use when the user wants to add or change custom text transformations for the Hex voice app.\nlicense: MIT\n---\n\n# Hex Personal Transformations\n\nThis skill targets current Hex (dev builds now, and the next stable release).\nHex 2.3.1 uses an older runtime; its matching skill installs with\n`npx skills add anomalyco/hex#app-v2.3.1 --skill hex-personal-commands`.\n\nHex runs `~/.config/hex/hex.config.ts` itself, in an embedded JavaScript\nengine. There is no package to install and no build step.\n\n1. Check for `~/.config/hex/hex.config.ts` (or `hex.config.js`). If it is\n   missing, ask the user to open Hex's Modes pane and choose Create Config,\n   or run `hex commands init` if the `hex` CLI is available.\n2. Read `~/.config/hex/AGENTS.md` for the current API and limits, and\n   `hex.d.ts` for exact types. Hex owns both and rewrites them; do not edit\n   them.\n3. Edit only the config and files it imports. Scripts are plain TypeScript or\n   JavaScript: they can import `@hex/commands` and files in the folder, not\n   npm packages, Effect, or Node APIs, and they have no filesystem, network,\n   or timer access. Enums, namespaces, and constructor parameter properties are\n   rejected.\n4. Use `defineHexConfig` from `@hex/commands` and declare pure `transformations`\n   entries (`{ id, name, description?, transform(text, context) }`).\n5. Transformations must be selected in the mode's Transformations section.\n   They run after mode corrections and optional AI rewriting, not for meetings.\n6. Run `hex commands check` (macOS) after editing. It loads the config as Hex\n   does and prints what it registers or the error with file, line, and column.\n   Optionally type-check with `npx -y -p typescript tsc` in `~/.config/hex`. A\n   running Hex reloads the config on save and shows load errors in Modes'\n   Transformations section.\n   If `hex` reports `commands check` as an unrecognized subcommand, stop: the\n   user is on an older Hex (such as 2.3.1). Tell them to install the matching\n   skill with `npx skills add anomalyco/hex#app-v2.3.1 --skill hex-personal-commands`,\n   or to switch to the dev build (https://github.com/anomalyco/hex#downloads).\n\nCompletion criterion: the requested behavior is represented in the config,\n`hex commands check` succeeds (or, without the CLI, the reload succeeded in\nHex), and any verification gap is reported.\n",
+      "card": {
+        "title_zh": "Hex 个人文本转换配置",
+        "purpose_zh": "指导在 ~/.config/hex/hex.config.ts 中为 Hex 语音应用配置确定性的个人文本转换，编辑配置并用 hex commands check 校验。",
+        "does": [
+          "检查 ~/.config/hex/hex.config.ts 或 hex.config.js 是否存在，缺失时引导用户创建",
+          "读取 AGENTS.md 与 hex.d.ts 了解当前 API、限制与类型，且不修改它们",
+          "仅编辑配置文件及其导入的文件，使用 @hex/commands 的 defineHexConfig 声明纯 transformations 条目",
+          "说明转换需在模式的 Transformations 区选中，且在模式纠正与可选 AI 改写之后运行，不用于会议",
+          "编辑后运行 hex commands check 加载配置并输出注册项或带文件行列的错误",
+          "可选在 ~/.config/hex 用 npx -y -p typescript tsc 做类型检查"
+        ],
+        "inputs": [
+          "~/.config/hex/hex.config.ts 或 hex.config.js 配置文件",
+          "~/.config/hex/AGENTS.md 与 hex.d.ts 参考文档",
+          "用户描述的期望文本转换行为"
+        ],
+        "outputs": [
+          "更新后的 Hex 配置文件及其导入文件",
+          "hex commands check 的注册项列表或错误信息（含文件、行、列）",
+          "验证缺口报告"
+        ],
+        "scenarios": [
+          "为 Hex 语音应用新增自定义文本转换",
+          "修改已有个人确定性转换逻辑",
+          "排查配置加载错误"
+        ],
+        "prerequisites": [
+          "用户使用当前 Hex（dev 构建或下一稳定版）；2.3.1 需安装匹配 skill",
+          "配置文件存在，或可通过 Modes 面板 Create Config 或 hex commands init 创建",
+          "macOS 上可用 hex CLI 运行 commands check"
+        ],
+        "limits": [
+          "脚本不能导入 npm 包、Effect 或 Node API，无文件系统、网络、定时器访问",
+          "不支持枚举、命名空间、构造函数参数属性",
+          "转换需在模式中手动选中，不适用于会议",
+          "AGENTS.md 与 hex.d.ts 由 Hex 拥有并重写，不可编辑",
+          "若 hex 不识别 commands check 子命令，说明版本过旧需换 skill 或 dev 构建"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "写作",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Configure Hex personal deterministic transcript transformations in `~/.config/hex/hex.config.ts`."
+          },
+          {
+            "field": "does",
+            "quote": "Read `~/.config/hex/AGENTS.md` for the current API and limits, and `hex.d.ts` for exact types. Hex owns both and rewrites them; do not edit them."
+          },
+          {
+            "field": "does",
+            "quote": "Use `defineHexConfig` from `@hex/commands` and declare pure `transformations` entries (`{ id, name, description?, transform(text, context) }`)."
+          },
+          {
+            "field": "does",
+            "quote": "Run `hex commands check` (macOS) after editing. It loads the config as Hex does and prints what it registers or the error with file, line, and column."
+          },
+          {
+            "field": "does",
+            "quote": "Optionally type-check with `npx -y -p typescript tsc` in `~/.config/hex`."
+          },
+          {
+            "field": "limits",
+            "quote": "Scripts are plain TypeScript or JavaScript: they can import `@hex/commands` and files in the folder, not npm packages, Effect, or Node APIs, and they have no filesystem, network, or timer access."
+          },
+          {
+            "field": "limits",
+            "quote": "Enums, namespaces, and constructor parameter properties are rejected."
+          },
+          {
+            "field": "limits",
+            "quote": "Transformations must be selected in the mode's Transformations section. They run after mode corrections and optional AI rewriting, not for meetings."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If `hex` reports `commands check` as an unrecognized subcommand, stop: the user is on an older Hex (such as 2.3.1)."
+          },
+          {
+            "field": "does",
+            "quote": "Edit only the config and files it imports."
+          }
+        ]
+      }
+    }
+  ]
+}
