@@ -251,7 +251,7 @@
       "skill_path": "skills/coding/bisect-anything/SKILL.md",
       "blob_sha": "bd2b033de981b34bc71d16247a385d25bf7465a0",
       "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/coding/bisect-anything/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -818,7 +818,7 @@
       "skill_path": "skills/design/brand-kit/SKILL.md",
       "blob_sha": "78a7a4c8a9d00ca14e1e9ee6e26075f18c6ffb67",
       "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/design/brand-kit/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -835,18 +835,132 @@
       "skill_path": "skills/design/image-gen/SKILL.md",
       "blob_sha": "8300cdd8a6b00580b17774f0b42adeb1f3055f7f",
       "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/design/image-gen/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "image-gen",
         "description": "Generate images with the user's own API keys (Google Gemini \"Nano Banana\" or OpenAI gpt-image). Use when asked to generate, create or make an image, illustration, icon, cut-out, sticker, thumbnail, texture, mockup or visual asset, to edit an image, or to make several images that stay consistent (same character or object). Also used by the vox-explainer skill for collage cut-outs."
       },
       "excerpt": "---\nname: image-gen\ndescription: Generate images with the user's own API keys (Google Gemini \"Nano Banana\" or OpenAI gpt-image). Use when asked to generate, create or make an image, illustration, icon, cut-out, sticker, thumbnail, texture, mockup or visual asset, to edit an image, or to make several images that stay consistent (same character or object). Also used by the vox-explainer skill for collage cut-outs.\n---\n\n# Image gen\n\n```\npython3 ~/simcraft/skills/design/image-gen/scripts/gen_image.py \"<prompt>\" --out <dir> --name <name> [options]\n```\nStandard library only, so any `python3` works.\n\n## Keys\n\nThe script reads `GEMINI_API_KEY` and `OPENAI_API_KEY` from the environment, or from `~/.config/simcraft/keys.env` (one `NAME=value` per line, chmod 600).\n- Run `--check` to see which keys are set. It never prints a key.\n- If no key is set, tell the user to open the file themselves (`open -e ~/.config/simcraft/keys.env`) and paste it in. Never ask them to paste a key into chat, and never read keys out of other projects' files.\n- Keys go only in request headers. They never go in a URL, a log, or a sidecar file.\n- Get a Gemini key at aistudio.google.com/apikey (it has a free tier). Get an OpenAI key at platform.openai.com/api-keys.\n\n## Options\n\n| Option | What it does |\n|---|---|\n| `--n 4` | Makes 4 variations in parallel, plus `<name>_sheet.png` to pick from. Use this for anything that matters. |\n| `--aspect 16:9` | Sets the shape: 16:9, 9:16, 1:1, 4:3 or 3:4. Match it to where the image goes. |\n| `--ref a.png b.png` | Reference images. Use them to edit an image, match a style, or keep the same character or object across images. |\n| `--cutout` | Gives a transparent PNG for collages. Gemini generates on chroma green and the script keys it out with clean edges. OpenAI makes real transparency. |\n| `--provider gemini\\|openai` | Picks the provider. Default: Gemini if its key is set. |\n| `--model M` | Picks the model. By default Gemini picks the newest image model the key can use (`--models` lists them), and OpenAI uses gpt-image-2. |\n| `--quality low\\|medium\\|high` | OpenAI only. Default high. |\n| `--brand devin` | Adds a brand kit's image style and palette to the prompt. **For any brand work, run the brand-kit skill first.** |\n\nEvery image gets a `<name>.json` sidecar with the exact prompt, model and settings, so it can be remade or tweaked later.\n\n## Which provider\n\n- **Gemini:** fast and cheap. Best for iterating, for edits, and for keeping things consistent with `--ref`.\n- **OpenAI gpt-image:** best for images with text in them, and for true transparent cut-outs.\n\n## Prompting\n\n- Describe the subject, the medium, the light and the framing, in that order. Say what to leave out.\n- **No text in images** unless the user asks for it. Models still misspell words. Add type afterwards in code.\n- For a series, generate one anchor image first. Then pass that same anchor as `--ref` to every other image. Never chain image 2 into image 3, because small errors pile up.\n- Show the user the contact sheet before using images anywhere. Regenerate one variation instead of all of them.\n",
-      "card": null
+      "card": {
+        "title_zh": "图像生成工具",
+        "purpose_zh": "用用户自己的 Gemini 或 OpenAI API 密钥生成、编辑图像，并保持多张图像中角色或物体一致。",
+        "does": [
+          "调用 gen_image.py 按提示词生成图像并输出到指定目录",
+          "支持并行生成多个变体并生成对比联系表",
+          "支持通过参考图编辑图像或保持角色、物体一致",
+          "支持透明抠图输出 PNG",
+          "支持选择 Gemini 或 OpenAI 提供商及模型、画质、宽高比",
+          "为每张图生成记录提示词与设置的 JSON 附属文件"
+        ],
+        "inputs": [
+          "提示词",
+          "输出目录与文件名",
+          "环境变量或 keys.env 中的 GEMINI_API_KEY、OPENAI_API_KEY",
+          "可选参考图",
+          "可选宽高比、变体数量、提供商、模型、画质、品牌参数"
+        ],
+        "outputs": [
+          "生成的图像文件",
+          "多张变体时的联系表 PNG",
+          "透明抠图 PNG",
+          "记录提示词、模型与设置的 JSON 附属文件"
+        ],
+        "scenarios": [
+          "生成插画、图标、贴纸、缩略图、纹理或视觉素材",
+          "编辑已有图像",
+          "生成同一角色或物体保持一致的多张图像",
+          "为拼贴制作透明抠图",
+          "为品牌工作生成符合品牌风格的图像"
+        ],
+        "prerequisites": [
+          "需要 python3 环境（仅用标准库）",
+          "需设置 GEMINI_API_KEY 或 OPENAI_API_KEY，可放在 ~/.config/simcraft/keys.env",
+          "品牌工作需先运行 brand-kit 技能"
+        ],
+        "limits": [
+          "图像中文字易拼写错误，除非用户要求否则不加文字",
+          "系列图应先做锚点图并以参考图传递，不可链式传递以免误差累积",
+          "使用前应先向用户展示联系表",
+          "密钥不得粘贴到聊天、不得写入 URL、日志或附属文件",
+          "未设置密钥时需用户自行打开文件填写"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "图像",
+          "设计/UI",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Generate images with the user's own API keys (Google Gemini \"Nano Banana\" or OpenAI gpt-image)."
+          },
+          {
+            "field": "does",
+            "quote": "python3 ~/simcraft/skills/design/image-gen/scripts/gen_image.py \"<prompt>\" --out <dir> --name <name> [options]"
+          },
+          {
+            "field": "does",
+            "quote": "Makes 4 variations in parallel, plus `<name>_sheet.png` to pick from."
+          },
+          {
+            "field": "does",
+            "quote": "Reference images. Use them to edit an image, match a style, or keep the same character or object across images."
+          },
+          {
+            "field": "does",
+            "quote": "Gives a transparent PNG for collages."
+          },
+          {
+            "field": "does",
+            "quote": "Every image gets a `<name>.json` sidecar with the exact prompt, model and settings"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The script reads `GEMINI_API_KEY` and `OPENAI_API_KEY` from the environment, or from `~/.config/simcraft/keys.env`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Standard library only, so any `python3` works."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**For any brand work, run the brand-kit skill first.**"
+          },
+          {
+            "field": "limits",
+            "quote": "**No text in images** unless the user asks for it. Models still misspell words."
+          },
+          {
+            "field": "limits",
+            "quote": "Never chain image 2 into image 3, because small errors pile up."
+          },
+          {
+            "field": "limits",
+            "quote": "Show the user the contact sheet before using images anywhere."
+          },
+          {
+            "field": "limits",
+            "quote": "Never ask them to paste a key into chat, and never read keys out of other projects' files."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Keys go only in request headers. They never go in a URL, a log, or a sidecar file."
+          }
+        ]
+      }
     },
     {
       "skill_path": "skills/learning/from-scratch/SKILL.md",
@@ -957,7 +1071,7 @@
       "skill_path": "skills/learning/paper-to-runnable/SKILL.md",
       "blob_sha": "ae9d9e15dc6981cd4c100fd404e0dfc1ee05ca43",
       "source_url": "https://github.com/dotslashsimran/simcraft/blob/58224d131814572224537fb516b8c5d33dd5fa67/skills/learning/paper-to-runnable/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
       "generated_at": null,
       "model": null,
       "status": "failed",

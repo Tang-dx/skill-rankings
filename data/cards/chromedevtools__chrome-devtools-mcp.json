@@ -1,0 +1,665 @@
+{
+  "schema": 1,
+  "repo": "ChromeDevTools/chrome-devtools-mcp",
+  "tree_sha": "d8088e7d6fe8601ea2b3d14a0ef67e86ce3fe47b",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/a11y-debugging/SKILL.md",
+      "blob_sha": "d6b2413b7aa090c8a5c605982456811767a3c622",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/8ba2ac945ebaf1adb92208c29f3a30e73a920956/skills/a11y-debugging/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "a11y-debugging",
+        "description": "Uses Chrome DevTools MCP for accessibility (a11y) debugging and auditing based on web.dev guidelines. Use when testing semantic HTML, ARIA labels, focus states, keyboard navigation, tap targets, and color contrast."
+      },
+      "excerpt": "---\nname: a11y-debugging\ndescription: Uses Chrome DevTools MCP for accessibility (a11y) debugging and auditing based on web.dev guidelines. Use when testing semantic HTML, ARIA labels, focus states, keyboard navigation, tap targets, and color contrast.\n---\n\n## Core Concepts\n\n**Page Targeting**: Page-scoped tools (`take_snapshot`, `list_console_messages`, `evaluate_script`, `press_key`, `take_screenshot`, `lighthouse_audit`, etc.) require a `pageId` parameter. Retrieve available page IDs using `list_pages` or from `new_page`.\n\n**Accessibility Tree vs DOM**: Visually hiding an element (e.g., `CSS opacity: 0`) behaves differently for screen readers than `display: none` or `aria-hidden=\"true\"`. The `take_snapshot` tool returns the accessibility tree of the page, which represents what assistive technologies \"see\", making it the most reliable source of truth for semantic structure.\n\n**Reading web.dev documentation**: If you need to research specific accessibility guidelines (like `https://web.dev/articles/accessible-tap-targets`), you can append `.md.txt` to the URL (e.g., `https://web.dev/articles/accessible-tap-targets.md.txt`) to fetch the clean, raw markdown version. This is much easier to read!\n\n## Workflow Patterns\n\n### 1. Automated Audit (Lighthouse)\n\nStart by running a Lighthouse accessibility audit to get a comprehensive baseline. This tool provides a high-level score and lists specific failing elements with remediation advice.\n\n1.  Run the audit:\n    - Set `mode` to `\"navigation\"` to refresh the page and capture load issues.\n    - Omit `outputDirPath` to save reports to the default temporary directory (the exact path to `report.json` is returned under `Reports`), or set `outputDirPath` to a directory within the workspace.\n2.  **Analyze the Summary**:\n    - In the default text output, category scores use a 0-100 scale (100 is a perfect score), followed by `Passed: N` and `Failed: N` audit counts.\n    - If the server was started with `--experimentalStructuredContent`, inspect `summary.scores[].score` (0-1 scale) and `summary.audits.failed` in the structured content instead.\n3.  **Review the Report (CRITICAL)**:\n    - **Parsing**: Do not read the entire file line-by-line. Use a CLI tool like `jq` or a Node.js one-liner to filter for failures from the report path returned by `lighthouse_audit`:\n      ```bash\n      # Extract failing audits with their details (replace with report.json path from tool response)\n      node -e \"const r=require('<path/to/report.json>'); Object.values(r.audits).filter(a=>a.score!==null && a.score<1).forEach(a=>console.log(JSON.stringify({id:a.id, title:a.title, items:a.details?.items})))\"\n      ```\n    - This efficiently extracts the `selector` and `snippet` of failing elements without loading the full report into context.\n\n### 2. Browser Issues & Audits\n\nChrome automatically checks for common accessibility problems. Use `list_console_messages` to check for these native audits:\n\n- `types`: `[\"issue\"]`\n- `includePreservedMessages`: `true` (to catch issues that occurred during page load)\n\nThis often reveals missing labels, invalid ARIA attributes, and other critical errors without manual investigation.\n\n### 3. Semantics & Structure\n\nThe accessibility tree exposes the heading hierarchy and semantic landmarks.\n\n1.  Navigate to the page.\n2.  Use `take_snapshot` to capture the accessibility tree.\n3.  **Check Heading Levels**: Ensure heading levels (`h1`, `h2`, `h3`, etc.) are logical and do not skip levels. The snapshot will include heading roles.\n4.  **Content Reordering**: Verify that the DOM order (which drives the accessibility tree) matches the visual reading order. Use `take_screenshot` to inspect the visual layout and compare it against the snapshot structure to catch CSS floats or absolute positioning that jumbles the logical flow.\n\n### 4. Labels, Forms & Text Alternatives\n\n1.  Locate buttons, inputs, and images in the `take_snapshot` output.\n2.  Ensure interactive elements have an accessible name (e.g., a button should not just say `\"\"` if it only contains an icon).\n3.  **Orphaned Inputs**: Verify that all form inputs have associated labels. Use `evaluate_script` with the **\"Find Orphaned Form Inputs\" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md).\n4.  Check images for `alt` text.\n\n### 5. Focus & Keyboard Navigation\n\nTesting \"keyboard traps\" and proper focus management without visual feedback relies on tracking the focused element.\n\n1.  Use the `press_key` tool with `\"Tab\"` or `\"Shift+Tab\"` to move focus.\n2.  Use `take_snapshot` to capture the updated accessibility tree.\n3.  Locate the element marked as focused in the snapshot to verify focus moved to the expected interactive element.\n4.  If a modal opens, focus must move into the modal and \"trap\" within it until closed.\n\n### 6. Tap Targets and Visuals\n\nAccording to web.dev, tap targets should be at least 48x48 pixels with sufficient spacing. Since the accessibility tree doesn't show sizes, use `evaluate_script` with the **\"Measure Tap Target Size\" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md).\n\n_Pass the element's `uid` from the snapshot as an argument to `evaluate_script`._\n\n### 7. Color Contrast\n\nTo verify color contrast ratios, use the **\"Check Color Contrast\" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md) with `evaluate_script`.\n\n### 8. Global Page Checks\n\nVerify document-level accessibility settings often missed in component testing using the **\"Global Page Checks\" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md).\n\n## Troubleshooting\n\nIf standard a11y queries fail or the `evaluate_script` snippets return unexpected results:\n\n- **Visual Inspection**: If automated scripts cannot determine contrast (e.g., text over gradient images or complex backgrounds), use `take_screenshot` to capture the element. While models cannot measure exact contrast ratios from images, they can visually assess legibility and identify obvious issues.\n",
+      "card": {
+        "title_zh": "无障碍调试审计",
+        "purpose_zh": "借助 Chrome DevTools MCP 按 web.dev 指南对网页做无障碍调试与审计，覆盖语义 HTML、ARIA 标签、焦点状态、键盘导航、点击目标与颜色对比度。",
+        "does": [
+          "运行 Lighthouse 无障碍审计获取基线分数与失败项",
+          "用 list_console_messages 查看浏览器原生无障碍问题",
+          "用 take_snapshot 检查无障碍树中的标题层级与语义结构",
+          "检查按钮、输入框、图片的可访问名称与 alt 文本",
+          "用 press_key 测试键盘导航与焦点陷阱",
+          "用 evaluate_script 片段测量点击目标尺寸、颜色对比度与全局页面检查"
+        ],
+        "inputs": [
+          "目标页面的 pageId（通过 list_pages 或 new_page 获取）",
+          "Lighthouse 审计的 mode 与可选 outputDirPath",
+          "take_snapshot 返回的无障碍树",
+          "references/a11y-snippets.md 中的脚本片段及元素 uid"
+        ],
+        "outputs": [
+          "Lighthouse 无障碍评分与通过/失败数量",
+          "report.json 报告路径及失败审计项详情",
+          "控制台无障碍 issue 消息",
+          "无障碍树快照与截图",
+          "脚本片段返回的点击目标尺寸、对比度等检查结果"
+        ],
+        "scenarios": [
+          "网页无障碍自动化审计",
+          "语义结构与标题层级检查",
+          "表单标签与图片替代文本核查",
+          "键盘导航与焦点管理测试",
+          "点击目标尺寸与颜色对比度验证"
+        ],
+        "prerequisites": [
+          "使用 Chrome DevTools MCP 工具",
+          "页面级工具需提供 pageId 参数",
+          "部分检查需引用 references/a11y-snippets.md 中的脚本片段"
+        ],
+        "limits": [
+          "无障碍树不显示元素尺寸，点击目标需用脚本测量",
+          "模型无法从截图测量精确对比度，只能目视判断可读性",
+          "复杂背景或渐变上的对比度可能无法由脚本判定",
+          "结构化内容评分需服务器以 --experimentalStructuredContent 启动"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network"
+        ],
+        "tags": [
+          "测试",
+          "前端",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Uses Chrome DevTools MCP for accessibility (a11y) debugging and auditing based on web.dev guidelines."
+          },
+          {
+            "field": "does",
+            "quote": "Start by running a Lighthouse accessibility audit to get a comprehensive baseline."
+          },
+          {
+            "field": "does",
+            "quote": "Use `list_console_messages` to check for these native audits"
+          },
+          {
+            "field": "does",
+            "quote": "Use `take_snapshot` to capture the accessibility tree."
+          },
+          {
+            "field": "does",
+            "quote": "Ensure interactive elements have an accessible name"
+          },
+          {
+            "field": "does",
+            "quote": "Use the `press_key` tool with `\"Tab\"` or `\"Shift+Tab\"` to move focus."
+          },
+          {
+            "field": "does",
+            "quote": "use `evaluate_script` with the **\"Measure Tap Target Size\" snippet**"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Page-scoped tools (`take_snapshot`, `list_console_messages`, `evaluate_script`, `press_key`, `take_screenshot`, `lighthouse_audit`, etc.) require a `pageId` parameter."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use `evaluate_script` with the **\"Find Orphaned Form Inputs\" snippet** found in [references/a11y-snippets.md](references/a11y-snippets.md)."
+          },
+          {
+            "field": "limits",
+            "quote": "Since the accessibility tree doesn't show sizes, use `evaluate_script` with the **\"Measure Tap Target Size\" snippet**"
+          },
+          {
+            "field": "limits",
+            "quote": "While models cannot measure exact contrast ratios from images, they can visually assess legibility and identify obvious issues."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "you can append `.md.txt` to the URL (e.g., `https://web.dev/articles/accessible-tap-targets.md.txt`) to fetch the clean, raw markdown version."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/chrome-devtools-cli/SKILL.md",
+      "blob_sha": "0e028ba767b91b68d06118e7aee229b8ec36bf1f",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/8ba2ac945ebaf1adb92208c29f3a30e73a920956/skills/chrome-devtools-cli/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "chrome-devtools-cli",
+        "description": "Use this skill to write shell scripts or run shell commands to automate tasks in the browser or otherwise use Chrome DevTools via CLI."
+      },
+      "excerpt": "---\nname: chrome-devtools-cli\ndescription: Use this skill to write shell scripts or run shell commands to automate tasks in the browser or otherwise use Chrome DevTools via CLI.\n---\n\nThe `chrome-devtools-mcp` CLI lets you interact with the browser from your terminal.\n\n## Setup\n\n_Note: If this is your very first time using the CLI, see [references/installation.md](references/installation.md) for setup. Installation is a one-time prerequisite and is **not** part of the regular AI workflow._\n\n## AI Workflow\n\n1. **Execute**: Run tools directly. If you don't know the target page's ID, run `chrome-devtools list_pages` to find it. The background server starts implicitly; **do not** run `start`/`status`/`stop` before each use.\n2. **Inspect**: Use `chrome-devtools take_snapshot <pageId>` to get an element `<uid>`.\n3. **Act**: Use `chrome-devtools click <pageId> <uid>`, `chrome-devtools fill <pageId> <uid> <value>`, etc. State persists across commands.\n\nSnapshot example:\n\n```\nuid=1_0 RootWebArea \"Example Domain\" url=\"https://example.com/\"\n  uid=1_1 heading \"Example Domain\" level=\"1\"\n```\n\n## Permissions & File Access\n\nBy default, the CLI has full filesystem access (`--allowUnrestrictedPaths=true`), allowing file-saving parameters (`--filePath`, `--outputDirPath`) and `upload_file` to access files anywhere on the system. Pass `--allowUnrestrictedPaths=false` if you want to restrict file access to the OS temp directory.\n\n## Command Usage\n\n```sh\nchrome-devtools <tool> [arguments] [flags]\n```\n\n- Required arguments are passed positionally; optional arguments use flags.\n- Use `--help` on any command for usage details.\n- Output defaults to plain Markdown-like text; pass `--output-format=json` for JSON.\n\n## Input Automation (<uid> from snapshot)\n\n```bash\nchrome-devtools take_snapshot 1 # Take a text snapshot of the page to get UIDs for elements\nchrome-devtools click 1 \"id\" # Clicks on the provided element\nchrome-devtools click 1 \"id\" --dblClick true --includeSnapshot true # Double clicks and returns a snapshot\nchrome-devtools drag 1 \"src\" \"dst\" # Drag an element onto another element\nchrome-devtools drag 1 \"src\" \"dst\" --includeSnapshot true # Drag an element and return a snapshot\nchrome-devtools fill 1 \"id\" \"text\" # Type text into an input, textarea, or select an option\nchrome-devtools fill 1 \"id\" \"text\" --includeSnapshot true # Fill an element and return a snapshot\nchrome-devtools handle_dialog 1 accept # Handle a browser dialog (accept/dismiss)\nchrome-devtools handle_dialog 1 dismiss --promptText \"hi\" # Dismiss a dialog with prompt text\nchrome-devtools hover 1 \"id\" # Hover over the provided element\nchrome-devtools hover 1 \"id\" --includeSnapshot true # Hover over an element and return a snapshot\nchrome-devtools press_key 1 \"Enter\" # Press a key or key combination (\"Control+A\", \"Escape\")\nchrome-devtools press_key 1 \"Control+A\" --includeSnapshot true # Press a key and return a snapshot\nchrome-devtools type_text 1 \"hello\" # Type text using keyboard into a focused input\nchrome-devtools type_text 1 \"hello\" --submitKey \"Enter\" # Type text and press a submit key\nchrome-devtools upload_file 1 \"id\" \"file.txt\" # Upload a file through a provided element\nchrome-devtools upload_file 1 \"id\" \"file.txt\" --includeSnapshot true # Upload a file and return a snapshot\n```\n\n## Navigation\n\n```bash\nchrome-devtools close_page 1 # Closes the page by its index\nchrome-devtools list_pages # Get a list of pages open in the browser\nchrome-devtools navigate_page 1 --url \"https://example.com\" # Navigates the currently selected page to a URL\nchrome-devtools navigate_page 1 --type \"reload\" --ignoreCache true # Reload page ignoring cache\nchrome-devtools navigate_page 1 --url \"https://example.com\" --timeout 5000 # Navigate with a timeout\nchrome-devtools navigate_page 1 --type \"reload\" --handleBeforeUnload \"accept\" # Handle before unload dialog\nchrome-devtools navigate_page 1 --type \"back\" --initScript \"foo()\" # Navigate back and run an init script\nchrome-devtools new_page \"https://example.com\" # Creates a new page\nchrome-devtools new_page \"https://example.com\" --background true --timeout 5000 # Create new page in background\nchrome-devtools new_page \"https://example.com\" --isolatedContext \"ctx\" # Create new page with isolated context\nchrome-devtools select_page 1 # Select a page as a context for future tool calls\nchrome-devtools select_page 1 --bringToFront true # Select a page and bring it to front\n```\n\n## Emulation\n\nEach `emulate` call replaces all previously configured emulation settings (except `--extraHttpHeaders`), so pass all desired settings in a single call.\n\n```bash\nchrome-devtools emulate 1 --networkConditions \"Offline\" # Emulate network conditions (resets other settings)\nchrome-devtools emulate 1 --cpuThrottlingRate 4 --geolocation \"0,0\" # Emulate CPU throttling and geolocation (resets other settings)\nchrome-devtools emulate 1 --colorScheme \"dark\" --viewport \"1920x1080\" # Emulate color scheme and viewport (resets other settings)\nchrome-devtools emulate 1 --userAgent \"Mozilla/5.0...\" # Emulate user agent (resets other settings)\nchrome-devtools resize_page 1 1920 1080 # Resizes the selected page's window\n```\n\n## Performance\n\n```bash\nchrome-devtools performance_analyze_insight 1 \"NAVIGATION_0\" \"LCPBreakdown\" # Get more details on a specific Performance Insight (pageId, insightSetId, insightName)\nchrome-devtools performance_start_trace 1 --reload true --autoStop false # Starts a performance trace recording (reload, autoStop)\nchrome-devtools performance_start_trace 1 --reload true --autoStop true --filePath \"t.json.gz\" # Start trace and save to a file\nchrome-devtools performance_stop_trace 1 # Stops the active performance trace\nchrome-devtools performance_stop_trace 1 --filePath \"t.json.gz\" # Stop trace and save to a file\n```\n\n## Memory\n\n```bash\nchrome-devtools take_heapsnapshot 1 \"./snap.heapsnapshot\" # Capture a memory heap snapshot\n```\n\n### Memory Debugging (requires `--memoryDebugging=true`)\n\n```bash\nchrome-devtools get_heapsnapshot_summary \"./snap.heapsnapshot\" # Get snapshot summary stats\nchrome-devtools compare_heapsnapshots \"./base.heapsnapshot\" \"./target.heapsnapshot\" # Compare two snapshots\nchrome-devtools get_heapsnapshot_details \"./snap.heapsnapshot\" # Snapshot statistics and per-class aggregates (with class IDs)\nchrome-devtools get_heapsnapshot_class_nodes \"./snap.heapsnapshot\" 18 # Inspect instances of a class (class ID from get_heapsnapshot_details)\nchrome-devtools get_heapsnapshot_dominators \"./snap.heapsnapshot\" 123 # Dominator tree for node\nchrome-devtools get_heapsnapshot_duplicate_strings \"./snap.heapsnapshot\" # Find duplicated strings\nchrome-devtools get_heapsnapshot_edges \"./snap.heapsnapshot\" 123 # Node edges/references\nchrome-devtools get_heapsnapshot_object_details \"./snap.heapsnapshot\" 123 # Object details by node ID\nchrome-devtools get_heapsnapshot_retainers \"./snap.heapsnapshot\" 123 # Retaining objects\nchrome-devtools get_heapsnapshot_retaining_paths \"./snap.heapsnapshot\" 123 # Shortest retaining paths\nchrome-devtools close_heapsnapshot \"./snap.heapsnapshot\" # Free memory from loaded snapshot\n```\n\n## Network\n\nNetwork mocking commands require `--categoryNetworkMocks=true` at server startup.\nChanging this flag requires a server restart.\n\n```bash\nchrome-devtools get_network_request 1 # Get the currently selected network request for page 1\nchrome-devtools get_network_request 1 --reqid 1 --requestFilePath \"req.md\" # Get request by id and save to file\nchrome-devtools get_network_request 1 --reqid 1 --responseFilePath \"res.md\" # Save response body to file\nchrome-devtools list_network_requests 1 # List all network requests for page 1\nchrome-devtools list_network_requests 1 --pageSize 50 --pageIdx 0 # List network requests with pagination\nchrome-devtools list_network_requests 1 --resourceTypes fetch # Filter requests by resource type\nchrome-devtools list_network_requests 1 --includePreservedRequests true # Include preserved requests\nchrome-devtools mock_network 1 --route 'https:",
+      "card": {
+        "title_zh": "Chrome DevTools 命令行",
+        "purpose_zh": "通过 chrome-devtools-mcp 命令行工具在终端中操作浏览器，执行页面导航、元素交互、性能追踪、内存分析、网络请求查看与模拟、调试检查等自动化任务。",
+        "does": [
+          "通过 take_snapshot 获取页面元素 uid，再用 click、fill、hover、press_key 等命令进行页面交互",
+          "用 list_pages、navigate_page、new_page、select_page、close_page 管理页面与导航",
+          "用 emulate、resize_page 模拟网络、CPU、地理位置、配色、视口和用户代理",
+          "用 performance_start_trace、performance_stop_trace、lighthouse_audit 做性能追踪与审计",
+          "用 take_heapsnapshot 及内存调试命令分析堆快照，用 list_network_requests、mock_network 查看和模拟网络请求",
+          "用 evaluate_script、list_console_messages、get_css_styles、take_screenshot、screencast 调试与截图录屏"
+        ],
+        "inputs": [
+          "工具名与位置参数（如 pageId、uid、文本值）",
+          "可选 flags（如 --includeSnapshot、--output-format=json、--filePath）",
+          "目标 URL 与页面 ID",
+          "本地脚本文件路径（evaluate_script --sourcePath）",
+          "堆快照文件路径"
+        ],
+        "outputs": [
+          "默认 Markdown 风格文本输出，可切换为 JSON",
+          "页面文本快照与元素 uid",
+          "截图、录屏 mp4、性能追踪文件、堆快照文件",
+          "Lighthouse 审计报告",
+          "网络请求与响应内容"
+        ],
+        "scenarios": [
+          "浏览器页面自动化操作与表单填写",
+          "前端页面性能追踪与 Lighthouse 审计",
+          "内存堆快照分析与泄漏排查",
+          "网络请求查看与响应模拟",
+          "页面截图、录屏与调试检查"
+        ],
+        "prerequisites": [
+          "首次使用需按 references/installation.md 完成一次性安装",
+          "网络模拟需启动时加 --categoryNetworkMocks=true",
+          "内存调试需 --memoryDebugging=true",
+          "PWA 功能需 --categoryPwa=true",
+          "实验性功能需对应启动 flag（如 --experimentalVision=true）"
+        ],
+        "limits": [
+          "每个 emulate 调用会重置此前除 --extraHttpHeaders 外的模拟设置",
+          "网络模拟与 PWA 等分类功能需启动时开启对应 flag，更改需重启服务器",
+          "实验性工具默认禁用，需启动时开启对应 flag",
+          "默认 CLI 拥有完整文件系统访问权限，可用 --allowUnrestrictedPaths=false 限制到系统临时目录"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "自动化",
+          "测试",
+          "前端",
+          "运维部署"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this skill to write shell scripts or run shell commands to automate tasks in the browser or otherwise use Chrome DevTools via CLI."
+          },
+          {
+            "field": "does",
+            "quote": "chrome-devtools take_snapshot 1 # Take a text snapshot of the page to get UIDs for elements"
+          },
+          {
+            "field": "does",
+            "quote": "chrome-devtools click 1 \"id\" # Clicks on the provided element"
+          },
+          {
+            "field": "does",
+            "quote": "chrome-devtools navigate_page 1 --url \"https://example.com\" # Navigates the currently selected page to a URL"
+          },
+          {
+            "field": "does",
+            "quote": "chrome-devtools emulate 1 --colorScheme \"dark\" --viewport \"1920x1080\" # Emulate color scheme and viewport (resets other settings)"
+          },
+          {
+            "field": "does",
+            "quote": "chrome-devtools performance_start_trace 1 --reload true --autoStop false # Starts a performance trace recording (reload, autoStop)"
+          },
+          {
+            "field": "does",
+            "quote": "chrome-devtools take_heapsnapshot 1 \"./snap.heapsnapshot\" # Capture a memory heap snapshot"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Network mocking commands require `--categoryNetworkMocks=true` at server startup."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "### Memory Debugging (requires `--memoryDebugging=true`)"
+          },
+          {
+            "field": "limits",
+            "quote": "Each `emulate` call replaces all previously configured emulation settings (except `--extraHttpHeaders`), so pass all desired settings in a single call."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "chrome-devtools <tool> [arguments] [flags]"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/chrome-devtools/SKILL.md",
+      "blob_sha": "c3c23cca0f3edfac7420a4e46f633caa8ba18ed0",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/8ba2ac945ebaf1adb92208c29f3a30e73a920956/skills/chrome-devtools/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "chrome-devtools",
+        "description": "Uses Chrome DevTools via MCP for efficient debugging, troubleshooting and browser automation. Use when debugging web pages, automating browser interactions, analyzing performance, or inspecting network requests. This skill does not apply to `--slim` mode (MCP configuration)."
+      },
+      "excerpt": "---\nname: chrome-devtools\ndescription: Uses Chrome DevTools via MCP for efficient debugging, troubleshooting and browser automation. Use when debugging web pages, automating browser interactions, analyzing performance, or inspecting network requests. This skill does not apply to `--slim` mode (MCP configuration).\n---\n\n## Core Concepts\n\n**Browser lifecycle**: Browser starts automatically on first tool call using a persistent Chrome profile. Configure via CLI args in the MCP server configuration: `npx chrome-devtools-mcp@latest --help`.\nAddional tooling can be enabled by providing the following flags:\n\n- For extension tooling, use the `--categoryExtensions` flag.\n- For memory tooling, use the `--memoryDebugging` flag.\n\n**Page targeting**: Page-scoped tools require a `pageId` parameter to target a specific page. Use `list_pages` to see available pages and their IDs (e.g. `pageId: 1`), or use the ID returned when creating a page with `new_page`.\nNote: For `evaluate_script`, `pageId` is required when targeting pages. However, when `--categoryExtensions` is enabled, `pageId` is optional so you can pass `serviceWorkerId` instead to evaluate inside an extension background service worker.\n**Element interaction**: Use `take_snapshot` to get page structure with element `uid`s. Each element has a unique `uid` for interaction. If an element isn't found, take a fresh snapshot - the element may have been removed or the page changed.\n\n## Workflow Patterns\n\n### Before interacting with a page\n\n1. Navigate: `navigate_page` or `new_page`\n2. Wait: `wait_for` to ensure content is loaded if you know what you look for.\n3. Snapshot: `take_snapshot` with `pageId` to understand page structure\n4. Interact: Use element `uid`s from snapshot for `click`, `fill`, etc., passing the corresponding `pageId`.\n\n### Efficient data retrieval\n\n- Use `filePath` parameter for large outputs (screenshots, snapshots, traces)\n- Use pagination (`pageIdx`, `pageSize`) and filtering (`types`) to minimize data\n- Set `includeSnapshot: false` on input actions unless you need updated page state\n\n### Tool selection\n\n- **Network mocks**: `mock_network` and `remove_network_mock` require `--categoryNetworkMocks` at server startup.\n- **Automation/interaction**: `take_snapshot` (text-based, faster, better for automation)\n- **Visual inspection**: `take_screenshot` (when user needs to see visual state)\n- **CSS & Styling inspection**: Use `get_css_styles` to inspect matched rules, cascade, and CSS variables. Treat the output as authoritative and complete.\n- **Additional details**: Use `evaluate_script` for runtime DOM/JS data not available via `get_css_styles` or `take_snapshot`.\n- **Runtime values**: Use `set_logpoints` to log expressions at script or source-file lines (source maps supported) instead of editing code; read the output with `list_console_messages`.\n\n### Parallel execution\n\nYou can send multiple tool calls in parallel, but maintain correct order: navigate → wait → snapshot → interact.\n\n### Testing an extension\n\n> **Before proceeding**: Extension tools (`install_extension`, `list_extensions`, etc.) are only available when the MCP server is started with the `--categoryExtensions` flag. If these tools are not in your tool list, stop and ask the user to update their MCP server configuration:\n>\n> ```json\n> {\n>   \"mcpServers\": {\n>     \"chrome-devtools\": {\n>       \"command\": \"npx\",\n>       \"args\": [\"chrome-devtools-mcp@latest\", \"--categoryExtensions\"]\n>     }\n>   }\n> }\n> ```\n>\n> After updating, the user must restart the MCP server (or their AI client) for the change to take effect.\n\n1. **Install**: Use `install_extension` with the path to the unpacked extension.\n2. **Identify**: Get the extension ID from the response or by calling `list_extensions`.\n3. **Trigger Action**: Use `trigger_extension_action` to open the popup or side panel if applicable.\n4. **Verify Service Worker**: Use `evaluate_script` with `serviceWorkerId` (omitting `pageId` and `args`) to check extension state or trigger background actions. When evaluating in a page, pass `pageId` (omitting `serviceWorkerId`).\n5. **Verify Page Behavior**: Navigate to a page where the extension operates and use `take_snapshot` to check if content scripts injected elements or modified the page correctly.\n\n## Troubleshooting\n\nIf `chrome-devtools-mcp` is insufficient, guide users to use Chrome DevTools UI:\n\n- https://developer.chrome.com/docs/devtools\n- https://developer.chrome.com/docs/devtools/ai-assistance\n\nIf there are errors launching `chrome-devtools-mcp` or Chrome, refer to https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/troubleshooting.md.\n",
+      "card": {
+        "title_zh": "Chrome DevTools 调试",
+        "purpose_zh": "通过 MCP 调用 Chrome DevTools，进行网页调试、故障排查、浏览器自动化、性能分析与网络请求检查；不适用于 --slim 模式。",
+        "does": [
+          "通过 MCP 启动并管理持久化 Chrome 浏览器会话",
+          "导航页面、等待加载、获取页面快照并按元素 uid 交互",
+          "截图、检查 CSS 样式、执行脚本获取运行时数据",
+          "设置日志点读取控制台输出，检查网络请求与模拟网络",
+          "安装并测试浏览器扩展（需启用扩展类别标志）"
+        ],
+        "inputs": [
+          "页面 ID（pageId）与元素 uid",
+          "导航目标、等待条件、脚本表达式",
+          "MCP 服务器启动参数（如 --categoryExtensions、--memoryDebugging、--categoryNetworkMocks）",
+          "扩展解包路径"
+        ],
+        "outputs": [
+          "页面快照与元素 uid 列表",
+          "截图、追踪等文件（可用 filePath 输出）",
+          "CSS 样式匹配规则与变量",
+          "控制台消息与脚本执行结果",
+          "扩展列表与扩展 ID"
+        ],
+        "scenarios": [
+          "调试网页问题",
+          "自动化浏览器交互",
+          "分析页面性能",
+          "检查网络请求",
+          "测试浏览器扩展"
+        ],
+        "prerequisites": [
+          "已配置 chrome-devtools-mcp 的 MCP 服务器",
+          "部分功能需在启动时加对应标志，如扩展工具需 --categoryExtensions",
+          "修改 MCP 配置后需重启 MCP 服务器或 AI 客户端"
+        ],
+        "limits": [
+          "不适用于 --slim 模式",
+          "页面级工具需提供 pageId",
+          "网络模拟工具需启动时启用 --categoryNetworkMocks",
+          "扩展工具仅在启用 --categoryExtensions 时可用",
+          "若 MCP 不足需改用 Chrome DevTools UI 或参考故障排查文档"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "测试",
+          "前端",
+          "自动化",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Uses Chrome DevTools via MCP for efficient debugging, troubleshooting and browser automation."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "This skill does not apply to `--slim` mode (MCP configuration)."
+          },
+          {
+            "field": "does",
+            "quote": "Browser starts automatically on first tool call using a persistent Chrome profile."
+          },
+          {
+            "field": "does",
+            "quote": "Use `take_snapshot` to get page structure with element `uid`s."
+          },
+          {
+            "field": "does",
+            "quote": "Use `get_css_styles` to inspect matched rules, cascade, and CSS variables."
+          },
+          {
+            "field": "does",
+            "quote": "Use `set_logpoints` to log expressions at script or source-file lines (source maps supported) instead of editing code"
+          },
+          {
+            "field": "does",
+            "quote": "Use `install_extension` with the path to the unpacked extension."
+          },
+          {
+            "field": "inputs",
+            "quote": "Page-scoped tools require a `pageId` parameter to target a specific page."
+          },
+          {
+            "field": "inputs",
+            "quote": "For extension tooling, use the `--categoryExtensions` flag."
+          },
+          {
+            "field": "outputs",
+            "quote": "Use `filePath` parameter for large outputs (screenshots, snapshots, traces)"
+          },
+          {
+            "field": "outputs",
+            "quote": "Get the extension ID from the response or by calling `list_extensions`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "After updating, the user must restart the MCP server (or their AI client) for the change to take effect."
+          },
+          {
+            "field": "limits",
+            "quote": "**Network mocks**: `mock_network` and `remove_network_mock` require `--categoryNetworkMocks` at server startup."
+          },
+          {
+            "field": "limits",
+            "quote": "If `chrome-devtools-mcp` is insufficient, guide users to use Chrome DevTools UI"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`npx chrome-devtools-mcp@latest --help`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Use `filePath` parameter for large outputs (screenshots, snapshots, traces)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/cookie-debugging/SKILL.md",
+      "blob_sha": "2a0d5663dd94cba6c89a3c9d1a76d066b949f1d6",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/8ba2ac945ebaf1adb92208c29f3a30e73a920956/skills/cookie-debugging/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "cookie-debugging",
+        "description": "Uses Chrome DevTools MCP for inspecting, debugging, and testing cookies, session state, authentication issues, and cookie consent compliance. Use when diagnosing 401/403 errors, authentication redirects, session expiration, Cookie/Set-Cookie header issues, cookie banner consent conformance, or third-party cookie/SameSite/Partitioned cookie warnings."
+      },
+      "excerpt": "---\nname: cookie-debugging\ndescription: Uses Chrome DevTools MCP for inspecting, debugging, and testing cookies, session state, authentication issues, and cookie consent compliance. Use when diagnosing 401/403 errors, authentication redirects, session expiration, Cookie/Set-Cookie header issues, cookie banner consent conformance, or third-party cookie/SameSite/Partitioned cookie warnings.\n---\n\n## Core Concepts\n\n**Page Targeting**: Page-scoped tools (`list_network_requests`, `get_network_request`, `list_console_messages`, `evaluate_script`, `navigate_page`, `take_snapshot`, `click`, `lighthouse_audit`, `close_page`, etc.) require a `pageId` parameter. Retrieve available page IDs using `list_pages` or from `new_page`.\n\n### HttpOnly vs Client-Side Storage\n\nCookies marked `HttpOnly` cannot be accessed or modified by client-side JavaScript (`cookieStore` or `document.cookie`). However, the browser **automatically attaches active HttpOnly cookies to outgoing HTTP request headers (`Cookie`)**.\n\n- To inspect current `HttpOnly` values: Look at the `Cookie` request header of any outgoing HTTP request via `get_network_request`.\n- To inspect how cookies were created or configured: Look at the `Set-Cookie` response header of login/auth responses.\n- To inspect non-`HttpOnly` cookies: Use `evaluate_script` with the modern `cookieStore` API (`async () => await cookieStore.getAll()`).\n\n### Session Strategy: Live Tab vs Isolated Context\n\nChoose the right session environment to avoid state contamination (e.g., residual analytics or auth tokens):\n\n| Strategy                            | When to Use                                                                   | Setup / Teardown                                                                                              |\n| :---------------------------------- | :---------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ |\n| **Live Tab (Active Page)**          | Diagnosing an active user session, live 401/403 error, or current state.      | Operates on the user's existing page; get its `pageId` from `list_pages`.                                     |\n| **Clean-Slate (`isolatedContext`)** | Testing cookie consent banners, first-time visits, or zero-cookie guarantees. | Call `new_page` with a unique `isolatedContext` (e.g. `\"consent-audit-1\"`). When finished, call `close_page`. |\n\n### Client-Side Capabilities & Limitations\n\n| Action                                                           | Client JavaScript (`cookieStore` / `document.cookie`) | DevTools Network & Context Tools                        |\n| :--------------------------------------------------------------- | :---------------------------------------------------- | :------------------------------------------------------ |\n| **Read Non-HttpOnly**                                            | ✅ `async () => await cookieStore.getAll()`           | ✅ `get_network_request` (Request `Cookie`)             |\n| **Read HttpOnly**                                                | ❌ Blocked by browser security                        | ✅ `get_network_request` (Request `Cookie`)             |\n| **Inspect Attributes** (`Domain`, `Path`, `SameSite`, `Expires`) | ✅ `async () => await cookieStore.getAll()`           | ✅ `get_network_request` (Response `Set-Cookie`)        |\n| **Modify / Delete Non-HttpOnly**                                 | ✅ `async () => await cookieStore.set(...)`           | N/A                                                     |\n| **Modify / Delete HttpOnly**                                     | ❌ **Silent failure** in JavaScript                   | ✅ Use `new_page(isolatedContext: ...)` for clean state |\n\n> [!WARNING]\n> Attempting to clear an `HttpOnly` cookie via JavaScript (`cookieStore.delete` or `document.cookie = \"...; max-age=0\"`) will silently fail. To test in an unauthenticated or fresh state, always spawn a new isolated context using `new_page` with `isolatedContext`.\n\n---\n\n## Workflow Patterns\n\n### 1. Diagnosing Authentication Failures & Redirects (401 / 403)\n\nWhen an authenticated page request fails, returns 401/403, or redirects to login:\n\n1. **List Recent Requests**: Call `list_network_requests` with `includePreservedRequests: true`.\n2. **Find the Target Request**: Locate the failing request (401/403) or redirect (302/307).\n3. **Inspect Outgoing `Cookie` Header**: Call `get_network_request` with the `reqid`.\n   - Verify if the `Cookie` header was attached and whether required tokens (e.g. `SESSION_ID`, `auth_token`) were sent.\n4. **Trigger Active Inspection (If no recent request exists)**:\n   - If the cookie was set in a previous session and no network call is listed, trigger a request:\n     - Use `navigate_page` with `type: \"reload\"`, OR\n     - Call `evaluate_script` with `() => fetch(window.location.href)`\n   - Then call `get_network_request` on the new request to inspect the active `Cookie` header.\n5. **Trace the Setting Request**: If the cookie is missing or rejected:\n   - Check earlier login/handshake responses for `Set-Cookie` directives:\n     - **Path mismatch**: e.g., `Path=/api` when the request is to `/`.\n     - **Domain mismatch**: e.g., `Domain=api.example.com` preventing cookies on `sub.example.com`.\n     - **Secure flag on HTTP**: `Secure` cookies are never sent over unencrypted `http://`.\n     - **SameSite blocking**: `SameSite=Strict` cookies are omitted on cross-site navigations.\n     - **Expiration**: Check if `Expires` or `Max-Age` elapsed.\n\n### 2. Cookie Banner & Consent Conformance Testing\n\nTo verify that no non-essential or tracking cookies are set before consent or when declining:\n\n1. **Start Clean**: Open a fresh isolated context with a dedicated name:\n   ```json\n   {\"url\": \"<PAGE_URL>\", \"isolatedContext\": \"consent-test-1\"}\n   ```\n2. **Record Baseline Cookies**: Before interacting with the banner, run `evaluate_script` with `async () => await cookieStore.getAll()`.\n3. **Inspect Premature Network Requests & Issues**:\n   - Call `list_network_requests` to ensure no third-party tracking beacons fired before consent.\n   - Call `list_console_messages` with `types: [\"issue\"]` to check for tracking warnings.\n4. **Interact with Consent Banner**:\n   - Capture snapshot with `take_snapshot` to locate the \"Decline\" or \"Reject All\" button `uid`.\n   - Click the button with `click`.\n5. **Verify Cookie Difference**:\n   - Run `evaluate_script` with `async () => await cookieStore.getAll()` after clicking to assert that only strictly necessary or consent-state cookies exist.\n6. **Test Consent Revocation (Lifecycle Audit)**:\n   - When auditing consent withdrawal or preference changes:\n     - Locate and click the \"Cookie Settings\", \"Manage Preferences\", or footer privacy trigger (`take_snapshot` $\\rightarrow$ `click`).\n     - Deselect non-essential categories or click \"Revoke All\" / \"Save Preferences\".\n     - Re-query `cookieStore.getAll()` to verify previously accepted non-essential cookies were cleared or expired.\n     - Call `list_network_requests` on subsequent actions to ensure tracking beacons are no longer fired.\n7. **Teardown Context**: Call `close_page` when the audit is complete to prevent leftover cookies from affecting subsequent tasks.\n\n### 3. Auditing Cookie Security, SameSite & CHIPS (Partitioned Cookies)\n\n1. **Fast-Track: Native DevTools Issues (Recommended)**:\n   - Call `list_console_messages` with:\n     ```json\n     {\n       \"pageId\": 1,\n       \"types\": [\"issue\"],\n       \"includePreservedMessages\": true\n     }\n     ```\n   - Check for `CookieIssue` entries, such as:\n     - `SameSiteNoneInsecure`: `SameSite=None` without `Secure`.\n     - `ThirdPartyCookiePhaseout`: Third-party cookie blocked or restricted.\n     - `SchemefulSameSite`: Cross-scheme cookie issues.\n     - `PartitionedCookies`: Invalid CHIPS partitioning attributes.\n2. **Deep Audit: Lighthouse Third-Party Cookies**:\n   - Run `light",
+      "card": null
+    },
+    {
+      "skill_path": "skills/debug-optimize-lcp/SKILL.md",
+      "blob_sha": "89b48b64b0352c850e64c8db7cdfbd3527361f54",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/8ba2ac945ebaf1adb92208c29f3a30e73a920956/skills/debug-optimize-lcp/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "debug-optimize-lcp",
+        "description": "Guides debugging and optimizing Largest Contentful Paint (LCP) using Chrome DevTools MCP tools. Use this skill whenever the user asks about LCP performance, slow page loads, Core Web Vitals optimization, or wants to understand why their page's main content takes too long to appear. Also use when the user mentions \"largest contentful paint\", \"page load speed\", \"CWV\", or wants to improve how fast their hero image or main content renders."
+      },
+      "excerpt": "---\nname: debug-optimize-lcp\ndescription: Guides debugging and optimizing Largest Contentful Paint (LCP) using Chrome DevTools MCP tools. Use this skill whenever the user asks about LCP performance, slow page loads, Core Web Vitals optimization, or wants to understand why their page's main content takes too long to appear. Also use when the user mentions \"largest contentful paint\", \"page load speed\", \"CWV\", or wants to improve how fast their hero image or main content renders.\n---\n\n## What is LCP and why it matters\n\nLargest Contentful Paint (LCP) measures how quickly a page's main content becomes visible. It's the time from navigation start until the largest image or text block renders in the viewport.\n\n- **Good**: 2.5 seconds or less\n- **Needs improvement**: 2.5–4.0 seconds\n- **Poor**: greater than 4.0 seconds\n\nLCP is a Core Web Vital that directly affects user experience and search ranking. On 73% of mobile pages, the LCP element is an image.\n\n## LCP Subparts Breakdown\n\nEvery page's LCP breaks down into four sequential subparts with no gaps or overlaps. Understanding which subpart is the bottleneck is the key to effective optimization.\n\n| Subpart                       | Ideal % of LCP | What it measures                               |\n| ----------------------------- | -------------- | ---------------------------------------------- |\n| **Time to First Byte (TTFB)** | ~40%           | Navigation start → first byte of HTML received |\n| **Resource load delay**       | <10%           | TTFB → browser starts loading the LCP resource |\n| **Resource load duration**    | ~40%           | Time to download the LCP resource              |\n| **Element render delay**      | <10%           | LCP resource downloaded → LCP element rendered |\n\nThe \"delay\" subparts should be as close to zero as possible. If either delay subpart is large relative to the total LCP, that's the first place to optimize.\n\n**Common Pitfall**: Optimizing one subpart (like compressing an image to reduce load duration) without checking others. If render delay is the real bottleneck, a smaller image won't help — the saved time just shifts to render delay.\n\n## Debugging Workflow\n\nFollow these steps in order. Each step builds on the previous one.\n\n### Step 1: Record a Performance Trace\n\nNavigate to the page, then record a trace with reload to capture the full page load including LCP:\n\n1. `navigate_page` with `pageId` to the target URL.\n2. `performance_start_trace` with `pageId`, `reload: true` and `autoStop: true`.\n\nThe trace results will include LCP timing and available insight sets. Note the insight set IDs from the output — you'll need them in the next step.\n\n### Step 2: Analyze LCP Insights\n\nUse `performance_analyze_insight` to drill into LCP-specific insights. Look for these insight names in the trace results:\n\n- **LCPBreakdown** — Shows the four LCP subparts with timing for each.\n- **DocumentLatency** — Server response time issues affecting TTFB.\n- **RenderBlocking** — Resources blocking the LCP element from rendering.\n- **LCPDiscovery** — Whether the LCP resource was discoverable early.\n\nCall `performance_analyze_insight` with `pageId`, the insight set ID, and the insight name from the trace results.\n\n### Step 3: Identify the LCP Element\n\nUse `evaluate_script` (with `pageId`) and the **\"Identify LCP Element\" snippet** found in [references/lcp-snippets.md](references/lcp-snippets.md) to reveal the LCP element's tag, resource URL, and raw timing data.\n\nThe `url` field tells you what resource to look for in the network waterfall. If `url` is empty, the LCP element is text-based (no resource to load).\n\n### Step 4: Check the Network Waterfall\n\nUse `list_network_requests` to see when the LCP resource loaded relative to other resources:\n\n- Call `list_network_requests` with `pageId` filtered by `resourceTypes: [\"image\", \"font\"]` (adjust based on Step 3).\n- Then use `get_network_request` with `pageId` and the LCP resource's request ID for full details.\n\n**Key Checks:**\n\n- **Start Time**: Compare against the HTML document and the first resource. If the LCP resource starts much later than the first resource, there's resource load delay to eliminate.\n- **Duration**: A large resource load duration suggests the file is too big or the server is slow.\n\n### Step 5: Inspect HTML for Common Issues\n\nUse `evaluate_script` (with `pageId`) and the **\"Audit Common Issues\" snippet** found in [references/lcp-snippets.md](references/lcp-snippets.md) to check for lazy-loaded images in the viewport, missing fetchpriority, and render-blocking scripts.\n\n## Optimization Strategies\n\nAfter identifying the bottleneck subpart, apply these prioritized fixes.\n\n### 1. Eliminate Resource Load Delay (target: <10%)\n\nThe most common bottleneck. The LCP resource should start loading immediately.\n\n- **Root Cause**: LCP image loaded via JS/CSS, `data-src` usage, or `loading=\"lazy\"`.\n- **Fix**: Use standard `<img>` with `src`. **Never** lazy-load the LCP image.\n- **Fix**: Add `<link rel=\"preload\" fetchpriority=\"high\">` if the image isn't discoverable in HTML.\n- **Fix**: Add `fetchpriority=\"high\"` to the LCP `<img>` tag.\n\n### 2. Eliminate Element Render Delay (target: <10%)\n\nThe element should render immediately after loading.\n\n- **Root Cause**: Large stylesheets, synchronous scripts in `<head>`, or main thread blocking.\n- **Fix**: Inline critical CSS, defer non-critical CSS/JS.\n- **Fix**: Break up long tasks blocking the main thread.\n- **Fix**: Use Server-Side Rendering (SSR) so the element exists in initial HTML.\n\n### 3. Reduce Resource Load Duration (target: ~40%)\n\nMake the resource smaller or faster to deliver.\n\n- **Fix**: Use modern formats (WebP, AVIF) and responsive images (`srcset`).\n- **Fix**: Serve from a CDN.\n- **Fix**: Set `Cache-Control` headers.\n- **Fix**: Use `font-display: swap` if LCP is text blocked by a web font.\n\n### 4. Reduce TTFB (target: ~40%)\n\nThe HTML document itself takes too long to arrive.\n\n- **Fix**: Minimize redirects and optimize server response time.\n- **Fix**: Cache HTML at the edge (CDN).\n- **Fix**: Ensure pages are eligible for back/forward cache (bfcache).\n\n## Verifying Fixes & Emulation\n\n- **Verification**: Re-run the trace (`performance_start_trace` with `pageId` and `reload: true`) and compare the new subpart breakdown. The bottleneck should shrink.\n- **Emulation**: Lab measurements differ from real-world experience. Use `emulate` to test under constraints:\n  - `emulate` with `pageId`, `networkConditions: \"Fast 3G\"` and `cpuThrottlingRate: 4`.\n  - This surfaces issues visible only on slower connections/devices.\n",
+      "card": {
+        "title_zh": "LCP调试与优化",
+        "purpose_zh": "指导使用Chrome DevTools MCP工具调试并优化最大内容绘制（LCP），通过拆解四个子部分定位瓶颈并给出针对性修复策略。",
+        "does": [
+          "讲解LCP定义、评分阈值及四个子部分拆解",
+          "按五步工作流记录性能追踪、分析LCP洞察、识别LCP元素、检查网络瀑布、审计HTML常见问题",
+          "针对资源加载延迟、元素渲染延迟、资源加载时长、TTFB四类瓶颈给出优化策略",
+          "指导重跑追踪验证修复效果并用网络与CPU节流模拟测试"
+        ],
+        "inputs": [
+          "目标页面URL与pageId",
+          "性能追踪结果及洞察集ID",
+          "LCP元素识别脚本与常见问题审计脚本",
+          "网络请求列表与LCP资源请求详情"
+        ],
+        "outputs": [
+          "LCP四子部分耗时拆解与瓶颈定位",
+          "LCP元素标签、资源URL与原始计时数据",
+          "按优先级排列的优化建议",
+          "修复前后追踪对比结果"
+        ],
+        "scenarios": [
+          "用户询问LCP性能或页面加载慢",
+          "优化Core Web Vitals",
+          "排查首屏主图或主内容渲染过慢",
+          "理解页面主要内容为何迟迟不出现"
+        ],
+        "prerequisites": [
+          "需使用Chrome DevTools MCP工具（navigate_page、performance_start_trace、performance_analyze_insight、evaluate_script、list_network_requests、get_network_request、emulate）",
+          "需参考references/lcp-snippets.md中的识别与审计脚本"
+        ],
+        "limits": [
+          "仅覆盖LCP单一指标，未涉及其他Core Web Vitals",
+          "实验室测量与真实用户体验存在差异",
+          "优化建议需人工在页面代码中实施"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "前端",
+          "数据分析",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Guides debugging and optimizing Largest Contentful Paint (LCP) using Chrome DevTools MCP tools."
+          },
+          {
+            "field": "does",
+            "quote": "Every page's LCP breaks down into four sequential subparts with no gaps or overlaps. Understanding which subpart is the bottleneck is the key to effective optimization."
+          },
+          {
+            "field": "does",
+            "quote": "Follow these steps in order. Each step builds on the previous one."
+          },
+          {
+            "field": "does",
+            "quote": "After identifying the bottleneck subpart, apply these prioritized fixes."
+          },
+          {
+            "field": "does",
+            "quote": "Re-run the trace (`performance_start_trace` with `pageId` and `reload: true`) and compare the new subpart breakdown."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use `evaluate_script` (with `pageId`) and the **\"Identify LCP Element\" snippet** found in [references/lcp-snippets.md](references/lcp-snippets.md)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`performance_start_trace` with `pageId`, `reload: true` and `autoStop: true`."
+          },
+          {
+            "field": "limits",
+            "quote": "Lab measurements differ from real-world experience."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use this skill whenever the user asks about LCP performance, slow page loads, Core Web Vitals optimization"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/inspect-in-devtools/SKILL.md",
+      "blob_sha": "4130dfda9391765591d43856e27b5562f0ede55d",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/8ba2ac945ebaf1adb92208c29f3a30e73a920956/skills/inspect-in-devtools/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "inspect-in-devtools",
+        "description": "Use this skill to connect to the Chrome DevTools UI for interactive debugging, UI/UX review, Q&A, showing elements/network requests/panels to the user, inspecting the user's current DevTools selection, and addressing or polling for DevTools UI comment threads."
+      },
+      "excerpt": "---\nname: inspect-in-devtools\ndescription: Use this skill to connect to the Chrome DevTools UI for interactive debugging, UI/UX review, Q&A, showing elements/network requests/panels to the user, inspecting the user's current DevTools selection, and addressing or polling for DevTools UI comment threads.\n---\n\n# Debug, Review, and Q&A in DevTools\n\nUse this skill to:\n\n1. **Show a target to the user**: Open DevTools and reveal a panel, a DOM element, or a network request.\n2. **Inspect the user's selection**: Read the element or network request that the user selected in DevTools.\n3. **Address DevTools comments**: Fetch comment threads, answer questions or apply fixes, and resolve the threads.\n\n## Prerequisites\n\n- **Chrome version**: Chrome M159 or later.\n- **Required flag**: `--devtools-comments` in the MCP server config. Without it, `open_devtools`, `reveal_in_devtools`, `get_devtools_comments`, and `resolve_devtools_comment` are not available.\n- **Headed browser**: Chrome must not run in `--headless` mode.\n- **Page targeting**: All tools require a `pageId` from `list_pages` or `new_page`.\n\n## Workflows\n\n### 1. Open DevTools\n\nCall `open_devtools` with `pageId`. Do this before you call `reveal_in_devtools`, `get_devtools_comments`, or `resolve_devtools_comment`.\n\n### 2. Reveal a panel, element, or network request\n\nCall `reveal_in_devtools` with `pageId` and these optional parameters:\n\n- `panelName`: `\"elements\"`, `\"network\"`, `\"sources\"`, or `\"console\"`. Pass it alone to switch panels.\n- `uid`: Element `uid` from `take_snapshot`. Reveals the element in the Elements panel.\n- `reqid`: Request `reqid` from `list_network_requests`. Reveals the request in the Network panel.\n\n`uid` and `reqid` are mutually exclusive.\n\n### 3. Inspect the user's selection\n\n- **DOM element**: Call `take_snapshot`. The snapshot marks the element selected in the Elements panel. Pass its `uid` to `get_css_styles`, `take_screenshot`, or `evaluate_script`.\n- **Network request**: Call `get_network_request` and omit `reqid`. It returns the request selected in the Network panel.\n\n### 4. Handle comment threads\n\nSelect the mode from the user's request.\n\n#### Mode A: One-shot (comments already exist)\n\nUse this mode when the user says the comments are already in DevTools, or asks you not to poll.\n\n1. Call `get_devtools_comments` once.\n2. Process and resolve each returned thread.\n3. Summarize your changes and answers in chat, then end your turn. Do **not** poll.\n\n#### Mode B: Watch (wait for user feedback)\n\nUse this mode when the user asks you to wait while they debug, review, or add comments.\n\n1. Call `get_devtools_comments` immediately.\n2. While the result is `\"No open DevTools comments found.\"`, wait 10 seconds, then call it again. Call it immediately if a `\"DevTools comment threads updated\"` notification arrives.\n3. Stop after 12 consecutive empty polls (about 2 minutes) or when the user asks you to stop.\n4. When threads appear, process and resolve them. Then reset the empty-poll counter and continue polling.\n\nRules for polling:\n\n- **Use a background sub-agent** when sub-agent tools are available, so the main thread stays responsive. The sub-agent returns the threads to the main agent, or resolves them itself if it has workspace and MCP tools.\n- **Poll inline** only when sub-agent tools are unavailable. Do not end your turn early.\n- **Never call `get_devtools_comments` back-to-back** without the 10-second delay.\n\n#### Process and resolve a thread\n\nFor each `### Thread: <id>`:\n\n1. **Inspect the anchored target**:\n   - `Related element uid`: Use `get_css_styles`, `take_snapshot`, or `take_screenshot` with the `uid`.\n   - `Related network reqid`: Use `get_network_request` with the `reqid`.\n   - Optionally call `reveal_in_devtools` to show the target to the user.\n2. **Address the comment**:\n   - For a code or styling request, apply the fix in the workspace. Reload and verify the page if needed.\n   - For a question or root-cause investigation, collect diagnostic data. Do not make unnecessary code edits.\n3. **Resolve**: Call `resolve_devtools_comment` with `pageId`, `threadId`, and `replyText`:\n   - For a question or root cause, write a detailed answer.\n   - For a straightforward fix, write 1–2 sentences that state the change and the file.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/memory-leak-debugging/SKILL.md",
+      "blob_sha": "5f2adc3abf021b118892ed87fdba803e702947e3",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/8ba2ac945ebaf1adb92208c29f3a30e73a920956/skills/memory-leak-debugging/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "memory-leak-debugging",
+        "description": "Diagnoses and resolves memory leaks in JavaScript/Node.js applications. Use when a user reports high memory usage, OOM errors, or wants to capture, compare, or inspect heap snapshots with Chrome DevTools MCP memory tools."
+      },
+      "excerpt": "---\nname: memory-leak-debugging\ndescription: Diagnoses and resolves memory leaks in JavaScript/Node.js applications. Use when a user reports high memory usage, OOM errors, or wants to capture, compare, or inspect heap snapshots with Chrome DevTools MCP memory tools.\n---\n\n# Memory Leak Debugging\n\nThis skill provides expert guidance and workflows for finding, diagnosing, and fixing memory leaks in JavaScript and Node.js applications using Chrome DevTools MCP tools.\n\n## Prerequisites\n\nAdvanced memory debugging tools (`compare_heapsnapshots`, `get_heapsnapshot_details`, etc.) are only available when the server is started with the `--memoryDebugging` flag. First check if these tools are available; if not, try to read the MCP configuration file to check if `--memoryDebugging` is enabled.\n\n## Core Principles\n\n- **Prefer MCP memory tools:** Do NOT attempt to read raw `.heapsnapshot` files directly, as they are extremely large and will consume too many tokens. Use the Chrome DevTools MCP heap snapshot tools to summarize, compare, and inspect snapshots.\n- **Isolate the Leak:** Determine if the leak is in the browser (client-side) or Node.js (server-side).\n- **Common Culprits:** Look for detached DOM nodes, unhandled closures, global variables, event listeners not being removed, and caches growing unbounded. _Note: Detached DOM nodes are sometimes intentional caches; always ask the user before nulling them._\n- **Close Loaded Snapshots:** Heap snapshots can be large. After completing an investigation, use `close_heapsnapshot` for each loaded snapshot to release memory held by the MCP server.\n\n## Workflows\n\n### 1. Capturing Snapshots\n\nWhen investigating a frontend web application memory leak, utilize the `chrome-devtools-mcp` tools to interact with the application and take snapshots.\n\n- Use page-scoped tools like `click`, `navigate_page`, `fill`, etc. (specifying `pageId`) to manipulate the page into the desired state.\n- Revert the page back to the original state after interactions to see if memory is released.\n- Repeat the same user interactions 10 times to amplify the leak.\n- Use `take_heapsnapshot` (with `pageId`) to save `.heapsnapshot` files to disk at baseline, target (after actions), and final (after reverting actions) states.\n\n### 2. Comparing Snapshots\n\nOnce you have generated `.heapsnapshot` files using `take_heapsnapshot`, compare them with Chrome DevTools MCP memory tools.\n\n- Start with `get_heapsnapshot_summary` for each snapshot to confirm that the files load and to compare high-level totals.\n- Use `compare_heapsnapshots` to compare baseline and target snapshots. Start without `classIndex` for the summary diff, then request detailed class diffs only for suspicious growth by specifying `classIndex`.\n- Use the summary output from `compare_heapsnapshots` before drilling into specific node IDs.\n\n### 3. Inspecting Retainers and Dominator Chains\n\nWhen a class or object type grows unexpectedly, inspect the retaining chain and dominators with the MCP tools before changing code.\n\n- Use `get_heapsnapshot_class_nodes` to list instances of the suspicious class.\n- Use `get_heapsnapshot_retainers`, `get_heapsnapshot_retaining_paths`, `get_heapsnapshot_dominators`, and `get_heapsnapshot_edges` to understand why representative nodes are still reachable.\n- Use `get_heapsnapshot_object_details` with a specific `nodeId` to retrieve detailed object metadata (size, type, distance, and DOM detachedness).\n- Use `get_heapsnapshot_duplicate_strings` when string growth dominates the diff.\n- Read [references/common-leaks.md](references/common-leaks.md) for examples of common memory leaks and how to fix them after the retaining path points at application code.\n\n### 4. Advanced Analysis and Categorized Filters\n\nUse built-in MCP memory tools and filters to pinpoint specific leak categories directly without external tools.\n\n- Use `get_heapsnapshot_details` or `get_heapsnapshot_class_nodes` with `filterName` to target common leak causes:\n  - `objectsRetainedByDetachedDomNodes`: Identifies detached DOM elements retained in memory.\n  - `objectsRetainedByEventHandlers`: Identifies objects kept alive by unremoved event listeners.\n  - `objectsRetainedByContexts`: Identifies objects trapped in closures or execution contexts.\n  - `objectsRetainedByConsole`: Identifies objects retained by console logging.\n",
+      "card": {
+        "title_zh": "内存泄漏调试",
+        "purpose_zh": "诊断并修复 JavaScript/Node.js 应用中的内存泄漏，指导用户用 Chrome DevTools MCP 内存工具捕获、比较和检查堆快照。",
+        "does": [
+          "判断泄漏位于浏览器端还是 Node.js 端",
+          "用页面工具操作页面并多次重复交互以放大泄漏",
+          "在基线、目标、还原状态分别捕获堆快照",
+          "用摘要与对比工具比较快照并定位可疑类增长",
+          "检查保留链、支配者、边与重复字符串以找出泄漏原因",
+          "按分类过滤器定位游离 DOM、事件处理器、闭包、console 保留对象"
+        ],
+        "inputs": [
+          "用户报告的高内存占用或 OOM 现象",
+          "Chrome DevTools MCP 内存调试工具（需 --memoryDebugging 启动）",
+          "目标页面或 Node.js 应用",
+          "页面交互步骤（点击、导航、填写等）"
+        ],
+        "outputs": [
+          "写入磁盘的 .heapsnapshot 快照文件",
+          "快照摘要与类差异对比结果",
+          "可疑对象的保留链与支配者分析",
+          "泄漏原因定位与修复建议"
+        ],
+        "scenarios": [
+          "前端 Web 应用内存持续增长排查",
+          "Node.js 服务端内存泄漏诊断",
+          "OOM 错误根因分析",
+          "堆快照对比与保留链检查"
+        ],
+        "prerequisites": [
+          "高级内存工具仅在服务器以 --memoryDebugging 标志启动时可用",
+          "需先检查工具是否可用，必要时读取 MCP 配置文件确认标志已启用",
+          "需使用 Chrome DevTools MCP 工具而非直接读取原始快照文件"
+        ],
+        "limits": [
+          "不要直接读取原始 .heapsnapshot 文件，文件极大且消耗过多 token",
+          "游离 DOM 节点有时是有意缓存，置空前须先询问用户",
+          "调查结束后需对每个已加载快照调用 close_heapsnapshot 释放内存",
+          "高级内存工具依赖 --memoryDebugging 启动标志"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "数据分析",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Diagnoses and resolves memory leaks in JavaScript/Node.js applications."
+          },
+          {
+            "field": "does",
+            "quote": "Determine if the leak is in the browser (client-side) or Node.js (server-side)."
+          },
+          {
+            "field": "does",
+            "quote": "Repeat the same user interactions 10 times to amplify the leak."
+          },
+          {
+            "field": "does",
+            "quote": "Use `take_heapsnapshot` (with `pageId`) to save `.heapsnapshot` files to disk at baseline, target (after actions), and final (after reverting actions) states."
+          },
+          {
+            "field": "does",
+            "quote": "Use `compare_heapsnapshots` to compare baseline and target snapshots."
+          },
+          {
+            "field": "does",
+            "quote": "Use `get_heapsnapshot_retainers`, `get_heapsnapshot_retaining_paths`, `get_heapsnapshot_dominators`, and `get_heapsnapshot_edges` to understand why representative nodes are still reachable."
+          },
+          {
+            "field": "does",
+            "quote": "Use `get_heapsnapshot_details` or `get_heapsnapshot_class_nodes` with `filterName` to target common leak causes"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Advanced memory debugging tools (`compare_heapsnapshots`, `get_heapsnapshot_details`, etc.) are only available when the server is started with the `--memoryDebugging` flag."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "First check if these tools are available; if not, try to read the MCP configuration file to check if `--memoryDebugging` is enabled."
+          },
+          {
+            "field": "limits",
+            "quote": "Do NOT attempt to read raw `.heapsnapshot` files directly, as they are extremely large and will consume too many tokens."
+          },
+          {
+            "field": "limits",
+            "quote": "Detached DOM nodes are sometimes intentional caches; always ask the user before nulling them."
+          },
+          {
+            "field": "limits",
+            "quote": "After completing an investigation, use `close_heapsnapshot` for each loaded snapshot to release memory held by the MCP server."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Use `take_heapsnapshot` (with `pageId`) to save `.heapsnapshot` files to disk"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/troubleshooting/SKILL.md",
+      "blob_sha": "94a23d4cb7f4dfce11eacf6f0e418d445f12fb50",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/8ba2ac945ebaf1adb92208c29f3a30e73a920956/skills/troubleshooting/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "troubleshooting",
+        "description": "Uses Chrome DevTools MCP and documentation to troubleshoot connection and target issues. Trigger this skill when list_pages, new_page, or navigate_page fail, or when the server initialization fails."
+      },
+      "excerpt": "---\nname: troubleshooting\ndescription: Uses Chrome DevTools MCP and documentation to troubleshoot connection and target issues. Trigger this skill when list_pages, new_page, or navigate_page fail, or when the server initialization fails.\n---\n\n## Troubleshooting Wizard\n\nYou are acting as a troubleshooting wizard to help the user configure and fix their Chrome DevTools MCP server setup. When this skill is triggered (e.g., because `list_pages`, `new_page`, or `navigate_page` failed, or the server wouldn't start), follow this step-by-step diagnostic process:\n\n### Step 1: Find and Read Configuration\n\nYour first action should be to locate and read the MCP configuration file. Search for the following files in the user's workspace: `.mcp.json`, `.vscode/mcp.json`, `gemini-extension.json`, or `.gemini/settings.json` (or user-scoped files such as `~/.claude.json` if accessible).\n\nIf you find a configuration file, read and interpret it to identify potential issues such as:\n\n- Incorrect arguments or flags.\n- Missing environment variables.\n- Usage of `--autoConnect` in incompatible environments.\n\nIf you cannot find any of these files, only then should you ask the user to provide their configuration file content.\n\n### Step 2: Triage Common Connection Errors\n\nBefore reading documentation or suggesting configuration changes, check if the error message matches one of the following common patterns.\n\n#### Error: `Could not find DevToolsActivePort`\n\nThis error is highly specific to the `--autoConnect` feature. It means the MCP server cannot find the file created by a running, debuggable Chrome instance. This is not a generic connection failure.\n\nYour primary goal is to guide the user to ensure Chrome is running and properly configured. Do not immediately suggest switching to `--browserUrl`. Follow this exact sequence:\n\n1. **Ask the user to confirm that the correct Chrome version** (e.g., \"Chrome Canary\" if the error mentions it) is currently running.\n2. **If the user confirms it is running, instruct them to enable remote debugging.** Be very specific about the URL and the action: \"Please open a new tab in Chrome, navigate to `chrome://inspect/#remote-debugging`, and make sure the 'Enable remote debugging' checkbox is checked.\"\n3. **Once the user confirms both steps, your only next action should be to call the `list_pages` tool.** This is the simplest and safest way to verify if the connection is now successful. Do not retry the original, more complex command yet.\n4. **If `list_pages` succeeds, the problem is resolved.** If it still fails with the same error, then you can proceed to the more advanced steps like suggesting `--browserUrl` or checking for sandboxing issues.\n\n#### Symptom: Server starts but creates a new empty profile\n\nIf the server starts successfully but `list_pages` returns an empty list or creates a new profile instead of connecting to the existing Chrome instance, check for typos in the arguments.\n\n- **Check for flag typos:** For example, `--autoBronnect` instead of `--autoConnect`.\n- **Verify the configuration:** Ensure the arguments match the expected flags exactly.\n\n#### Symptom: Missing Tools / Only a few tools available\n\nIf the server starts successfully but only a limited subset of tools (like `list_pages`, `list_console_messages`, `get_console_message`, `list_network_requests`) are available, this is likely because the MCP client is enforcing a **read-only mode**.\n\nAll tools in `chrome-devtools-mcp` are annotated with `readOnlyHint: true` (for safe, non-modifying tools) or `readOnlyHint: false` (for tools that modify browser state, like `emulate`, `click`, `navigate_page`). To access the full suite of tools, the user must disable read-only mode in their MCP client (e.g., by exiting \"Plan Mode\" in Gemini CLI or adjusting their client's tool safety settings).\n\n#### Symptom: Extension tools are missing or extensions fail to load\n\nIf the tools related to extensions (like `install_extension`) are not available, or if the extensions you load are not functioning:\n\n1. **Check for the `--categoryExtensions` flag**: Ensure this flag is passed in the MCP server configuration to enable the extension category tools.\n\n#### Other Common Errors\n\nIdentify other error messages from the failed tool call or the MCP initialization logs:\n\n- `Target closed`\n- \"Tool not found\" (check if they are using `--slim` which only enables navigation, script evaluation and screenshot tools).\n- Missing `pageId`: Page-scoped tools require a `pageId` argument. Call `list_pages` to find active page IDs.\n- `ProtocolError: Network.enable timed out` or `The socket connection was closed unexpectedly`\n- `Error [ERR_MODULE_NOT_FOUND]: Cannot find module`\n- Any sandboxing or host validation errors.\n\n### Step 3: Read Known Issues\n\nRead the contents of https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/troubleshooting.md to map the error to a known issue. Pay close attention to:\n\n- Sandboxing restrictions (macOS Seatbelt, Linux containers).\n- WSL requirements.\n- `--autoConnect` handshakes, timeouts, and requirements (requires **running** Chrome 144+).\n\n### Step 4: Formulate a Configuration\n\nBased on the exact error and the user's environment (OS, MCP client), formulate the correct MCP configuration snippet. Check if they need to:\n\n- Pass `--browser-url=http://127.0.0.1:9222` instead of `--autoConnect` (e.g. if they are in a sandboxed environment like Claude Desktop).\n- Enable remote debugging in Chrome (`chrome://inspect/#remote-debugging`) and accept the connection prompt. **Ask the user to verify this is enabled if using `--autoConnect`.**\n- Add `--logFile <absolute_path_to_log_file>` to capture debug logs for analysis.\n- Increase `startup_timeout_ms` (e.g. to 20000) if using Codex on Windows.\n\n_If you are unsure of the user's configuration, ask the user to provide their current MCP server JSON configuration._\n\n### Step 5: Run Diagnostic Commands\n\nIf the issue is still unclear, run diagnostic commands to test the server directly:\n\n- Run `npx chrome-devtools-mcp@latest --help` to verify the installation and Node.js environment.\n- If you need more information, run `NODE_DEBUG=* npx chrome-devtools-mcp@latest --logFile=/tmp/cdm-test.log` to capture verbose logs. Analyze the output for errors.\n\n### Step 6: Check GitHub for Existing Issues\n\nIf https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/troubleshooting.md does not cover the specific error, check if the `gh` (GitHub CLI) tool is available in the environment. If so, search the GitHub repository for similar issues:\n`gh issue list --repo ChromeDevTools/chrome-devtools-mcp --search \"<error snippet>\" --state all`\n\nAlternatively, you can recommend that the user checks https://github.com/ChromeDevTools/chrome-devtools-mcp/issues and https://github.com/ChromeDevTools/chrome-devtools-mcp/discussions for help.\n",
+      "card": null
+    }
+  ]
+}

@@ -1,0 +1,541 @@
+{
+  "schema": 1,
+  "repo": "alibaba/open-code-review",
+  "tree_sha": "2852bc90db57e828b75e34928b2f83c6fe7917d7",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/open-code-review-delegate/SKILL.md",
+      "blob_sha": "493d2112cff2cfcf1760469637b5c3dd1373841a",
+      "source_url": "https://github.com/alibaba/open-code-review/blob/0e9060da66af36a96a15516e76a001953095318b/skills/open-code-review-delegate/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "open-code-review-delegate",
+        "description": "Delegation mode for open-code-review (OCR). Instead of OCR calling an LLM endpoint, this skill instructs the host agent to perform the code review itself, using OCR only for deterministic engineering: file selection and rule resolution. Use when the host agent should drive the review with its own LLM capabilities."
+      },
+      "excerpt": "---\nname: open-code-review-delegate\ndescription: >\n  Delegation mode for open-code-review (OCR). Instead of OCR calling an LLM\n  endpoint, this skill instructs the host agent to perform the code review\n  itself, using OCR only for deterministic engineering: file selection and\n  rule resolution. Use when the host agent should drive the review with its\n  own LLM capabilities.\nlicense: Apache-2.0\ncompatibility: >\n  Requires the `ocr` CLI installed (via `npm install -g\n  @alibaba-group/open-code-review` or GitHub release binary). Does NOT\n  require a configured LLM endpoint — delegation mode is LLM-free on the\n  OCR side.\nmetadata:\n  author: alibaba\n  homepage: https://github.com/alibaba/open-code-review\n  version: \"1.0.0\"\n---\n\n# Open Code Review — Delegation Mode\n\nA skill for performing AI code review where OCR provides deterministic engineering (file filtering, rule resolution) and the host agent performs the actual review using its own intelligence and tools.\n\n## Workflow\n\n### Step 1: Preview — Determine What to Review\n\n```bash\nocr delegate preview --format json [--from <ref> --to <ref>] [--commit <hash>] [--exclude <patterns>]\n```\n\nThis outputs:\n- **mode** (workspace / range / commit)\n- **from / to / commit / merge_base** — ref metadata for constructing git commands\n- **Reviewable file list** — paths, status, insertions/deletions\n- **Excluded files** — with exclusion reason\n\n**Common invocations:**\n\n| Scenario | Command |\n|----------|---------|\n| Workspace changes | `ocr delegate preview` |\n| Branch comparison | `ocr delegate preview --from main --to feature` |\n| Single commit | `ocr delegate preview -c abc123` |\n\n### Step 2: Get Rules for Files\n\n```bash\nocr delegate rule --format json <path1> <path2> ...\n```\n\nPass the reviewable file paths from Step 1. Output is grouped by rule content — files sharing the same rule appear under one group, avoiding repetition.\n\n### Step 3: Get Diffs\n\nChoose the diff command using the mode and refs from Step 1. Use `git --no-pager` for every Git call during the review.\n\nThe diff commands disable external diff programs, text conversion, and color to produce plain patches.\n\n**Range mode** (merge_base provided in preview output):\n```bash\ngit --no-pager diff --no-ext-diff --no-textconv --no-color <merge_base>..<to> -- \"<path>\"\n```\n\n**Commit mode**:\n```bash\ngit --no-pager show --no-ext-diff --no-textconv --no-color <commit> -- \"<path>\"\n```\n\n**Workspace mode**:\n```bash\n# Tracked files\ngit --no-pager diff --no-ext-diff --no-textconv --no-color HEAD -- \"<path>\"\n# New untracked files — read directly (entire file is new code)\ncat \"<path>\"\n```\n\nTo read context:\n\n```bash\ngit --no-pager log --no-color --oneline -- \"<path>\"\ngit --no-pager blame --no-textconv -- \"<path>\"\ngit --no-pager show --no-ext-diff --no-textconv --no-color \"<ref>:<path>\"\n```\n\nFor large diffs, add `--output=\"<absolute-diff-file>\"` to the command for the selected mode. Choose a unique absolute path outside the repository and create its parent directory. Use the same path in file-reading tool calls:\n\n```bash\ngit --no-pager diff --no-ext-diff --no-textconv --no-color --output=\"<absolute-diff-file>\" <merge_base>..<to> -- \"<path>\"\n```\n\nAfter Git exits with code 0, read and review the entire file in chunks, then remove it. If Git fails or times out, retry or record `skipped` with the error. Check unexpectedly empty output against a fresh preview.\n\n### Step 4: Review Each File\n\nCreate a checklist containing every `reviewable_files` entry. For each reviewable file:\n\nUse `(path, status)` as the checklist identity. Workspace mode can report the same path twice when a staged deletion is followed by an untracked recreation.\n\n1. Get its diff (Step 3)\n2. Consult its Rule Group (from Step 2) for the review checklist\n3. Conduct a thorough review, using appropriate context tools as needed\n4. Mark the file `reviewed`, or `skipped` with a concrete reason\n\nFor large changes, review in bounded batches grouped by shared rules and diff size. Do not stop after finding the first high-severity issue.\n\n### Step 5: Format Output\n\nEach comment must follow this structure:\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| path | string | yes | Relative file path |\n| content | string | yes | Review comment describing the issue |\n| start_line | integer | no | Start line in the new file |\n| end_line | integer | no | End line in the new file |\n| category | enum | no | bug, security, performance, maintainability, test, style, documentation, other |\n| severity | enum | no | critical, high, medium, low |\n\n### Step 6: Classify and Report\n\nBefore reporting, verify that every previewed file is accounted for. Include `total_files`, `reviewed_files`, `skipped_files`, and `coverage_rate` in the summary. A skipped file must include its reason.\n\nGroup findings by severity:\n\n- **Critical/High**: Bugs, security issues, data loss risks — always report\n- **Medium**: Performance concerns, error handling gaps, maintainability issues — report with context\n- **Low**: Style nits, minor suggestions — report only if clearly valuable\n\nDiscard likely false positives silently.\n\n### Step 7: Fix (Optional)\n\nIf the user requested \"review and fix\":\n- Apply High/Critical fixes directly\n- Describe Medium fixes that require manual intervention\n- Skip Low-priority items unless trivial\n\n## Sub-commands Reference\n\n| Command | Purpose |\n|---------|---------|\n| `ocr delegate preview` | Which files to review + mode/ref metadata |\n| `ocr delegate rule <path...>` | Review rules grouped by content |\n\n## Shared Flags\n\n| Flag | Description |\n|------|-------------|\n| `--from <ref>` | Source ref for range mode |\n| `--to <ref>` | Target ref for range mode |\n| `-c, --commit <hash>` | Single commit mode |\n| `--repo <path>` | Repository root (default: cwd) |\n| `--rule <path>` | Custom rule.json path |\n| `--exclude <patterns>` | Comma-separated exclude patterns |\n| `-b, --background <text>` | Business context |\n| `-B, --background-file <path>` | Business context from Markdown file (takes precedence over `-b`) |\n| `-f, --format <text\\|json>` | Output format; use `json` for agent integrations |\n\n## Gotchas\n\n- **No LLM needed on OCR side** — delegation mode never calls an LLM. All intelligence comes from the host agent.\n- **Rules are grouped** — Files sharing the same rule are grouped together in the output. You can pass any number of paths per call; for large changes, fetch rules per-batch as you review.\n- **Working directory matters** — `ocr delegate` operates on the Git repo at the current directory. Use `--repo /path` to override.\n- **Untracked files in workspace mode** — `preview` includes untracked files. For these, read the file directly instead of using `git diff`.\n- **Background context** — pass `--background` to `preview` when you have requirement context; it appears in the output for your reference during review.\n- **Coverage is mandatory** — every `reviewable_files` entry must end as reviewed or explicitly skipped; do not silently omit files.\n\n### Recovering Oversized Background Context\n\n`--background-file` has two independent limits. The raw file must not exceed\n1 MiB, and the sanitized content must not exceed 8000 characters. Either\ncondition aborts the command. When the command reports either limit:\n\n1. Do not silently truncate the source file.\n2. Summarize the original material while preserving its requirements,\n   constraints, acceptance criteria, and other review-critical details.\n3. Retry the affected command by passing the summary as one shell-safe\n   argument (for example, use a quoted/escaped argument produced by the host\n   shell, or write it to a new size-bounded file and pass that file). Do not\n   place untrusted summary text directly in a double-quoted shell template;\n   `$()`, backticks, quotes, and variable references can still be evaluated.\n   Omit the original `--background-file` so the CLI does not reload the same\n   oversized file and fail again.\n4. If a faithful summary is not",
+      "card": {
+        "title_zh": "OCR委托式代码审查",
+        "purpose_zh": "让宿主智能体自行完成代码审查，OCR 只负责确定性的文件筛选与规则解析，无需在 OCR 侧配置 LLM 端点。",
+        "does": [
+          "用 ocr delegate preview 预览待审查文件、模式与 ref 元数据",
+          "用 ocr delegate rule 按文件获取分组后的审查规则",
+          "按 workspace/range/commit 模式用 git 命令获取 diff 与上下文",
+          "逐文件对照规则审查并标记 reviewed 或 skipped",
+          "按指定字段结构输出评论并按严重级别分类汇总覆盖率",
+          "用户要求时可直接应用高危修复"
+        ],
+        "inputs": [
+          "ocr delegate preview 命令及 --from/--to/--commit/--exclude 等参数",
+          "待审查文件路径列表",
+          "可选业务背景 --background 或 --background-file",
+          "自定义规则文件 --rule 路径",
+          "仓库根目录 --repo"
+        ],
+        "outputs": [
+          "待审查文件清单、排除文件及原因、模式与 ref 元数据",
+          "按规则内容分组的审查规则",
+          "结构化审查评论（path、content、行号、category、severity）",
+          "含 total_files、reviewed_files、skipped_files、coverage_rate 的汇总报告",
+          "可选的代码修复改动"
+        ],
+        "scenarios": [
+          "审查工作区未提交改动",
+          "比较两个分支之间的差异",
+          "审查单个提交",
+          "带业务背景的需求相关代码审查",
+          "审查后直接修复高危问题"
+        ],
+        "prerequisites": [
+          "已安装 ocr CLI（npm 全局安装或 GitHub release 二进制）",
+          "当前目录或 --repo 指向 Git 仓库",
+          "CLI 需 v1.9.0 及以上才支持 --format json"
+        ],
+        "limits": [
+          "OCR 侧不调用 LLM，全部智能来自宿主智能体",
+          "--background-file 原始文件不得超过 1 MiB，清洗后内容不得超过 8000 字符",
+          "工作区模式下未跟踪文件需直接读取而非 git diff",
+          "每个可审查文件必须标记 reviewed 或 skipped，不得静默遗漏",
+          "旧版 CLI 不支持 --format 时只能改用文本输出"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "installs_packages"
+        ],
+        "tags": [
+          "代码审查",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "this skill instructs the host agent to perform the code review itself, using OCR only for deterministic engineering: file selection and rule resolution."
+          },
+          {
+            "field": "does",
+            "quote": "ocr delegate preview --format json [--from <ref> --to <ref>] [--commit <hash>] [--exclude <patterns>]"
+          },
+          {
+            "field": "does",
+            "quote": "ocr delegate rule --format json <path1> <path2> ..."
+          },
+          {
+            "field": "does",
+            "quote": "Choose the diff command using the mode and refs from Step 1. Use `git --no-pager` for every Git call during the review."
+          },
+          {
+            "field": "does",
+            "quote": "Mark the file `reviewed`, or `skipped` with a concrete reason"
+          },
+          {
+            "field": "does",
+            "quote": "Include `total_files`, `reviewed_files`, `skipped_files`, and `coverage_rate` in the summary."
+          },
+          {
+            "field": "does",
+            "quote": "Apply High/Critical fixes directly"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary)."
+          },
+          {
+            "field": "limits",
+            "quote": "delegation mode never calls an LLM. All intelligence comes from the host agent."
+          },
+          {
+            "field": "limits",
+            "quote": "The raw file must not exceed 1 MiB, and the sanitized content must not exceed 8000 characters."
+          },
+          {
+            "field": "limits",
+            "quote": "For these, read the file directly instead of using `git diff`."
+          },
+          {
+            "field": "limits",
+            "quote": "every `reviewable_files` entry must end as reviewed or explicitly skipped; do not silently omit files."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm install -g @alibaba-group/open-code-review"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "git --no-pager diff --no-ext-diff --no-textconv --no-color <merge_base>..<to> -- \"<path>\""
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/open-code-review/SKILL.md",
+      "blob_sha": "01317b749e475294236fc85999a4f277c88bbc5a",
+      "source_url": "https://github.com/alibaba/open-code-review/blob/0e9060da66af36a96a15516e76a001953095318b/skills/open-code-review/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "open-code-review",
+        "description": "Performs AI-powered code review on Git changes using the `ocr` CLI from alibaba/open-code-review. Use when the user asks to review code, review a pull request, review staged/unstaged changes, review a commit, or compare branches for code quality issues. Produces line-level review comments and can automatically apply fixes when requested. With appropriate review rules, can detect various types of issues including bugs, security vulnerabilities, performance problems, and code quality concerns."
+      },
+      "excerpt": "---\nname: open-code-review\ndescription: >\n  Performs AI-powered code review on Git changes using the `ocr` CLI from\n  alibaba/open-code-review. Use when the user asks to review code, review\n  a pull request, review staged/unstaged changes, review a commit, or\n  compare branches for code quality issues. Produces line-level review\n  comments and can automatically apply fixes when requested. With appropriate\n  review rules, can detect various types of issues including bugs, security\n  vulnerabilities, performance problems, and code quality concerns.\nlicense: Apache-2.0\ncompatibility: >\n  Requires the `ocr` CLI installed (via `npm install -g\n  @alibaba-group/open-code-review` or GitHub release binary). Requires a\n  configured supported LLM provider before first run (protocols: Anthropic,\n  OpenAI Chat Completions, OpenAI Responses, AWS Bedrock).\nmetadata:\n  author: alibaba\n  homepage: https://github.com/alibaba/open-code-review\n  version: \"1.0.0\"\n---\n\n# Open Code Review\n\nA skill for invoking [open-code-review](https://github.com/alibaba/open-code-review) (`ocr`) — an open-source AI code review CLI that reads Git diffs and generates structured, line-level review comments.\n\n## Workflow\n\n### Step 1: Gather Business Context\n\nAnalyze the review target (commits, branch, or changes) to extract concise business context. Pass this context via `--background` to improve review quality.\n\n### Step 2: Run Code Review\n\n**Do not pre-check whether `ocr` is installed** — skip probes like `command -v ocr` or `ocr --version`. Assume the CLI is available and run the review directly; that saves a tool call on the common path. Only if the review fails with `command not found` should you install it per Troubleshooting.\n\nRun the OCR command with appropriate flags. **Always pass business context via `--background`** when available:\n\n```bash\nocr review --audience agent --background \"business context here\" [user-args]\n```\n\n**Argument handling:**\n\n- **Background context** (RECOMMENDED): use `--background \"context\"` or `-b \"context\"` to provide business context for better review quality\n- **Default** (no user arguments): reviews staged, unstaged, and untracked changes (workspace mode)\n- **Specific commit**: use `--commit` or `-c` to review a single commit against its parent\n- **Branch comparison**: use `--from <ref>` and `--to <ref>` to review diff between two refs\n- **Timeout**: effective timeout per review group = `--timeout` × review rounds. Default `--timeout 15` with default effort `medium` (2 rounds) gives 30 minutes; `low`/`high` give 15/45 minutes.\n- **Concurrency**: default concurrency is 8 file workers; reduce with `--concurrency <n>` if rate limits are hit\n- **Preview mode**: use `--preview` or `-p` to preview which files will be reviewed without running the LLM\n- **Output file**: use `--output <path>` to write the full result to a file instead of stdout. If the command fails with `unknown flag: --output`, do not continue the review with plain stdout. Ask the user whether to upgrade (`npm i -g @alibaba-group/open-code-review@latest`) and wait for the answer before proceeding. After the user confirms and the upgrade succeeds, rerun with `--output`.\n- **Installation**: if `ocr` command is not found, install it by running `npm i -g @alibaba-group/open-code-review`\n\n**Common invocation patterns:**\n\n| User says | Command to run |\n|-----------|---------------|\n| \"review my changes\" / \"review the working copy\" | `ocr review --audience agent -b \"context\"` |\n| \"review this PR\" / \"review feature branch\" | `ocr review --audience agent -b \"context\" --from main --to <branch>` |\n| \"review commit abc123\" | `ocr review --audience agent -b \"context\" --commit abc123` |\n| \"what would be reviewed?\" (dry-run) | `ocr review --preview` |\n\n**Output mode:**\n\n- Always use `--audience agent` to suppress progress UI and emit only the final summary\n- **Prevent output truncation**: For large reviews or restricted tool environments, pass `--output /tmp/ocr_out.txt` and inspect the file in full via a file reading tool instead of piping stdout through `tail` or `head`, which drops earlier review comments.\n\n**On failure:** If `ocr review` exits non-zero (e.g. an LLM connection error), do not retry blindly — consult the Troubleshooting section below for the matching fix before re-running.\n\n### Step 3: Report\n\nOCR output includes structured `severity` (critical / high / medium / low) and `category` (bug / security / performance / maintainability / test / style / documentation / other) on each comment. Present results grouped by severity, discarding `low` severity items that are likely false positives or nitpicks.\n\n### Step 4: Fix\n\nBefore applying fixes, check whether the user requested automatic fixes:\n\n- If the user explicitly requested \"review and fix\" or similar, proceed with automatic fixes\n- If the user only requested \"review\" without fix intent, ask for permission before applying any changes\n\nWhen fixing issues and suggestions:\n\n- Focus on critical, high, and medium severity items\n- Apply fixes directly to the code when safe and well-defined\n- For complex fixes requiring manual intervention, clearly describe what needs to be done\n- Always verify fixes with the user before committing\n\n## Output Format\n\nEach comment in OCR's output contains:\n\n- `path`: File path\n- `content`: Review comment text\n- `start_line` / `end_line`: Line range (both 0 means positioning failed)\n- `category`: Issue category (bug, security, performance, maintainability, test, style, documentation, other)\n- `severity`: Issue severity (critical, high, medium, low)\n- `suggestion_code`: Optional fix suggestion\n- `existing_code`: Optional original code snippet\n- `thinking`: Optional LLM reasoning process\n\nPresent results grouped by severity using this template:\n\n```markdown\n## Code Review Results\n\n**Files reviewed**: N\n**Issues found**: X critical, Y high, Z medium\n\n### Critical\n\n- **`path/to/file.java:42`** [bug] — Brief description\n  > Recommendation: How to fix\n\n### High\n\n- **`path/to/file.java:26`** [bug] — Brief description\n  > Recommendation: How to fix\n\n### Medium\n\n- **`path/to/file.ts:88`** [performance] — Brief description\n  > Recommendation: How to fix (if applicable)\n```\n\nIf no critical, high, or medium severity issues remain after filtering, state: \"Review complete — no critical, high, or medium issues found in N files.\"\n\n**Handling mispositioned comments:**\n\nWhen `start_line` and `end_line` are both `0`, the comment failed to locate the exact position in the file. In such cases:\n\n1. Read the comment content to understand the issue\n2. Examine the target file mentioned in the comment\n3. Identify the relevant code section based on the comment's context\n4. Apply the fix or suggestion to the correct location\n\n## Custom Review Rules\n\nIf the user wants project-specific rules, OCR resolves them in this priority order:\n\n1. `--rule <path>` flag (highest)\n2. `<repo>/.opencodereview/rule.json`\n3. `~/.opencodereview/rule.json`\n4. Built-in system defaults (lowest)\n\nBy default, the first matching user rule replaces the built-in system rule. Set `merge_system_rule: true` on a rule entry when the matched system rule and user rule should both be included.\n\nRule file format:\n\n```json\n{\n  \"rules\": [\n    {\n      \"path\": \"**/*.java\",\n      \"rule\": \"All new methods must validate required parameters for null\",\n      \"merge_system_rule\": true\n    },\n    {\n      \"path\": \"**/*mapper*.xml\",\n      \"rule\": \"Check SQL for injection risks and missing closing tags\"\n    }\n  ]\n}\n```\n\nTo preview which rule applies to a file before reviewing:\n\n```bash\nocr rules check src/main/java/com/example/Foo.java\n```\n\n## Advanced Review Options\n\nBeyond the common flags above, `ocr review` exposes a few groups of controls. Run `ocr review --help` for the complete list.\n\n**Scoping**\n\n- `--exclude '<patterns>'` — comma-separated gitignore-style patterns (for example `--exclude '**/generated/*,**/testdata/*'`), merged with `rule.json` excludes.\n- `--background-file <path>` — ",
+      "card": {
+        "title_zh": "开源AI代码审查",
+        "purpose_zh": "调用 ocr 命令行工具对 Git 变更做 AI 代码审查，生成行级评论，可按需自动修复。",
+        "does": [
+          "分析审查目标并提取业务背景，通过 --background 传入以提升审查质量",
+          "运行 ocr review 审查工作区改动、指定提交或两个分支之间的差异",
+          "按严重级别和类别输出结构化行级审查评论，过滤低级别噪音",
+          "在用户明确要求时直接应用修复，复杂问题给出说明",
+          "支持自定义审查规则文件与规则预览检查",
+          "支持预览模式、输出到文件、JSON/SARIF 格式及预算控制"
+        ],
+        "inputs": [
+          "Git 仓库及其变更（暂存、未暂存、未跟踪、提交或分支差异）",
+          "业务背景文本或背景 Markdown 文件路径",
+          "自定义审查规则文件（--rule 或 .opencodereview/rule.json）",
+          "可选的 provider/model、超时、并发、排除模式、token 预算等参数"
+        ],
+        "outputs": [
+          "按严重级别分组的行级审查评论（路径、行号、类别、严重级别、建议代码）",
+          "可写入指定文件的完整审查结果",
+          "text、json 或 sarif 格式的审查结果",
+          "审查摘要，如文件数与各级别问题数量"
+        ],
+        "scenarios": [
+          "审查本地工作区改动",
+          "审查某个提交",
+          "比较两个分支或审查 PR",
+          "预览将被审查的文件",
+          "按项目自定义规则做代码审查"
+        ],
+        "prerequisites": [
+          "已安装 ocr CLI（npm 全局安装或 GitHub 发布二进制）",
+          "首次运行前已配置受支持的 LLM 提供方（Anthropic、OpenAI Chat Completions、OpenAI Responses、AWS Bedrock）",
+          "当前目录为 Git 仓库，或通过 --repo 指定仓库路径"
+        ],
+        "limits": [
+          "未配置可用 LLM 时审查会直接失败",
+          "大差异可能触及 token 上限，单文件差异超过约 80% 预算会被跳过",
+          "工作区模式会包含未跟踪文件，需自行暂存以缩小范围",
+          "不支持工作区审查的断点续跑",
+          "旧版 CLI 不支持 --output，需先升级",
+          "不要使用 --audience human，会污染输出"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "代码审查",
+          "自动化",
+          "安全",
+          "测试",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Performs AI-powered code review on Git changes using the `ocr` CLI from alibaba/open-code-review."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Produces line-level review comments and can automatically apply fixes when requested."
+          },
+          {
+            "field": "does",
+            "quote": "Analyze the review target (commits, branch, or changes) to extract concise business context. Pass this context via `--background` to improve review quality."
+          },
+          {
+            "field": "does",
+            "quote": "ocr review --audience agent --background \"business context here\" [user-args]"
+          },
+          {
+            "field": "does",
+            "quote": "Present results grouped by severity, discarding `low` severity items that are likely false positives or nitpicks."
+          },
+          {
+            "field": "does",
+            "quote": "If the user explicitly requested \"review and fix\" or similar, proceed with automatic fixes"
+          },
+          {
+            "field": "does",
+            "quote": "If the user wants project-specific rules, OCR resolves them in this priority order:"
+          },
+          {
+            "field": "does",
+            "quote": "use `--preview` or `-p` to preview which files will be reviewed without running the LLM"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Requires a configured supported LLM provider before first run (protocols: Anthropic, OpenAI Chat Completions, OpenAI Responses, AWS Bedrock)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "if `ocr` command is not found, install it by running `npm i -g @alibaba-group/open-code-review`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "use `--output <path>` to write the full result to a file instead of stdout."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "If `ocr review` exits non-zero (e.g. an LLM connection error), do not retry blindly"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "plugins/open-code-review/skills/open-code-review-delegate/SKILL.md",
+      "blob_sha": "7648afd6563a27b662cbe2166c3c3a654ec26064",
+      "source_url": "https://github.com/alibaba/open-code-review/blob/0e9060da66af36a96a15516e76a001953095318b/plugins/open-code-review/skills/open-code-review-delegate/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "open-code-review-delegate",
+        "description": "Delegation mode for open-code-review (OCR). Instead of OCR calling an LLM endpoint, this skill instructs the host agent to perform the code review itself, using OCR only for deterministic engineering: file selection and rule resolution. Use when the host agent should drive the review with its own LLM capabilities."
+      },
+      "excerpt": "---\nname: open-code-review-delegate\ndescription: >\n  Delegation mode for open-code-review (OCR). Instead of OCR calling an LLM\n  endpoint, this skill instructs the host agent to perform the code review\n  itself, using OCR only for deterministic engineering: file selection and\n  rule resolution. Use when the host agent should drive the review with its\n  own LLM capabilities.\nlicense: Apache-2.0\ncompatibility: >\n  Requires the `ocr` CLI installed (via `npm install -g\n  @alibaba-group/open-code-review` or GitHub release binary). Does NOT\n  require a configured LLM endpoint — delegation mode is LLM-free on the\n  OCR side.\nmetadata:\n  author: alibaba\n  homepage: https://github.com/alibaba/open-code-review\n  version: \"1.0.0\"\n---\n\n# Open Code Review — Delegation Mode\n\nThis Codex plugin skill intentionally mirrors the canonical skill at\n`skills/open-code-review-delegate/SKILL.md`. Keep both files synchronized when\nupdating OCR delegation instructions; a symlink is avoided because plugin\ninstalls may only materialize the plugin subtree.\n\nA skill for performing AI code review where OCR provides deterministic engineering (file filtering, rule resolution) and the host agent performs the actual review using its own intelligence and tools.\n\n## Workflow\n\n### Step 1: Preview — Determine What to Review\n\n```bash\nocr delegate preview --format json [--from <ref> --to <ref>] [--commit <hash>] [--exclude <patterns>]\n```\n\nThis outputs:\n- **mode** (workspace / range / commit)\n- **from / to / commit / merge_base** — ref metadata for constructing git commands\n- **Reviewable file list** — paths, status, insertions/deletions\n- **Excluded files** — with exclusion reason\n\n**Common invocations:**\n\n| Scenario | Command |\n|----------|---------|\n| Workspace changes | `ocr delegate preview` |\n| Branch comparison | `ocr delegate preview --from main --to feature` |\n| Single commit | `ocr delegate preview -c abc123` |\n\n### Step 2: Get Rules for Files\n\n```bash\nocr delegate rule --format json <path1> <path2> ...\n```\n\nPass the reviewable file paths from Step 1. Output is grouped by rule content — files sharing the same rule appear under one group, avoiding repetition.\n\n### Step 3: Get Diffs\n\nChoose the diff command using the mode and refs from Step 1. Use `git --no-pager` for every Git call during the review.\n\nThe diff commands disable external diff programs, text conversion, and color to produce plain patches.\n\n**Range mode** (merge_base provided in preview output):\n```bash\ngit --no-pager diff --no-ext-diff --no-textconv --no-color <merge_base>..<to> -- \"<path>\"\n```\n\n**Commit mode**:\n```bash\ngit --no-pager show --no-ext-diff --no-textconv --no-color <commit> -- \"<path>\"\n```\n\n**Workspace mode**:\n```bash\n# Tracked files\ngit --no-pager diff --no-ext-diff --no-textconv --no-color HEAD -- \"<path>\"\n# New untracked files — read directly (entire file is new code)\ncat \"<path>\"\n```\n\nTo read context:\n\n```bash\ngit --no-pager log --no-color --oneline -- \"<path>\"\ngit --no-pager blame --no-textconv -- \"<path>\"\ngit --no-pager show --no-ext-diff --no-textconv --no-color \"<ref>:<path>\"\n```\n\nFor large diffs, add `--output=\"<absolute-diff-file>\"` to the command for the selected mode. Choose a unique absolute path outside the repository and create its parent directory. Use the same path in file-reading tool calls:\n\n```bash\ngit --no-pager diff --no-ext-diff --no-textconv --no-color --output=\"<absolute-diff-file>\" <merge_base>..<to> -- \"<path>\"\n```\n\nAfter Git exits with code 0, read and review the entire file in chunks, then remove it. If Git fails or times out, retry or record `skipped` with the error. Check unexpectedly empty output against a fresh preview.\n\n### Step 4: Review Each File\n\nCreate a checklist containing every `reviewable_files` entry. For each reviewable file:\n\nUse `(path, status)` as the checklist identity. Workspace mode can report the same path twice when a staged deletion is followed by an untracked recreation.\n\n1. Get its diff (Step 3)\n2. Consult its Rule Group (from Step 2) for the review checklist\n3. Conduct a thorough review, using appropriate context tools as needed\n4. Mark the file `reviewed`, or `skipped` with a concrete reason\n\nFor large changes, review in bounded batches grouped by shared rules and diff size. Do not stop after finding the first high-severity issue.\n\n### Step 5: Format Output\n\nEach comment must follow this structure:\n\n| Field | Type | Required | Description |\n|-------|------|----------|-------------|\n| path | string | yes | Relative file path |\n| content | string | yes | Review comment describing the issue |\n| start_line | integer | no | Start line in the new file |\n| end_line | integer | no | End line in the new file |\n| category | enum | no | bug, security, performance, maintainability, test, style, documentation, other |\n| severity | enum | no | critical, high, medium, low |\n\n### Step 6: Classify and Report\n\nBefore reporting, verify that every previewed file is accounted for. Include `total_files`, `reviewed_files`, `skipped_files`, and `coverage_rate` in the summary. A skipped file must include its reason.\n\nGroup findings by severity:\n\n- **Critical/High**: Bugs, security issues, data loss risks — always report\n- **Medium**: Performance concerns, error handling gaps, maintainability issues — report with context\n- **Low**: Style nits, minor suggestions — report only if clearly valuable\n\nDiscard likely false positives silently.\n\n### Step 7: Fix (Optional)\n\nIf the user requested \"review and fix\":\n- Apply High/Critical fixes directly\n- Describe Medium fixes that require manual intervention\n- Skip Low-priority items unless trivial\n\n## Sub-commands Reference\n\n| Command | Purpose |\n|---------|---------|\n| `ocr delegate preview` | Which files to review + mode/ref metadata |\n| `ocr delegate rule <path...>` | Review rules grouped by content |\n\n## Shared Flags\n\n| Flag | Description |\n|------|-------------|\n| `--from <ref>` | Source ref for range mode |\n| `--to <ref>` | Target ref for range mode |\n| `-c, --commit <hash>` | Single commit mode |\n| `--repo <path>` | Repository root (default: cwd) |\n| `--rule <path>` | Custom rule.json path |\n| `--exclude <patterns>` | Comma-separated exclude patterns |\n| `-b, --background <text>` | Business context |\n| `-B, --background-file <path>` | Business context from Markdown file (takes precedence over `-b`) |\n| `-f, --format <text\\|json>` | Output format; use `json` for agent integrations |\n\n## Gotchas\n\n- **No LLM needed on OCR side** — delegation mode never calls an LLM. All intelligence comes from the host agent.\n- **Rules are grouped** — Files sharing the same rule are grouped together in the output. You can pass any number of paths per call; for large changes, fetch rules per-batch as you review.\n- **Working directory matters** — `ocr delegate` operates on the Git repo at the current directory. Use `--repo /path` to override.\n- **Untracked files in workspace mode** — `preview` includes untracked files. For these, read the file directly instead of using `git diff`.\n- **Background context** — pass `--background` to `preview` when you have requirement context; it appears in the output for your reference during review.\n- **Coverage is mandatory** — every `reviewable_files` entry must end as reviewed or explicitly skipped; do not silently omit files.\n\n### Recovering Oversized Background Context\n\n`--background-file` has two independent limits. The raw file must not exceed\n1 MiB, and the sanitized content must not exceed 8000 characters. Either\ncondition aborts the command. When the command reports either limit:\n\n1. Do not silently truncate the source file.\n2. Summarize the original material while preserving its requirements,\n   constraints, acceptance criteria, and other review-critical details.\n3. Retry the affected command by passing the summary as one shell-safe\n   argument (for example, use a quoted/escaped argument produced by the host\n   shell, or write it to a new size-bounded file and pass that file). Do not\n   place untrusted sum",
+      "card": {
+        "title_zh": "OCR委托式代码审查",
+        "purpose_zh": "让宿主代理用自己的智能完成代码审查，OCR 只负责确定性的文件筛选与规则解析，不调用 LLM 端点。",
+        "does": [
+          "用 ocr delegate preview 预览待审查文件、模式与 ref 元数据",
+          "用 ocr delegate rule 按内容分组获取文件审查规则",
+          "按模式用 git diff/show 获取补丁并读取上下文",
+          "逐文件按规则清单审查并标记 reviewed 或 skipped",
+          "按指定字段结构输出评论并按严重程度分类汇总覆盖率",
+          "用户要求时可应用高危修复"
+        ],
+        "inputs": [
+          "Git 仓库路径（--repo，默认当前目录）",
+          "范围 ref（--from/--to）或单个提交哈希（-c）",
+          "待审查文件路径列表",
+          "自定义规则文件路径（--rule）",
+          "排除模式（--exclude）",
+          "业务背景文本或 Markdown 文件（-b/-B）",
+          "输出格式（-f text|json）"
+        ],
+        "outputs": [
+          "preview 的 JSON 或文本：模式、ref 元数据、可审查文件列表、被排除文件及原因",
+          "按规则内容分组的规则输出",
+          "结构化审查评论：path、content、start_line、end_line、category、severity",
+          "含 total_files、reviewed_files、skipped_files、coverage_rate 的汇总报告",
+          "可选的高/严重问题修复"
+        ],
+        "scenarios": [
+          "工作区改动审查",
+          "分支对比审查",
+          "单个提交审查",
+          "需要宿主代理自行驱动审查而非调用 LLM 端点时"
+        ],
+        "prerequisites": [
+          "已安装 ocr CLI（npm 全局安装或 GitHub release 二进制）",
+          "OCR 侧无需配置 LLM 端点",
+          "在 Git 仓库中运行，或用 --repo 指定仓库根目录"
+        ],
+        "limits": [
+          "OCR 侧不调用 LLM，全部智能来自宿主代理",
+          "--format 需 ocr v1.9.0 及以上，否则报 unknown flag",
+          "--background-file 原始文件不超过 1 MiB，清洗后内容不超过 8000 字符",
+          "工作区模式下未跟踪文件需直接读取而非 git diff",
+          "每个可审查文件必须标记 reviewed 或 skipped，不得静默遗漏",
+          "大 diff 需分批审查，不得在首个高危问题后停止"
+        ],
+        "hosts": [
+          "codex"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "代码审查",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A skill for performing AI code review where OCR provides deterministic engineering (file filtering, rule resolution) and the host agent performs the actual review using its own intelligence and tools."
+          },
+          {
+            "field": "does",
+            "quote": "ocr delegate preview --format json [--from <ref> --to <ref>] [--commit <hash>] [--exclude <patterns>]"
+          },
+          {
+            "field": "does",
+            "quote": "ocr delegate rule --format json <path1> <path2> ..."
+          },
+          {
+            "field": "does",
+            "quote": "git --no-pager diff --no-ext-diff --no-textconv --no-color <merge_base>..<to> -- \"<path>\""
+          },
+          {
+            "field": "does",
+            "quote": "Mark the file `reviewed`, or `skipped` with a concrete reason"
+          },
+          {
+            "field": "does",
+            "quote": "Include `total_files`, `reviewed_files`, `skipped_files`, and `coverage_rate` in the summary."
+          },
+          {
+            "field": "does",
+            "quote": "If the user requested \"review and fix\":"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Does NOT require a configured LLM endpoint — delegation mode is LLM-free on the OCR side."
+          },
+          {
+            "field": "limits",
+            "quote": "The raw file must not exceed 1 MiB, and the sanitized content must not exceed 8000 characters."
+          },
+          {
+            "field": "limits",
+            "quote": "For these, read the file directly instead of using `git diff`."
+          },
+          {
+            "field": "limits",
+            "quote": "every `reviewable_files` entry must end as reviewed or explicitly skipped; do not silently omit files."
+          },
+          {
+            "field": "hosts",
+            "quote": "This Codex plugin skill intentionally mirrors the canonical skill at `skills/open-code-review-delegate/SKILL.md`."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm install -g @alibaba-group/open-code-review"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "For large diffs, add `--output=\"<absolute-diff-file>\"` to the command for the selected mode."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "plugins/open-code-review/skills/open-code-review/SKILL.md",
+      "blob_sha": "66a09c01e43f0858b02badfced6eb1d74a4fb268",
+      "source_url": "https://github.com/alibaba/open-code-review/blob/0e9060da66af36a96a15516e76a001953095318b/plugins/open-code-review/skills/open-code-review/SKILL.md",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "open-code-review",
+        "description": "Performs AI-powered code review on Git changes using the `ocr` CLI from alibaba/open-code-review. Use when the user asks to review code, review a pull request, review staged/unstaged changes, review a commit, or compare branches for code quality issues. Produces line-level review comments and can automatically apply fixes when requested. With appropriate review rules, can detect various types of issues including bugs, security vulnerabilities, performance problems, and code quality concerns."
+      },
+      "excerpt": "---\nname: open-code-review\ndescription: >\n  Performs AI-powered code review on Git changes using the `ocr` CLI from\n  alibaba/open-code-review. Use when the user asks to review code, review\n  a pull request, review staged/unstaged changes, review a commit, or\n  compare branches for code quality issues. Produces line-level review\n  comments and can automatically apply fixes when requested. With appropriate\n  review rules, can detect various types of issues including bugs, security\n  vulnerabilities, performance problems, and code quality concerns.\nlicense: Apache-2.0\ncompatibility: >\n  Requires the `ocr` CLI installed (via `npm install -g\n  @alibaba-group/open-code-review` or GitHub release binary). Requires a\n  configured supported LLM provider before first run (protocols: Anthropic,\n  OpenAI Chat Completions, OpenAI Responses, AWS Bedrock).\nmetadata:\n  author: alibaba\n  homepage: https://github.com/alibaba/open-code-review\n  version: \"1.0.0\"\n---\n\n# Open Code Review\n\nThis Codex plugin skill intentionally mirrors the canonical skill at\n`skills/open-code-review/SKILL.md`. Keep both files synchronized when updating\nOCR agent instructions; a symlink is avoided because plugin installs may only\nmaterialize the plugin subtree.\n\nA skill for invoking [open-code-review](https://github.com/alibaba/open-code-review) (`ocr`) — an open-source AI code review CLI that reads Git diffs and generates structured, line-level review comments.\n\n## Workflow\n\n### Step 1: Gather Business Context\n\nAnalyze the review target (commits, branch, or changes) to extract concise business context. Pass this context via `--background` to improve review quality.\n\n### Step 2: Run Code Review\n\n**Do not pre-check whether `ocr` is installed** — skip probes like `command -v ocr` or `ocr --version`. Assume the CLI is available and run the review directly; that saves a tool call on the common path. Only if the review fails with `command not found` should you install it per Troubleshooting.\n\nRun the OCR command with appropriate flags. **Always pass business context via `--background`** when available:\n\n```bash\nocr review --audience agent --background \"business context here\" [user-args]\n```\n\n**Argument handling:**\n\n- **Background context** (RECOMMENDED): use `--background \"context\"` or `-b \"context\"` to provide business context for better review quality\n- **Default** (no user arguments): reviews staged, unstaged, and untracked changes (workspace mode)\n- **Specific commit**: use `--commit` or `-c` to review a single commit against its parent\n- **Branch comparison**: use `--from <ref>` and `--to <ref>` to review diff between two refs\n- **Timeout**: effective timeout per review group = `--timeout` × review rounds. Default `--timeout 15` with default effort `medium` (2 rounds) gives 30 minutes; `low`/`high` give 15/45 minutes.\n- **Concurrency**: default concurrency is 8 file workers; reduce with `--concurrency <n>` if rate limits are hit\n- **Preview mode**: use `--preview` or `-p` to preview which files will be reviewed without running the LLM\n- **Output file**: use `--output <path>` to write the full result to a file instead of stdout. If the command fails with `unknown flag: --output`, do not continue the review with plain stdout. Ask the user whether to upgrade (`npm i -g @alibaba-group/open-code-review@latest`) and wait for the answer before proceeding. After the user confirms and the upgrade succeeds, rerun with `--output`.\n- **Installation**: if `ocr` command is not found, install it by running `npm i -g @alibaba-group/open-code-review`\n\n**Common invocation patterns:**\n\n| User says | Command to run |\n|-----------|---------------|\n| \"review my changes\" / \"review the working copy\" | `ocr review --audience agent -b \"context\"` |\n| \"review this PR\" / \"review feature branch\" | `ocr review --audience agent -b \"context\" --from main --to <branch>` |\n| \"review commit abc123\" | `ocr review --audience agent -b \"context\" --commit abc123` |\n| \"what would be reviewed?\" (dry-run) | `ocr review --preview` |\n\n**Output mode:**\n\n- Always use `--audience agent` to suppress progress UI and emit only the final summary\n- **Prevent output truncation**: For large reviews or restricted tool environments, pass `--output /tmp/ocr_out.txt` and inspect the file in full via a file reading tool instead of piping stdout through `tail` or `head`, which drops earlier review comments.\n\n**On failure:** If `ocr review` exits non-zero (e.g. an LLM connection error), do not retry blindly — consult the Troubleshooting section below for the matching fix before re-running.\n\n### Step 3: Report\n\nOCR output includes structured `severity` (critical / high / medium / low) and `category` (bug / security / performance / maintainability / test / style / documentation / other) on each comment. Present results grouped by severity, discarding `low` severity items that are likely false positives or nitpicks.\n\n### Step 4: Fix\n\nBefore applying fixes, check whether the user requested automatic fixes:\n\n- If the user explicitly requested \"review and fix\" or similar, proceed with automatic fixes\n- If the user only requested \"review\" without fix intent, ask for permission before applying any changes\n\nWhen fixing issues and suggestions:\n\n- Focus on critical, high, and medium severity items\n- Apply fixes directly to the code when safe and well-defined\n- For complex fixes requiring manual intervention, clearly describe what needs to be done\n- Always verify fixes with the user before committing\n\n## Output Format\n\nEach comment in OCR's output contains:\n\n- `path`: File path\n- `content`: Review comment text\n- `start_line` / `end_line`: Line range (both 0 means positioning failed)\n- `category`: Issue category (bug, security, performance, maintainability, test, style, documentation, other)\n- `severity`: Issue severity (critical, high, medium, low)\n- `suggestion_code`: Optional fix suggestion\n- `existing_code`: Optional original code snippet\n- `thinking`: Optional LLM reasoning process\n\nPresent results grouped by severity using this template:\n\n```markdown\n## Code Review Results\n\n**Files reviewed**: N\n**Issues found**: X critical, Y high, Z medium\n\n### Critical\n\n- **`path/to/file.java:42`** [bug] — Brief description\n  > Recommendation: How to fix\n\n### High\n\n- **`path/to/file.java:26`** [bug] — Brief description\n  > Recommendation: How to fix\n\n### Medium\n\n- **`path/to/file.ts:88`** [performance] — Brief description\n  > Recommendation: How to fix (if applicable)\n```\n\nIf no critical, high, or medium severity issues remain after filtering, state: \"Review complete — no critical, high, or medium issues found in N files.\"\n\n**Handling mispositioned comments:**\n\nWhen `start_line` and `end_line` are both `0`, the comment failed to locate the exact position in the file. In such cases:\n\n1. Read the comment content to understand the issue\n2. Examine the target file mentioned in the comment\n3. Identify the relevant code section based on the comment's context\n4. Apply the fix or suggestion to the correct location\n\n## Custom Review Rules\n\nIf the user wants project-specific rules, OCR resolves them in this priority order:\n\n1. `--rule <path>` flag (highest)\n2. `<repo>/.opencodereview/rule.json`\n3. `~/.opencodereview/rule.json`\n4. Built-in system defaults (lowest)\n\nBy default, the first matching user rule replaces the built-in system rule. Set `merge_system_rule: true` on a rule entry when the matched system rule and user rule should both be included.\n\nRule file format:\n\n```json\n{\n  \"rules\": [\n    {\n      \"path\": \"**/*.java\",\n      \"rule\": \"All new methods must validate required parameters for null\",\n      \"merge_system_rule\": true\n    },\n    {\n      \"path\": \"**/*mapper*.xml\",\n      \"rule\": \"Check SQL for injection risks and missing closing tags\"\n    }\n  ]\n}\n```\n\nTo preview which rule applies to a file before reviewing:\n\n```bash\nocr rules check src/main/java/com/example/Foo.java\n```\n\n## Advanced Review Options\n\nBeyond the common flags above, `ocr review` exposes a few groups of contr",
+      "card": {
+        "title_zh": "开源AI代码审查",
+        "purpose_zh": "调用 ocr CLI 对 Git 变更做 AI 代码审查，生成行级评论，可按严重程度汇报，并在用户要求时自动修复问题。",
+        "does": [
+          "分析审查目标并提取业务上下文，通过 --background 传入以提升审查质量",
+          "运行 ocr review 审查工作区变更、指定提交或分支间差异",
+          "按 severity 与 category 分组呈现行级审查评论，过滤低严重度噪音",
+          "在用户明确要求时对 critical/high/medium 问题直接应用修复",
+          "支持自定义审查规则文件与 --rule 指定规则，并可预览规则匹配",
+          "支持 --format json/sarif 输出、--output 写文件及 --resume 续跑中断审查"
+        ],
+        "inputs": [
+          "Git 仓库及其变更（工作区、提交或分支范围）",
+          "业务上下文文本或 Markdown 背景文件",
+          "用户指定的审查目标参数（--commit、--from/--to 等）",
+          "自定义审查规则 JSON 文件",
+          "已配置的 LLM 提供方与模型"
+        ],
+        "outputs": [
+          "行级审查评论，含路径、行号、类别、严重度与修复建议",
+          "按严重度分组的 Markdown 审查报告",
+          "可选的 JSON 或 SARIF 格式结果文件",
+          "审查预览文件列表（--preview 模式）"
+        ],
+        "scenarios": [
+          "审查本地暂存、未暂存及未跟踪的改动",
+          "审查某个 pull request 或特性分支与主干的差异",
+          "审查单个提交相对其父提交的变更",
+          "用自定义项目规则检查特定文件类型",
+          "将审查结果导出为 SARIF 接入代码扫描"
+        ],
+        "prerequisites": [
+          "已安装 ocr CLI（npm 全局安装或 GitHub release 二进制）",
+          "首次运行前已配置受支持的 LLM 提供方（Anthropic、OpenAI Chat Completions、OpenAI Responses、AWS Bedrock）",
+          "当前目录为 Git 仓库，或用 --repo 指定仓库路径"
+        ],
+        "limits": [
+          "未配置可达的 LLM 时 ocr review 会直接失败",
+          "大 diff 可能触及 token 上限，单文件 diff 超过约 80% MAX_TOKENS 会被跳过",
+          "不支持工作区模式的审查续跑",
+          "--output 在旧版 CLI 上不可用，需先升级",
+          "不要使用 --audience human，会污染输出",
+          "不要将输出管道到 tail 或 head，会丢失评论"
+        ],
+        "hosts": [
+          "codex"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "代码审查",
+          "测试",
+          "安全",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Performs AI-powered code review on Git changes using the `ocr` CLI from alibaba/open-code-review."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Produces line-level review comments and can automatically apply fixes when requested."
+          },
+          {
+            "field": "does",
+            "quote": "ocr review --audience agent --background \"business context here\" [user-args]"
+          },
+          {
+            "field": "does",
+            "quote": "Present results grouped by severity, discarding `low` severity items that are likely false positives or nitpicks."
+          },
+          {
+            "field": "does",
+            "quote": "If the user explicitly requested \"review and fix\" or similar, proceed with automatic fixes"
+          },
+          {
+            "field": "does",
+            "quote": "If the user wants project-specific rules, OCR resolves them in this priority order:"
+          },
+          {
+            "field": "inputs",
+            "quote": "**Background context** (RECOMMENDED): use `--background \"context\"` or `-b \"context\"` to provide business context for better review quality"
+          },
+          {
+            "field": "inputs",
+            "quote": "**Specific commit**: use `--commit` or `-c` to review a single commit against its parent"
+          },
+          {
+            "field": "outputs",
+            "quote": "Each comment in OCR's output contains:"
+          },
+          {
+            "field": "outputs",
+            "quote": "**Output file**: use `--output <path>` to write the full result to a file instead of stdout."
+          },
+          {
+            "field": "scenarios",
+            "quote": "\"review this PR\" / \"review feature branch\""
+          },
+          {
+            "field": "scenarios",
+            "quote": "**Default** (no user arguments): reviews staged, unstaged, and untracked changes (workspace mode)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Requires the `ocr` CLI installed (via `npm install -g @alibaba-group/open-code-review` or GitHub release binary)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Requires a configured supported LLM provider before first run (protocols: Anthropic, OpenAI Chat Completions, OpenAI Responses, AWS Bedrock)."
+          }
+        ]
+      }
+    }
+  ]
+}

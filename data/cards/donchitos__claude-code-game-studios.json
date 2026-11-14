@@ -245,7 +245,7 @@
       "skill_path": ".claude/skills/architecture-review/SKILL.md",
       "blob_sha": "8c1dd9d6f27f396e3b769b939de27d780d7c486a",
       "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/architecture-review/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -1037,18 +1037,127 @@
       "skill_path": ".claude/skills/bug-triage/SKILL.md",
       "blob_sha": "b22c2d354e488ab4eef7cc4a9e4e4e0160f9d468",
       "source_url": "https://github.com/Donchitos/Claude-Code-Game-Studios/blob/abc0de79d6ceb0b5d7aa693945849b3937afbe6a/.claude/skills/bug-triage/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-14T00:18:33.358Z",
+      "generated_at": "2026-11-14T00:18:33.358Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "bug-triage",
         "description": "Re-evaluate open bugs — priority vs severity, assign to sprints, surface systemic trends. Run when the count grows."
       },
       "excerpt": "---\nname: bug-triage\ndescription: \"Re-evaluate open bugs — priority vs severity, assign to sprints, surface systemic trends. Run when the count grows.\"\nargument-hint: \"[sprint | full | trend]\"\nuser-invocable: true\nallowed-tools: Read, Glob, Grep, Write, Edit, Bash(bash \"*/.claude/skills/bug-triage/../../hooks/yaml-helper.sh\" resolve_config *)\nmodel: sonnet\n---\n\n!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys automation,workflow`\n\n**Automation mode**: Resolve `modes.automation` (`project.local.yaml` →\n`project.yaml` → default `collaborative`). Every `AskUserQuestion` call and\nevery file write follows `.claude/docs/automation-modes.md`\n(collaborative asks always · guided major-only · autonomous logs and proceeds;\n`automation_always_ask` categories always prompt).\n\n# Bug Triage\n\nThis skill processes the open bug backlog into a prioritised, sprint-assigned\naction list. It distinguishes between **severity** (how bad is the impact?) and\n**priority** (how urgently must we fix it?), detects systemic trends, and\nensures no critical bug is lost between sprints.\n\n**Output:** `production/qa/bug-triage-[date].md`\n\n**When to run:**\n- Sprint start — assign open bugs to the new sprint or backlog\n- After `/team-qa` completes and new bugs have been filed\n- When the bug count crosses 10+ open items\n\n---\n\n## 1. Parse Arguments\n\n**Modes:**\n- `/bug-triage sprint` — triage against the current sprint; assign fixable bugs\n  to the sprint backlog; defer the rest\n- `/bug-triage full` — full triage of all bugs regardless of sprint scope\n- `/bug-triage trend` — trend analysis only (no assignment); read-only report\n- No argument — run sprint mode if a current sprint exists, else full mode\n\n---\n\n## 2. Load Bug Backlog\n\n### Step 2a — Discover bug files\n\nGlob for bug reports in priority order:\n1. `production/qa/bugs/*.md` — individual bug report files (preferred format)\n2. `production/qa/bugs.md` — single consolidated bug log (fallback)\n3. Any `production/qa/qa-plan-*.md` \"Bugs Found\" table (last resort)\n\nIf no bug files found:\n> \"No bug files found in `production/qa/bugs/`. If bugs are tracked in a\n> different location, adjust the glob pattern. If no bugs exist yet, there is\n> nothing to triage.\"\n\nStop and report. Do not proceed if no bugs exist. Verdict: **COMPLETE** — no bug files in `production/qa/bugs/`; nothing to triage.\n\n**In `trend` mode, do not read full bug bodies.** Trend metrics (volume, severity\nmix, by-system, by-date) are computable from the header fields alone:\n```\nGrep pattern=\"\\*\\*(Severity|Priority|Status|System|Category|Reported)\\*\\*\" glob=\"production/qa/bugs/*.md\" output_mode=\"content\"\n```\n(Bug-report fields are bolded — `**Severity**:`, `- **System**:` — so match the\n`**field**` form, not a bare line-start `Field:`.)\nFull bug bodies are needed only for the priority-vs-severity **re-evaluation** in\n`sprint`/`full` modes; `trend` is a read-only report and skips it. (The one\ndeviation check that needs a story's status — \"bug filed against a Complete\nstory\" — is a targeted story-status grep either way, not a bug-body read.)\n\n### Step 2b — Load sprint context\n\nRead the most recently modified file in `production/sprints/` to understand:\n- Current sprint number / name\n- Stories in scope (for assignment target)\n- Sprint capacity constraints (if noted)\n\nIf no sprint file exists: note \"No sprint plan found — assigning to backlog only.\" At `workflow: minimal` there are no sprints by design — say that instead, and name the P1 bugs as the next fixes, ahead of the next story in the brief's build order.\n\n### Step 2c — Load severity reference\n\nRead `.claude/docs/coding-standards.md` for severity/priority definitions if they\nexist. If they do not exist, use the standard definitions in Step 3.\n\n---\n\n## 3. Classify Each Bug\n\nFor each bug, extract or infer:\n\n### Severity (impact of the bug)\n\n| Severity | Definition |\n|----------|-----------|\n| **S1 — Critical** | Game crashes, data loss, or complete feature failure. Cannot proceed past this point. |\n| **S2 — High** | Major feature broken but game is still playable. Significant wrong behaviour. |\n| **S3 — Medium** | Feature degraded but a workaround exists. Minor wrong behaviour. |\n| **S4 — Low** | Visual glitch, cosmetic issue, typo. No gameplay impact. |\n\n### Priority (urgency of the fix)\n\n| Priority | Definition |\n|----------|-----------|\n| **P1 — Fix this sprint** | Blocks QA, blocks release, or is regression from last sprint |\n| **P2 — Fix soon** | Should be resolved before the next major milestone |\n| **P3 — Backlog** | Would be good to fix, but no active blocking impact |\n| **P4 — Won't fix / Deferred** | Accepted risk or out of scope for current product scope |\n\n### Assignment\n\nFor each P1/P2 bug in `sprint` mode:\n- Identify which story or epic the fix belongs to\n- Check whether the current sprint has remaining capacity\n- If capacity exists: assign to sprint (`Sprint: [current]`)\n- If capacity is full: flag as `Priority overflow — consider pulling from sprint`\n\nFor `full` mode: assign all P1 to current sprint, P2 to next sprint estimate,\nP3+ to backlog.\n\n### Deviation check\n\nFlag bugs that suggest **systematic problems**:\n- 3+ bugs from the same system in the same sprint → \"Potential design or\n  implementation quality issue in [system]\"\n- 2+ S1/S2 bugs in the same story → \"Story may need to be reopened and\n  re-reviewed before shipping\"\n- Bug filed against a story marked Complete → \"Regression in completed story —\n  story should be re-opened in sprint tracking\"\n\n---\n\n## 4. Trend Analysis\n\nAfter classifying all bugs, generate trend metrics:\n\n### Volume trends\n- Total open bugs: [N]\n- Opened this sprint: [N]\n- Closed this sprint: [N]\n- Net change: [+N / -N]\n\n### System hot spots\n- Which system has the most open bugs?\n- Which system has the highest S1/S2 ratio?\n\n### Age analysis\n- How many bugs are older than 2 sprints?\n- Are any S1/S2 bugs un-assigned (sprint = none)?\n\n### Regression indicator\n- Any bugs filed against previously-completed stories?\n- Count: [N] regression bugs (story reopened implied)\n\n---\n\n## 5. Generate Triage Report\n\n```markdown\n# Bug Triage Report\n\n> **Date**: [date]\n> **Mode**: [sprint | full | trend]\n> **Generated by**: /bug-triage\n> **Open bugs processed**: [N]\n> **Sprint in scope**: [sprint name, or \"N/A\"]\n\n---\n\n## Triage Summary\n\n| Priority | Count | Notes |\n|----------|-------|-------|\n| P1 — Fix this sprint | [N] | [N] assigned to sprint, [N] overflow |\n| P2 — Fix soon | [N] | Scheduled for next sprint |\n| P3 — Backlog | [N] | Deferred |\n| P4 — Won't fix | [N] | Accepted risk |\n\n**Critical (S1/S2) unfixed count**: [N]\n\n---\n\n## P1 Bugs — Fix This Sprint\n\n| ID | System | Severity | Summary | Assigned to | Story |\n|----|--------|----------|---------|-------------|-------|\n| BUG-NNNN | [system] | S[1-4] | [one-line description] | [sprint] | [story path] |\n\n---\n\n## P2 Bugs — Fix Soon\n\n| ID | System | Severity | Summary | Target Sprint |\n|----|--------|----------|---------|---------------|\n| BUG-NNNN | [system] | S[1-4] | [one-line description] | Sprint [N+1] |\n\n---\n\n## P3/P4 Bugs — Backlog / Won't Fix\n\n| ID | System | Severity | Summary | Disposition |\n|----|--------|----------|---------|-------------|\n| BUG-NNNN | [system] | S4 | [one-line description] | Backlog |\n\n---\n\n## Systemic Issues Flagged\n\n[List any patterns from Step 3 deviation check, or \"None identified.\"]\n\n---\n\n## Trend Analysis\n\n**Volume**: [N] open / [+N] net change this sprint\n**Hot spot**: [system with most bugs]\n**Regressions**: [N] bugs against completed stories\n**Aged bugs (>2 sprints old)**: [N]\n\n[If N aged S1/S2 bugs > 0:]\n> ⚠️ [N] high-severity bugs have been open for more than 2 sprints without\n> assignment. These represent accepted risk that should be explicitly reviewed.\n\n---\n\n## Recommended Actions\n\n1. [Most urgent action — usually \"fix P1 bugs before QA hand-off\"]\n2. [Second action — usually \"investigate [hot spot system] quality\"]\n3. [Third action — optional improvement]\n```\n\n---\n\n## 6. Write ",
-      "card": null
+      "card": {
+        "title_zh": "缺陷分诊",
+        "purpose_zh": "将开放缺陷积压整理为按优先级排序、分配至冲刺的行动清单，区分严重度与优先级，识别系统性问题与趋势，并生成分诊报告。",
+        "does": [
+          "发现并加载 production/qa/bugs 下的缺陷文件与冲刺上下文",
+          "按 S1-S4 严重度与 P1-P4 优先级对每个缺陷分类",
+          "在 sprint 模式下按容量将 P1/P2 缺陷分配到冲刺或标记溢出",
+          "检查偏差模式：同系统多缺陷、同故事多高危、已完成故事回归",
+          "生成趋势指标：数量变化、热点系统、老化缺陷、回归数",
+          "经用户批准后写出分诊报告文件"
+        ],
+        "inputs": [
+          "参数：sprint、full、trend 或无参数",
+          "production/qa/bugs/*.md 或 production/qa/bugs.md 缺陷记录",
+          "production/sprints/ 下最近的冲刺计划",
+          "可选 .claude/docs/coding-standards.md 中的严重度定义"
+        ],
+        "outputs": [
+          "对话中呈现的分诊报告",
+          "production/qa/bug-triage-[date].md 报告文件（需批准后写入）"
+        ],
+        "scenarios": [
+          "冲刺开始时把开放缺陷分配到新冲刺或积压",
+          "/team-qa 完成后有新缺陷提交时",
+          "开放缺陷数量超过 10 个时",
+          "需要只读的趋势分析时"
+        ],
+        "prerequisites": [
+          "存在 production/qa/bugs/ 下的缺陷文件，否则停止并报告无可分诊内容",
+          "sprint 模式需要冲刺计划文件；无冲刺时仅分配至积压"
+        ],
+        "limits": [
+          "无缺陷文件时直接停止，不继续处理",
+          "trend 模式只读头部字段，不读完整缺陷正文",
+          "未经用户批准不得将缺陷标记为 Won't Fix",
+          "不得在冲刺容量已满时自动分配",
+          "趋势数据仅供参考，不单独作为阻塞依据"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "产品规划",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill processes the open bug backlog into a prioritised, sprint-assigned action list."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "It distinguishes between **severity** (how bad is the impact?) and **priority** (how urgently must we fix it?), detects systemic trends, and ensures no critical bug is lost between sprints."
+          },
+          {
+            "field": "does",
+            "quote": "For each P1/P2 bug in `sprint` mode: - Identify which story or epic the fix belongs to - Check whether the current sprint has remaining capacity"
+          },
+          {
+            "field": "does",
+            "quote": "Flag bugs that suggest **systematic problems**"
+          },
+          {
+            "field": "does",
+            "quote": "After classifying all bugs, generate trend metrics:"
+          },
+          {
+            "field": "inputs",
+            "quote": "Glob for bug reports in priority order: 1. `production/qa/bugs/*.md` — individual bug report files (preferred format)"
+          },
+          {
+            "field": "inputs",
+            "quote": "Read the most recently modified file in `production/sprints/` to understand:"
+          },
+          {
+            "field": "outputs",
+            "quote": "**Output:** `production/qa/bug-triage-[date].md`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Stop and report. Do not proceed if no bugs exist."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If no sprint file exists: note \"No sprint plan found — assigning to backlog only.\""
+          },
+          {
+            "field": "limits",
+            "quote": "**In `trend` mode, do not read full bug bodies.**"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Read, Glob, Grep, Write, Edit, Bash(bash \"*/.claude/skills/bug-triage/../../hooks/yaml-helper.sh\" resolve_config *)"
+          },
+          {
+            "field": "hosts",
+            "quote": "model: sonnet"
+          },
+          {
+            "field": "hosts",
+            "quote": "!`bash \"${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh\" resolve_config --keys automation,workflow`"
+          }
+        ]
+      }
     },
     {
       "skill_path": ".claude/skills/changelog/SKILL.md",
