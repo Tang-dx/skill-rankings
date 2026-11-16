@@ -1,0 +1,580 @@
+{
+  "schema": 1,
+  "repo": "backnotprop/plannotator",
+  "tree_sha": "0eb10de0344467635e1879ce715f2457cec3e1da",
+  "truncated_paths": 11,
+  "skills": [
+    {
+      "skill_path": ".agents/skills/release/SKILL.md",
+      "blob_sha": "885062d1463730b918c5232db1e319f7732d811f",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/.agents/skills/release/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "release-plannotator",
+        "description": "Prepare and execute a Plannotator release — draft release notes with full contributor credit, bump versions across all package files, build in dependency order, and kick off the tag-driven release pipeline. Use this skill whenever the user mentions preparing a release, bumping versions, writing release notes, tagging a release, or publishing. Also trigger when the user says things like \"let's ship\", \"prep a release\", \"what's changed since last release\", or \"time to cut a new version\"."
+      },
+      "excerpt": "---\nname: release-plannotator\ndescription: Prepare and execute a Plannotator release — draft release notes with full contributor credit, bump versions across all package files, build in dependency order, and kick off the tag-driven release pipeline. Use this skill whenever the user mentions preparing a release, bumping versions, writing release notes, tagging a release, or publishing. Also trigger when the user says things like \"let's ship\", \"prep a release\", \"what's changed since last release\", or \"time to cut a new version\".\n---\n\n# Plannotator Release\n\nThe process has four phases. Phase 1 (release notes) is where most of the work happens — present the draft for review before proceeding to later phases.\n\n## Phase 1: Draft Release Notes\n\nThis is the most important phase. The release notes are the public face of each version and the primary way the community sees their contributions recognized.\n\n### Step 1: Determine scope\n\n1. Find the latest release tag: `git tag --sort=-v:refname | head -1`\n2. Determine the new version number. Ask the user if unclear (patch, minor, or major).\n3. Gather all changes since the last tag:\n   - `git log --oneline <last-tag>..HEAD` for commit history\n   - `git log --merges --oneline <last-tag>..HEAD` for merged PRs\n4. For each PR, use `gh pr view <number> --json title,author,body,closedIssues,labels` to get details.\n\n### Step 2: Research contributors\n\nThis is critical. Every person who participated in the release gets credit — not just PR authors.\n\nFor each PR and linked issue, collect:\n- **PR authors** — the person who wrote the code\n- **Issue reporters** — who filed the bug or feature request\n- **Issue commenters** — who participated in the discussion with useful context\n- **Discussion creators** — who started relevant GitHub Discussions\n- **Feature requestors** — check the linked \"closes #N\" issues and their authors\n\nUse the GitHub API via `gh`:\n```bash\n# Get issue details including author\ngh issue view <number> --json author,title,body\n\n# Get issue comments to find participants\ngh api repos/backnotprop/plannotator/issues/<number>/comments --jq '.[].user.login'\n\n# Get PR review comments\ngh api repos/backnotprop/plannotator/pulls/<number>/comments --jq '.[].user.login'\n```\n\n### Step 3: Write the release notes\n\nRead the reference release notes in `references/` for the canonical template structure. These are real release notes from previous versions — match their tone, structure, and level of detail.\n\n- `release-notes-v0.13.0.md` — large release, 14 PRs, 3 first-time contributors, \"New Contributors\" + narrative \"Contributors\" section\n- `release-notes-v0.12.0.md` — large community release, 14 PRs, 10 external, detailed narrative \"Contributors\" section\n- `release-notes-v0.13.1.md` — small patch release, 2 PRs, no external authors, \"Community\" section focused on issue reporters\n\nPay attention to how each reference handles contributor crediting differently. Pick the pattern that fits the release's contributor profile — a release with many external PRs warrants a narrative \"Contributors\" section; a patch driven by issue reports uses a lighter \"Community\" section.\n\nWrite the file to the repo root as `RELEASE_NOTES_v<VERSION>.md`.\n\n#### Structure\n\n1. **X/Twitter follow link** — first line, always the same:\n   ```\n   Follow [@plannotator](https://x.com/plannotator) on X for updates\n   ```\n\n2. **\"Missed recent releases?\"** collapsible table — copy from the previous release's notes, then:\n   - Add the previous release (the one you're succeeding) as the newest row\n   - Keep roughly 10-12 rows; drop the oldest if needed\n   - Each row: version link + comma-separated feature highlights (short phrases). For the previous release's row, use the words of its TL;DR lines (below), joined by commas, without the labels\n\n3. **\"What's New in vX.Y.Z\"** — the heart of the notes\n   - **TL;DR first.** Directly under the `## What's New in vX.Y.Z` heading, put a `### TL;DR` heading and a list of 3 to 5 lines. The Inbox's What's new page reads this block: it shows it at the top of the release and in its list of releases. GitHub shows it too.\n     ```markdown\n     ## What's New in v0.28.53\n\n     ### TL;DR\n\n     - **New:** Start an agent in a new folder, or from a git URL\n     - **New:** \"+\" on each project row starts a session there\n     - **Changed:** New message offers the open thread's files\n     - **Off by default:** Bro mode: agents write to you in plain words\n\n     Starting an agent from New message now covers a new folder, …\n     ```\n     - Write each line as `- **Label:** text`. Use only these labels, spelled exactly so: New, Changed, Fixed, Removed, Off by default.\n     - Keep each line extremely terse: 10 words or fewer, no full stop at the end. Say what the user sees, in the user's words, not in code terms.\n     - Put no links, PR numbers or names in the lines. Use `code` only for a setting or a variable that the user types.\n     - Put the biggest change first. Use Removed for something that is gone, and Off by default for a feature the user must turn on.\n     - Put nothing between the `### TL;DR` heading and its list. The opening sentences come after the list.\n   - Open with 1-3 sentences summarizing the release theme and scope. Mention how many PRs, how many from external contributors, any first-timers.\n   - Each major feature/fix gets its own `###` subsection with:\n     - A descriptive heading (not the PR title verbatim — rephrase for clarity)\n     - 1-4 paragraphs explaining what changed and why it matters. Be specific and concrete. Describe the problem that existed before, what the change does, and how users experience it.\n     - Credit line at the bottom: PR link, linked issues with `closing [#N]`, and contributor attribution\n   - Minor changes go under `### Additional Changes` as bold-titled bullets\n\n4. **Install / Update** — standard block, read from the previous release notes and reuse verbatim\n\n5. **\"What's Changed\"** — bullet list of every PR in the release:\n   ```\n   - feat: descriptive PR title by @author in [#N](url)\n   ```\n\n6. **\"New Contributors\"** — if any first-time contributors:\n   ```\n   - @username made their first contribution in [#N](url)\n   ```\n\n7. **\"Contributors\" or \"Community\"** — narrative section recognizing everyone who participated:\n   - PR authors get a sentence about what they built\n   - Issue reporters and commenters get listed with what they reported/discussed\n   - Group community issue reporters in a bullet list at the end\n\n8. **Full Changelog link**:\n   ```\n   **Full Changelog**: https://github.com/backnotprop/plannotator/compare/<prev-tag>...<new-tag>\n   ```\n\n#### Writing guidelines\n\n- **Narrative over noise.** Write in clear, readable prose. Not marketing-speak, not changelog-dump. Explain what changed and why someone should care, in plain language.\n- **Bullets where they help.** Use bullet lists for enumerating discrete items (additional changes, contributor lists). Use paragraphs for explaining features.\n- **No cliches or buzzwords.** Don't say \"exciting\", \"game-changing\", \"seamless\", \"powerful\". Just describe what happened.\n- **No punchlines.** Don't end sections with a clever quip or a summary zinger. Let the feature speak for itself.\n- **Speak through practical benefit.** Describe what changed and what it means for the user in concrete, reliable terms. Not aspirational, not hype — just what it does.\n- **Don't overuse em dashes.** One or two per release is fine. If you notice them stacking up, restructure the sentence instead.\n- **Grammatical structure matters.** Vary sentence structure. Active voice. Concrete subjects and verbs.\n- **Contributor tags.** Use `@username` — bare at-mentions, not markdown links like `[@user](url)`. GitHub renders bare `@mentions` with avatar icons in release notes. This is important for community recognition.\n- **Every contributor counts.** Everyone who filed an issue, left a comment that shaped a decision, or participated in a discussion gets mentioned. This project's ",
+      "card": null
+    },
+    {
+      "skill_path": ".agents/skills/review-renovate/SKILL.md",
+      "blob_sha": "404542c7b283a9569de0d7be1a6dacf04e3f7dd8",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/.agents/skills/review-renovate/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "review-renovate",
+        "description": "Review Renovate bot PRs that update GitHub Actions dependencies. Verifies supply chain integrity by checking pinned commit SHAs against upstream tagged releases, reviews changelogs for breaking changes, and confirms compatibility with existing workflow configurations. Use when a Renovate PR updates GitHub Actions in .github/workflows/."
+      },
+      "excerpt": "---\nname: review-renovate\ndescription: Review Renovate bot PRs that update GitHub Actions dependencies. Verifies supply chain integrity by checking pinned commit SHAs against upstream tagged releases, reviews changelogs for breaking changes, and confirms compatibility with existing workflow configurations. Use when a Renovate PR updates GitHub Actions in .github/workflows/.\n---\n\n# Review Renovate GitHub Actions PRs\n\nYou are reviewing a Renovate bot PR that updates GitHub Actions dependencies. Your job is to verify supply chain integrity and ensure the upgrades won't break CI/CD workflows.\n\n## Inputs\n\nYou will be given a PR number or URL. Use `gh` CLI to fetch PR details and diff.\n\n## Steps\n\n### 1. Fetch PR metadata and diff\n\n```\ngh pr view <PR> --json title,body,files,commits,author,headRefName\ngh pr diff <PR>\n```\n\nConfirm the PR author is `app/renovate`. If not, flag this immediately — it may not be an automated dependency update.\n\n### 2. Identify all action version changes\n\nFrom the diff, extract each changed action:\n- Full action name (e.g., `oven-sh/setup-bun`)\n- Old version tag and pinned SHA\n- New version tag and pinned SHA\n- Update type (patch, minor, major)\n\n### 3. Verify pinned SHAs against upstream tags\n\nFor every action being updated, verify **both old and new** SHAs match the claimed version tags:\n\n```\ngh api repos/{owner}/{repo}/git/ref/tags/{version} --jq '.object.sha'\n```\n\nCompare each result against the SHA in the workflow file. If any SHA does not match, **stop and report a supply chain integrity failure**. Do not approve the PR.\n\n### 4. Review changelogs for breaking changes\n\nFrom the PR body (Renovate includes release notes), check each updated action for:\n- Removed inputs or outputs that the workflows currently use\n- Changed default behavior for inputs the workflows rely on\n- New required inputs\n- Major version bumps (these almost always have breaking changes)\n\n### 5. Check workflow compatibility\n\nRead the affected workflow files and verify:\n- No removed or renamed inputs are being used\n- No changed defaults affect current behavior\n- The action's runtime requirements are still met (e.g., Node.js version compatibility)\n\n### 6. Report findings\n\nPresent a summary table:\n\n| Action | Old | New | Type | SHA verified |\n|--------|-----|-----|------|-------------|\n| ... | ... | ... | patch/minor/major | yes/NO |\n\nThen state:\n- Whether all SHAs are verified\n- Whether any breaking changes were found\n- Whether the workflows remain compatible\n- A clear **safe to merge** or **do not merge** recommendation\n",
+      "card": null
+    },
+    {
+      "skill_path": ".agents/skills/update-deps/SKILL.md",
+      "blob_sha": "ad53bb838359686b5df85b183f3d7a3f3cae4e6c",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/.agents/skills/update-deps/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "update-deps",
+        "description": "Audit and update npm/Bun dependencies with supply chain integrity checks — verifies maintainers, publish age, tarball diffs, and provenance before bumping. Defers risky packages to ~/.supply-chain/notes/."
+      },
+      "excerpt": "---\nname: update-deps\ndescription: Audit and update npm/Bun dependencies with supply chain integrity checks — verifies maintainers, publish age, tarball diffs, and provenance before bumping. Defers risky packages to ~/.supply-chain/notes/.\ndisable-model-invocation: true\n---\n\n# Update Dependencies\n\nAudit outdated packages, verify supply chain integrity, bump what's safe, defer what needs review, and log everything.\n\nThis process has three phases: discovery, integrity audit, and execution. The integrity audit is the most important — every package gets checked before it touches the lockfile.\n\n## Phase 1: Discovery\n\nRun `bun outdated` to get the full list of packages with available updates.\n\n```bash\nbun outdated\n```\n\nParse the output into a structured list. For each package, note:\n- Package name\n- Current version\n- Available update version\n- Whether it's age-gated (indicated by `*` in the output — the footnote \"The * indicates that version isn't true latest due to minimum release age\" confirms this)\n- Whether it's a runtime dep, dev dep, or peer dep\n\nAlso check whether any packages are blocked entirely by the age gate (like `@pierre/diffs` was when its minimum semver range couldn't resolve). Flag these separately — they may need `minimumReleaseAgeExcludes` in `bunfig.toml`.\n\n## Phase 2: Integrity Audit\n\nThis is the core of the process. Spawn one **Sonnet sub-agent per package** to run the integrity check in parallel. Sonnet is used here because these are independent, structured verification tasks that don't need heavier reasoning.\n\nEach sub-agent receives the package name, current version, and target version, and performs the following checks:\n\n### Sub-agent prompt template\n\nFor each outdated package, spawn a Sonnet agent with this task:\n\n```\nYou are auditing the npm package \"{package}\" for a version bump from {current} to {target}.\n\nRun these checks and report back with a JSON object:\n\n1. **Maintainer verification**: Check if maintainers changed between versions.\n   npm view {package}@{current} maintainers --json\n   npm view {package}@{target} maintainers --json\n   Compare the two lists. Flag any additions or removals.\n\n2. **Publish date and age**: Get the publish timestamp.\n   npm view {package} time --json\n   Extract the date for version {target}. Calculate days since publication.\n   Flag if younger than 7 days.\n\n3. **Provenance**: Check if the package has registry signatures or attestations.\n   npm audit signatures (if not already run this session)\n   Note whether the package has provenance attestations.\n\n4. **Tarball diff**: Show what actually changed in the published package.\n   npm diff --diff={package}@{current} --diff={package}@{target}\n   Summarize the changes:\n   - How many files changed\n   - Are changes limited to version bumps, deps, and rebuilt dist? Or are there meaningful source changes?\n   - Any new runtime dependencies added?\n   - Any suspicious patterns (obfuscated code, eval(), network calls in unexpected places)\n\n5. **Release notes**: Try to find what changed.\n   Check the package's repository for release notes or changelog:\n   npm view {package}@{target} repository.url\n   gh release view v{target} --repo <owner/repo> (try with and without v prefix)\n   Summarize the changelog if found.\n\nReport your findings as JSON:\n\n{{\n  \"package\": \"{package}\",\n  \"from\": \"{current}\",\n  \"to\": \"{target}\",\n  \"age_days\": <number>,\n  \"maintainers_changed\": <boolean>,\n  \"maintainers_added\": [],\n  \"maintainers_removed\": [],\n  \"provenance\": <boolean>,\n  \"new_runtime_deps\": [],\n  \"files_changed\": <number>,\n  \"has_source_changes\": <boolean>,\n  \"changelog_summary\": \"<brief summary>\",\n  \"suspicious_patterns\": [],\n  \"verdict\": \"safe\" | \"review\" | \"defer\",\n  \"verdict_reason\": \"<one sentence explanation>\"\n}}\n\nVerdict guidelines:\n- \"safe\": Same maintainers, no new runtime deps, changes match what changelog describes, no suspicious patterns\n- \"review\": Minor concerns (e.g., new maintainer who is clearly from the same org, small new dep from known publisher)\n- \"defer\": Maintainer changes from unknown accounts, new runtime deps with unclear purpose, suspicious code patterns, substantive API changes that need integration testing\n```\n\n### Collecting results\n\nAs sub-agents complete, collect their JSON reports. If a sub-agent fails or times out, mark that package as \"defer\" with reason \"audit failed\".\n\n### Tier classification\n\nAfter collecting all results, classify packages into tiers. This helps the user understand the risk profile at a glance:\n\n| Tier | Description | Typical action |\n|------|-------------|----------------|\n| **Runtime, high surface** | Libraries your code calls directly (parsers, diff engines, UI libs) | Check provenance, review diff, run tests |\n| **SDK/API deps** | Third-party service SDKs (agent SDKs, platform integrations) | Read changelog for API changes, test integration |\n| **Dev-only** | Type definitions, build tools, test frameworks | Update freely — these don't ship |\n| **Build toolchain** | Bun itself, compilers, bundlers | Most caution — breakage affects all outputs |\n\n## Phase 3: Execution\n\n### Bump safe packages\n\nFor all packages with verdict \"safe\":\n\n```bash\nbun update pkg1@version1 pkg2@version2 ...\n```\n\nIf the update fails due to age gate conflicts (a package's minimum semver can't resolve), add it to `minimumReleaseAgeExcludes` in `bunfig.toml` and document why.\n\n### Log to supply chain notes\n\nWrite the full audit results to `~/.supply-chain/notes/<YYYY-MM-DD>.json`:\n\n```json\n{\n  \"date\": \"YYYY-MM-DD\",\n  \"project\": \"plannotator\",\n  \"bumped\": [\n    {\n      \"package\": \"...\",\n      \"from\": \"...\",\n      \"to\": \"...\",\n      \"age_days\": 0,\n      \"maintainers_changed\": false,\n      \"provenance\": false,\n      \"notes\": \"...\"\n    }\n  ],\n  \"deferred\": [\n    {\n      \"package\": \"...\",\n      \"current\": \"...\",\n      \"available\": \"...\",\n      \"age_days\": 0,\n      \"maintainers_changed\": false,\n      \"reason\": \"...\",\n      \"review_by\": \"YYYY-MM-DD\"\n    }\n  ],\n  \"excluded_from_age_gate\": [\n    {\n      \"package\": \"...\",\n      \"reason\": \"...\"\n    }\n  ]\n}\n```\n\nSet `review_by` to 7 days from today for deferred packages.\n\n### Check previously deferred packages\n\nRead all files in `~/.supply-chain/notes/` and collect any deferred packages from previous audits that are still at the same version in the current lockfile. These are packages that were deferred before and still haven't been updated.\n\nTo check: for each previously deferred entry, see if the current installed version matches the `current` field from the deferral note. If it does, the package is still deferred.\n\n## Phase 4: Recap\n\nPresent a clear summary to the user:\n\n### Updated\nList each bumped package with version change and one-line reason it was safe.\n\n### Deferred\nList each deferred package with version change and reason for deferral.\n\n### Still Deferred (from previous audits)\nList any packages that were deferred in previous audit sessions and still haven't been bumped. Include the original deferral date and reason. This is the \"you've been putting this off\" section — it keeps deferred packages from being forgotten.\n\nIf the still-deferred list is empty, say so — that's a good sign.\n\n### Age Gate Exclusions\nIf any packages were added to `minimumReleaseAgeExcludes`, note them and why.\n",
+      "card": null
+    },
+    {
+      "skill_path": "apps/kiro-cli/skills/plannotator-annotate/SKILL.md",
+      "blob_sha": "44401057fb5b8731c9ac00692a050aefd155341a",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/kiro-cli/skills/plannotator-annotate/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-annotate",
+        "description": "Open Plannotator's annotation UI for a file, folder, or URL, then address the returned annotations."
+      },
+      "excerpt": "---\nname: plannotator-annotate\ndisable-model-invocation: true\ndescription: Open Plannotator's annotation UI for a file, folder, or URL, then address the returned annotations.\n---\n\n# Plannotator Annotate (Kiro)\n\nRun:\n\n```bash\nPLANNOTATOR_ORIGIN=kiro-cli plannotator annotate $ARGUMENTS\n```\n\n`$ARGUMENTS` should be a markdown or plain-text config file path (.md, .txt, .yaml, .json, .toml, .ini, .csv, .log, …), folder path, html file path, or URL.\n\nIf the command reports that the arguments could not be resolved to a file, URL, or folder, work out which target the user means and re-run the command yourself with that concrete path or URL.\n\nIf the session closes without feedback (the output is empty, or a JSON object with `\"decision\": \"dismissed\"`), acknowledge it in one sentence and stop. Do not begin any work: closing the session is not approval.\n",
+      "card": null
+    },
+    {
+      "skill_path": "apps/kiro-cli/skills/plannotator-review/SKILL.md",
+      "blob_sha": "12de8136600f606b4f274dd2964f6232bc70363c",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/kiro-cli/skills/plannotator-review/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-review",
+        "description": "Open Plannotator's browser-based code review UI and address the returned feedback."
+      },
+      "excerpt": "---\nname: plannotator-review\ndisable-model-invocation: true\ndescription: Open Plannotator's browser-based code review UI and address the returned feedback.\n---\n\n# Plannotator Review (Kiro)\n\nRun:\n\n```bash\nPLANNOTATOR_ORIGIN=kiro-cli plannotator review\n```\n\nYou may append one directory or PR URL:\n\n```bash\nPLANNOTATOR_ORIGIN=kiro-cli plannotator review <pr-url>\nPLANNOTATOR_ORIGIN=kiro-cli plannotator review ../feature-worktree\n```\n\nDirectory paths are relative to the current session or absolute. Quote paths containing spaces. Feedback names the directory where changes belong.\n\nOr open the session against a specific base / diff mode (session-only, git-only; for a stacked branch, `--base <the branch below yours>` reviews just that layer):\n\n```bash\nPLANNOTATOR_ORIGIN=kiro-cli plannotator review --base <ref> [--diff-type <type>]\n```\n\nIf the session closes without feedback (the output is \"Review session closed without feedback.\" or empty), acknowledge it in one sentence and stop. Do not begin any work: closing the session is not approval.\n",
+      "card": null
+    },
+    {
+      "skill_path": "apps/qwen-code/skills/plannotator-annotate/SKILL.md",
+      "blob_sha": "ab3a976443f36c78603f49378c4d19c451161a58",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/qwen-code/skills/plannotator-annotate/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-annotate",
+        "description": "Open Plannotator's annotation UI for a markdown file, plain-text config file (.yaml, .json, .toml, .ini, .csv, .log, …), HTML file, URL, or folder and then respond to the returned annotations."
+      },
+      "excerpt": "---\nname: plannotator-annotate\ndescription: Open Plannotator's annotation UI for a markdown file, plain-text config file (.yaml, .json, .toml, .ini, .csv, .log, …), HTML file, URL, or folder and then respond to the returned annotations.\ndisable-model-invocation: true\n---\n\n# Plannotator Annotate (Qwen Code)\n\nUse this skill when the user wants to annotate a document in Plannotator instead of reviewing it inline in chat.\n\nRun for ordinary annotation/feedback:\n\n```bash\nplannotator annotate <path-or-url>\n```\n\nRun when the user asks to review, approve, accept, or gate a generated plan/spec/document:\n\n```bash\nplannotator annotate <path-or-url> --gate --json\n```\n\nRun it with the shell tool's `is_background: true`, and no trailing `&`. The command waits until the person finishes in the browser, which often takes longer than the shell tool's foreground limit (2 minutes by default, 10 at most); a foreground run would be stopped and the annotations lost. Then end your turn without stopping the task. When the task finishes, read its output (the tool result names the output file) and act on it.\n\nPlain `annotate` has no **Approve** button; it only supports feedback or closing the session. Never promise an approval action unless `--gate` is present. `--json` only changes the output format and does not enable approval by itself.\n\nBehavior:\n\n1. If annotations are returned, address them directly.\n2. If the session closes without feedback (the output is empty, or a JSON object with `\"decision\": \"dismissed\"`), acknowledge it in one sentence and stop. Do not begin any work: closing the session is not approval.\n3. In a `--gate` session, an approval may still carry notes — a `\"decision\": \"approved\"` result with a\n   `\"feedback\"` field (without `--json`, an \"Approved with Notes\" message). Read those notes and carry them into subsequent work, but\n   do not revise the document over them: they are guidance, not a change request.\n4. If the command reports that the arguments could not be resolved to a file,\n   URL, or folder, work out which target the user means and re-run the command\n   yourself with that concrete path or URL.\n\nDo not ask the user to paste a shell command into the chat. Run the command yourself.\n",
+      "card": null
+    },
+    {
+      "skill_path": "apps/qwen-code/skills/plannotator-last/SKILL.md",
+      "blob_sha": "ff20d31bc429ae197ede5779d53235cd8480f6db",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/qwen-code/skills/plannotator-last/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-last",
+        "description": "Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue."
+      },
+      "excerpt": "---\nname: plannotator-last\ndescription: Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue.\ndisable-model-invocation: true\n---\n\n# Plannotator Last (Qwen Code)\n\nUse this skill when the user wants to annotate the latest assistant response in Plannotator.\n\nDo not send a commentary/status message before running the command. The command\ntargets the latest rendered assistant response, so a preamble can mistakenly become the\nthing being annotated.\n\nRun:\n\n```bash\nplannotator last\n```\n\nRun it with the shell tool's `is_background: true`, and no trailing `&`. The command waits until the person finishes in the browser, which often takes longer than the shell tool's foreground limit (2 minutes by default, 10 at most); a foreground run would be stopped and the annotations lost. Then end your turn without stopping the task. When the task finishes, read its output (the tool result names the output file) and act on it.\n\nBehavior:\n\n1. If feedback is returned, incorporate it into the follow-up response.\n2. If the session closes without feedback (the output is empty, or a JSON object with `\"decision\": \"dismissed\"`), acknowledge it in one sentence and stop. Do not begin any work: closing the session is not approval.\n3. An approval may still carry notes — a `\"decision\": \"approved\"` result with a\n   `\"feedback\"` field. Read those notes and carry them into subsequent work, but\n   do not redo the message over them: they are guidance, not a change request.\n\nRun the command yourself rather than telling the user to invoke shell syntax manually.\n",
+      "card": {
+        "title_zh": "Plannotator 批注最新回复",
+        "purpose_zh": "在浏览器中打开 Plannotator 对最新渲染的助手回复进行批注，并依据返回的批注内容修改该回复或继续后续工作。",
+        "does": [
+          "以后台方式运行 plannotator last 命令，等待用户在浏览器中完成批注",
+          "读取命令输出文件，获取反馈、批准或关闭结果",
+          "将返回的反馈并入后续回复",
+          "会话无反馈关闭时仅作一句确认并停止，不开始任何工作",
+          "批准结果附带备注时，将备注带入后续工作但不重做该消息"
+        ],
+        "inputs": [
+          "用户希望对最新助手回复进行批注的请求",
+          "plannotator last 命令的输出文件内容（反馈、decision 字段等）"
+        ],
+        "outputs": [
+          "依据批注修订后的后续回复",
+          "对会话关闭无反馈的一句确认",
+          "携带批准备注的后续工作"
+        ],
+        "scenarios": [
+          "用户想对最新助手回复逐条批注并让助手据此修改",
+          "用户希望先审阅回复再决定是否批准继续",
+          "用户关闭批注会话而未给出反馈时助手停止工作"
+        ],
+        "prerequisites": [
+          "环境中可执行 plannotator 命令",
+          "shell 工具支持 is_background: true 后台运行"
+        ],
+        "limits": [
+          "运行命令前不得发送评论或状态消息，以免其成为被批注对象",
+          "必须后台运行且不加尾部 &，前台运行会超时并丢失批注",
+          "会话关闭无反馈不视为批准，不得开始任何工作",
+          "批准附带的备注是指导而非修改请求，不应据此重做消息"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "写作",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue."
+          },
+          {
+            "field": "does",
+            "quote": "Run it with the shell tool's `is_background: true`, and no trailing `&`."
+          },
+          {
+            "field": "does",
+            "quote": "When the task finishes, read its output (the tool result names the output file) and act on it."
+          },
+          {
+            "field": "does",
+            "quote": "If feedback is returned, incorporate it into the follow-up response."
+          },
+          {
+            "field": "does",
+            "quote": "If the session closes without feedback (the output is empty, or a JSON object with `\"decision\": \"dismissed\"`), acknowledge it in one sentence and stop."
+          },
+          {
+            "field": "does",
+            "quote": "An approval may still carry notes — a `\"decision\": \"approved\"` result with a `\"feedback\"` field."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run:\n\n```bash\nplannotator last\n```"
+          },
+          {
+            "field": "limits",
+            "quote": "Do not send a commentary/status message before running the command."
+          },
+          {
+            "field": "limits",
+            "quote": "a foreground run would be stopped and the annotations lost."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not begin any work: closing the session is not approval."
+          },
+          {
+            "field": "limits",
+            "quote": "they are guidance, not a change request."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "apps/qwen-code/skills/plannotator-review/SKILL.md",
+      "blob_sha": "ae295aa7ef85fef7cffb73f0fa170a4150f951f6",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/qwen-code/skills/plannotator-review/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-review",
+        "description": "Open Plannotator's browser-based code review UI for the current worktree, another directory, or a pull request URL, then act on the feedback that comes back."
+      },
+      "excerpt": "---\nname: plannotator-review\ndescription: Open Plannotator's browser-based code review UI for the current worktree, another directory, or a pull request URL, then act on the feedback that comes back.\ndisable-model-invocation: true\n---\n\n# Plannotator Review (Qwen Code)\n\nUse this skill when the user wants to review current code changes in Plannotator instead of reading a diff inline.\n\nRun:\n\n```bash\nplannotator review [--base <ref>] [--diff-type <type>] [directory-or-pr-url]\n```\n\nRun it with the shell tool's `is_background: true`, and no trailing `&`. The command waits until the person finishes the review in the browser, which often takes longer than the shell tool's foreground limit (2 minutes by default, 10 at most); a foreground run would be stopped and the review lost. Then end your turn without stopping the task. When the task finishes, read its output (the tool result names the output file) and act on it.\n\nReviewing one layer of a stacked branch? Pass `--base <the branch immediately below yours>` so the review shows only what this layer adds, instead of everything since `main`. Both flags are session-only (the reviewer can change either in the UI; nothing is persisted) and git-only.\n\nTo review another repository or worktree, pass its directory (relative to the current session or absolute), e.g. `plannotator review ../feature-worktree`. Quote paths containing spaces. Feedback names the selected directory; apply changes there.\n\nBehavior:\n\n1. If it returns feedback or annotations, address them in the same conversation.\n2. If it returns an approval/LGTM-style message, acknowledge that review passed and continue.\n3. If the session closes without feedback (the output is \"Review session closed without feedback.\" or empty), acknowledge it in one sentence and stop. Do not begin any work: closing the session is not approval.\n\nDo not ask the user to copy shell commands into chat. Run the command yourself.\n",
+      "card": null
+    },
+    {
+      "skill_path": "apps/skills/claude/plannotator-annotate/SKILL.md",
+      "blob_sha": "c9a1b98e56dbbce5a5332ebc6d1b637a0206979f",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/skills/claude/plannotator-annotate/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-annotate",
+        "description": "Open Plannotator's annotation UI for a markdown file, HTML file, URL, or folder and then respond to the returned annotations."
+      },
+      "excerpt": "---\nname: plannotator-annotate\ndescription: Open Plannotator's annotation UI for a markdown file, HTML file, URL, or folder and then respond to the returned annotations.\nallowed-tools: Bash(plannotator:*)\ndisable-model-invocation: true\n---\n\n# Plannotator Annotate\n\n## Markdown annotations\n\n!`plannotator annotate $ARGUMENTS`\n\n## Your task\n\nThe output above will be one of:\n\n1. The exact text `The user approved.`, an \"Approved with Notes\" message, OR a JSON object with `\"decision\": \"approved\"`. The user approved the markdown file(s). If it is the Approved with Notes message, or that object also carries a `\"feedback\"` field, the user approved *with notes*: read them and carry them into subsequent work — they are non-blocking guidance, not a request to revise the file. Otherwise acknowledge with a single sentence (\"Approved.\") and stop. Either way, do not begin any work.\n2. Empty, OR a JSON object with `\"decision\": \"dismissed\"`. The user closed the session without requesting changes. Acknowledge with a single sentence (\"Annotation session closed.\") and stop. Do not begin any work.\n3. Plaintext annotation feedback, OR a JSON object with `\"decision\": \"annotated\"` and a `\"feedback\"` field. Address the feedback. The user has reviewed the markdown file(s) and provided specific annotations and comments.\n4. A message that the arguments could not be resolved to a file, URL, or folder. The user described what to annotate in natural language: work out which file, URL, or folder they mean, run `plannotator annotate <path-or-url>` yourself with that concrete target (keeping any flags the message echoes), then handle its output per cases 1-3.\n",
+      "card": {
+        "title_zh": "Plannotator 标注处理",
+        "purpose_zh": "打开 Plannotator 标注界面，让用户对 Markdown、HTML、URL 或文件夹进行标注，并根据返回的批准、关闭或反馈结果决定后续动作。",
+        "does": [
+          "调用 plannotator annotate 打开标注界面，目标可为 Markdown 文件、HTML 文件、URL 或文件夹",
+          "识别用户批准结果，包括纯文本批准、带备注批准或 decision 为 approved 的 JSON",
+          "识别用户关闭会话，包括空输出或 decision 为 dismissed 的 JSON",
+          "读取带备注批准中的 feedback，作为后续工作的非阻塞指引",
+          "处理纯文本标注反馈或 decision 为 annotated 且含 feedback 的 JSON",
+          "当参数无法解析为目标时，根据自然语言推断具体文件、URL 或文件夹并重新调用"
+        ],
+        "inputs": [
+          "要标注的 Markdown 文件、HTML 文件、URL 或文件夹路径",
+          "用户以自然语言描述的目标（参数无法解析时）",
+          "Plannotator 返回的批准、关闭或标注反馈结果"
+        ],
+        "outputs": [
+          "对批准结果的单句确认（如 Approved.）",
+          "对关闭会话的单句确认（如 Annotation session closed.）",
+          "针对标注反馈的后续处理动作",
+          "带备注批准时被带入后续工作的反馈内容"
+        ],
+        "scenarios": [
+          "让用户审阅并标注 Markdown 文档",
+          "让用户标注 HTML 文件或网页 URL",
+          "让用户对文件夹内容进行标注",
+          "收集用户对文档的非阻塞备注并用于后续工作",
+          "根据用户自然语言描述定位待标注目标"
+        ],
+        "prerequisites": [
+          "环境中可执行 plannotator 命令",
+          "调用方具备 Bash(plannotator:*) 工具权限"
+        ],
+        "limits": [
+          "仅处理 Markdown、HTML、URL 或文件夹这几类目标",
+          "批准或关闭后只做单句确认并停止，不开始任何工作",
+          "带备注批准中的 feedback 是非阻塞指引，不要求修改文件",
+          "参数无法解析时需自行推断具体目标并重新调用",
+          "原文未说明标注界面的具体形态与运行环境"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "文档",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Open Plannotator's annotation UI for a markdown file, HTML file, URL, or folder and then respond to the returned annotations."
+          },
+          {
+            "field": "does",
+            "quote": "!`plannotator annotate $ARGUMENTS`"
+          },
+          {
+            "field": "does",
+            "quote": "Empty, OR a JSON object with `\"decision\": \"dismissed\"`. The user closed the session without requesting changes."
+          },
+          {
+            "field": "does",
+            "quote": "Plaintext annotation feedback, OR a JSON object with `\"decision\": \"annotated\"` and a `\"feedback\"` field. Address the feedback."
+          },
+          {
+            "field": "does",
+            "quote": "work out which file, URL, or folder they mean, run `plannotator annotate <path-or-url>` yourself with that concrete target (keeping any flags the message echoes), then handle its output per cases 1-3."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "allowed-tools: Bash(plannotator:*)"
+          },
+          {
+            "field": "limits",
+            "quote": "Otherwise acknowledge with a single sentence (\"Approved.\") and stop. Either way, do not begin any work."
+          },
+          {
+            "field": "limits",
+            "quote": "Acknowledge with a single sentence (\"Annotation session closed.\") and stop. Do not begin any work."
+          },
+          {
+            "field": "hosts",
+            "quote": "disable-model-invocation: true"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "apps/skills/claude/plannotator-inbox/SKILL.md",
+      "blob_sha": "95ad4a7dfe61ce7bd911d25f547733d846d898c9",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/skills/claude/plannotator-inbox/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-inbox",
+        "description": "Open the Plannotator Inbox in the browser (starting it if needed), say its address, and learn how to use the Inbox for the rest of the session."
+      },
+      "excerpt": "---\nname: plannotator-inbox\ndescription: Open the Plannotator Inbox in the browser (starting it if needed), say its address, and learn how to use the Inbox for the rest of the session.\nallowed-tools: Bash(plannotator:*)\ndisable-model-invocation: true\n---\n\n# Plannotator Inbox\n\n## Inbox address\n\n!`plannotator inbox --open`\n\n## Using the Inbox\n\nThe Plannotator Inbox is one window on this computer where you leave the person messages, `:::question` blocks they answer with a click, and files. They answer when they can. Nothing blocks: you send, then keep working or end your turn.\n\n- Use it for a decision only they can make (a :::question block; go on with other work), finished long work (a short summary with its pictures inline, files in `attachments`), or when they ask.\n- One thread per work stream, unless the person says otherwise.\n- Send with a `plannotator_inbox` tool when you have one (it can be listed with a prefix and may need loading through tool search first): `action` `send_message`, with a markdown `body`. Otherwise call `send_message` on the Inbox's MCP server, `plannotator inbox mcp`.\n- send_message's result says whether the person's reply arrives in this session by itself. When it does, do not wait or poll for it: end your turn or go on with other work. When it does not, go on with your work and read the thread later with read_thread.\n- A decision in the Inbox stays there: when the person writes in the chat, say what waits and link its thread, but never also ask it in the chat with a blocking question tool (AskUserQuestion or similar). Ask in the chat only about something new they raised there that needs no pictures or files, or when they ask.\n- Be proactive about Inbox updates and about replying to the person through the Inbox when you think they would want you to. Don't withhold important updates or decisions, and don't batch updates to send later: proactivity is better than procrastination.\n- Never run `plannotator inbox` just to send: send_message starts a stopped Inbox itself, and bare `plannotator inbox` opens the window for the person.\n- Before your first send, run `plannotator inbox --help` and read it: every field, the full question syntax, and how to connect the MCP server.\n- The `plannotator` skill, where you have it, has more.\n\n## Your task\n\nThe output above is the Plannotator Inbox's address; it opened in the person's browser unless the output says why not. Tell them the address in one sentence, with that reason when there is one. If the output is an error, tell them what it says; `Unknown inbox option: --open` means their Plannotator is older than this command (update with `plannotator update`, or run `plannotator inbox` in a terminal).\n\nThis command starts no new work and resumes none: do anything else the person asked in the same message, otherwise stop there. For the rest of this session, use the Inbox as above: for a decision the person is not here to make, and to hand over long work you finished.\n",
+      "card": {
+        "title_zh": "Plannotator 收件箱",
+        "purpose_zh": "在浏览器中打开 Plannotator Inbox（必要时启动它），告知用户其地址，并在本次会话余下时间按说明使用收件箱发送消息、提问块与文件。",
+        "does": [
+          "运行 plannotator inbox --open 打开收件箱并获取地址",
+          "用一句话告知用户收件箱地址或输出中的失败原因",
+          "通过 plannotator_inbox 工具或收件箱 MCP 服务器的 send_message 发送 markdown 消息",
+          "用 :::question 块向用户提出只有其能做的决定，不阻塞继续工作",
+          "把完成的长任务摘要与附件文件投递到收件箱",
+          "用 read_thread 稍后读取线程回复"
+        ],
+        "inputs": [
+          "用户请求（同一消息中的其他任务）",
+          "plannotator inbox --open 的输出（收件箱地址或错误信息）",
+          "send_message 的 markdown body 与 action 参数",
+          ":::question 块内容"
+        ],
+        "outputs": [
+          "浏览器中打开的收件箱窗口",
+          "告知用户的收件箱地址一句话",
+          "发送到收件箱的消息、提问块与 attachments 文件",
+          "线程回复（可能自动回到会话，或需 read_thread 读取）"
+        ],
+        "scenarios": [
+          "需要用户本人做决定时通过提问块征询",
+          "完成长任务后交付摘要与图片、附件",
+          "用户主动要求通过收件箱联系",
+          "按工作流分线程持续向用户推送进展"
+        ],
+        "prerequisites": [
+          "本机已安装 plannotator 命令行",
+          "首次发送前运行 plannotator inbox --help 阅读字段与提问语法",
+          "若使用工具需 plannotator_inbox 工具或连接 plannotator inbox mcp 的 MCP 服务器"
+        ],
+        "limits": [
+          "该命令本身不启动也不恢复任何新工作",
+          "不得仅为发送而运行 plannotator inbox",
+          "不得在聊天中用阻塞式提问工具重复收件箱中的待决问题",
+          "回复不自动到达时不得等待或轮询",
+          "Unknown inbox option: --open 表示 Plannotator 版本过旧，需 plannotator update 或在终端运行 plannotator inbox"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Open the Plannotator Inbox in the browser (starting it if needed), say its address, and learn how to use the Inbox for the rest of the session."
+          },
+          {
+            "field": "does",
+            "quote": "!`plannotator inbox --open`"
+          },
+          {
+            "field": "does",
+            "quote": "Tell them the address in one sentence, with that reason when there is one."
+          },
+          {
+            "field": "does",
+            "quote": "Send with a `plannotator_inbox` tool when you have one"
+          },
+          {
+            "field": "does",
+            "quote": "Use it for a decision only they can make (a :::question block; go on with other work)"
+          },
+          {
+            "field": "does",
+            "quote": "read the thread later with read_thread."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before your first send, run `plannotator inbox --help` and read it"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Otherwise call `send_message` on the Inbox's MCP server, `plannotator inbox mcp`."
+          },
+          {
+            "field": "limits",
+            "quote": "This command starts no new work and resumes none"
+          },
+          {
+            "field": "limits",
+            "quote": "Never run `plannotator inbox` just to send"
+          },
+          {
+            "field": "limits",
+            "quote": "never also ask it in the chat with a blocking question tool (AskUserQuestion or similar)"
+          },
+          {
+            "field": "limits",
+            "quote": "When it does, do not wait or poll for it"
+          },
+          {
+            "field": "limits",
+            "quote": "`Unknown inbox option: --open` means their Plannotator is older than this command (update with `plannotator update`, or run `plannotator inbox` in a terminal)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "allowed-tools: Bash(plannotator:*)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "apps/skills/claude/plannotator-last/SKILL.md",
+      "blob_sha": "28870c369ddbc5ecade2ef77cf6c46d03867b253",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/skills/claude/plannotator-last/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-last",
+        "description": "Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue."
+      },
+      "excerpt": "---\nname: plannotator-last\ndescription: Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue.\nallowed-tools: Bash(plannotator:*)\ndisable-model-invocation: true\n---\n\n# Plannotator Last\n\n## Message annotations\n\n!`plannotator annotate-last $ARGUMENTS`\n\n## Your task\n\nThe output above will be one of:\n\n1. The exact text `The user approved.`, an \"Approved with Notes\" message, OR a JSON object with `\"decision\": \"approved\"`. The user approved your last message. If it is the Approved with Notes message, or that object also carries a `\"feedback\"` field, the user approved *with notes*: read them and carry them into subsequent work — they are non-blocking guidance, not a request to revise the message. Otherwise acknowledge with a single sentence (\"Approved.\") and stop. Either way, do not begin any work.\n2. Empty, OR a JSON object with `\"decision\": \"dismissed\"`. The user closed the session without requesting changes. Acknowledge with a single sentence (\"Annotation session closed.\") and stop. Do not begin any work.\n3. Plaintext annotation feedback, OR a JSON object with `\"decision\": \"annotated\"` and a `\"feedback\"` field. Address the feedback. The user has reviewed your last message and provided specific annotations and comments.\n",
+      "card": {
+        "title_zh": "Plannotator 批注回读",
+        "purpose_zh": "在最新一条已渲染的助手消息上打开 Plannotator，读取用户返回的批注结果，据此修订该消息或继续后续工作。",
+        "does": [
+          "对最新渲染的助手消息启动 Plannotator 批注会话",
+          "解析返回结果：批准、带备注批准、关闭会话或带反馈批注",
+          "批准时仅用一句话确认并停止，不开始新工作",
+          "带备注批准时把备注作为非阻塞指引带入后续工作",
+          "关闭会话时仅确认并停止",
+          "收到批注反馈时按反馈处理"
+        ],
+        "inputs": [
+          "命令参数 $ARGUMENTS（传给 plannotator annotate-last）",
+          "用户在 Plannotator 中产生的批注或反馈内容"
+        ],
+        "outputs": [
+          "对批准或关闭的简短确认语句",
+          "依据批注反馈对消息的修订或后续工作"
+        ],
+        "scenarios": [
+          "用户想对助手最新回复逐条批注并给出修改意见",
+          "用户审阅后批准并附带非阻塞备注",
+          "用户直接关闭批注会话"
+        ],
+        "prerequisites": [
+          "环境中可执行 plannotator 命令",
+          "存在一条已渲染的助手消息可供批注"
+        ],
+        "limits": [
+          "仅作用于最新一条已渲染的助手消息",
+          "批准或关闭时不得开始任何新工作",
+          "模型不可主动调用（disable-model-invocation）",
+          "仅允许 Bash(plannotator:*) 工具"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "写作",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue."
+          },
+          {
+            "field": "does",
+            "quote": "!`plannotator annotate-last $ARGUMENTS`"
+          },
+          {
+            "field": "does",
+            "quote": "The user closed the session without requesting changes. Acknowledge with a single sentence (\"Annotation session closed.\") and stop. Do not begin any work."
+          },
+          {
+            "field": "does",
+            "quote": "Address the feedback. The user has reviewed your last message and provided specific annotations and comments."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "allowed-tools: Bash(plannotator:*)"
+          },
+          {
+            "field": "limits",
+            "quote": "disable-model-invocation: true"
+          },
+          {
+            "field": "limits",
+            "quote": "Either way, do not begin any work."
+          },
+          {
+            "field": "hosts",
+            "quote": "allowed-tools: Bash(plannotator:*)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "apps/skills/claude/plannotator-review/SKILL.md",
+      "blob_sha": "94b8373b9b3bec211124abec2c268135da348012",
+      "source_url": "https://github.com/backnotprop/plannotator/blob/3810fbac9733b024a3057469fd1cdee538736e8c/apps/skills/claude/plannotator-review/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "plannotator-review",
+        "description": "Open Plannotator's browser-based code review UI for the current worktree, another directory, or a pull request URL, then act on the feedback that comes back."
+      },
+      "excerpt": "---\nname: plannotator-review\ndescription: Open Plannotator's browser-based code review UI for the current worktree, another directory, or a pull request URL, then act on the feedback that comes back.\nallowed-tools: Bash(plannotator:*)\ndisable-model-invocation: true\n---\n\n# Plannotator Review\n\nArguments pass through to `plannotator review`: one directory or PR/MR URL, `--git` / `--gitbutler`, and the session-only open-state flags `--base <ref>` / `--diff-type <type>` (git-only; for a stacked branch, `--base <the branch below yours>` reviews just that layer).\n\nFor another repository or worktree, pass its path relative to this session or an absolute path, e.g. `/plannotator-review ../feature-worktree`. Quote paths containing spaces. Supply a target, not prose; feedback names the directory where changes belong.\n\n## Code review feedback\n\n!`plannotator review $ARGUMENTS`\n\n## Your task\n\nIf the review above contains feedback or annotations, address them in the same conversation. If no changes were requested (an approval/LGTM-style result), acknowledge that review passed and continue.\n\nIf the session closes without feedback (the output is \"Review session closed without feedback.\" or empty), acknowledge it in one sentence and stop. Do not begin any work: closing the session is not approval.\n\nIf the review was moved to the background, wait for it to finish. If Claude Code stopped it at its background time limit before the user decided, tell the user, and only when they ask, run `plannotator review $ARGUMENTS` again with `run_in_background` and `timeout: 7200000`: their annotations are restored from the saved draft.\n",
+      "card": null
+    }
+  ]
+}

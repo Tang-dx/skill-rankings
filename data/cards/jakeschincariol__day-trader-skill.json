@@ -152,7 +152,7 @@
       "skill_path": "trader-analyst/SKILL.md",
       "blob_sha": "9d9b95a4a722a348e50de6a7ae69956fe128b64f",
       "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-analyst/SKILL.md",
-      "fetched_at": "2026-11-13T11:49:55.150Z",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -1241,18 +1241,132 @@
       "skill_path": "trader-timemachine/SKILL.md",
       "blob_sha": "ecef8b13f13ac43e4bb8d79886faef05ea0fdf04",
       "source_url": "https://github.com/Jakeschincariol/day-trader-skill/blob/3d0f4ef6986f4984b7c6bd46f7ff4f87744c3abd/trader-timemachine/SKILL.md",
-      "fetched_at": "2026-11-13T11:49:55.150Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "trader-timemachine",
         "description": "Time Machine. Replays every possible outcome of a trade before you risk a dollar: 10,000 simulated sessions plus every past time the setup fired. Takes the plan from trader-exit (entry, stop, target), rebuilds the rest of the day 10,000 times from the stock's own 5-minute bars over the last 60 days, and re-runs the same rule on every past session. Prints the odds of target first, stop first, or neither by the close, where the price sits at the close, the average R, the history, and one honest ve"
       },
       "excerpt": "---\nname: trader-timemachine\ndescription: >-\n  Time Machine. Replays every possible outcome of a trade before you risk a\n  dollar: 10,000 simulated sessions plus every past time the setup fired.\n  Takes the plan from trader-exit (entry, stop, target), rebuilds the rest of\n  the day 10,000 times from the stock's own 5-minute bars over the last 60\n  days, and re-runs the same rule on every past session. Prints the odds of\n  target first, stop first, or neither by the close, where the price sits at\n  the close, the average R, the history, and one honest verdict, then hands\n  off to /trader-budget. Use when the user says \"run the time machine\",\n  \"replay this trade\", \"what are the odds\", \"simulate this trade\", \"monte\n  carlo\", \"backtest this setup\", \"how often does this hit the target\", \"is\n  this a coin flip\", or after /trader-exit writes a plan, before\n  /trader-budget.\nargument-hint: \"[path to plan.json, or TICKER]\"\n---\n\n# trader-timemachine\n\nThe Time Machine sits between the plan and the money. trader-exit has set\nthe entry, the stop and the target. Before anything is sized or sent, this\nskill asks one question: if today plays out like the stock's own last 60\ndays, how often does this plan hit the target first, the stop first, or\nneither? It answers with 10,000 replays and with the real record of the same\nrule on every past session. It is a simulation built from the stock's own\nrecent bars, not a prediction. Day trading loses most people money, and a\ngood-looking replay does not change that.\n\n`${CLAUDE_SKILL_DIR}` below is this skill's folder (where this SKILL.md lives).\n\n```bash\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run                    # trader/plan.json, 10,000 replays, seed 19\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --write            # also save trader/timemachine.json\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --until 15:55      # end each replay at your flat-by time\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --json\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --symbol TSLA --date 2026-10-19 \\\n    --entry 364.18 --stop 358.32 --target 370.04 --entry-time \"10:15 AM\"\npython3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" chart --from           # ASCII fan chart of the saved run\n```\n\nOther flags: `--replays N`, `--seed N` (default 19), `--window N` (default 2\nbars), `--offline FILE` (a saved Yahoo chart JSON, `.json` or `.json.gz`),\n`--now \"2026-10-19 10:15\"` (New York time) to pin the clock.\n\n## What it reads and writes\n\n| file | what |\n| --- | --- |\n| `trader/plan.json` | the plan from trader-exit: symbol, date, entry, entry_time / entry_bar, stop, stop_rule, target, target_r, opening range |\n| Yahoo chart API | one request: 60 days of 5-minute bars (`range=60d&interval=5m`), free and unofficial, can lag |\n| `trader/timemachine.json` | with `--write`: `{plan, mc, history}` plus the verdict. `mc` holds the odds, percentiles, the fan-chart bands, 160 sample paths and a 24-bin histogram of the close |\n\n## How it works\n\n1. **The pool.** It keeps only FULL sessions before the plan's date: all 78\n   five-minute bars, 9:30 to 4:00 New York time. Half days, gaps and today\n   are left out. Every bar becomes four ratios to the bar before it:\n   open, high, low and close over the previous close.\n2. **One replay.** Start at the entry price. For each bar left in the day,\n   pick a past bar from the same time of day (plus or minus 2 bars) at\n   random, and scale it to the current price. Bar by bar, it checks the stop\n   first, then the target. A bar that touches both counts as the stop.\n3. **10,000 replays** give four odds. Target first. Stop first. Neither,\n   which means the trade was still open at `--until` (default 4:00 PM, the\n   close, or 1:00 PM on an NYSE early-close day). Green, which means target\n   first or above the entry at `--until`.\n   R is +1 at a 1R target, -1 at the stop, and otherwise the distance from\n   the entry at `--until` divided by the risk. A gap through the stop still\n   counts as -1R here. A real fill can be worse.\n4. **The history.** The plan's own rule (the same opening range, stop rule\n   and target R) runs again on every one of those past sessions. That is\n   what really happened, not a simulation.\n5. **The verdict** is one line from the numbers. It looks only at the\n   replays that hit one side, and asks how often the target came first. A\n   bigger target needs to win less often to break even: 1 in (1 + R). That\n   is 50 % at 1R, 33 % at 2R, 25 % at 3R. Less than 5 points from break-even:\n   \"Close to a coin flip\" at 1R, \"Close to break-even\" at any other R. 5 to\n   15 points: \"Leans toward the target\" or \"Leans toward the stop\". 15 or\n   more: \"Strongly toward\" one of them. So a 2R plan with target first\n   24.1 % and stop first 50.5 % is close to break-even (it needs 33 % of\n   the 74.6 % that hit a side, and got 32 %), not a loser.\n6. **Below the verdict**, when it applies: a line when more than 40 % of the\n   replays hit neither (the price at `--until` decides those), and the\n   average R when its sign goes against the lean. Those can only point the\n   other way because of the replays that hit neither.\n\n**The seed.** The draws come from Python's `random.Random(seed)`, seed 19 by\ndefault. Same plan, same data, same seed: the same numbers, on any machine.\nSay the seed with every result so the user can repeat it.\n\n**5-minute bars only.** Yahoo keeps 60 days of 5-min bars but only about 7\ndays of 1-min bars, too few sessions for a fair pool. It refuses, in one\nplain line, when there are fewer than 20 full sessions, when the entry bar is\nnot in the data (wrong date, not closed yet, a future day), or when the plan\ndoes not make sense (a stop above a buy's entry, an entry off the 5-minute\ngrid). A live in-progress bar is never used.\n\n## Steps\n\n1. Make sure `trader/plan.json` is today's plan from `/trader-exit`. If there\n   is none, run that first, or pass the plan as flags.\n2. Run `timemachine.py run --write`. Add `--until 15:55` when the plan has a\n   flat-by time, so \"neither\" means still open at the time you would get out.\n3. Tell the user, in this order: the four odds, the median and the 5 to 95\n   range of the price at the close, the average R, the history line, then the\n   verdict line and any line under it exactly as printed. Say the seed.\n4. If the verdict is a coin flip or close to break-even, say so plainly. Do\n   not dress it up. If the history and the replays disagree, say that too.\n5. Say once that this is built from the last 60 days and is not a prediction.\n   Earnings, news and halts can do things those 60 days never did. Check\n   `/trader-news` for the stock before going on.\n6. If the user still wants the trade, hand off to `/trader-budget` to size it.\n\n## Example: the reel\n\nTSLA, Monday 2026-10-19. The 15-minute opening range is 354.47 to 362.18.\nThe 10:10 bar closes above it: entry 364.18 at 10:15 AM (bar 8), stop 358.32\n(the range midpoint, rounded down), target 370.04 (1R, risk 5.86 a share).\n\n```\n10,000 replays of the rest of the session, 10:15 AM to 4:00 PM (69 five-minute bars), seed 19.\n  target first   29.4 %\n  stop first     25.5 %\n  neither        45.1 %   still open at 4:00 PM\n  green          51.7 %   target first, or above the entry at 4:00 PM\n  Price at 4:00 PM: median 364.36, 90 % of replays between 355.54 and 373.54.\n  Average R: +0.034\nHistory: the same rule on each of those 59 real sessions fired 33 times:\n13 target, 15 stop, 5 neither. Average R -0.062.\nClose to a coin flip: target first 29.4 % vs stop first 25.5 %.\n45.1 % of the replays hit neither by 4:00 PM; the price at 4:00 PM decides those.\n```\n\nAt 1R the target has to come first in half of the replays that hit one\nside. It did in 53.6 %. The replays came out close to a coin flip, and the\nreal history was slightly worse than even. That is the honest answer for this setup, and it is what\nthe user should hear before `/trader-budget` sizes 8 shares.\n\n## Rules\n\n- Every number comes from the run. Never round a coin f",
-      "card": null
+      "card": {
+        "title_zh": "交易时光机回测",
+        "purpose_zh": "在真实下单前，用股票自身近60天5分钟K线对交易计划做1万次蒙特卡洛重放，并回测同一规则在历史每个交易日的表现，给出目标先到、止损先到、都未触及的概率与结论。",
+        "does": [
+          "读取trader-exit生成的交易计划（入场、止损、目标）",
+          "从Yahoo图表接口获取60天5分钟K线数据",
+          "用近60天完整交易日的K线做1万次蒙特卡洛重放",
+          "统计目标先到、止损先到、都未触及、收绿四项概率及收盘价分位与平均R",
+          "在同一规则下回测历史每个交易日的真实结果",
+          "输出一行结论并交接给/trader-budget做仓位计算"
+        ],
+        "inputs": [
+          "trader/plan.json交易计划文件",
+          "命令行参数：--symbol、--date、--entry、--stop、--target、--entry-time",
+          "--replays、--seed、--window、--until、--offline、--now等可选参数"
+        ],
+        "outputs": [
+          "终端打印的四项概率、收盘价中位数与5-95区间、平均R、历史回测行、结论行",
+          "加--write时写出trader/timemachine.json，含plan、mc、history与结论",
+          "chart子命令输出已保存运行的ASCII扇形图"
+        ],
+        "scenarios": [
+          "用户说运行时光机、重放这笔交易、胜率如何、模拟这笔交易",
+          "trader-exit写出计划之后、trader-budget定仓位之前",
+          "用户询问这个形态命中目标的频率或是否像抛硬币"
+        ],
+        "prerequisites": [
+          "需要先有trader-exit生成的trader/plan.json，或用命令行参数直接传入计划",
+          "需要能访问Yahoo图表接口获取60天5分钟K线，或提供已保存的JSON文件",
+          "至少需要20个完整交易日的数据，且入场K线须在数据中"
+        ],
+        "limits": [
+          "仅使用5分钟K线，非逐笔、非实时",
+          "Yahoo数据免费非官方，可能延迟",
+          "少于20个完整交易日、入场K线缺失或计划不合理时拒绝运行",
+          "模拟结果不是预测，不构成财务建议",
+          "每次运行只处理一个计划",
+          "不打印盈亏或利润，不下单、不定仓位、不改计划"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "数据分析",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Time Machine. Replays every possible outcome of a trade before you risk a dollar: 10,000 simulated sessions plus every past time the setup fired."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "rebuilds the rest of the day 10,000 times from the stock's own 5-minute bars over the last 60 days, and re-runs the same rule on every past session."
+          },
+          {
+            "field": "does",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" run --write            # also save trader/timemachine.json"
+          },
+          {
+            "field": "does",
+            "quote": "**10,000 replays** give four odds. Target first. Stop first. Neither, which means the trade was still open at `--until`"
+          },
+          {
+            "field": "does",
+            "quote": "**The history.** The plan's own rule (the same opening range, stop rule and target R) runs again on every one of those past sessions."
+          },
+          {
+            "field": "does",
+            "quote": "If the user still wants the trade, hand off to `/trader-budget` to size it."
+          },
+          {
+            "field": "inputs",
+            "quote": "`trader/plan.json` | the plan from trader-exit: symbol, date, entry, entry_time / entry_bar, stop, stop_rule, target, target_r, opening range"
+          },
+          {
+            "field": "inputs",
+            "quote": "Other flags: `--replays N`, `--seed N` (default 19), `--window N` (default 2 bars), `--offline FILE`"
+          },
+          {
+            "field": "outputs",
+            "quote": "`trader/timemachine.json` | with `--write`: `{plan, mc, history}` plus the verdict."
+          },
+          {
+            "field": "outputs",
+            "quote": "python3 \"${CLAUDE_SKILL_DIR}/timemachine.py\" chart --from           # ASCII fan chart of the saved run"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user says \"run the time machine\", \"replay this trade\", \"what are the odds\", \"simulate this trade\", \"monte carlo\", \"backtest this setup\""
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Make sure `trader/plan.json` is today's plan from `/trader-exit`. If there is none, run that first, or pass the plan as flags."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Yahoo chart API | one request: 60 days of 5-minute bars (`range=60d&interval=5m`), free and unofficial, can lag"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "It refuses, in one plain line, when there are fewer than 20 full sessions, when the entry bar is not in the data"
+          },
+          {
+            "field": "limits",
+            "quote": "**5-minute bars only.** Yahoo keeps 60 days of 5-min bars but only about 7 days of 1-min bars, too few sessions for a fair pool."
+          }
+        ]
+      }
     }
   ]
 }

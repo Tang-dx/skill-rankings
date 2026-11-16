@@ -1,0 +1,1212 @@
+{
+  "schema": 1,
+  "repo": "Tencent/LoopForge",
+  "tree_sha": "6937d9d9cace37e96a814c7a84ea457c5f92a32b",
+  "truncated_paths": 9,
+  "skills": [
+    {
+      "skill_path": "skills/report-workflow-usage/SKILL.md",
+      "blob_sha": "00bf7cd7acd894dad635d6a00ed2033f95cebff6",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/skills/report-workflow-usage/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "report-workflow-usage",
+        "description": "将外部工作流已结束执行的真实模型用量上报到 AgentFlow 用量分析。用于工作流结束后的上报节点、补报或重试，支持多模型汇总和项目限定凭据；不用于重新上报 AgentFlow 已原生统计的执行。"
+      },
+      "excerpt": "---\nname: report-workflow-usage\ndescription: 将外部工作流已结束执行的真实模型用量上报到 AgentFlow 用量分析。用于工作流结束后的上报节点、补报或重试，支持多模型汇总和项目限定凭据；不用于重新上报 AgentFlow 已原生统计的执行。\n---\n\n# 上报外部工作流用量\n\n读取宿主提供的完整执行汇总，校验后调用本 Skill 的脚本上报。默认只处理当前工作流明确指定的那次执行。\n\n## 工作流输入\n\n- `AGENTFLOW_URL`：目标 AgentFlow 基础地址。\n- `AGENTFLOW_INSIGHT_TOKEN`：宿主通过密钥环境变量注入的数据源 Token；不要把 Token 放进提示词、命令参数、产物或日志，也不要打印环境变量。\n- `AGENTFLOW_USAGE_FILE`：宿主已生成的终态汇总 JSON 文件路径；也可显式指定文件参数。\n- Python 3：脚本只依赖标准库。\n\n挂载到工作流时，参考 [工作流集成](references/workflow-integration.md)。首次生成或转换输入时，读取 [上报契约](references/contract.md)。\n\n## 执行\n\n1. 确认汇总属于本次指定的外部执行，状态为 `succeeded`、`failed` 或 `cancelled`。不要为收尾节点另造一次“业务执行”，也不要把上报成功改写为业务成功。\n2. 使用执行器/API 返回的真实模型用量。若宿主已给出符合契约的文件，直接使用；若给出其他格式，仅按已知字段含义转换。不要估算 Token、读取本机其他无关会话或用零填补未知用量。缺少真实用量时停止上报并说明需要的宿主数据；费用未知可以使用 `null` / `unknown`。\n3. 从本 Skill 根目录调用以下脚本。脚本路径相对 Skill 根目录，输入文件路径相对工作目录；工作目录可以与 Skill 目录不同。\n\n```sh\npython3 /absolute/path/to/report-workflow-usage/scripts/report_usage.py --check\npython3 /absolute/path/to/report-workflow-usage/scripts/report_usage.py\n```\n\n实际使用时将路径替换为当前已加载 Skill 的根目录。若没有设置 `AGENTFLOW_USAGE_FILE`，在脚本后传入宿主提供的 JSON 文件路径。`--check` 只校验文件，不联网、不要求 Token。\n\n4. `accepted` 或 `duplicate` 是已持久化的成功回执。返回上报状态、记录 ID 和执行 ID；不要声称业务执行因此成功。失败时保留原文件，说明可补报。\n\n## 重试与边界\n\n- 同一来源、相同记录 ID、相同内容可安全重试。记录 ID 和执行 ID 在首次上报前固定，重试不要刷新时间、ID 或改用另一数据源 Token。\n- 脚本对网络错误、429、5xx 默认最多尝试 5 次；用尽后停止本次上报，交给宿主重试策略。400、401、403、409、413 不自动重试；409 要核对原事实，不能生成新 ID 绕过去重。\n- 不创建数据源、不扩大用户映射、不修改工作流主任务结果。接入时明确使用哪个项目的数据源；用户显式调用本 Skill，或宿主明确配置该上报步骤，即可按既有配置执行，不需要每次重复确认。\n- 一次执行只由一个来源上报。AgentFlow 原生 Run 已被统计；不要把同一 Run 再作为外部执行上报。\n- Agent 的最终 Token 往往在该 Agent 退出后才完整可得。若要包含收尾 Agent 本身的消耗，必须由宿主在会话结束后调用脚本，不能在该 Agent 尚未结束时声称上报了完整用量。\n",
+      "card": {
+        "title_zh": "外部工作流用量上报",
+        "purpose_zh": "将外部工作流已结束执行的真实模型用量上报到 AgentFlow 用量分析，用于工作流结束后的上报节点、补报或重试，支持多模型汇总和项目限定凭据。",
+        "does": [
+          "读取宿主提供的完整执行汇总并校验后调用脚本上报",
+          "确认汇总属于本次指定外部执行且状态为 succeeded、failed 或 cancelled",
+          "使用执行器或 API 返回的真实模型用量，不估算 Token、不用零填补未知用量",
+          "调用 report_usage.py 的 --check 仅校验文件，不联网、不要求 Token",
+          "返回上报状态、记录 ID 和执行 ID，不声称业务执行因此成功",
+          "对网络错误、429、5xx 默认最多尝试 5 次，400、401、403、409、413 不自动重试"
+        ],
+        "inputs": [
+          "AGENTFLOW_URL：目标 AgentFlow 基础地址",
+          "AGENTFLOW_INSIGHT_TOKEN：宿主通过密钥环境变量注入的数据源 Token",
+          "AGENTFLOW_USAGE_FILE：宿主已生成的终态汇总 JSON 文件路径，也可显式指定文件参数",
+          "Python 3：脚本只依赖标准库"
+        ],
+        "outputs": [
+          "上报状态（如 accepted 或 duplicate）",
+          "记录 ID",
+          "执行 ID"
+        ],
+        "scenarios": [
+          "工作流结束后的上报节点",
+          "补报已结束执行的真实模型用量",
+          "对同一来源、相同记录 ID、相同内容安全重试",
+          "校验宿主提供的汇总 JSON 文件"
+        ],
+        "prerequisites": [
+          "宿主提供完整执行汇总，状态为 succeeded、failed 或 cancelled",
+          "宿主通过密钥环境变量注入 AGENTFLOW_INSIGHT_TOKEN，不放入提示词、命令参数、产物或日志",
+          "具备 Python 3，脚本只依赖标准库",
+          "明确使用哪个项目的数据源"
+        ],
+        "limits": [
+          "不用于重新上报 AgentFlow 已原生统计的执行",
+          "缺少真实用量时停止上报并说明需要的宿主数据",
+          "不创建数据源、不扩大用户映射、不修改工作流主任务结果",
+          "一次执行只由一个来源上报",
+          "409 要核对原事实，不能生成新 ID 绕过去重",
+          "收尾 Agent 本身的消耗需宿主在会话结束后调用脚本才能完整上报"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "needs_secret"
+        ],
+        "tags": [
+          "自动化",
+          "运维部署",
+          "数据分析"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "将外部工作流已结束执行的真实模型用量上报到 AgentFlow 用量分析。用于工作流结束后的上报节点、补报或重试，支持多模型汇总和项目限定凭据；不用于重新上报 AgentFlow 已原生统计的执行。"
+          },
+          {
+            "field": "does",
+            "quote": "读取宿主提供的完整执行汇总，校验后调用本 Skill 的脚本上报。默认只处理当前工作流明确指定的那次执行。"
+          },
+          {
+            "field": "does",
+            "quote": "确认汇总属于本次指定的外部执行，状态为 `succeeded`、`failed` 或 `cancelled`。"
+          },
+          {
+            "field": "does",
+            "quote": "使用执行器/API 返回的真实模型用量。若宿主已给出符合契约的文件，直接使用；若给出其他格式，仅按已知字段含义转换。不要估算 Token、读取本机其他无关会话或用零填补未知用量。"
+          },
+          {
+            "field": "does",
+            "quote": "`--check` 只校验文件，不联网、不要求 Token。"
+          },
+          {
+            "field": "does",
+            "quote": "`accepted` 或 `duplicate` 是已持久化的成功回执。返回上报状态、记录 ID 和执行 ID；不要声称业务执行因此成功。"
+          },
+          {
+            "field": "does",
+            "quote": "脚本对网络错误、429、5xx 默认最多尝试 5 次；用尽后停止本次上报，交给宿主重试策略。400、401、403、409、413 不自动重试；409 要核对原事实，不能生成新 ID 绕过去重。"
+          },
+          {
+            "field": "inputs",
+            "quote": "- `AGENTFLOW_URL`：目标 AgentFlow 基础地址。"
+          },
+          {
+            "field": "inputs",
+            "quote": "- `AGENTFLOW_INSIGHT_TOKEN`：宿主通过密钥环境变量注入的数据源 Token；不要把 Token 放进提示词、命令参数、产物或日志，也不要打印环境变量。"
+          },
+          {
+            "field": "inputs",
+            "quote": "- `AGENTFLOW_USAGE_FILE`：宿主已生成的终态汇总 JSON 文件路径；也可显式指定文件参数。"
+          },
+          {
+            "field": "inputs",
+            "quote": "- Python 3：脚本只依赖标准库。"
+          },
+          {
+            "field": "outputs",
+            "quote": "返回上报状态、记录 ID 和执行 ID；不要声称业务执行因此成功。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "缺少真实用量时停止上报并说明需要的宿主数据；费用未知可以使用 `null` / `unknown`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "接入时明确使用哪个项目的数据源；用户显式调用本 Skill，或宿主明确配置该上报步骤，即可按既有配置执行，不需要每次重复确认。"
+          },
+          {
+            "field": "limits",
+            "quote": "不创建数据源、不扩大用户映射、不修改工作流主任务结果。"
+          },
+          {
+            "field": "limits",
+            "quote": "一次执行只由一个来源上报。AgentFlow 原生 Run 已被统计；不要把同一 Run 再作为外部执行上报。"
+          },
+          {
+            "field": "limits",
+            "quote": "若要包含收尾 Agent 本身的消耗，必须由宿主在会话结束后调用脚本，不能在该 Agent 尚未结束时声称上报了完整用量。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 /absolute/path/to/report-workflow-usage/scripts/report_usage.py --check"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "local/.claude/skills/agent-observability/SKILL.md",
+      "blob_sha": "5f980a684bb51eee75fbe3b584051a5de7190622",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.claude/skills/agent-observability/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agent-observability",
+        "description": "Add or maintain CodeBuddy hook observability for projects that need local metrics for tool latency, transcript token usage, session cost, and multi-agent trace attribution. Use when wiring hook-based telemetry, and debugging missing usage events."
+      },
+      "excerpt": "---\nname: agent-observability\ndescription: Add or maintain CodeBuddy hook observability for projects that need local metrics for tool latency, transcript token usage, session cost, and multi-agent trace attribution. Use when wiring hook-based telemetry, and debugging missing usage events.\n---\n\n## Workflow\n\n1. Merge `templates/settings-hook.json` into the user or project `settings.json`.\n2. Keep hook entries command-only and keep timeouts around 5 to 10 seconds.\n3. Run a normal CodeBuddy session and inspect `logs/metrics.ndjson`.\n4. Inspect `logs/.state.json` when usage replay or offsets look wrong.\n5. Keep the runtime generic and verify output from `metrics.ndjson` and `.state.json`.\n\n## Read Next\n\n- Read `references/quickstart.md` for setup and smoke-test steps.\n- Read `references/schema-v2.md` when you need field definitions or sidecar state shape.\n## Key Files\n\n- `scripts/main.py`: hook entrypoint for `session-start`, `user-prompt-submit`, `pre`, `post`, and `stop`\n- `scripts/run_hook.sh`: stable shell wrapper for CodeBuddy hook commands\n- `scripts/core/collector.py`: transcript parsing, pre/post pairing, and session usage recording\n- `scripts/core/state.py`: persisted hook state, offsets, and pending tool events\n- `scripts/core/devflow.py`: optional devflow-awareness — detects a `multi-agents-devflow-*` team, reads `workflow-state.json`, and emits `stage_transition` events. No-ops entirely on non-devflow projects.\n- `templates/settings-hook.json`: hook wiring template\n\n## Output Contract\n\n- Always emit `event`, `sid`, and `ts`.\n- Emit `tool` for per-call latency and `usage` for transcript-derived token and cost events.\n- Emit `stop` for end-of-session flush.\n- Never block the main hook flow; hook exits must stay `0`.\n",
+      "card": {
+        "title_zh": "CodeBuddy钩子可观测性",
+        "purpose_zh": "为需要本地指标的项目添加或维护 CodeBuddy 钩子可观测性，采集工具延迟、transcript token 用量、会话成本与多智能体追踪归属，并排查缺失的用量事件。",
+        "does": [
+          "将 templates/settings-hook.json 合并进用户或项目的 settings.json",
+          "保持钩子条目为纯命令形式，超时约 5 到 10 秒",
+          "运行普通 CodeBuddy 会话并检查 logs/metrics.ndjson",
+          "在用量重放或偏移异常时检查 logs/.state.json",
+          "通过 scripts/main.py 处理 session-start、user-prompt-submit、pre、post、stop 钩子事件",
+          "解析 transcript、配对 pre/post 并记录会话用量，可选检测 multi-agents-devflow-* 团队并发出 stage_transition 事件"
+        ],
+        "inputs": [
+          "用户或项目的 settings.json",
+          "templates/settings-hook.json 钩子接线模板",
+          "CodeBuddy 会话产生的 transcript",
+          "可选的 workflow-state.json（devflow 项目）"
+        ],
+        "outputs": [
+          "logs/metrics.ndjson 指标日志",
+          "logs/.state.json 钩子状态与偏移",
+          "包含 event、sid、ts 的事件，以及 tool、usage、stop 事件"
+        ],
+        "scenarios": [
+          "为项目接入基于钩子的本地遥测",
+          "调试缺失的用量事件",
+          "检查工具调用延迟与会话成本",
+          "排查用量重放或偏移问题",
+          "为多智能体 devflow 项目记录阶段转换"
+        ],
+        "prerequisites": [
+          "项目使用 CodeBuddy 并支持 settings.json 钩子配置",
+          "将 templates/settings-hook.json 合并进 settings.json",
+          "钩子命令通过 scripts/run_hook.sh 包装执行"
+        ],
+        "limits": [
+          "钩子条目须为纯命令形式，超时保持在 5 到 10 秒",
+          "钩子不得阻塞主流程，退出码必须保持 0",
+          "devflow 感知在非 devflow 项目上完全不做任何操作",
+          "原文未说明支持的其他宿主平台"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "运维部署",
+          "数据分析",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Add or maintain CodeBuddy hook observability for projects that need local metrics for tool latency, transcript token usage, session cost, and multi-agent trace attribution."
+          },
+          {
+            "field": "does",
+            "quote": "Merge `templates/settings-hook.json` into the user or project `settings.json`."
+          },
+          {
+            "field": "does",
+            "quote": "Keep hook entries command-only and keep timeouts around 5 to 10 seconds."
+          },
+          {
+            "field": "does",
+            "quote": "Run a normal CodeBuddy session and inspect `logs/metrics.ndjson`."
+          },
+          {
+            "field": "does",
+            "quote": "Inspect `logs/.state.json` when usage replay or offsets look wrong."
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/main.py`: hook entrypoint for `session-start`, `user-prompt-submit`, `pre`, `post`, and `stop`"
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/core/collector.py`: transcript parsing, pre/post pairing, and session usage recording"
+          },
+          {
+            "field": "does",
+            "quote": "detects a `multi-agents-devflow-*` team, reads `workflow-state.json`, and emits `stage_transition` events. No-ops entirely on non-devflow projects."
+          },
+          {
+            "field": "outputs",
+            "quote": "Always emit `event`, `sid`, and `ts`."
+          },
+          {
+            "field": "outputs",
+            "quote": "Emit `tool` for per-call latency and `usage` for transcript-derived token and cost events."
+          },
+          {
+            "field": "outputs",
+            "quote": "Emit `stop` for end-of-session flush."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Merge `templates/settings-hook.json` into the user or project `settings.json`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`scripts/run_hook.sh`: stable shell wrapper for CodeBuddy hook commands"
+          },
+          {
+            "field": "limits",
+            "quote": "Never block the main hook flow; hook exits must stay `0`."
+          },
+          {
+            "field": "limits",
+            "quote": "Keep hook entries command-only and keep timeouts around 5 to 10 seconds."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`scripts/run_hook.sh`: stable shell wrapper for CodeBuddy hook commands"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run a normal CodeBuddy session and inspect `logs/metrics.ndjson`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "local/.claude/skills/brainstorming/SKILL.md",
+      "blob_sha": "06cd0a21ee771f6bb7aaba9341a77ca09a8c7d04",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.claude/skills/brainstorming/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "brainstorming",
+        "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+      },
+      "excerpt": "---\nname: brainstorming\ndescription: \"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.\"\n---\n\n# Brainstorming Ideas Into Designs\n\nHelp turn ideas into fully formed designs and specs through natural collaborative dialogue.\n\nStart by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.\n\n<HARD-GATE>\nDo NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.\n</HARD-GATE>\n\n## Anti-Pattern: \"This Is Too Simple To Need A Design\"\n\nEvery project goes through this process. A todo list, a single-function utility, a config change — all of them. \"Simple\" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.\n\n## Checklist\n\nYou MUST create a task for each of these items and complete them in order:\n\n1. **Explore project context** — check files, docs, recent commits\n2. **Offer visual companion** (if topic will involve visual questions) — this is its own message, not combined with a clarifying question. See the Visual Companion section below.\n3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria\n4. **Propose 2-3 approaches** — with trade-offs and your recommendation\n5. **Present design** — in sections scaled to their complexity, get user approval after each section\n6. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit\n7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)\n8. **User reviews written spec** — ask user to review the spec file before proceeding\n9. **Transition to implementation** — invoke writing-plans skill to create implementation plan\n\n## Process Flow\n\n```dot\ndigraph brainstorming {\n    \"Explore project context\" [shape=box];\n    \"Visual questions ahead?\" [shape=diamond];\n    \"Offer Visual Companion\\n(own message, no other content)\" [shape=box];\n    \"Ask clarifying questions\" [shape=box];\n    \"Propose 2-3 approaches\" [shape=box];\n    \"Present design sections\" [shape=box];\n    \"User approves design?\" [shape=diamond];\n    \"Write design doc\" [shape=box];\n    \"Spec self-review\\n(fix inline)\" [shape=box];\n    \"User reviews spec?\" [shape=diamond];\n    \"Invoke writing-plans skill\" [shape=doublecircle];\n\n    \"Explore project context\" -> \"Visual questions ahead?\";\n    \"Visual questions ahead?\" -> \"Offer Visual Companion\\n(own message, no other content)\" [label=\"yes\"];\n    \"Visual questions ahead?\" -> \"Ask clarifying questions\" [label=\"no\"];\n    \"Offer Visual Companion\\n(own message, no other content)\" -> \"Ask clarifying questions\";\n    \"Ask clarifying questions\" -> \"Propose 2-3 approaches\";\n    \"Propose 2-3 approaches\" -> \"Present design sections\";\n    \"Present design sections\" -> \"User approves design?\";\n    \"User approves design?\" -> \"Present design sections\" [label=\"no, revise\"];\n    \"User approves design?\" -> \"Write design doc\" [label=\"yes\"];\n    \"Write design doc\" -> \"Spec self-review\\n(fix inline)\";\n    \"Spec self-review\\n(fix inline)\" -> \"User reviews spec?\";\n    \"User reviews spec?\" -> \"Write design doc\" [label=\"changes requested\"];\n    \"User reviews spec?\" -> \"Invoke writing-plans skill\" [label=\"approved\"];\n}\n```\n\n**The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.\n\n## The Process\n\n**Understanding the idea:**\n\n- Check out the current project state first (files, docs, recent commits)\n- Before asking detailed questions, assess scope: if the request describes multiple independent subsystems (e.g., \"build a platform with chat, file storage, billing, and analytics\"), flag this immediately. Don't spend questions refining details of a project that needs to be decomposed first.\n- If the project is too large for a single spec, help the user decompose into sub-projects: what are the independent pieces, how do they relate, what order should they be built? Then brainstorm the first sub-project through the normal design flow. Each sub-project gets its own spec → plan → implementation cycle.\n- For appropriately-scoped projects, ask questions one at a time to refine the idea\n- Prefer multiple choice questions when possible, but open-ended is fine too\n- Only one question per message - if a topic needs more exploration, break it into multiple questions\n- Focus on understanding: purpose, constraints, success criteria\n\n**Exploring approaches:**\n\n- Propose 2-3 different approaches with trade-offs\n- Present options conversationally with your recommendation and reasoning\n- Lead with your recommended option and explain why\n\n**Presenting the design:**\n\n- Once you believe you understand what you're building, present the design\n- Scale each section to its complexity: a few sentences if straightforward, up to 200-300 words if nuanced\n- Ask after each section whether it looks right so far\n- Cover: architecture, components, data flow, error handling, testing\n- Be ready to go back and clarify if something doesn't make sense\n\n**Design for isolation and clarity:**\n\n- Break the system into smaller units that each have one clear purpose, communicate through well-defined interfaces, and can be understood and tested independently\n- For each unit, you should be able to answer: what does it do, how do you use it, and what does it depend on?\n- Can someone understand what a unit does without reading its internals? Can you change the internals without breaking consumers? If not, the boundaries need work.\n- Smaller, well-bounded units are also easier for you to work with - you reason better about code you can hold in context at once, and your edits are more reliable when files are focused. When a file grows large, that's often a signal that it's doing too much.\n\n**Working in existing codebases:**\n\n- Explore the current structure before proposing changes. Follow existing patterns.\n- Where existing code has problems that affect the work (e.g., a file that's grown too large, unclear boundaries, tangled responsibilities), include targeted improvements as part of the design - the way a good developer improves code they're working in.\n- Don't propose unrelated refactoring. Stay focused on what serves the current goal.\n\n## After the Design\n\n**Documentation:**\n\n- Write the validated design (spec) to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`\n  - (User preferences for spec location override this default)\n- Use elements-of-style:writing-clearly-and-concisely skill if available\n- Commit the design document to git\n\n**Spec Self-Review:**\nAfter writing the spec document, look at it with fresh eyes:\n\n1. **Placeholder scan:** Any \"TBD\", \"TODO\", incomplete sections, or vague requirements? Fix them.\n2. **Internal consistency:** Do any sections contradict each other? Does the architecture match the feature descriptions?\n3. **Scope check:** Is this focused enough for a single implementation plan, or does it need decomposition?\n4. **Ambiguity check:** Could any requirement be interpreted two different ways? If so, pick one and make it explicit.\n\nFix any issues inline. No need to re-review — just fix and move on.\n\n**User Review Gate:**\nAfter the spec review loop passes, ask the user to review the written spec before proceeding:\n\n> \"Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan.\"\n\nWait for the user's response. If they request changes, make them ",
+      "card": null
+    },
+    {
+      "skill_path": "local/.claude/skills/knowledge-distillation/SKILL.md",
+      "blob_sha": "7b3de183db139bcb7072f3d9076c2ff45145368b",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.claude/skills/knowledge-distillation/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "knowledge-distillation",
+        "description": "通用知识沉淀能力 - 提供从项目交付过程中提炼可复用经验、教训和模式的标准化方法论，包括信息收集、精简提炼、结构化输出。不绑定任何特定工作流或存储方式。当用户说\"帮我做知识沉淀\"、\"总结一下这次需求的经验\"、\"记录一下踩坑\"、\"沉淀一下这次的技术决策\"、\"做个复盘\"时使用本技能。"
+      },
+      "excerpt": "---\nname: knowledge-distillation\ndescription: 通用知识沉淀能力 - 提供从项目交付过程中提炼可复用经验、教训和模式的标准化方法论，包括信息收集、精简提炼、结构化输出。不绑定任何特定工作流或存储方式。当用户说\"帮我做知识沉淀\"、\"总结一下这次需求的经验\"、\"记录一下踩坑\"、\"沉淀一下这次的技术决策\"、\"做个复盘\"时使用本技能。\n---\n\n# 通用知识沉淀能力\n\n提供一套标准化的知识沉淀方法论，帮助从项目/需求交付过程中系统性地提炼可复用的经验、教训和模式。本 skill 关注**知识提炼方法本身**，不绑定任何特定的存储位置、项目管理工具或工作流。\n\n---\n\n## 适用场景\n\n- 需求/项目交付完成后，提炼可复用的知识\n- 技术攻关后，记录关键决策和踩坑经验\n- 代码改造后，沉淀可复用的改造模式\n- 定期回顾，梳理团队知识资产\n\n---\n\n## 核心流程\n\n### Step 1: 信息收集\n\n回顾交付过程中的各阶段产物和记录，提取有沉淀价值的信息：\n\n| 信息来源 | 关注要点 |\n|---------|---------|\n| 需求分析产物 | 需求理解中的关键决策、澄清的歧义、识别的边界条件 |\n| 技术方案产物 | 架构决策理由、方案取舍原因、技术选型考量 |\n| 代码实现产物 | 实现中遇到的坑、关键改造模式、巧妙的解决方案 |\n| 测试产物 | 发现的缺陷模式、易出错的场景、测试方法的有效性 |\n| 审核/评审记录 | 被打回的原因、修订内容、评审中提出的关键问题 |\n| 沟通记录 | 用户/干系人补充的关键上下文信息 |\n\n### Step 2: 筛选与提炼\n\n对收集的原始信息进行筛选和精炼，每条知识点必须满足以下标准：\n\n| 标准 | 要求 | 反例 |\n|------|------|------|\n| **可复用** | 对后续类似场景有参考价值 | \"本次需求的截止日期是 X\" |\n| **具体明确** | 包含具体的模块名、函数名、技术术语等上下文 | \"某个模块有个坑需要注意\" |\n| **结论导向** | 直接写结论和做法，不记录过程讨论 | \"经过 3 轮讨论最终决定...\" |\n| **精简** | 每条 1-3 句话，直击要点 | 大段复制粘贴原始产物内容 |\n\n### Step 3: 分类组织\n\n将提炼的知识点按类别组织：\n\n| 类别 | 内容范围 | 举例 |\n|------|---------|------|\n| **业务知识** | 业务规则、模块职责、数据流向 | \"X 表的 Y 字段由外部程序写入，不在本系统控制范围内\" |\n| **技术决策** | 架构选型、方案取舍及其理由 | \"选择序列表方案而非 Redis 方案，因为需要事务内原子操作\" |\n| **改造模式** | 可复用的代码改造范式 | \"通用化函数设计：接受 table_name/id_column 参数，支持多业务类型\" |\n| **踩坑记录** | 易错点、陷阱、注意事项 | \"GBK 编码文件中不能使用 UTF-8 特殊字符，否则编译失败\" |\n| **流程改进** | 对工作流程的改进建议 | \"审核标准应增加 X 检查项，本次因遗漏导致返工\" |\n\n### Step 4: 结构化输出\n\n按照下方模板输出知识沉淀结果，并写入用户指定的文件路径。若用户未指定路径，询问保存位置。\n\n---\n\n## 知识沉淀输出模板\n\n```markdown\n## {需求/项目标识} - {标题} ({日期})\n\n### 业务知识\n- {从需求分析中提炼的业务规则、模块职责、数据流向等}\n\n### 技术决策\n- {架构选型理由、方案取舍、为什么选 A 不选 B}\n\n### 改造模式\n- {代码改造中总结的可复用模式/范式}\n\n### 踩坑记录\n- {实现/测试过程中遇到的坑、易错点、注意事项}\n\n### 流程改进\n- {本次流程执行中发现的改进点}\n```\n\n> 如果某个类别没有值得沉淀的内容，该类别可省略。\n> 如果本次交付整体没有新的知识点（如简单配置变更），输出一条简要记录说明。\n\n---\n\n## 写入规则\n\n1. **追加不覆盖**：每次沉淀追加新章节，不修改或删除已有条目\n2. **幂等安全**：同一需求/项目多次沉淀时，检查是否已存在对应章节，避免重复\n3. **版本化**：沉淀产物应纳入版本控制，确保可追溯\n\n---\n\n## 知识质量自检\n\n沉淀完成后，检查以下要点：\n\n- [ ] 每条知识点是否满足\"可复用、具体明确、结论导向、精简\"四个标准？\n- [ ] 是否遗漏了重要的决策理由或踩坑经验？\n- [ ] 知识点的分类是否准确？\n- [ ] 是否包含了足够的上下文信息，让不了解本次需求的人也能理解？\n- [ ] 是否有大段复制粘贴原始产物的情况？（应提炼为精简结论）\n\n---\n\n## 关键原则\n\n1. **宁缺毋滥**：只沉淀真正有复用价值的知识，不为了填充而凑数\n2. **具体到位**：包含具体的技术术语、模块名、函数名，让知识可操作\n3. **结论优先**：直接给出结论和最佳实践，不记录冗长的讨论过程\n4. **持续积累**：每次交付都追加，逐步构建团队知识资产\n5. **可检索性**：使用清晰的标题和分类，便于后续检索和引用\n",
+      "card": {
+        "title_zh": "通用知识沉淀",
+        "purpose_zh": "提供从项目或需求交付过程中提炼可复用经验、教训和模式的标准化方法论，涵盖信息收集、筛选提炼、分类组织与结构化输出，不绑定特定工作流或存储方式。",
+        "does": [
+          "按需求分析、技术方案、代码实现、测试、评审、沟通等来源收集有沉淀价值的信息",
+          "按可复用、具体明确、结论导向、精简四条标准筛选并提炼知识点",
+          "将知识点分类为业务知识、技术决策、改造模式、踩坑记录、流程改进",
+          "按给定 Markdown 模板结构化输出知识沉淀结果",
+          "写入用户指定路径，未指定时询问保存位置，追加不覆盖并做幂等检查",
+          "沉淀完成后按自检清单检查质量"
+        ],
+        "inputs": [
+          "交付过程中的各阶段产物和记录（需求分析、技术方案、代码实现、测试、评审、沟通记录）",
+          "用户指定的知识沉淀保存文件路径",
+          "需求或项目标识与标题"
+        ],
+        "outputs": [
+          "按模板组织的 Markdown 知识沉淀章节（业务知识、技术决策、改造模式、踩坑记录、流程改进）",
+          "无新知识点时的简要记录",
+          "写入用户指定文件的知识沉淀内容"
+        ],
+        "scenarios": [
+          "需求或项目交付完成后提炼可复用知识",
+          "技术攻关后记录关键决策和踩坑经验",
+          "代码改造后沉淀可复用的改造模式",
+          "定期回顾梳理团队知识资产",
+          "对某次需求做复盘总结"
+        ],
+        "prerequisites": [
+          "用户提供或可获取交付过程各阶段产物与记录",
+          "用户指定保存路径，否则需先询问"
+        ],
+        "limits": [
+          "只关注知识提炼方法本身，不绑定存储位置、项目管理工具或工作流",
+          "不记录过程讨论，只写结论和做法",
+          "每条知识点需 1-3 句话，禁止大段复制原始产物",
+          "宁缺毋滥，不为填充而凑数",
+          "某类别无内容时可省略"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "提供一套标准化的知识沉淀方法论，帮助从项目/需求交付过程中系统性地提炼可复用的经验、教训和模式。"
+          },
+          {
+            "field": "does",
+            "quote": "回顾交付过程中的各阶段产物和记录，提取有沉淀价值的信息"
+          },
+          {
+            "field": "does",
+            "quote": "对收集的原始信息进行筛选和精炼，每条知识点必须满足以下标准"
+          },
+          {
+            "field": "does",
+            "quote": "将提炼的知识点按类别组织"
+          },
+          {
+            "field": "does",
+            "quote": "按照下方模板输出知识沉淀结果，并写入用户指定的文件路径。若用户未指定路径，询问保存位置。"
+          },
+          {
+            "field": "does",
+            "quote": "沉淀完成后，检查以下要点"
+          },
+          {
+            "field": "inputs",
+            "quote": "需求分析产物 | 需求理解中的关键决策、澄清的歧义、识别的边界条件"
+          },
+          {
+            "field": "outputs",
+            "quote": "## {需求/项目标识} - {标题} ({日期})"
+          },
+          {
+            "field": "scenarios",
+            "quote": "需求/项目交付完成后，提炼可复用的知识"
+          },
+          {
+            "field": "scenarios",
+            "quote": "技术攻关后，记录关键决策和踩坑经验"
+          },
+          {
+            "field": "scenarios",
+            "quote": "代码改造后，沉淀可复用的改造模式"
+          },
+          {
+            "field": "scenarios",
+            "quote": "定期回顾，梳理团队知识资产"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "若用户未指定路径，询问保存位置"
+          },
+          {
+            "field": "limits",
+            "quote": "本 skill 关注**知识提炼方法本身**，不绑定任何特定的存储位置、项目管理工具或工作流。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "按照下方模板输出知识沉淀结果，并写入用户指定的文件路径。"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "local/.claude/skills/tech-design/SKILL.md",
+      "blob_sha": "62aa512490501428f78da34dfc129d3eaacf9e76",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.claude/skills/tech-design/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "tech-design",
+        "description": "通用技术方案撰写技能。根据需求输入（需求分析报告或口头描述）自动生成结构完整的技术方案 Markdown 文档。当用户说\"帮我写技术方案\"、\"出一个技术设计文档\"、\"写一份 design doc\"、\"给这个需求出方案\"时使用本技能。"
+      },
+      "excerpt": "---\nname: tech-design\ndescription: 通用技术方案撰写技能。根据需求输入（需求分析报告或口头描述）自动生成结构完整的技术方案 Markdown 文档。当用户说\"帮我写技术方案\"、\"出一个技术设计文档\"、\"写一份 design doc\"、\"给这个需求出方案\"时使用本技能。\n---\n\n# 技术方案撰写技能\n\n## 工作流程\n\n### 第一步：解析需求输入\n\n根据输入类型进行处理：\n\n- **需求分析报告**：读取报告文件，提取需求背景、功能点、约束条件\n- **口头描述**：直接理解用户描述，若信息不足以支撑方案撰写，追问以下关键信息：\n  - 核心功能是什么？\n  - 涉及哪些系统/模块？\n  - 有无性能/安全特殊要求？\n  - 预计数据量级？\n\n### 第二步：加载方案模板\n\n读取通用技术方案模板：[references/general.md](references/general.md)\n\n### 第三步：撰写技术方案\n\n按照模板结构生成技术方案，注意：\n\n- 架构图、流程图、时序图统一使用 Mermaid 语法绘制\n- 不涉及的章节（如灰度策略、第三方依赖）直接删除，不强行填写\n- 若某章节信息不足，标注\"待补充\"并说明需要哪些信息\n- 方案中的估算数据（性能指标、数据量等）需标注来源或假设依据\n\n### 第四步：保存文档\n\n将生成的技术方案保存为 Markdown 文件：\n\n- 若用户已指定输出路径，保存到指定路径\n- 若用户未指定路径，询问保存位置\n- 文件名建议：`tech-design-[需求名称].md`\n\n## 注意事项\n\n- 方案内容应具体、可落地，避免空泛描述\n- 关键技术决策需说明\"为什么选这个，为什么不选那个\"\n- 复杂方案优先用图表表达，文字辅助说明\n",
+      "card": {
+        "title_zh": "技术方案撰写",
+        "purpose_zh": "根据需求分析报告或口头描述，自动生成结构完整的技术方案 Markdown 文档，并保存为文件。",
+        "does": [
+          "解析需求输入：读取需求分析报告文件，提取需求背景、功能点、约束条件",
+          "对口头描述信息不足时追问核心功能、涉及系统模块、性能安全要求、数据量级",
+          "读取通用技术方案模板 references/general.md",
+          "按模板结构撰写技术方案，架构图、流程图、时序图使用 Mermaid 语法",
+          "删除不涉及章节，信息不足处标注待补充并说明所需信息，估算数据标注来源或假设依据",
+          "将方案保存为 Markdown 文件，未指定路径时询问保存位置"
+        ],
+        "inputs": [
+          "需求分析报告文件",
+          "用户口头需求描述",
+          "用户指定的输出路径（可选）"
+        ],
+        "outputs": [
+          "技术方案 Markdown 文档",
+          "文件名建议为 tech-design-[需求名称].md"
+        ],
+        "scenarios": [
+          "用户说帮我写技术方案",
+          "用户要求出一个技术设计文档",
+          "用户要求写一份 design doc",
+          "用户要求给某个需求出方案"
+        ],
+        "prerequisites": [
+          "需要存在通用技术方案模板文件 references/general.md"
+        ],
+        "limits": [
+          "不涉及的章节直接删除，不强行填写",
+          "信息不足的章节标注待补充",
+          "估算数据需标注来源或假设依据",
+          "用户未指定保存路径时需询问保存位置"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "产品规划",
+          "写作"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "通用技术方案撰写技能。根据需求输入（需求分析报告或口头描述）自动生成结构完整的技术方案 Markdown 文档。"
+          },
+          {
+            "field": "does",
+            "quote": "读取通用技术方案模板：[references/general.md](references/general.md)"
+          },
+          {
+            "field": "does",
+            "quote": "架构图、流程图、时序图统一使用 Mermaid 语法绘制"
+          },
+          {
+            "field": "does",
+            "quote": "不涉及的章节（如灰度策略、第三方依赖）直接删除，不强行填写"
+          },
+          {
+            "field": "does",
+            "quote": "若某章节信息不足，标注\"待补充\"并说明需要哪些信息"
+          },
+          {
+            "field": "does",
+            "quote": "将生成的技术方案保存为 Markdown 文件"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "读取通用技术方案模板：[references/general.md](references/general.md)"
+          },
+          {
+            "field": "limits",
+            "quote": "方案中的估算数据（性能指标、数据量等）需标注来源或假设依据"
+          },
+          {
+            "field": "limits",
+            "quote": "若用户未指定路径，询问保存位置"
+          },
+          {
+            "field": "scenarios",
+            "quote": "当用户说\"帮我写技术方案\"、\"出一个技术设计文档\"、\"写一份 design doc\"、\"给这个需求出方案\"时使用本技能。"
+          },
+          {
+            "field": "outputs",
+            "quote": "文件名建议：`tech-design-[需求名称].md`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "local/.claude/skills/writing-plans/SKILL.md",
+      "blob_sha": "8988ee5a30761660b1a243ac665a4c1926f98666",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.claude/skills/writing-plans/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "writing-plans",
+        "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+      },
+      "excerpt": "---\nname: writing-plans\ndescription: Use when you have a spec or requirements for a multi-step task, before touching code\n---\n\n# Writing Plans\n\n## Overview\n\nWrite comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.\n\nAssume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.\n\n**Announce at start:** \"I'm using the writing-plans skill to create the implementation plan.\"\n\n**Context:** If working in an isolated worktree, it should have been created via the `superpowers:using-git-worktrees` skill at execution time.\n\n**Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-.md`\n- (User preferences for plan location override this default)\n\n## Scope Check\n\nIf the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.\n\n## File Structure\n\nBefore defining tasks, map out which files will be created or modified and what each one is responsible for. This is where decomposition decisions get locked in.\n\n- Design units with clear boundaries and well-defined interfaces. Each file should have one clear responsibility.\n- You reason best about code you can hold in context at once, and your edits are more reliable when files are focused. Prefer smaller, focused files over large ones that do too much.\n- Files that change together should live together. Split by responsibility, not by technical layer.\n- In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure - but if a file you're modifying has grown unwieldy, including a split in the plan is reasonable.\n\nThis structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.\n\n## Bite-Sized Task Granularity\n\n**Each step is one action (2-5 minutes):**\n- \"Write the failing test\" - step\n- \"Run it to make sure it fails\" - step\n- \"Implement the minimal code to make the test pass\" - step\n- \"Run the tests and make sure they pass\" - step\n- \"Commit\" - step\n\n## Plan Document Header\n\n**Every plan MUST start with this header:**\n\n```markdown\n# [Feature Name] Implementation Plan\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.\n\n**Goal:** [One sentence describing what this builds]\n\n**Architecture:** [2-3 sentences about approach]\n\n**Tech Stack:** [Key technologies/libraries]\n\n---\n```\n\n## Task Structure\n\n````markdown\n### Task N: [Component Name]\n\n**Files:**\n- Create: `exact/path/to/file.py`\n- Modify: `exact/path/to/existing.py:123-145`\n- Test: `tests/exact/path/to/test.py`\n\n- [ ] **Step 1: Write the failing test**\n\n```python\ndef test_specific_behavior():\n    result = function(input)\n    assert result == expected\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `pytest tests/path/test.py::test_name -v`\nExpected: FAIL with \"function not defined\"\n\n- [ ] **Step 3: Write minimal implementation**\n\n```python\ndef function(input):\n    return expected\n```\n\n- [ ] **Step 4: Run test to verify it passes**\n\nRun: `pytest tests/path/test.py::test_name -v`\nExpected: PASS\n\n- [ ] **Step 5: Commit**\n\n```bash\ngit add tests/path/test.py src/path/file.py\ngit commit -m \"feat: add specific feature\"\n```\n````\n\n## No Placeholders\n\nEvery step must contain the actual content an engineer needs. These are **plan failures** — never write them:\n- \"TBD\", \"TODO\", \"implement later\", \"fill in details\"\n- \"Add appropriate error handling\" / \"add validation\" / \"handle edge cases\"\n- \"Write tests for the above\" (without actual test code)\n- \"Similar to Task N\" (repeat the code — the engineer may be reading tasks out of order)\n- Steps that describe what to do without showing how (code blocks required for code steps)\n- References to types, functions, or methods not defined in any task\n\n## Remember\n\n- Exact file paths always\n- Complete code in every step — if a step changes code, show the code\n- Exact commands with expected output\n- DRY, YAGNI, TDD, frequent commits\n\n## Self-Review\n\nAfter writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.\n\n**1. Spec coverage:** Skim each section/requirement in the spec. Can you point to a task that implements it? List any gaps.\n\n**2. Placeholder scan:** Search your plan for red flags — any of the patterns from the \"No Placeholders\" section above. Fix them.\n\n**3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.\n\nIf you find issues, fix them inline. No need to re-review — just fix and move on.\nIf you find a spec requirement with no task, add the task.\n\n## Execution Handoff\n\nAfter saving the plan, offer execution choice:\n\n**\"Plan complete and saved to `docs/superpowers/plans/.md`. Two execution options:**\n\n**1. Subagent-Driven (recommended)**\n- I dispatch a fresh subagent per task, review between tasks, fast iteration\n\n**2. Inline Execution**\n- Execute tasks in this session using executing-plans, batch execution with checkpoints\n\n**Which approach?\"**\n\n**If Subagent-Driven chosen:**\n- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development\n- Fresh subagent per task + two-stage review\n\n**If Inline Execution chosen:**\n- **REQUIRED SUB-SKILL:** Use superpowers:executing-plans\n- Batch execution with checkpoints for review\n",
+      "card": null
+    },
+    {
+      "skill_path": "local/.codebuddy/skills/agent-observability/SKILL.md",
+      "blob_sha": "5f980a684bb51eee75fbe3b584051a5de7190622",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.codebuddy/skills/agent-observability/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agent-observability",
+        "description": "Add or maintain CodeBuddy hook observability for projects that need local metrics for tool latency, transcript token usage, session cost, and multi-agent trace attribution. Use when wiring hook-based telemetry, and debugging missing usage events."
+      },
+      "excerpt": "---\nname: agent-observability\ndescription: Add or maintain CodeBuddy hook observability for projects that need local metrics for tool latency, transcript token usage, session cost, and multi-agent trace attribution. Use when wiring hook-based telemetry, and debugging missing usage events.\n---\n\n## Workflow\n\n1. Merge `templates/settings-hook.json` into the user or project `settings.json`.\n2. Keep hook entries command-only and keep timeouts around 5 to 10 seconds.\n3. Run a normal CodeBuddy session and inspect `logs/metrics.ndjson`.\n4. Inspect `logs/.state.json` when usage replay or offsets look wrong.\n5. Keep the runtime generic and verify output from `metrics.ndjson` and `.state.json`.\n\n## Read Next\n\n- Read `references/quickstart.md` for setup and smoke-test steps.\n- Read `references/schema-v2.md` when you need field definitions or sidecar state shape.\n## Key Files\n\n- `scripts/main.py`: hook entrypoint for `session-start`, `user-prompt-submit`, `pre`, `post`, and `stop`\n- `scripts/run_hook.sh`: stable shell wrapper for CodeBuddy hook commands\n- `scripts/core/collector.py`: transcript parsing, pre/post pairing, and session usage recording\n- `scripts/core/state.py`: persisted hook state, offsets, and pending tool events\n- `scripts/core/devflow.py`: optional devflow-awareness — detects a `multi-agents-devflow-*` team, reads `workflow-state.json`, and emits `stage_transition` events. No-ops entirely on non-devflow projects.\n- `templates/settings-hook.json`: hook wiring template\n\n## Output Contract\n\n- Always emit `event`, `sid`, and `ts`.\n- Emit `tool` for per-call latency and `usage` for transcript-derived token and cost events.\n- Emit `stop` for end-of-session flush.\n- Never block the main hook flow; hook exits must stay `0`.\n",
+      "card": {
+        "title_zh": "CodeBuddy钩子可观测性",
+        "purpose_zh": "为需要本地指标的项目添加或维护 CodeBuddy 钩子可观测性，采集工具延迟、transcript token 用量、会话成本与多智能体追踪归属，并排查缺失的用量事件。",
+        "does": [
+          "将 templates/settings-hook.json 合并进用户或项目的 settings.json",
+          "保持钩子条目为纯命令形式，超时约 5 到 10 秒",
+          "运行普通 CodeBuddy 会话并检查 logs/metrics.ndjson",
+          "在用量重放或偏移异常时检查 logs/.state.json",
+          "通过 scripts/main.py 处理 session-start、user-prompt-submit、pre、post、stop 钩子事件",
+          "解析 transcript、配对 pre/post 并记录会话用量，可选检测 multi-agents-devflow-* 团队并发出 stage_transition 事件"
+        ],
+        "inputs": [
+          "用户或项目的 settings.json",
+          "templates/settings-hook.json 钩子接线模板",
+          "CodeBuddy 会话产生的 transcript",
+          "可选的 workflow-state.json（devflow 项目）"
+        ],
+        "outputs": [
+          "logs/metrics.ndjson 指标日志",
+          "logs/.state.json 钩子状态与偏移",
+          "包含 event、sid、ts 的事件，以及 tool、usage、stop 事件"
+        ],
+        "scenarios": [
+          "为项目接入基于钩子的本地遥测",
+          "调试缺失的用量事件",
+          "检查工具调用延迟与会话成本",
+          "排查用量重放或偏移问题",
+          "为多智能体 devflow 项目记录阶段转换"
+        ],
+        "prerequisites": [
+          "项目使用 CodeBuddy 并支持 settings.json 钩子配置",
+          "将 templates/settings-hook.json 合并进 settings.json",
+          "钩子命令通过 scripts/run_hook.sh 包装执行"
+        ],
+        "limits": [
+          "钩子条目须为纯命令形式，超时保持在 5 到 10 秒",
+          "钩子不得阻塞主流程，退出码必须保持 0",
+          "devflow 感知在非 devflow 项目上完全不做任何操作",
+          "原文未说明支持的其他宿主平台"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "运维部署",
+          "数据分析",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Add or maintain CodeBuddy hook observability for projects that need local metrics for tool latency, transcript token usage, session cost, and multi-agent trace attribution."
+          },
+          {
+            "field": "does",
+            "quote": "Merge `templates/settings-hook.json` into the user or project `settings.json`."
+          },
+          {
+            "field": "does",
+            "quote": "Keep hook entries command-only and keep timeouts around 5 to 10 seconds."
+          },
+          {
+            "field": "does",
+            "quote": "Run a normal CodeBuddy session and inspect `logs/metrics.ndjson`."
+          },
+          {
+            "field": "does",
+            "quote": "Inspect `logs/.state.json` when usage replay or offsets look wrong."
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/main.py`: hook entrypoint for `session-start`, `user-prompt-submit`, `pre`, `post`, and `stop`"
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/core/collector.py`: transcript parsing, pre/post pairing, and session usage recording"
+          },
+          {
+            "field": "does",
+            "quote": "detects a `multi-agents-devflow-*` team, reads `workflow-state.json`, and emits `stage_transition` events. No-ops entirely on non-devflow projects."
+          },
+          {
+            "field": "outputs",
+            "quote": "Always emit `event`, `sid`, and `ts`."
+          },
+          {
+            "field": "outputs",
+            "quote": "Emit `tool` for per-call latency and `usage` for transcript-derived token and cost events."
+          },
+          {
+            "field": "outputs",
+            "quote": "Emit `stop` for end-of-session flush."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Merge `templates/settings-hook.json` into the user or project `settings.json`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`scripts/run_hook.sh`: stable shell wrapper for CodeBuddy hook commands"
+          },
+          {
+            "field": "limits",
+            "quote": "Never block the main hook flow; hook exits must stay `0`."
+          },
+          {
+            "field": "limits",
+            "quote": "Keep hook entries command-only and keep timeouts around 5 to 10 seconds."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`scripts/run_hook.sh`: stable shell wrapper for CodeBuddy hook commands"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run a normal CodeBuddy session and inspect `logs/metrics.ndjson`."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "local/.codebuddy/skills/brainstorming/SKILL.md",
+      "blob_sha": "06cd0a21ee771f6bb7aaba9341a77ca09a8c7d04",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.codebuddy/skills/brainstorming/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "brainstorming",
+        "description": "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+      },
+      "excerpt": "---\nname: brainstorming\ndescription: \"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation.\"\n---\n\n# Brainstorming Ideas Into Designs\n\nHelp turn ideas into fully formed designs and specs through natural collaborative dialogue.\n\nStart by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.\n\n<HARD-GATE>\nDo NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.\n</HARD-GATE>\n\n## Anti-Pattern: \"This Is Too Simple To Need A Design\"\n\nEvery project goes through this process. A todo list, a single-function utility, a config change — all of them. \"Simple\" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.\n\n## Checklist\n\nYou MUST create a task for each of these items and complete them in order:\n\n1. **Explore project context** — check files, docs, recent commits\n2. **Offer visual companion** (if topic will involve visual questions) — this is its own message, not combined with a clarifying question. See the Visual Companion section below.\n3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria\n4. **Propose 2-3 approaches** — with trade-offs and your recommendation\n5. **Present design** — in sections scaled to their complexity, get user approval after each section\n6. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit\n7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)\n8. **User reviews written spec** — ask user to review the spec file before proceeding\n9. **Transition to implementation** — invoke writing-plans skill to create implementation plan\n\n## Process Flow\n\n```dot\ndigraph brainstorming {\n    \"Explore project context\" [shape=box];\n    \"Visual questions ahead?\" [shape=diamond];\n    \"Offer Visual Companion\\n(own message, no other content)\" [shape=box];\n    \"Ask clarifying questions\" [shape=box];\n    \"Propose 2-3 approaches\" [shape=box];\n    \"Present design sections\" [shape=box];\n    \"User approves design?\" [shape=diamond];\n    \"Write design doc\" [shape=box];\n    \"Spec self-review\\n(fix inline)\" [shape=box];\n    \"User reviews spec?\" [shape=diamond];\n    \"Invoke writing-plans skill\" [shape=doublecircle];\n\n    \"Explore project context\" -> \"Visual questions ahead?\";\n    \"Visual questions ahead?\" -> \"Offer Visual Companion\\n(own message, no other content)\" [label=\"yes\"];\n    \"Visual questions ahead?\" -> \"Ask clarifying questions\" [label=\"no\"];\n    \"Offer Visual Companion\\n(own message, no other content)\" -> \"Ask clarifying questions\";\n    \"Ask clarifying questions\" -> \"Propose 2-3 approaches\";\n    \"Propose 2-3 approaches\" -> \"Present design sections\";\n    \"Present design sections\" -> \"User approves design?\";\n    \"User approves design?\" -> \"Present design sections\" [label=\"no, revise\"];\n    \"User approves design?\" -> \"Write design doc\" [label=\"yes\"];\n    \"Write design doc\" -> \"Spec self-review\\n(fix inline)\";\n    \"Spec self-review\\n(fix inline)\" -> \"User reviews spec?\";\n    \"User reviews spec?\" -> \"Write design doc\" [label=\"changes requested\"];\n    \"User reviews spec?\" -> \"Invoke writing-plans skill\" [label=\"approved\"];\n}\n```\n\n**The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.\n\n## The Process\n\n**Understanding the idea:**\n\n- Check out the current project state first (files, docs, recent commits)\n- Before asking detailed questions, assess scope: if the request describes multiple independent subsystems (e.g., \"build a platform with chat, file storage, billing, and analytics\"), flag this immediately. Don't spend questions refining details of a project that needs to be decomposed first.\n- If the project is too large for a single spec, help the user decompose into sub-projects: what are the independent pieces, how do they relate, what order should they be built? Then brainstorm the first sub-project through the normal design flow. Each sub-project gets its own spec → plan → implementation cycle.\n- For appropriately-scoped projects, ask questions one at a time to refine the idea\n- Prefer multiple choice questions when possible, but open-ended is fine too\n- Only one question per message - if a topic needs more exploration, break it into multiple questions\n- Focus on understanding: purpose, constraints, success criteria\n\n**Exploring approaches:**\n\n- Propose 2-3 different approaches with trade-offs\n- Present options conversationally with your recommendation and reasoning\n- Lead with your recommended option and explain why\n\n**Presenting the design:**\n\n- Once you believe you understand what you're building, present the design\n- Scale each section to its complexity: a few sentences if straightforward, up to 200-300 words if nuanced\n- Ask after each section whether it looks right so far\n- Cover: architecture, components, data flow, error handling, testing\n- Be ready to go back and clarify if something doesn't make sense\n\n**Design for isolation and clarity:**\n\n- Break the system into smaller units that each have one clear purpose, communicate through well-defined interfaces, and can be understood and tested independently\n- For each unit, you should be able to answer: what does it do, how do you use it, and what does it depend on?\n- Can someone understand what a unit does without reading its internals? Can you change the internals without breaking consumers? If not, the boundaries need work.\n- Smaller, well-bounded units are also easier for you to work with - you reason better about code you can hold in context at once, and your edits are more reliable when files are focused. When a file grows large, that's often a signal that it's doing too much.\n\n**Working in existing codebases:**\n\n- Explore the current structure before proposing changes. Follow existing patterns.\n- Where existing code has problems that affect the work (e.g., a file that's grown too large, unclear boundaries, tangled responsibilities), include targeted improvements as part of the design - the way a good developer improves code they're working in.\n- Don't propose unrelated refactoring. Stay focused on what serves the current goal.\n\n## After the Design\n\n**Documentation:**\n\n- Write the validated design (spec) to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`\n  - (User preferences for spec location override this default)\n- Use elements-of-style:writing-clearly-and-concisely skill if available\n- Commit the design document to git\n\n**Spec Self-Review:**\nAfter writing the spec document, look at it with fresh eyes:\n\n1. **Placeholder scan:** Any \"TBD\", \"TODO\", incomplete sections, or vague requirements? Fix them.\n2. **Internal consistency:** Do any sections contradict each other? Does the architecture match the feature descriptions?\n3. **Scope check:** Is this focused enough for a single implementation plan, or does it need decomposition?\n4. **Ambiguity check:** Could any requirement be interpreted two different ways? If so, pick one and make it explicit.\n\nFix any issues inline. No need to re-review — just fix and move on.\n\n**User Review Gate:**\nAfter the spec review loop passes, ask the user to review the written spec before proceeding:\n\n> \"Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan.\"\n\nWait for the user's response. If they request changes, make them ",
+      "card": null
+    },
+    {
+      "skill_path": "local/.codebuddy/skills/knowledge-distillation/SKILL.md",
+      "blob_sha": "7b3de183db139bcb7072f3d9076c2ff45145368b",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.codebuddy/skills/knowledge-distillation/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "knowledge-distillation",
+        "description": "通用知识沉淀能力 - 提供从项目交付过程中提炼可复用经验、教训和模式的标准化方法论，包括信息收集、精简提炼、结构化输出。不绑定任何特定工作流或存储方式。当用户说\"帮我做知识沉淀\"、\"总结一下这次需求的经验\"、\"记录一下踩坑\"、\"沉淀一下这次的技术决策\"、\"做个复盘\"时使用本技能。"
+      },
+      "excerpt": "---\nname: knowledge-distillation\ndescription: 通用知识沉淀能力 - 提供从项目交付过程中提炼可复用经验、教训和模式的标准化方法论，包括信息收集、精简提炼、结构化输出。不绑定任何特定工作流或存储方式。当用户说\"帮我做知识沉淀\"、\"总结一下这次需求的经验\"、\"记录一下踩坑\"、\"沉淀一下这次的技术决策\"、\"做个复盘\"时使用本技能。\n---\n\n# 通用知识沉淀能力\n\n提供一套标准化的知识沉淀方法论，帮助从项目/需求交付过程中系统性地提炼可复用的经验、教训和模式。本 skill 关注**知识提炼方法本身**，不绑定任何特定的存储位置、项目管理工具或工作流。\n\n---\n\n## 适用场景\n\n- 需求/项目交付完成后，提炼可复用的知识\n- 技术攻关后，记录关键决策和踩坑经验\n- 代码改造后，沉淀可复用的改造模式\n- 定期回顾，梳理团队知识资产\n\n---\n\n## 核心流程\n\n### Step 1: 信息收集\n\n回顾交付过程中的各阶段产物和记录，提取有沉淀价值的信息：\n\n| 信息来源 | 关注要点 |\n|---------|---------|\n| 需求分析产物 | 需求理解中的关键决策、澄清的歧义、识别的边界条件 |\n| 技术方案产物 | 架构决策理由、方案取舍原因、技术选型考量 |\n| 代码实现产物 | 实现中遇到的坑、关键改造模式、巧妙的解决方案 |\n| 测试产物 | 发现的缺陷模式、易出错的场景、测试方法的有效性 |\n| 审核/评审记录 | 被打回的原因、修订内容、评审中提出的关键问题 |\n| 沟通记录 | 用户/干系人补充的关键上下文信息 |\n\n### Step 2: 筛选与提炼\n\n对收集的原始信息进行筛选和精炼，每条知识点必须满足以下标准：\n\n| 标准 | 要求 | 反例 |\n|------|------|------|\n| **可复用** | 对后续类似场景有参考价值 | \"本次需求的截止日期是 X\" |\n| **具体明确** | 包含具体的模块名、函数名、技术术语等上下文 | \"某个模块有个坑需要注意\" |\n| **结论导向** | 直接写结论和做法，不记录过程讨论 | \"经过 3 轮讨论最终决定...\" |\n| **精简** | 每条 1-3 句话，直击要点 | 大段复制粘贴原始产物内容 |\n\n### Step 3: 分类组织\n\n将提炼的知识点按类别组织：\n\n| 类别 | 内容范围 | 举例 |\n|------|---------|------|\n| **业务知识** | 业务规则、模块职责、数据流向 | \"X 表的 Y 字段由外部程序写入，不在本系统控制范围内\" |\n| **技术决策** | 架构选型、方案取舍及其理由 | \"选择序列表方案而非 Redis 方案，因为需要事务内原子操作\" |\n| **改造模式** | 可复用的代码改造范式 | \"通用化函数设计：接受 table_name/id_column 参数，支持多业务类型\" |\n| **踩坑记录** | 易错点、陷阱、注意事项 | \"GBK 编码文件中不能使用 UTF-8 特殊字符，否则编译失败\" |\n| **流程改进** | 对工作流程的改进建议 | \"审核标准应增加 X 检查项，本次因遗漏导致返工\" |\n\n### Step 4: 结构化输出\n\n按照下方模板输出知识沉淀结果，并写入用户指定的文件路径。若用户未指定路径，询问保存位置。\n\n---\n\n## 知识沉淀输出模板\n\n```markdown\n## {需求/项目标识} - {标题} ({日期})\n\n### 业务知识\n- {从需求分析中提炼的业务规则、模块职责、数据流向等}\n\n### 技术决策\n- {架构选型理由、方案取舍、为什么选 A 不选 B}\n\n### 改造模式\n- {代码改造中总结的可复用模式/范式}\n\n### 踩坑记录\n- {实现/测试过程中遇到的坑、易错点、注意事项}\n\n### 流程改进\n- {本次流程执行中发现的改进点}\n```\n\n> 如果某个类别没有值得沉淀的内容，该类别可省略。\n> 如果本次交付整体没有新的知识点（如简单配置变更），输出一条简要记录说明。\n\n---\n\n## 写入规则\n\n1. **追加不覆盖**：每次沉淀追加新章节，不修改或删除已有条目\n2. **幂等安全**：同一需求/项目多次沉淀时，检查是否已存在对应章节，避免重复\n3. **版本化**：沉淀产物应纳入版本控制，确保可追溯\n\n---\n\n## 知识质量自检\n\n沉淀完成后，检查以下要点：\n\n- [ ] 每条知识点是否满足\"可复用、具体明确、结论导向、精简\"四个标准？\n- [ ] 是否遗漏了重要的决策理由或踩坑经验？\n- [ ] 知识点的分类是否准确？\n- [ ] 是否包含了足够的上下文信息，让不了解本次需求的人也能理解？\n- [ ] 是否有大段复制粘贴原始产物的情况？（应提炼为精简结论）\n\n---\n\n## 关键原则\n\n1. **宁缺毋滥**：只沉淀真正有复用价值的知识，不为了填充而凑数\n2. **具体到位**：包含具体的技术术语、模块名、函数名，让知识可操作\n3. **结论优先**：直接给出结论和最佳实践，不记录冗长的讨论过程\n4. **持续积累**：每次交付都追加，逐步构建团队知识资产\n5. **可检索性**：使用清晰的标题和分类，便于后续检索和引用\n",
+      "card": {
+        "title_zh": "通用知识沉淀",
+        "purpose_zh": "提供从项目或需求交付过程中提炼可复用经验、教训和模式的标准化方法论，涵盖信息收集、筛选提炼、分类组织与结构化输出，不绑定特定工作流或存储方式。",
+        "does": [
+          "按需求分析、技术方案、代码实现、测试、评审、沟通等来源收集有沉淀价值的信息",
+          "按可复用、具体明确、结论导向、精简四条标准筛选并提炼知识点",
+          "将知识点分类为业务知识、技术决策、改造模式、踩坑记录、流程改进",
+          "按给定 Markdown 模板结构化输出知识沉淀结果",
+          "写入用户指定路径，未指定时询问保存位置，追加不覆盖并做幂等检查",
+          "沉淀完成后按自检清单检查质量"
+        ],
+        "inputs": [
+          "交付过程中的各阶段产物和记录（需求分析、技术方案、代码实现、测试、评审、沟通记录）",
+          "用户指定的知识沉淀保存文件路径",
+          "需求或项目标识与标题"
+        ],
+        "outputs": [
+          "按模板组织的 Markdown 知识沉淀章节（业务知识、技术决策、改造模式、踩坑记录、流程改进）",
+          "无新知识点时的简要记录",
+          "写入用户指定文件的知识沉淀内容"
+        ],
+        "scenarios": [
+          "需求或项目交付完成后提炼可复用知识",
+          "技术攻关后记录关键决策和踩坑经验",
+          "代码改造后沉淀可复用的改造模式",
+          "定期回顾梳理团队知识资产",
+          "对某次需求做复盘总结"
+        ],
+        "prerequisites": [
+          "用户提供或可获取交付过程各阶段产物与记录",
+          "用户指定保存路径，否则需先询问"
+        ],
+        "limits": [
+          "只关注知识提炼方法本身，不绑定存储位置、项目管理工具或工作流",
+          "不记录过程讨论，只写结论和做法",
+          "每条知识点需 1-3 句话，禁止大段复制原始产物",
+          "宁缺毋滥，不为填充而凑数",
+          "某类别无内容时可省略"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "提供一套标准化的知识沉淀方法论，帮助从项目/需求交付过程中系统性地提炼可复用的经验、教训和模式。"
+          },
+          {
+            "field": "does",
+            "quote": "回顾交付过程中的各阶段产物和记录，提取有沉淀价值的信息"
+          },
+          {
+            "field": "does",
+            "quote": "对收集的原始信息进行筛选和精炼，每条知识点必须满足以下标准"
+          },
+          {
+            "field": "does",
+            "quote": "将提炼的知识点按类别组织"
+          },
+          {
+            "field": "does",
+            "quote": "按照下方模板输出知识沉淀结果，并写入用户指定的文件路径。若用户未指定路径，询问保存位置。"
+          },
+          {
+            "field": "does",
+            "quote": "沉淀完成后，检查以下要点"
+          },
+          {
+            "field": "inputs",
+            "quote": "需求分析产物 | 需求理解中的关键决策、澄清的歧义、识别的边界条件"
+          },
+          {
+            "field": "outputs",
+            "quote": "## {需求/项目标识} - {标题} ({日期})"
+          },
+          {
+            "field": "scenarios",
+            "quote": "需求/项目交付完成后，提炼可复用的知识"
+          },
+          {
+            "field": "scenarios",
+            "quote": "技术攻关后，记录关键决策和踩坑经验"
+          },
+          {
+            "field": "scenarios",
+            "quote": "代码改造后，沉淀可复用的改造模式"
+          },
+          {
+            "field": "scenarios",
+            "quote": "定期回顾，梳理团队知识资产"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "若用户未指定路径，询问保存位置"
+          },
+          {
+            "field": "limits",
+            "quote": "本 skill 关注**知识提炼方法本身**，不绑定任何特定的存储位置、项目管理工具或工作流。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "按照下方模板输出知识沉淀结果，并写入用户指定的文件路径。"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "local/.codebuddy/skills/tech-design/SKILL.md",
+      "blob_sha": "62aa512490501428f78da34dfc129d3eaacf9e76",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.codebuddy/skills/tech-design/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "tech-design",
+        "description": "通用技术方案撰写技能。根据需求输入（需求分析报告或口头描述）自动生成结构完整的技术方案 Markdown 文档。当用户说\"帮我写技术方案\"、\"出一个技术设计文档\"、\"写一份 design doc\"、\"给这个需求出方案\"时使用本技能。"
+      },
+      "excerpt": "---\nname: tech-design\ndescription: 通用技术方案撰写技能。根据需求输入（需求分析报告或口头描述）自动生成结构完整的技术方案 Markdown 文档。当用户说\"帮我写技术方案\"、\"出一个技术设计文档\"、\"写一份 design doc\"、\"给这个需求出方案\"时使用本技能。\n---\n\n# 技术方案撰写技能\n\n## 工作流程\n\n### 第一步：解析需求输入\n\n根据输入类型进行处理：\n\n- **需求分析报告**：读取报告文件，提取需求背景、功能点、约束条件\n- **口头描述**：直接理解用户描述，若信息不足以支撑方案撰写，追问以下关键信息：\n  - 核心功能是什么？\n  - 涉及哪些系统/模块？\n  - 有无性能/安全特殊要求？\n  - 预计数据量级？\n\n### 第二步：加载方案模板\n\n读取通用技术方案模板：[references/general.md](references/general.md)\n\n### 第三步：撰写技术方案\n\n按照模板结构生成技术方案，注意：\n\n- 架构图、流程图、时序图统一使用 Mermaid 语法绘制\n- 不涉及的章节（如灰度策略、第三方依赖）直接删除，不强行填写\n- 若某章节信息不足，标注\"待补充\"并说明需要哪些信息\n- 方案中的估算数据（性能指标、数据量等）需标注来源或假设依据\n\n### 第四步：保存文档\n\n将生成的技术方案保存为 Markdown 文件：\n\n- 若用户已指定输出路径，保存到指定路径\n- 若用户未指定路径，询问保存位置\n- 文件名建议：`tech-design-[需求名称].md`\n\n## 注意事项\n\n- 方案内容应具体、可落地，避免空泛描述\n- 关键技术决策需说明\"为什么选这个，为什么不选那个\"\n- 复杂方案优先用图表表达，文字辅助说明\n",
+      "card": {
+        "title_zh": "技术方案撰写",
+        "purpose_zh": "根据需求分析报告或口头描述，自动生成结构完整的技术方案 Markdown 文档，并保存为文件。",
+        "does": [
+          "解析需求输入：读取需求分析报告文件，提取需求背景、功能点、约束条件",
+          "对口头描述信息不足时追问核心功能、涉及系统模块、性能安全要求、数据量级",
+          "读取通用技术方案模板 references/general.md",
+          "按模板结构撰写技术方案，架构图、流程图、时序图使用 Mermaid 语法",
+          "删除不涉及章节，信息不足处标注待补充并说明所需信息，估算数据标注来源或假设依据",
+          "将方案保存为 Markdown 文件，未指定路径时询问保存位置"
+        ],
+        "inputs": [
+          "需求分析报告文件",
+          "用户口头需求描述",
+          "用户指定的输出路径（可选）"
+        ],
+        "outputs": [
+          "技术方案 Markdown 文档",
+          "文件名建议为 tech-design-[需求名称].md"
+        ],
+        "scenarios": [
+          "用户说帮我写技术方案",
+          "用户要求出一个技术设计文档",
+          "用户要求写一份 design doc",
+          "用户要求给某个需求出方案"
+        ],
+        "prerequisites": [
+          "需要存在通用技术方案模板文件 references/general.md"
+        ],
+        "limits": [
+          "不涉及的章节直接删除，不强行填写",
+          "信息不足的章节标注待补充",
+          "估算数据需标注来源或假设依据",
+          "用户未指定保存路径时需询问保存位置"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "文档",
+          "产品规划",
+          "写作"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "通用技术方案撰写技能。根据需求输入（需求分析报告或口头描述）自动生成结构完整的技术方案 Markdown 文档。"
+          },
+          {
+            "field": "does",
+            "quote": "读取通用技术方案模板：[references/general.md](references/general.md)"
+          },
+          {
+            "field": "does",
+            "quote": "架构图、流程图、时序图统一使用 Mermaid 语法绘制"
+          },
+          {
+            "field": "does",
+            "quote": "不涉及的章节（如灰度策略、第三方依赖）直接删除，不强行填写"
+          },
+          {
+            "field": "does",
+            "quote": "若某章节信息不足，标注\"待补充\"并说明需要哪些信息"
+          },
+          {
+            "field": "does",
+            "quote": "将生成的技术方案保存为 Markdown 文件"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "读取通用技术方案模板：[references/general.md](references/general.md)"
+          },
+          {
+            "field": "limits",
+            "quote": "方案中的估算数据（性能指标、数据量等）需标注来源或假设依据"
+          },
+          {
+            "field": "limits",
+            "quote": "若用户未指定路径，询问保存位置"
+          },
+          {
+            "field": "scenarios",
+            "quote": "当用户说\"帮我写技术方案\"、\"出一个技术设计文档\"、\"写一份 design doc\"、\"给这个需求出方案\"时使用本技能。"
+          },
+          {
+            "field": "outputs",
+            "quote": "文件名建议：`tech-design-[需求名称].md`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "local/.codebuddy/skills/writing-plans/SKILL.md",
+      "blob_sha": "8988ee5a30761660b1a243ac665a4c1926f98666",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.codebuddy/skills/writing-plans/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "writing-plans",
+        "description": "Use when you have a spec or requirements for a multi-step task, before touching code"
+      },
+      "excerpt": "---\nname: writing-plans\ndescription: Use when you have a spec or requirements for a multi-step task, before touching code\n---\n\n# Writing Plans\n\n## Overview\n\nWrite comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.\n\nAssume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.\n\n**Announce at start:** \"I'm using the writing-plans skill to create the implementation plan.\"\n\n**Context:** If working in an isolated worktree, it should have been created via the `superpowers:using-git-worktrees` skill at execution time.\n\n**Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-.md`\n- (User preferences for plan location override this default)\n\n## Scope Check\n\nIf the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.\n\n## File Structure\n\nBefore defining tasks, map out which files will be created or modified and what each one is responsible for. This is where decomposition decisions get locked in.\n\n- Design units with clear boundaries and well-defined interfaces. Each file should have one clear responsibility.\n- You reason best about code you can hold in context at once, and your edits are more reliable when files are focused. Prefer smaller, focused files over large ones that do too much.\n- Files that change together should live together. Split by responsibility, not by technical layer.\n- In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure - but if a file you're modifying has grown unwieldy, including a split in the plan is reasonable.\n\nThis structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.\n\n## Bite-Sized Task Granularity\n\n**Each step is one action (2-5 minutes):**\n- \"Write the failing test\" - step\n- \"Run it to make sure it fails\" - step\n- \"Implement the minimal code to make the test pass\" - step\n- \"Run the tests and make sure they pass\" - step\n- \"Commit\" - step\n\n## Plan Document Header\n\n**Every plan MUST start with this header:**\n\n```markdown\n# [Feature Name] Implementation Plan\n\n> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.\n\n**Goal:** [One sentence describing what this builds]\n\n**Architecture:** [2-3 sentences about approach]\n\n**Tech Stack:** [Key technologies/libraries]\n\n---\n```\n\n## Task Structure\n\n````markdown\n### Task N: [Component Name]\n\n**Files:**\n- Create: `exact/path/to/file.py`\n- Modify: `exact/path/to/existing.py:123-145`\n- Test: `tests/exact/path/to/test.py`\n\n- [ ] **Step 1: Write the failing test**\n\n```python\ndef test_specific_behavior():\n    result = function(input)\n    assert result == expected\n```\n\n- [ ] **Step 2: Run test to verify it fails**\n\nRun: `pytest tests/path/test.py::test_name -v`\nExpected: FAIL with \"function not defined\"\n\n- [ ] **Step 3: Write minimal implementation**\n\n```python\ndef function(input):\n    return expected\n```\n\n- [ ] **Step 4: Run test to verify it passes**\n\nRun: `pytest tests/path/test.py::test_name -v`\nExpected: PASS\n\n- [ ] **Step 5: Commit**\n\n```bash\ngit add tests/path/test.py src/path/file.py\ngit commit -m \"feat: add specific feature\"\n```\n````\n\n## No Placeholders\n\nEvery step must contain the actual content an engineer needs. These are **plan failures** — never write them:\n- \"TBD\", \"TODO\", \"implement later\", \"fill in details\"\n- \"Add appropriate error handling\" / \"add validation\" / \"handle edge cases\"\n- \"Write tests for the above\" (without actual test code)\n- \"Similar to Task N\" (repeat the code — the engineer may be reading tasks out of order)\n- Steps that describe what to do without showing how (code blocks required for code steps)\n- References to types, functions, or methods not defined in any task\n\n## Remember\n\n- Exact file paths always\n- Complete code in every step — if a step changes code, show the code\n- Exact commands with expected output\n- DRY, YAGNI, TDD, frequent commits\n\n## Self-Review\n\nAfter writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.\n\n**1. Spec coverage:** Skim each section/requirement in the spec. Can you point to a task that implements it? List any gaps.\n\n**2. Placeholder scan:** Search your plan for red flags — any of the patterns from the \"No Placeholders\" section above. Fix them.\n\n**3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.\n\nIf you find issues, fix them inline. No need to re-review — just fix and move on.\nIf you find a spec requirement with no task, add the task.\n\n## Execution Handoff\n\nAfter saving the plan, offer execution choice:\n\n**\"Plan complete and saved to `docs/superpowers/plans/.md`. Two execution options:**\n\n**1. Subagent-Driven (recommended)**\n- I dispatch a fresh subagent per task, review between tasks, fast iteration\n\n**2. Inline Execution**\n- Execute tasks in this session using executing-plans, batch execution with checkpoints\n\n**Which approach?\"**\n\n**If Subagent-Driven chosen:**\n- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development\n- Fresh subagent per task + two-stage review\n\n**If Inline Execution chosen:**\n- **REQUIRED SUB-SKILL:** Use superpowers:executing-plans\n- Batch execution with checkpoints for review\n",
+      "card": {
+        "title_zh": "实现计划编写",
+        "purpose_zh": "在动手写代码前，把多步任务的规格或需求转化为面向零上下文工程师的完整实现计划，按小步任务拆分并保存到文档。",
+        "does": [
+          "把规格拆成每个2-5分钟的单动作步骤，含写失败测试、运行验证、最小实现、再运行、提交",
+          "先规划文件结构，明确每个文件职责与边界，再据此分解任务",
+          "要求每步给出确切文件路径、完整代码、确切命令与预期输出，禁止占位符",
+          "计划开头使用固定头部模板，含目标、架构、技术栈与子技能提示",
+          "写完后自检规格覆盖、占位符与类型一致性并就地修正",
+          "保存计划后提供子代理驱动或内联执行两种执行方式选择"
+        ],
+        "inputs": [
+          "多步任务的规格或需求文档",
+          "代码库现状与既有模式",
+          "用户对计划保存位置的偏好"
+        ],
+        "outputs": [
+          "保存到 docs/superpowers/plans/YYYY-MM-DD-.md 的实现计划文档",
+          "执行方式选择提示"
+        ],
+        "scenarios": [
+          "已有规格、准备开始多步编码任务前",
+          "需要把大规格拆成可独立测试的子计划",
+          "需要给缺乏上下文的工程师交付分步实施指引"
+        ],
+        "prerequisites": [
+          "已有规格或需求",
+          "若在隔离工作树中工作，应已通过 superpowers:using-git-worktrees 创建"
+        ],
+        "limits": [
+          "若规格覆盖多个独立子系统，建议拆成每个子系统一份计划",
+          "不写占位符，如 TBD、TODO、稍后实现等",
+          "代码步骤必须给出实际代码块",
+          "自检为自身清单式检查，不派发子代理"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files",
+          "shell"
+        ],
+        "tags": [
+          "产品规划",
+          "文档",
+          "写作",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Use when you have a spec or requirements for a multi-step task, before touching code"
+          },
+          {
+            "field": "does",
+            "quote": "Each step is one action (2-5 minutes):"
+          },
+          {
+            "field": "does",
+            "quote": "Before defining tasks, map out which files will be created or modified and what each one is responsible for."
+          },
+          {
+            "field": "does",
+            "quote": "Every step must contain the actual content an engineer needs."
+          },
+          {
+            "field": "does",
+            "quote": "After writing the complete plan, look at the spec with fresh eyes and check the plan against it."
+          },
+          {
+            "field": "does",
+            "quote": "After saving the plan, offer execution choice:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If working in an isolated worktree, it should have been created via the `superpowers:using-git-worktrees` skill at execution time."
+          },
+          {
+            "field": "limits",
+            "quote": "If the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming."
+          },
+          {
+            "field": "limits",
+            "quote": "\"TBD\", \"TODO\", \"implement later\", \"fill in details\""
+          },
+          {
+            "field": "limits",
+            "quote": "This is a checklist you run yourself — not a subagent dispatch."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "git add tests/path/test.py src/path/file.py"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run: `pytest tests/path/test.py::test_name -v`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "local/.codex/skills/devflow-codex/SKILL.md",
+      "blob_sha": "d7b378e8e6591f9494cf675c8b5466aaeda742b5",
+      "source_url": "https://github.com/Tencent/LoopForge/blob/dd56585276d8ecb6e0d6865f55e255194d75f85a/local/.codex/skills/devflow-codex/SKILL.md",
+      "fetched_at": "2026-11-16T00:18:29.909Z",
+      "generated_at": "2026-11-16T00:18:29.909Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "devflow-codex",
+        "description": "在 Codex 中运行 devflow。用户提到 devflow、start/resume/status/abort devflow、多 agent 工作流，或要求“按 Codex devflow 跑”时使用。"
+      },
+      "excerpt": "---\nname: devflow-codex\ndescription: 在 Codex 中运行 devflow。用户提到 devflow、start/resume/status/abort devflow、多 agent 工作流，或要求“按 Codex devflow 跑”时使用。\n---\n\n# DevFlow Codex 工作流\n\n这是 Codex 原生工作流入口。Codex 运行时只读取 `.codex/`，不读取\n`.codebuddy/`。\n\n`.codex/` 与 `.codebuddy/` 是两套独立工作流资产；二者应保持流程契约一致，\n但互不作为运行时依赖。\n\n## 必读文件\n\n启动或恢复前必须读取：\n\n1. `.codex/assets/devflow.defaults.yaml`\n2. `.codex/runtime/start-workflow.md`\n3. `.codex/runtime/workflow-state-spec.md`\n4. TASK-01 需求澄清时读取 `.codex/skills/superpowers/brainstorming/SKILL.md`\n5. TASK-05 知识沉淀时读取 `.codex/skills/knowledge-distillation/SKILL.md`\n6. 当前阶段对应的 `.codex/agents/<role>.md`\n7. 当前阶段需要的 `.codex/rules/` 和 `.codex/checklists/`\n\n## 在 Codex 中如何触发\n\nCodex 不会自动把仓库里的命令文件注册进 `/` 菜单。请用自然语言或显式\nskill 触发：\n\n```text\n$devflow-codex start 需求描述...\n$devflow-codex status TASK_SLUG\n$devflow-codex resume TASK_SLUG\n$devflow-codex abort TASK_SLUG\n```\n\n也可以直接说：\n\n```text\n用 devflow 跑这个需求：...\n```\n\n## 编排规则\n\n- 主 Codex 线程是唯一 orchestrator。\n- `workflow-state.json` 是阶段交接和审计的唯一持久化状态。\n- 不使用 CodeBuddy 的 `team_create`、`send_message`、`team_delete`。\n- medium/large 的 TASK-01 必须使用 `superpowers:brainstorming` 做需求澄清，\n  且必须等待用户明确回答或确认后才能进入 TASK-02。\n- TASK-02 及之后的角色阶段必须通过 Codex `multi_agent_v1.spawn_agent`\n  派发；只有工具不存在或返回 unavailable/not found 时，才允许主线程内联执行\n  并在 `workflow-state.json.decisions[]` 记录降级原因。\n- 阶段产物和状态 schema 必须保持 devflow 兼容。\n\n## 启动协议\n\n按 `.codex/runtime/start-workflow.md` 执行：\n\n1. 初始化 `artifacts/{task_slug}/` 和 `workflow-state.json`。\n2. Phase 0 做需求草图、影响扫描和规模判定。\n3. small 进入 SOLO。\n4. medium/large 先由主 Codex 线程调用 `superpowers:brainstorming` 完成\n   TASK-01 需求分析与澄清，写入 `01-requirement/requirement-report.md`，\n   经用户确认后再进入 TASK-02。\n5. TASK-02 起使用 `multi_agent_v1.spawn_agent` 派发对应角色。\n6. 如果用户要求先确认方案，停在 TASK-03 前。\n\n## 阶段协议\n\n每个阶段：\n\n1. 先读取 `workflow-state.json`。\n2. 读取 `.codex/agents/<role>.md`。\n3. 写入阶段开始状态。\n4. 产出对应 artifact。\n5. 更新 `workflow-state.json`。\n6. 返回主线程，由主线程按 routing table 决定下一阶段。\n\n## 完成协议\n\n结束时生成 `workflow-summary.md`，更新 summary 字段，保留全部产物，并向用户\n汇总改动、验证、审查和知识沉淀结果。\n",
+      "card": {
+        "title_zh": "Codex 多代理开发工作流",
+        "purpose_zh": "在 Codex 中运行 devflow 多 agent 工作流，支持 start、resume、status、abort 四种操作，按阶段编排需求澄清、角色派发与状态持久化。",
+        "does": [
+          "按 start、resume、status、abort 触发并管理 devflow 任务",
+          "初始化 artifacts/{task_slug}/ 与 workflow-state.json 作为唯一持久化状态",
+          "Phase 0 做需求草图、影响扫描和规模判定，small 进入 SOLO",
+          "medium/large 用 superpowers:brainstorming 澄清需求并等用户确认",
+          "TASK-02 起通过 multi_agent_v1.spawn_agent 派发角色阶段",
+          "结束时生成 workflow-summary.md 并汇总改动、验证、审查与知识沉淀"
+        ],
+        "inputs": [
+          "自然语言需求描述",
+          "TASK_SLUG 任务标识",
+          "start/resume/status/abort 触发指令",
+          "必读文件：devflow.defaults.yaml、start-workflow.md、workflow-state-spec.md 等"
+        ],
+        "outputs": [
+          "artifacts/{task_slug}/ 阶段产物",
+          "workflow-state.json 状态文件",
+          "01-requirement/requirement-report.md 需求报告",
+          "workflow-summary.md 总结文件"
+        ],
+        "scenarios": [
+          "用户提到 devflow 或要求按 Codex devflow 跑需求",
+          "需要多 agent 分阶段协作完成开发任务",
+          "需要恢复或查询已有任务状态",
+          "需要中止某个 devflow 任务"
+        ],
+        "prerequisites": [
+          "仓库中存在 .codex/ 工作流资产目录",
+          "启动或恢复前读取指定的必读文件",
+          "Codex 环境支持 multi_agent_v1.spawn_agent，否则需记录降级原因"
+        ],
+        "limits": [
+          "Codex 运行时只读取 .codex/，不读取 .codebuddy/",
+          "Codex 不会自动把仓库命令文件注册进 / 菜单，需自然语言或显式 skill 触发",
+          "不使用 CodeBuddy 的 team_create、send_message、team_delete",
+          "medium/large 的 TASK-01 必须等用户明确回答或确认后才能进入 TASK-02",
+          "spawn_agent 不可用时才允许主线程内联执行并记录降级原因"
+        ],
+        "hosts": [
+          "codex"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "产品规划",
+          "文档",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "在 Codex 中运行 devflow。用户提到 devflow、start/resume/status/abort devflow、多 agent 工作流，或要求“按 Codex devflow 跑”时使用。"
+          },
+          {
+            "field": "does",
+            "quote": "$devflow-codex start 需求描述...\n$devflow-codex status TASK_SLUG\n$devflow-codex resume TASK_SLUG\n$devflow-codex abort TASK_SLUG"
+          },
+          {
+            "field": "does",
+            "quote": "初始化 `artifacts/{task_slug}/` 和 `workflow-state.json`。"
+          },
+          {
+            "field": "does",
+            "quote": "Phase 0 做需求草图、影响扫描和规模判定。"
+          },
+          {
+            "field": "does",
+            "quote": "medium/large 先由主 Codex 线程调用 `superpowers:brainstorming` 完成\n   TASK-01 需求分析与澄清，写入 `01-requirement/requirement-report.md`，\n   经用户确认后再进入 TASK-02。"
+          },
+          {
+            "field": "does",
+            "quote": "TASK-02 起使用 `multi_agent_v1.spawn_agent` 派发对应角色。"
+          },
+          {
+            "field": "does",
+            "quote": "结束时生成 `workflow-summary.md`，更新 summary 字段，保留全部产物，并向用户\n汇总改动、验证、审查和知识沉淀结果。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "启动或恢复前必须读取："
+          },
+          {
+            "field": "prerequisites",
+            "quote": "TASK-02 及之后的角色阶段必须通过 Codex `multi_agent_v1.spawn_agent`\n  派发；只有工具不存在或返回 unavailable/not found 时，才允许主线程内联执行\n  并在 `workflow-state.json.decisions[]` 记录降级原因。"
+          },
+          {
+            "field": "limits",
+            "quote": "Codex 运行时只读取 `.codex/`，不读取\n`.codebuddy/`。"
+          },
+          {
+            "field": "limits",
+            "quote": "Codex 不会自动把仓库里的命令文件注册进 `/` 菜单。请用自然语言或显式\nskill 触发："
+          },
+          {
+            "field": "limits",
+            "quote": "不使用 CodeBuddy 的 `team_create`、`send_message`、`team_delete`。"
+          },
+          {
+            "field": "limits",
+            "quote": "medium/large 的 TASK-01 必须使用 `superpowers:brainstorming` 做需求澄清，\n  且必须等待用户明确回答或确认后才能进入 TASK-02。"
+          },
+          {
+            "field": "hosts",
+            "quote": "这是 Codex 原生工作流入口。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "写入阶段开始状态。"
+          }
+        ]
+      }
+    }
+  ]
+}
