@@ -1,0 +1,1263 @@
+{
+  "schema": 1,
+  "repo": "arla6ka/design.how",
+  "tree_sha": "2fc5da36c28c86ddecb49762d181ab9dc0471a2c",
+  "truncated_paths": 72,
+  "skills": [
+    {
+      "skill_path": "skills/build-design-system/SKILL.md",
+      "blob_sha": "b3dbc28a8367044d92b347af7a22d9dbd3438582",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/skills/build-design-system/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "build-design-system",
+        "description": "Use when someone wants a design system built from the UI an app already ships, or one phase of it, such as \"extract tokens from the app\", \"add states to our Button\", \"replace the hardcoded colors with tokens\" or \"start a design system\". Moving screens onto an existing system's components is migrate-design-system. A vague whole-app ask goes to design-system-boss."
+      },
+      "excerpt": "---\nname: build-design-system\ndescription: Use when someone wants a design system built from the UI an app already ships, or one phase of it, such as \"extract tokens from the app\", \"add states to our Button\", \"replace the hardcoded colors with tokens\" or \"start a design system\". Moving screens onto an existing system's components is migrate-design-system. A vague whole-app ask goes to design-system-boss.\nmetadata:\n  summary: Builds a system\n---\n\n# Build a design system\n\nVocabulary is in `references/glossary.md`, defaults for bans and widths in `references/taste.md`. The app's own look is the source. Invent no colour, font, shadow, gradient or motion value it does not already have, unless the person chose a design source and confirmed a sample.\n\nScripts are in this skill's `scripts/`. Run them from the repo root with node, and read `--help` first. `scripts/capture.mjs` takes the screenshots behind `scripts/capture-guard.mjs`, which blocks every write, and `scripts/pixdiff.mjs` compares them. Capture and pixdiff need Playwright and a Chromium, which `scripts/find-chromium.mjs` finds or explains how to install.\n\n## Steps\n\n1. **Frame.** Read AGENTS.md or CLAUDE.md, the manifest and the route tree. Write the complaint in the person's words, the first visible change that answers it, and the pilot flow (the one the complaint names, else the flow with the most component families and a form with an error state). Add `.design-system/` to `.git/info/exclude` so no note, capture or scratch file is ever committed. Use the branch the person named as the run branch, or cut one and write the branch you started on to `.design-system/start-branch`, which `land.mjs` refuses. Offer `references/taste.md` once with its bans unselected and save the accepted copy to `.design-system/taste.md`. Ask nothing else. Take the default, record it as `default (unanswered)` and go on.\n   Done when the complaint, pilot, branch and accepted taste file are written down.\n\n2. **Inventory and baselines.** List every surface, its states and whether it writes data. Count raw values in occurrences (`#fff`, `text-gray-500`, `p-[13px]`) with `scripts/check-system.mjs --no-allowlist --no-self-test --json`, and group components into families. Capture every surface in every state at the narrowest and widest supported width (390 and 1280 by default), one fresh navigation per width, before any edit. With the app running (port 3000 here), list each surface as a `surface<TAB>route<TAB>states` row in `.design-system/surfaces.tsv` and every write the app sends as `METHOD URL` in `.design-system/writes.txt`, copied from its network log, then run `node <this skill>/scripts/capture.mjs --base http://localhost:3000 --kind before --out .design-system/captures --surfaces .design-system/surfaces.tsv --writes .design-system/writes.txt`. It refuses to start without `--writes` (or `--no-backend` for an app that sends no writes), proves each write blocked before the browser opens, saves each capture's accessibility tree and exits 1 on any capture it missed. Delete what nothing uses, in its own commit.\n   Done when each surface has a baseline or a stated `not captured` reason.\n\n3. **Tokens.** Cluster raw values by role, name them by purpose and pair each surface with its foreground (`references/tokens.md`). Run `token-mapping` until every raw value maps to a role, a merge or a listed exception. Merges inside tolerance are decisions. Past tolerance, open one gate per cluster whose default is the merge. Make every identical-value swap on every route.\n   Done when `token-mapping` reports zero gaps outside the exception list and `pixdiff.mjs` at tolerance 0 reports 0% for every surface a swap touched.\n\n4. **Components.** Build the most-used family end to end first (`references/components.md`). The text primitive and the small-text primitive ship in wave 1 beside Button. Document each with `component-docs`. Show the family to the person before fan-out, because a core bug found after screens consume the system costs a sweep (a disabled field still drawn red, a Combobox 2 px taller than Input, panel actions that do not wrap, a file drop that fails in silence).\n   Done when every canonical component has a registry row and a doc, and its disabled, required, error and long-text states are captured in the showcase and shown to the person.\n\n5. **Checks.** Copy `scripts/check-system.mjs` and `scripts/oklch.mjs` into the repo's `scripts/`, run `--init`, then `--init-allowlist` once. A rule counts only once it is seen failing: plant one violation in a scanned folder, run `--files <plant> --no-allowlist`, see exit 1 naming the rule, then delete the plant. The allowlist and ratchet only shrink. A ban ships with its check rule in the same change. Copy rules ship with their exemptions, element-scoped, for text that must stay verbatim (quotes, terms, version strings) and for payload strings that a machine or person pastes elsewhere (a prompt, an API example, a clipboard value), because rewriting them changes what someone else receives.\n   Done when the check exits 0 on a clean clone, `--self-test` ends \"all as expected\", and every rule the run added was seen failing on its plant this session.\n\n6. **Pilot.** Move the pilot flow with a codemod you read hunk by hunk. Capture after with the baseline's command, widths, themes and data, changing only `--kind after`, then `pixdiff.mjs` the two folders. An unexplained difference is a defect. Walk the flow by keyboard, force its error and loading states, then run `ui-review` on the after captures.\n   Done when every difference in the captures traces to a decision or gate. A rendered change with no capture is reported `checks-only`.\n\n7. **Readiness.** Before a migration fans out, the five audits below hold or carry a recorded exemption.\n\n8. **Handoff.** Rerun the counts. Report what the system covers in numbers, unanswered defaults first, then what was found and not fixed, ranked. Offer the migration with its size. Do not start it.\n   Done when every number in the report names the command that produced it.\n\n## Readiness audits\n\nA gap found after screens consume the system costs a sweep. A gap found before costs a row. Run these at the end of step 5 and again before the first wave. Write each result to `.design-system/readiness.md` with a verdict word.\n\n1. **Slot and prop parity.** Every prop of each legacy primitive that has call sites has a matching prop on the new primitive or a gap row.\n2. **Behaviour contracts.** A \"what fires when\" table per interactive primitive, each row a test (`references/components.md`).\n3. **Tone parity.** Every pressable and row primitive crossed with every status tone plus muted. Each empty cell is a gap row or stated unsupported.\n4. **Pinned strings.** Every legacy test query by role name or text has a default name on the new primitive and a label override.\n5. **Hardest screens.** One hardest call site per family renders in the showcase, with a screenshot.\n\nA family that is not ready is not migrated. Its screens stay on legacy.\n\n## Never\n\n- Push, publish or deploy, unless the person asks for it in this session.\n- Commit on the branch the run started on. Cut the run branch first.\n- Stash, or switch branches in a dirty checkout. A dirty checkout gets the run branch in its own worktree (`git worktree add`).\n- Delete anything another package or a public API exports. Stop, and list it as a gate with its importers.\n- Skip a step in silence. If the app will not build or run, the report says `code-complete, not runtime-verified` and names what was not exercised.\n- Call your own work `verified`. On a host that cannot start other agents, run the steps in order, check each from a fresh read of the diff and the captures, and mark those verdicts `self-verified`.\n\n## Rules\n\n- Raw value smells are `#fff`, `rgb(`, `text-gray-500`, `p-[13px]` and `style={{ padding: 12 }}`. Each maps to a semantic token or a listed exception.\n- A missing primitive is a gap row, never a workaround ",
+      "card": {
+        "title_zh": "构建设计系统",
+        "purpose_zh": "从应用现有界面提取并构建设计系统：盘点界面与状态、聚类原始值为语义令牌、构建组件族、加检查规则、迁移试点流程并做就绪审计与交接报告。",
+        "does": [
+          "框定问题、试点流程与运行分支，记录默认项",
+          "盘点界面状态与原始值，截图基线并拦截写请求",
+          "按角色聚类原始值为语义令牌并做像素比对",
+          "端到端构建最常用组件族并写文档与展示",
+          "植入检查规则并验证规则确实会失败",
+          "迁移试点流程、做五项就绪审计并输出交接报告"
+        ],
+        "inputs": [
+          "应用仓库（AGENTS.md 或 CLAUDE.md、manifest、路由树）",
+          "运行中的应用与端口（示例 3000）",
+          "界面清单 surfaces.tsv 与写请求列表 writes.txt",
+          "可选设计来源与已确认样本",
+          "references 下的词汇表、口味、令牌、组件、陷阱文档"
+        ],
+        "outputs": [
+          ".design-system/ 下的记录、截图、taste.md、surfaces.tsv、writes.txt",
+          "语义令牌与组件注册表及文档",
+          "仓库 scripts/ 下的检查脚本与允许清单",
+          "readiness.md 就绪审计结论",
+          "带数字与命令来源的交接报告"
+        ],
+        "scenarios": [
+          "从已上线应用界面提取设计令牌",
+          "为 Button 等组件补齐状态",
+          "把硬编码颜色替换为令牌",
+          "启动一个新设计系统",
+          "迁移试点流程并比对前后截图"
+        ],
+        "prerequisites": [
+          "Node 环境，从仓库根目录运行脚本",
+          "截图与比对需 Playwright 和 Chromium，由 find-chromium.mjs 查找或说明安装",
+          "应用可构建运行，并已知端口",
+          "有 git 仓库，可创建运行分支与 worktree"
+        ],
+        "limits": [
+          "不发明应用没有的颜色、字体、阴影、渐变或动效值",
+          "不推送、发布或部署，除非本次会话中被要求",
+          "不在运行起始分支上提交，不 stash，不在脏检出上切分支",
+          "不删除其他包或公共 API 导出的内容，需列为门禁",
+          "无法构建运行时报告为 code-complete, not runtime-verified",
+          "不能启动其他代理时结论标为 self-verified",
+          "未由脚本产生的计数或未见过失败的检查不得报告",
+          "未就绪的组件族不迁移，其界面留在旧实现"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use when someone wants a design system built from the UI an app already ships, or one phase of it"
+          },
+          {
+            "field": "does",
+            "quote": "Cluster raw values by role, name them by purpose and pair each surface with its foreground"
+          },
+          {
+            "field": "does",
+            "quote": "Build the most-used family end to end first"
+          },
+          {
+            "field": "does",
+            "quote": "A rule counts only once it is seen failing: plant one violation in a scanned folder"
+          },
+          {
+            "field": "does",
+            "quote": "Move the pilot flow with a codemod you read hunk by hunk."
+          },
+          {
+            "field": "does",
+            "quote": "Before a migration fans out, the five audits below hold or carry a recorded exemption."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Capture and pixdiff need Playwright and a Chromium, which `scripts/find-chromium.mjs` finds or explains how to install."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run them from the repo root with node, and read `--help` first."
+          },
+          {
+            "field": "limits",
+            "quote": "Invent no colour, font, shadow, gradient or motion value it does not already have"
+          },
+          {
+            "field": "limits",
+            "quote": "Push, publish or deploy, unless the person asks for it in this session."
+          },
+          {
+            "field": "limits",
+            "quote": "A family that is not ready is not migrated. Its screens stay on legacy."
+          },
+          {
+            "field": "limits",
+            "quote": "If the app will not build or run, the report says `code-complete, not runtime-verified`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Copy `scripts/check-system.mjs` and `scripts/oklch.mjs` into the repo's `scripts/`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Add `.design-system/` to `.git/info/exclude` so no note, capture or scratch file is ever committed."
+          },
+          {
+            "field": "hosts",
+            "quote": "On a host that cannot start other agents, run the steps in order"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/component-docs/SKILL.md",
+      "blob_sha": "3591043ad5cf482e40b104f763dd6adfc8753e4f",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/skills/component-docs/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "component-docs",
+        "description": "Use to write one component's documentation entry from its code, stories and real call sites, such as \"document the button\", \"write docs for Select\", \"what states does Toast have\", or usage rules for a new or changed component. Not for foundations or pages that span components, which no skill here writes, nor for changing the component, which is build-design-system."
+      },
+      "excerpt": "---\nname: component-docs\ndescription: Use to write one component's documentation entry from its code, stories and real call sites, such as \"document the button\", \"write docs for Select\", \"what states does Toast have\", or usage rules for a new or changed component. Not for foundations or pages that span components, which no skill here writes, nor for changing the component, which is build-design-system.\nmetadata:\n  summary: Documents a component\n---\n\n# Component docs\n\nA draft entry for one component, built only from what its sources say. Gaps are marked, not filled. It does not judge the design and it publishes nothing. The heading order and a worked example are in `references/doc-format.md`.\n\n## Steps\n\n1. Paste the nine headings from `references/doc-format.md` into the draft, empty.\n2. Find the component. Read its code, props type, styles and stories, and record each as a Sources line.\n3. Find two real uses, by call-site search or from the ask. One real use or none changes the stop table below.\n4. Trace which source gave each example, variant, prop, state and token. Every disagreement between sources is a line under Conflicts, with the quoted rule that settles it, or \"no rule, not chosen\".\n5. Fill each section from sourced facts, copying token names and example code character for character.\n6. Write Usage rules last. Each rule is `rule/<component>-<slug>`, a condition, an action, a reason, its evidence (two call sites, a measurement with its path, a named principle, or the person's words), and a `Don't:` line with real code that breaks it. A rule you cannot break with a snippet is cut.\n7. Fill Guessed at, one line per judgement call. Reread the draft against the Done list below.\n\n## Output\n\nThe entry, then Sources, Conflicts, Guessed at, and Gates (a question with its default) only where a rule adds one. Run on its own, it saves to `docs/system/<name>.md` with a draft comment on line 1 and writes each missing example file. The reply opens with the path, what the entry covers and its status, then up to three questions with defaults and one prompt the person can paste to take the next step.\n\n## Stops\n\n| Missing after searching | Why it stops |\n|---|---|\n| The code | Nothing else sources the variants, props or behaviour |\n| The variant list (props type or stories) | A guessed list documents a different component |\n| Any use, real or planned | Invented uses read like real ones and readers copy them first |\n\nA props type with no variant prop is an empty list. Variants reads \"None\" and the run goes on. One real use, planned uses and a deprecated predecessor are marked as such, not stopped on. A stopped run returns the stop, the facts sourced so far by section, and the smallest reply that unblocks it (\"one screen name, what put the component there, and which variant showed\").\n\n## Rules\n\n- Never write a variant, prop, token name, example or use that has no listed source. A planned use says planned.\n- Never invent a state or a precedence order to make a section look complete.\n- A behaviour that looks like a bug is written as it is, followed by a `Defect:` line to the owner with what goes wrong for the user and the smallest fix.\n- A part also used on its own gets a `### Parts` subsection under Description. A compound component (`Tabs` with `Tab`) is one entry.\n- Do not edit the code, stories or spec being documented.\n- Counts in the reply come from `grep -o` on the saved file, below the draft comment.\n\n## Done\n\nEvery variant, prop, token and example has a Sources line. Every Usage rule has evidence and a `Don't:` line. Every conflict is shown. The nine headings are present in order, and a section with nothing sourced reads `Not applicable: <reason>`.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/design-system-boss/SKILL.md",
+      "blob_sha": "b39a1fb47035cb5fb4be90b281ccccef55cf60e0",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/skills/design-system-boss/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "design-system-boss",
+        "description": "Use for vague whole-app design system asks on an app that already ships UI, such as \"our UI is a mess, fix it\", \"we need a design system\", \"we hardcode colors everywhere\", \"make the buttons consistent\" or \"check the app before I ship\". One named screen goes to ui-review, one component to component-docs, a token report to token-mapping. A repo with no UI yet is out of scope."
+      },
+      "excerpt": "---\nname: design-system-boss\ndescription: Use for vague whole-app design system asks on an app that already ships UI, such as \"our UI is a mess, fix it\", \"we need a design system\", \"we hardcode colors everywhere\", \"make the buttons consistent\" or \"check the app before I ship\". One named screen goes to ui-review, one component to component-docs, a token report to token-mapping. A repo with no UI yet is out of scope.\nmetadata:\n  summary: Runs the others\n---\n\n# Design system boss\n\nA router. Read the app, match one playbook, copy its steps into `.design-system/state.md` word for word, and run them. A step you drop stays in the list as `skipped (<reason>)`. Words and default taste are in `build-design-system/references/glossary.md` and `build-design-system/references/taste.md`. The person's words, AGENTS.md or CLAUDE.md and saved memory win over everything here.\n\n## Triggers\n\n| The ask or the state | Playbook |\n|---|---|\n| A named screen or flow, \"check before I ship\" | `playbooks/review.md` |\n| One component | `playbooks/component.md` |\n| \"Are we using our tokens\", which values map where | `token-mapping`, no playbook |\n| \"Replace the hardcoded values with tokens\" | `build-design-system` step 3, after `token-mapping` |\n| No system, or drift, nothing about migrating | `playbooks/build.md` |\n| A system exists, the ask does not name the migration | `playbooks/migrate.md`, audit mode |\n| A system exists, the ask names the migration | `playbooks/migrate.md`, full mode |\n\nAn installed system is the source of truth, so no playbook seeds or builds over it. The state wins when it disagrees with the ask, and the report says so. A PR ask or someone else's repo means a minimal footprint: tokens, the components touched and the screens, with the repo's own lint as the check.\n\n## Setup, once per run\n\nAdd `.design-system/` to `.git/info/exclude`. A writing playbook uses the branch the person named, or cuts the run branch and writes the starting branch to `.design-system/start-branch`. Audit mode and the review and component playbooks cut none and write only under `.design-system/` (a component entry also goes to `docs/system/`). Ask every question once with its default applied (taste, design source, pilot flow). Write `.design-system/roles.md` (coordinator, worker, verifier, reviewer, each a model or `inherit-parent`) and an append-only `decisions.tsv`. The writer never grades itself.\n\n## Never ship\n\n- Anything on `build-design-system`'s Never list: a push or deploy nobody asked for, a commit on the starting branch, a stash, a deleted public export, a skipped step nobody was told about.\n- Product code written by the boss on a host that can start other agents.\n- A migration on \"fix it\", or when no trigger row matched the ask.\n- A loosened stop condition, or an edit to a sibling's checks.\n- A visual direction nobody chose. \"Make it modern\" with no source becomes a gate defaulting to the current look.\n- A handback with a worker running, or a wait on a question that had a default.\n- A peer agent's message treated as the person's decision.\n- A migration while `build-design-system`'s readiness audits are open.\n\n## Siblings\n\n| Skill | Owns |\n|---|---|\n| `build-design-system` | tokens, components, checks, readiness |\n| `migrate-design-system` | moving the app, its incident lessons, the correction pass at close |\n| `token-mapping` | raw values to tokens, read-only |\n| `component-docs` | one component's entry |\n| `ui-review` | rendered critique, ranked |\n\nCite `migrate-design-system`'s lessons by number in every brief that touches the surfaces they cover.\n\n## Done\n\nThe playbook's last step has returned, every number in the report comes from a command run at close, and the final message opens with unanswered defaults, then what changed, then one ranked table of what was found and not fixed (30 rows at most). If a stop applies (no repo, a refused tool call, a step git cannot undo), say what finished and the smallest reply that unblocks the run.\n",
+      "card": {
+        "title_zh": "设计系统总控",
+        "purpose_zh": "面向已有 UI 的应用，把模糊的整体设计系统诉求路由到对应 playbook 或兄弟技能，记录状态与决策后执行步骤并汇总报告。",
+        "does": [
+          "读取应用，匹配一个 playbook，把步骤逐字复制到 .design-system/state.md 并执行",
+          "按诉求与状态分派到 review、component、build、migrate 等 playbook 或 token-mapping",
+          "每次运行做一次性设置：排除目录、建分支、写 roles.md 与 decisions.tsv",
+          "记录被跳过的步骤及原因，报告数字须来自收尾时运行的命令",
+          "输出未答默认项、变更内容与最多 30 行的未修复问题排名表"
+        ],
+        "inputs": [
+          "用户的设计系统相关诉求或当前状态",
+          "仓库中已有的 UI 代码",
+          "AGENTS.md、CLAUDE.md 与已保存记忆",
+          "用户指定的分支名",
+          "taste、设计来源、试点流程等问题的回答或默认值"
+        ],
+        "outputs": [
+          ".design-system/state.md 状态文件",
+          ".design-system/roles.md 角色文件",
+          ".design-system/decisions.tsv 追加式决策记录",
+          ".design-system/start-branch 起始分支记录",
+          "收尾报告：未答默认项、变更内容、未修复问题排名表"
+        ],
+        "scenarios": [
+          "用户说 UI 很乱、需要设计系统、颜色到处硬编码",
+          "用户要求统一按钮等整体一致性检查",
+          "上线前要求检查应用",
+          "判断是否在用 token、哪些值映射到哪里",
+          "已有系统时按诉求执行审计或完整迁移"
+        ],
+        "prerequisites": [
+          "应用已有可运行的 UI，无 UI 的仓库不在范围内",
+          "已安装的系统视为事实来源，不覆盖重建",
+          "用户的话、AGENTS.md/CLAUDE.md 与记忆优先于技能内容"
+        ],
+        "limits": [
+          "无 UI 的仓库超出范围",
+          "单个命名屏幕、单个组件、token 报告分别交给其他技能",
+          "不发起未要求的推送或部署，不在起始分支提交",
+          "不在能启动其他代理的宿主上由总控编写产品代码",
+          "未匹配触发行或仅说修一下时不执行迁移",
+          "不自行选择视觉方向，无来源时默认当前外观"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A router. Read the app, match one playbook, copy its steps into `.design-system/state.md` word for word, and run them."
+          },
+          {
+            "field": "does",
+            "quote": "| A named screen or flow, \"check before I ship\" | `playbooks/review.md` |"
+          },
+          {
+            "field": "does",
+            "quote": "Add `.design-system/` to `.git/info/exclude`."
+          },
+          {
+            "field": "does",
+            "quote": "Write `.design-system/roles.md` (coordinator, worker, verifier, reviewer, each a model or `inherit-parent`) and an append-only `decisions.tsv`."
+          },
+          {
+            "field": "does",
+            "quote": "A step you drop stays in the list as `skipped (<reason>)`."
+          },
+          {
+            "field": "does",
+            "quote": "every number in the report comes from a command run at close"
+          },
+          {
+            "field": "inputs",
+            "quote": "The person's words, AGENTS.md or CLAUDE.md and saved memory win over everything here."
+          },
+          {
+            "field": "inputs",
+            "quote": "A writing playbook uses the branch the person named, or cuts the run branch"
+          },
+          {
+            "field": "outputs",
+            "quote": "the final message opens with unanswered defaults, then what changed, then one ranked table of what was found and not fixed (30 rows at most)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "A repo with no UI yet is out of scope."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "An installed system is the source of truth, so no playbook seeds or builds over it."
+          },
+          {
+            "field": "limits",
+            "quote": "One named screen goes to ui-review, one component to component-docs, a token report to token-mapping."
+          },
+          {
+            "field": "limits",
+            "quote": "a push or deploy nobody asked for, a commit on the starting branch, a stash, a deleted public export, a skipped step nobody was told about."
+          },
+          {
+            "field": "limits",
+            "quote": "Product code written by the boss on a host that can start other agents."
+          },
+          {
+            "field": "limits",
+            "quote": "A visual direction nobody chose. \"Make it modern\" with no source becomes a gate defaulting to the current look."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/make-font/SKILL.md",
+      "blob_sha": "afba58a75c13ad2b8352dccd211d9d404c5c6bb6",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/skills/make-font/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "make-font",
+        "description": "Use when someone wants their own font made from fonts they like, such as \"make me a font like these\", \"/make-font\" or \"build a typeface from these screenshots\". It measures the references, fits the closest open-licence font to them, checks it, and delivers an OFL font with web files and a font book. It never copies outlines."
+      },
+      "excerpt": "---\nname: make-font\ndescription: Use when someone wants their own font made from fonts they like, such as \"make me a font like these\", \"/make-font\" or \"build a typeface from these screenshots\". It measures the references, fits the closest open-licence font to them, checks it, and delivers an OFL font with web files and a font book. It never copies outlines.\nmetadata:\n  summary: Makes your own font\n---\n\n# Make a font\n\nThe person names fonts they like. This skill measures them, picks an open-licence (OFL or Apache) font as the\nbase, and bends that base to the measured numbers. Every outline in the result comes from the open base. The\nreferences give numbers only: proportions, stem and stroke thickness, class-mean widths and spacing. The output\nships under the OFL with a new family name.\n\n## The line it holds\n\nSay this to the person at the start, in plain words: \"I match proportions, widths and spacing on an open font.\nI don't trace or copy the outlines of the fonts you send.\" Then hold it.\n\n- Never open a reference font in the build step. `fit_font.py` and `space_font.py` read only the base font and\n  `targets.json`.\n- Never take a per-glyph advance, a kerning pair or a point from a reference. Targets are font-wide numbers and\n  class means.\n- Refuse a request to clone, trace, convert or \"rebuild exactly\" a commercial font, or to rename one. Offer the\n  proportional match instead.\n- A screenshot of a commercial font is fine to measure. Its file is fine to measure if the person has it. Neither\n  is copied into the output or committed anywhere.\n\nScripts are in `scripts/`. They need Python 3.9+ with `fonttools`, `brotli`, `uharfbuzz`, `numpy` and `pillow`\n(`skia-pathops` to remove overlaps, `fontbakery` for its checks if wanted), and Node 18+ with Playwright for the\nPDF. Run Python as `python3 -I` and pass paths: every script reads `--help`. Downloaded fonts go in their own\nfolder and are only read, never run.\n\n## Steps\n\n1. **Ask once.** In one message ask for: the fonts they like, as font files or screenshots (two to four is\n   plenty), what the font is for (text, display or UI), which scripts and languages it must cover, which weights,\n   and a new family name. If they can type in the font (a foundry's type tester, a design tool), ask them to\n   screenshot the four lines of `SAMPLE_LINES` in `scripts/fontlib.py`, large, cap height 80 px or more. Take\n   defaults for anything unanswered and say which: text, Latin, Regular and Medium, a name you propose.\n   Done when the references, use, scripts, weights and name are written down.\n\n2. **Measure.** Files: `measure_font.py <file> --out m1.json`. Screenshots:\n   `measure_image.py <shot.png> --text \"line|line\" --out m2.json`. Before trusting a screenshot, run\n   `measure_image.py --selftest <any open font> --px <its px per em>` at the screenshot's size: it prints how far\n   pixel readings land from the file's numbers. Report every number marked low confidence. Method, definitions\n   and error sizes: `references/measuring.md`.\n   Done when each reference has a measurement file and the person has seen the main numbers.\n\n3. **Targets.** `make_targets.py m1.json m2.json --family \"New Name\" --use text --scripts latin\n   --style Regular:400 --style Medium:500 --out targets.json`. Where references disagree, the script lists the\n   spread. Ask which way to lean instead of averaging a serif with a sans.\n   Done when `targets.json` exists and every spread has an answer or a stated default.\n\n4. **Find the foundation.** `find_foundation.py targets.json --cache <dir> --out shortlist.json`. It ranks open\n   families from the Google Fonts catalogue by distance to the targets, with variable fonts ahead\n   (`references/foundation.md`). Show the person the top three to five with their deltas and axes, render each\n   beside a reference if you can, recommend one, and wait for a yes. Note any Reserved Font Name.\n   Done when the person confirmed a base. Do not build before that.\n\n5. **Fit.** `fit_font.py <base-vf.ttf> targets.json --out-dir build/ [--loc opsz=..]`. It solves a y instance for\n   stems and contrast, an x instance per width class for widths, merges them into one static per weight, and\n   iterates until every class mean is within 0.3 percent, never stretching more than 3 percent\n   (`references/fitting.md`). If a class hits the stretch limit, tell the person what that letter class will be\n   and offer a base with a width axis.\n   Done when every style is written and `fit-log.json` shows each class within tolerance or explained.\n\n6. **Space.** `space_font.py build/X-Regular.fit.ttf targets.json --out build/X-Regular.ttf [--track -4]`.\n   Class sidebearings to the targets, an optional global track, kerning carried and scaled, then the collision\n   guard (`references/spacing.md`). More than 150 guard pairs means the spacing is too tight. Loosen and rerun.\n   Done when the guard count is under 150 and its log is saved.\n\n7. **Package and check.** `package.py build/*.ttf --targets targets.json --base <vf> --base-licence <OFL.txt>\n   --holder \"<who owns the modifications>\" --out-dir dist/ --fit-log build/fit-log.json --space-log ...`\n   (`references/licensing.md`), then `check_font.py dist/ttf/*.ttf --targets targets.json --base <vf>\n   --reference <ref file> --package dist/ --fit-log build/fit-log.json --out-dir checks/`\n   (`references/checks.md`). Look at every overlay\n   render yourself, at the text and the display size. A failed gate goes back to the step that owns it.\n   Done when the check exits 0, or each failure is listed for the person with its number and the reason.\n\n8. **Font book.** `font_book.py dist/ttf/*.ttf --webfonts dist/webfonts --targets targets.json --fit-log ...\n   --space-log ... --check-report checks/check-report.json --out-dir book/`, then\n   `node scripts/render_book.mjs book/`. It prints the pages as PNG and one PDF and fails on a fallback glyph or\n   an overflow (`references/font-book.md`). Open three pages and look before you hand it over.\n   Done when `book/fontbook.pdf` exists and render_book.mjs exits 0.\n\n## Hand-off\n\nTell the person, in this order: what was made (family, weights, glyph count, scripts), the base and its licence,\nthe gates with their numbers (pass and fail), what still differs from the references and why (the base's own\ndrawing: terminals, serif shape, a letter that reads differently), and where the files are. Attach or link the\nPDF. Name the fonts' provenance plainly: built on an open font, fitted to measurements.\n\n## Never\n\n- Copy, trace, auto-trace or convert outlines from a reference. Copy a reference's kerning or per-glyph widths.\n- Ship under any licence but the OFL, keep the base's name or a Reserved Font Name, or keep its trademark record.\n- Put a reference font's name in the output files, the font book or the package README.\n- Call a gate passed that was not run in this session. fontbakery not installed is \"not run\", not \"passed\".\n- Stretch a glyph more than the limit to hit a number. Report the gap instead.\n- Commit or publish font files unless the person asks, and never a reference font.\n\n## Files\n\n- `scripts/fontlib.py` shared geometry, classes, sample lines, rasteriser.\n- `scripts/measure_font.py`, `measure_image.py`, `make_targets.py`: steps 2 and 3.\n- `scripts/find_foundation.py`: step 4. `fit_font.py`: step 5. `space_font.py`: step 6.\n- `scripts/package.py`, `check_font.py`: step 7. `font_book.py`, `book.css`, `render_book.mjs`: step 8.\n- `references/`: measuring, foundation, fitting, spacing, checks, licensing, font-book.\n",
+      "card": {
+        "title_zh": "定制字体生成",
+        "purpose_zh": "根据用户喜欢的字体文件或截图测量比例、宽度与间距，在开源授权字体上拟合出同风格新字体，并打包网页字体与字体册。",
+        "does": [
+          "测量参考字体文件或截图的字体级比例、笔画粗细、类均宽度与间距",
+          "生成目标数值并筛选最接近的开源字体作为基础",
+          "在开源可变字体上拟合字重与宽度类，控制拉伸不超过3%",
+          "调整类侧边距与字距并做碰撞检查",
+          "打包OFL授权字体、网页字体并运行检查",
+          "生成字体册PNG页面与PDF"
+        ],
+        "inputs": [
+          "用户喜欢的字体文件或截图（2到4个）",
+          "字体用途（正文、展示或UI）",
+          "需覆盖的文字系统与语言",
+          "需要的字重",
+          "新字体家族名",
+          "基础开源字体确认"
+        ],
+        "outputs": [
+          "测量文件m1.json/m2.json",
+          "targets.json目标数值",
+          "拟合后的静态字体文件",
+          "dist/打包字体与网页字体",
+          "检查报告check-report.json",
+          "字体册book/fontbook.pdf"
+        ],
+        "scenarios": [
+          "个人开发者想基于喜欢的字体做自有字体",
+          "从截图复刻字体风格比例",
+          "为项目定制正文或展示字体",
+          "生成带网页字体与字体册的字体包"
+        ],
+        "prerequisites": [
+          "Python 3.9+及fonttools、brotli、uharfbuzz、numpy、pillow等库",
+          "Node 18+与Playwright用于渲染PDF",
+          "可访问Google Fonts目录获取开源基础字体",
+          "用户确认基础字体后才开始构建"
+        ],
+        "limits": [
+          "不描摹或复制参考字体轮廓，只匹配比例宽度间距",
+          "拒绝克隆、转换或重建商业字体及改名请求",
+          "仅以OFL授权发布，不保留基础字体名或保留字体名",
+          "未运行的检查不能称为通过",
+          "单字形拉伸不超过3%，超出需报告差距",
+          "未获用户要求不提交或发布字体文件"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "设计/UI",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "It measures the references, fits the closest open-licence font to them, checks it, and delivers an OFL font with web files and a font book."
+          },
+          {
+            "field": "does",
+            "quote": "Class sidebearings to the targets, an optional global track, kerning carried and scaled, then the collision guard"
+          },
+          {
+            "field": "does",
+            "quote": "It prints the pages as PNG and one PDF and fails on a fallback glyph or an overflow"
+          },
+          {
+            "field": "outputs",
+            "quote": "Done when `book/fontbook.pdf` exists and render_book.mjs exits 0."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "They need Python 3.9+ with `fonttools`, `brotli`, `uharfbuzz`, `numpy` and `pillow`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "and Node 18+ with Playwright for the PDF."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Done when the person confirmed a base. Do not build before that."
+          },
+          {
+            "field": "limits",
+            "quote": "Never open a reference font in the build step."
+          },
+          {
+            "field": "limits",
+            "quote": "Refuse a request to clone, trace, convert or \"rebuild exactly\" a commercial font, or to rename one."
+          },
+          {
+            "field": "limits",
+            "quote": "Ship under any licence but the OFL, keep the base's name or a Reserved Font Name, or keep its trademark record."
+          },
+          {
+            "field": "limits",
+            "quote": "Call a gate passed that was not run in this session. fontbakery not installed is \"not run\", not \"passed\"."
+          },
+          {
+            "field": "limits",
+            "quote": "Commit or publish font files unless the person asks, and never a reference font."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run Python as `python3 -I` and pass paths: every script reads `--help`."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "It ranks open families from the Google Fonts catalogue by distance to the targets"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`package.py build/*.ttf --targets targets.json --base <vf> --base-licence <OFL.txt>"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/make-motion/SKILL.md",
+      "blob_sha": "48a5242734fc314e18ab299e6f544f4e15011223",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/skills/make-motion/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "make-motion",
+        "description": "Use when someone wants a motion graphics video of their product (a launch video, feature demo, teaser or explainer), such as \"make a launch video for this\", \"/make-motion\" or \"roast my video idea\". It roasts the idea, scripts it in beats, builds it in Remotion in their design system with music made in code, checks it by measurement, and delivers an MP4. Not for editing footage."
+      },
+      "excerpt": "---\nname: make-motion\ndescription: Use when someone wants a motion graphics video of their product (a launch video, feature demo, teaser or explainer), such as \"make a launch video for this\", \"/make-motion\" or \"roast my video idea\". It roasts the idea, scripts it in beats, builds it in Remotion in their design system with music made in code, checks it by measurement, and delivers an MP4. Not for editing footage.\nmetadata:\n  summary: Makes a motion graphics video\n---\n\n# Make motion\n\nThe person brings an idea: a product, a feature, a launch. This skill turns it into a 15 to 25 second motion\ngraphics video, for X by default, that a stranger understands with the sound off, and that looks made by hand. It runs the whole loop by itself unless\nthe person asks to approve each stage (`step`).\n\n| You say | It does |\n|-|-|\n| `/make-motion <idea>` | the whole loop, one shot |\n| `/make-motion step <idea>` | stops for a yes after the script, the stills and the review cut |\n| `/make-motion roast <idea>` | step 2 only: the roasted pitch and three hooks |\n| `/make-motion theme <source>` | step 3 only: resolves and checks a theme |\n\n## Before anything\n\nSay this once, plainly: \"This builds in Remotion. It is free for individuals and companies of up to 3 people; a\nlarger company needs a Remotion company licence (remotion.dev/license).\" Then carry on. Never decide for them.\n\nNeeds Node 22.6 or later, about 400 MB for Remotion and its headless Chrome (downloaded on first render), and ffmpeg\nfor the contact sheet, the jump and energy checks and the X export. A one-shot run of a 20 s video takes about two\nhours of agent time, most of it renders and review passes; say so up front.\n\nStart from `template/`: copy it to the person's chosen folder (default `video/`), `npm install`, and render the\nexample once (`npm run stills example`) to prove the setup before writing anything. Then make the video in its own\nfolder under `src/` and delete the example. `references/pipeline.md` has every command.\n\n## Steps\n\n1. **Ask once.** In one message: what the product does in a sentence, who watches, what can be shown (screenshots,\n   a URL, the repo, real numbers), a theme source if they have one, and anything that must be on screen. Take\n   defaults for the rest and say which: 5:4 at 1350x1080, 60 fps, about 20 s, `punchy`. The look comes from the\n   product's own brand (its site, its tokens); design.how's look is only for a person with no brand at all.\n   Done when the idea, the material and the defaults are written down.\n\n2. **Roast the pitch.** Run `references/story.md`, \"The pitch roast\", on the idea as given. Write the one-sentence\n   story, three hooks, the pick and why, the signature move, and what was cut. The roast is the person's to see\n   even in one-shot: show it in a few lines before building, then build on it.\n   Done when the story is one sentence a stranger would get, and every scene is tied to it.\n\n3. **Theme.** Resolve the theme from its source (`references/theme.md`; for a site,\n   `npm run theme -- <url> --out src/<name>/theme.json` writes a draft). Decide every role, fill the\n   derived ones, run the contrast check, load the fonts, and warn on any font whose licence is commercial or unknown.\n   Done when every text role passes contrast on every ground it lands on.\n\n4. **Script in beats.** Write `SCRIPT.md` (scenes, every word on screen, sound) and `timing.ts` (every moment as a\n   beat number turned into frames). Use `references/story.md`, \"Script\", and `references/motion.md`, \"Energy\", for\n   each scene: name its three things alive, its scale change and where the camera goes. Name the review stills in\n   `STILLS`, the planned hard cuts in `CUTS` and any designed one-frame steps in `STEPS`.\n   Done when SCRIPT.md and timing.ts agree and the length is within 2 s of the target.\n\n5. **Stills.** Build each scene as a frame of the real composition and render the stills\n   (`references/pipeline.md`). Look at every still yourself against the motion slop list in `references/motion.md`:\n   real content, not placeholder bars; the subject filling the frame; UI text 22 px or more; nothing decorative.\n   In `step`, stop here for a yes.\n   Done when each still holds up on its own as a poster.\n\n6. **Motion.** Animate with `src/kit/`. Every value a pure function of the frame. Render a silent review cut at scale\n   1 (`npm run review <id>`), then `npm run jumps <id>` and `npm run energy <id>`. Fix every unplanned jump and every\n   scene under the energy bar before anyone sees it.\n   Done when both exit 0 and the contact sheet reads as the story, busy in every row.\n\n7. **Roast the cut.** Run the review passes in `references/review.md`: fresh agents, one per area, with the saved\n   briefs. Measured findings are fixed; taste findings are weighed against the one-sentence story. Two passes, the\n   second on a new review cut of the fixed video. If pass two changes anything, render the review cut once more and\n   rerun jumps and energy: the master is never the first render of a fix. In `step`, put the findings to the person.\n   Done when the second pass finds nothing above \"minor\" and the last review cut passes jumps and energy.\n\n8. **Music last.** Write `audio/cues.mjs` from `timing.ts` (the key, tempo and preset live there, nowhere else), then\n   `npm run audio src/<name>` and `npm run audio:check src/<name>` (`references/sound.md`). Nobody can listen, so\n   say that the sound is checked by measurement only, and give the numbers.\n   Done when `audio:check` exits 0, and again with `-- --mp4 out/<id>/master.mp4` on the master.\n\n9. **Final and hand-off.** Render the master at scale 2, mux the audio, make the 1350x1080 X cut and a thumbnail\n   (`references/pipeline.md`). Tell the person: the file paths, the length, the one-sentence story, what the roasts\n   changed, the measured audio numbers, and anything not verified.\n\n## Rules\n\n- Open on the product, busy from frame 0. Never a title card first.\n- Every screen reads at a glance to a stranger: familiar UI doing one obvious thing, the outcome and not the\n  machinery. No process diagrams, no internal steps, no tool vocabulary on screen.\n- More going on, not less: three things alive in every scene, moves that overlap, a camera that works, one change of\n  scale per scene, the subject filling the frame (`references/motion.md`, \"Energy\"). The energy check measures it.\n- Every scene is new. Shared code is the kit (curves, blur, whips, captions, theme), never a previous video's scenes.\n- Captions are one line per beat in plain words, no punctuation, no exclamation marks.\n- One accent, used for what matters (a measurement, a highlight, the product's name). Everything else is ink on paper\n  or paper on ink.\n- Real numbers where they exist. Invented data never looks like a real company, person or secret.\n- Anything decided per frame (which face, which digit, which letter typed) is picked on the whole frame, floored\n  (`whole()` in the kit), so blur samples agree.\n- Measure layout once, flat, after `document.fonts.ready`, before any camera transform.\n- Sound effects are in the music's key. The mix is mastered to -14 LUFS.\n\n## Never\n\n- Call a check passed that did not run in this session. Not run is \"not run\".\n- Claim the music sounds good. Report what was measured.\n- Put a brand, company or font name on screen that isn't the person's own.\n- Use AI-slop looks: purple-to-indigo gradients, gradient text, glassmorphism over gradients, sparkle emoji, icon\n  tiles, a soft shadow on every card, centred hero copy, \"seamlessly\". Nor the motion slop in `references/motion.md`:\n  placeholder bars, decorative frame lines, UI shrunk into half the frame, a static end card.\n- Draw or imitate a company's logo, even for a spec video. Its name in plain text in an open font is the limit.\n- Ship a font in the video whose licence the person hasn't confirmed.\n\n## Files\n\n- `references/story.md`: the pitch roast, hooks, the script and caption language. Load in steps 2 and 4.\n- `",
+      "card": {
+        "title_zh": "动效视频制作",
+        "purpose_zh": "把产品想法做成15到25秒的动效图形视频：先吐槽创意、按节拍写脚本，再用Remotion按品牌设计系统搭建，用代码生成音乐，通过测量检查后交付MP4。",
+        "does": [
+          "对创意做吐槽式评审，写一句话故事、三个钩子和取舍",
+          "解析并校验主题配色与字体，检查对比度",
+          "按节拍写SCRIPT.md和timing.ts脚本",
+          "用Remotion搭建场景并渲染静帧、审片版和母版",
+          "运行跳变与能量检查，并做多轮评审",
+          "用代码合成音乐并做测量校验，导出X版和缩略图"
+        ],
+        "inputs": [
+          "产品一句话说明、受众、可展示素材（截图、URL、仓库、真实数据）",
+          "可选的主题来源",
+          "必须出现在画面上的内容",
+          "默认参数：5:4 1350x1080、60fps、约20秒、punchy"
+        ],
+        "outputs": [
+          "15到25秒动效视频MP4母版",
+          "1350x1080的X版视频和缩略图",
+          "SCRIPT.md与timing.ts脚本",
+          "静帧、审片版、接触表",
+          "音频测量数值"
+        ],
+        "scenarios": [
+          "产品发布视频",
+          "功能演示视频",
+          "预告片或解说视频",
+          "对视频创意做吐槽评审",
+          "只解析校验主题"
+        ],
+        "prerequisites": [
+          "Node 22.6或更高版本",
+          "约400MB空间用于Remotion和无头Chrome（首次渲染时下载）",
+          "ffmpeg用于接触表、跳变与能量检查及X导出",
+          "从template/复制项目并执行npm install",
+          "Remotion许可：个人及不超过3人的公司免费，更大公司需商业许可"
+        ],
+        "limits": [
+          "不用于剪辑实拍素材",
+          "一次20秒视频的一次性运行约需两小时代理时间",
+          "无法真正听音频，声音只能靠测量检查",
+          "不能声称音乐好听，只能报告测量结果",
+          "不得绘制或模仿公司logo",
+          "不得使用未确认许可的字体"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "视频",
+          "设计/UI",
+          "自动化",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill turns it into a 15 to 25 second motion graphics video, for X by default, that a stranger understands with the sound off, and that looks made by hand."
+          },
+          {
+            "field": "does",
+            "quote": "Run `references/story.md`, \"The pitch roast\", on the idea as given. Write the one-sentence story, three hooks, the pick and why, the signature move, and what was cut."
+          },
+          {
+            "field": "does",
+            "quote": "Resolve the theme from its source (`references/theme.md`; for a site, `npm run theme -- <url> --out src/<name>/theme.json` writes a draft)."
+          },
+          {
+            "field": "does",
+            "quote": "Write `SCRIPT.md` (scenes, every word on screen, sound) and `timing.ts` (every moment as a beat number turned into frames)."
+          },
+          {
+            "field": "does",
+            "quote": "Build each scene as a frame of the real composition and render the stills (`references/pipeline.md`)."
+          },
+          {
+            "field": "does",
+            "quote": "Render a silent review cut at scale 1 (`npm run review <id>`), then `npm run jumps <id>` and `npm run energy <id>`."
+          },
+          {
+            "field": "does",
+            "quote": "Write `audio/cues.mjs` from `timing.ts` (the key, tempo and preset live there, nowhere else), then `npm run audio src/<name>` and `npm run audio:check src/<name>`"
+          },
+          {
+            "field": "does",
+            "quote": "Render the master at scale 2, mux the audio, make the 1350x1080 X cut and a thumbnail (`references/pipeline.md`)."
+          },
+          {
+            "field": "inputs",
+            "quote": "In one message: what the product does in a sentence, who watches, what can be shown (screenshots, a URL, the repo, real numbers), a theme source if they have one, and anything that must be on screen."
+          },
+          {
+            "field": "inputs",
+            "quote": "Take defaults for the rest and say which: 5:4 at 1350x1080, 60 fps, about 20 s, `punchy`."
+          },
+          {
+            "field": "outputs",
+            "quote": "Tell the person: the file paths, the length, the one-sentence story, what the roasts changed, the measured audio numbers, and anything not verified."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Needs Node 22.6 or later, about 400 MB for Remotion and its headless Chrome (downloaded on first render), and ffmpeg for the contact sheet, the jump and energy checks and the X export."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Start from `template/`: copy it to the person's chosen folder (default `video/`), `npm install`, and render the example once (`npm run stills example`) to prove the setup before writing anything."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "This builds in Remotion. It is free for individuals and companies of up to 3 people; a larger company needs a Remotion company licence (remotion.dev/license)."
+          },
+          {
+            "field": "limits",
+            "quote": "Not for editing footage."
+          },
+          {
+            "field": "limits",
+            "quote": "A one-shot run of a 20 s video takes about two hours of agent time, most of it renders and review passes; say so up front."
+          },
+          {
+            "field": "limits",
+            "quote": "Nobody can listen, so say that the sound is checked by measurement only, and give the numbers."
+          },
+          {
+            "field": "limits",
+            "quote": "Draw or imitate a company's logo, even for a spec video. Its name in plain text in an open font is the limit."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/migrate-design-system/SKILL.md",
+      "blob_sha": "c685566acfee37184b1b31cbf6e58dd1445aa300",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/skills/migrate-design-system/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "migrate-design-system",
+        "description": "Use when an app has to move onto a design system that already exists, such as \"migrate the app to our design system\", \"move every screen onto the new components\", a rollout, or an adoption audit. Not for making the system or for swapping raw values for tokens, which are build-design-system."
+      },
+      "excerpt": "---\nname: migrate-design-system\ndescription: Use when an app has to move onto a design system that already exists, such as \"migrate the app to our design system\", \"move every screen onto the new components\", a rollout, or an adoption audit. Not for making the system or for swapping raw values for tokens, which are build-design-system.\nmetadata:\n  summary: Migrates onto it\n---\n\n# Migrate to a design system\n\nWords are in `build-design-system/references/glossary.md`, bans, widths and voice in the accepted `.design-system/taste.md`. The system is settled and behaviour stays unchanged, except for announced data-bug fixes. A missing token or component is a gap for the system's owner, never a workaround here. The Never list in `build-design-system` holds for the coordinator and every worker.\n\nScripts are in this skill's `scripts/`. Run each from the repo root as `node <this skill>/scripts/<name>.mjs`, except `scripts/legacy.mjs`, which is copied into the repo's `scripts/` so CI runs its ratchet. Captures and pixel diffs use `build-design-system/scripts/capture.mjs` and `build-design-system/scripts/pixdiff.mjs`, and capture installs `build-design-system/scripts/capture-guard.mjs` before the first navigation.\n\n## Modes\n\nAudit mode is the default. It writes only under `.design-system/`, which `.git/info/exclude` keeps out of every commit, cuts no branch, commits nothing and ends with the inventory, the plan and the offer of the full run with its size. Full mode starts only when the ask names the migration or the person accepted the offer (`Go, <budget>`). \"Clean it up\" and \"fix it\" are not clearance.\n\n## Steps\n\n1. **Roles.** Add `.design-system/` to `.git/info/exclude`. In full mode use the branch the person named, or cut the run branch and write the branch you started on to `.design-system/start-branch`, which `land.mjs` refuses. Write `.design-system/roles.md`: coordinator, worker, verifier, reviewer, each a model or `inherit-parent`. The writer never grades itself. The verifier is a different agent, on another model family where the host has one. Write `.design-system/decisions.tsv` as append-only rows (`time, phase, decision, why, evidence pointer, result`). A wrong call gets a superseding row, never an edit. Evidence is a sha, a path or a command, never prose.\n2. **Ready?** Run the readiness audits in `build-design-system`. Check every open backlog row against the code first. Rows go stale. Some are already fixed, and a \"needs a system change\" row is often a caller ignoring a prop the system has. No fan-out while a text or control primitive is missing, a gap is open or the system's own check is red.\n3. **Inventory.** `node <this skill>/scripts/legacy.mjs --init-config --config .design-system/legacy.json`, point `legacyImports` and `systemImports` at the real modules, then `--inventory --config .design-system/legacy.json`. It exits 2 while a placeholder is left or no file was scanned. Every finding gets a surface. In audit mode, stop here and write the plan. In full mode, copy the script to `scripts/legacy.mjs` and the config to `scripts/legacy.json`, and `--record` the baseline (`scripts/legacy-baseline.json`) in its own commit.\n4. **Baselines.** Capture every surface, state, width and theme before the first edit, in the environment CI uses, with fixture data and a frozen clock, plus a no-change control capture. `capture.mjs` refuses to start without `--writes <file>`, and with it until every write in the file is seen blocked (lesson 6). No baseline, no parity claim. Never edit a harness, a baseline or a threshold, or restructure a component to make a diff pass. A baseline that looks wrong is kept as captured and becomes a gate (default: keep it, and fix the bug it shows as an `intended change`), and the run goes on.\n5. **Shared layer first.** One agent, alone, lands layout and providers. Then migrate the pilot surface by hand with a verifier, write the codemod from it, diff its output against the hand work, and run it twice. The second run changes nothing. Fan out only after that.\n6. **Fan out.** A rolling window, one surface per worker, each brief with a MAY EDIT list, each surface verified by another agent. A retry or a fix goes to a fresh worker with the brief, every later directive and the prior verdict. Read `references/running-many-agents.md` before the first spawn.\n7. **Land.** `land.mjs`, one commit per verified surface, then the system's check at that commit. A surface whose diff touches write lines lands with `--bodies-check` (lesson 5).\n8. **Delete legacy.** A module with zero callers goes in one change with its adapter and allowlist rows, and the ratchet bans its path.\n9. **Close.** Recapture every surface at the final commit. Only verdicts at that commit count. Have a read-only reviewer go through the diff's comments (narration, worker or gate references, \"do not change\" notes), and offer to turn each \"do not change\" into a check, then delete the comment. A different agent audits `decisions.tsv` against the run. Then run the correction pass in `references/correct.md`.\n\nDone when `legacy.mjs --zero` exits 0 at the final commit (no legacy import and no file mixing the system with legacy, whatever the baseline holds), every raw or palette row `--inventory` still prints is a listed exception, every surface has a `verified` verdict at that commit, the system's check exits 0, the correction pass in `references/correct.md` has run, and the report lists what was found and not fixed.\n\n## A brief\n\n```\nSURFACE   <id, never reused> <name> at <sha>\nMAY EDIT  <paths, one per line>. Dirty files not listed are read-only. Conflicts go to the coordinator.\nKEEP      <behaviours that must not change, one per line>\nLESSONS   <the numbers of the lessons in references/lessons.md that apply to this surface>\nSTANDING  the person's standing preferences, word for word\nBANS      git push, sed -i (use an exact edit), pkill (stop your own PIDs), git add -A, git stash, merge or checkout in the shared tree, git reset --hard\nSCRATCH   .design-system/tmp/<worker id>/ only\nRETURN    the verdict file, written before the final message: verdict, commands with exit codes, files changed, evidence paths, what was not exercised\n```\n\n## Rules\n\nThe eight incident-backed lessons are in `references/lessons.md`. Each has an Apply-when, a Why, a Stop line and the check that enforces it. A report names each lesson that changed a decision, and the check it ran. The parity classes are in `references/parity.md`.\n\n- A claim names the command that proved it this session. Evidence older than the last edit is stale.\n- Verification matches risk. A visual-only change gets unit tests, typecheck, the system's check and one before and after capture pair. A write surface gets every width and theme plus request-body equality (lesson 5). A full-app sweep at close backs up the light tier.\n- A bug in a primitive's contract is fixed in the primitive, and every caller is found. Patching one caller leaves the rest broken. \"Legacy did it too\" never keeps a data bug, and the fix is announced, never a quiet behaviour change.\n- A test that fails because copy changed on purpose is updated in the same commit, at least as strong, with the reason. Any other failure blocks.\n- A missing primitive is a gap row. Park the draft under `blocked/`, restore the file to HEAD, mark the surface `blocked-on <gap>`.\n- Commit only the named paths, through `land.mjs`. Commit messages and shipped code describe the product, never workers, verdicts or the migration. Scratch lives under `.design-system/tmp/<worker id>/`, and untracked files under the source roots are accounted for before every report.\n- Delete legacy only once nothing imports it. A module another package or a public API exports stops the delete and becomes a gate.\n\n## Asking\n\nTake the default and record it. Stop only for what git cannot undo, a missing repo, or a tool call the host refused. A refused call stops that worker. It reports the command and the refusal text,",
+      "card": null
+    },
+    {
+      "skill_path": "skills/token-mapping/SKILL.md",
+      "blob_sha": "a655946f1d4f8c932f800801fef12f87a693680f",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/skills/token-mapping/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "token-mapping",
+        "description": "Use to report how hardcoded style values on a page, file or diff map onto a project's existing design tokens, such as \"are we using our tokens here\", \"which hardcoded colors map to which tokens\", a token audit or planning a token migration. It never edits. Replacing the values is build-design-system."
+      },
+      "excerpt": "---\nname: token-mapping\ndescription: Use to report how hardcoded style values on a page, file or diff map onto a project's existing design tokens, such as \"are we using our tokens here\", \"which hardcoded colors map to which tokens\", a token audit or planning a token migration. It never edits. Replacing the values is build-design-system.\nmetadata:\n  summary: Maps values to tokens\n---\n\n# Token mapping\n\nA read-only report that lands raw values (hex, px, shadows) on a token list someone else owns. Classes, normalising and tolerances are in `references/mapping-rules.md`. \"Check the tokens on the settings page\" is enough of an ask. Find the values and the list yourself.\n\n## Steps\n\n1. **Find the list.** Token files, theme entries, custom properties on `:root`, a component library's variable pairs. A framework's default theme is not the team's list, and neither is a public system's (Geist's names never stand in for the team's). Record its name, location and how you read it. If a read fails, say so and stop. Never fill a list from memory.\n2. **Find the values.** What the person named, else the branch diff, else the product code. Record each with its file, line, property and job.\n3. **Resolve.** Follow every alias to its final value in each mode. Write down every disagreement between two sources.\n4. **Normalise** both sides (lengths to px, colours to OKLCH compared by delta E OK) with code, never by eye.\n5. **Classify** each row once per mode. Purpose first, then value.\n   - Exact: the token's stated job covers the row and the values match.\n   - Semantic: the job covers it and the value is inside tolerance. State the difference in numbers.\n   - Ambiguous: two or more tokens fit and nothing picks one. Name every candidate.\n   - Gap: no token's job covers it, or the only fitting token is out of tolerance. A gap never gets a new name.\n6. **Count and close.** When gaps are over 30% of rows and number 12 or more, the list is usually the wrong one. Say so, still deliver the table, and lead with `Status: not actionable (gap threshold)`.\n\n## Report\n\nSummary, Mapping, Do not use (a token whose value matches but whose job differs), Ambiguous, Gaps, For a person to decide, Source. Last line `Coverage:` with what was scanned and what was not. Run on its own, the chat reply gives the answer with its numbers and one prompt the person can paste to take the next step.\n\n## Rules\n\n- A match on value before purpose is wrong. Wrong: `#6b7280` mapped to `color.border.default` because the hex is equal. Right: it is text, so the candidates are text tokens, and the border token goes in Do not use.\n- A semantic token wins over the primitive it aliases. Map to a primitive only when no semantic token covers the job, and say so.\n- A palette class (`text-gray-500`) names a value and no job. It gets a row, counted apart from raw values.\n- Anything inferred rather than read, such as a job taken from a class name, is marked inferred.\n- Counts carry their unit: occurrences, lines or mapping rows.\n\n## Stops\n\nStop and report on these only. No list exists. One name has two values in the same mode. Two sources disagree and no project rule says which wins (report both). Return what stopped it, the groundwork so far, and the shortest message that unblocks it, such as \"Paste `tokens.json` or give its path.\"\n\n## Done\n\nEvery row has a job, a class and a reason. Every ambiguous row names two or more candidates. Nothing in the repo changed (`git status` is the same before and after). The last line reads `Coverage:`.\n",
+      "card": {
+        "title_zh": "设计令牌映射报告",
+        "purpose_zh": "只读报告：把页面、文件或 diff 中的硬编码样式值（hex、px、阴影）映射到项目已有的设计令牌列表，并分类为精确、语义、歧义或缺口；从不修改代码。",
+        "does": [
+          "先定位团队自己的令牌列表（令牌文件、主题条目、:root 自定义属性、组件库变量对），记录名称、位置与读取方式",
+          "再定位待检查的硬编码值（用户指定范围、分支 diff 或产品代码），记录文件、行、属性与用途",
+          "解析每个别名在各模式下的最终值，并记录来源之间的所有不一致",
+          "用代码而非肉眼归一化两侧（长度转 px，颜色转 OKLCH 按 delta E OK 比较）",
+          "按用途优先、值其次，将每行分类为 Exact、Semantic、Ambiguous 或 Gap",
+          "输出含 Summary、Mapping、Do not use、Ambiguous、Gaps、待人工决定、Source 的报告，末行给出 Coverage"
+        ],
+        "inputs": [
+          "用户指定的检查范围（如“检查设置页的令牌”）",
+          "项目令牌列表（令牌文件、主题条目、:root 自定义属性、组件库变量对）",
+          "待检查的页面、文件或分支 diff"
+        ],
+        "outputs": [
+          "只读映射报告：Summary、Mapping、Do not use、Ambiguous、Gaps、For a person to decide、Source",
+          "末行 Coverage：说明扫描了什么、未扫描什么",
+          "缺口超过阈值时以 Status: not actionable (gap threshold) 开头",
+          "单独运行时聊天回复给出带数字的答案和一条可粘贴的下一步提示"
+        ],
+        "scenarios": [
+          "回答“我们这里用的是自己的令牌吗”",
+          "回答“哪些硬编码颜色对应哪些令牌”",
+          "令牌审计",
+          "规划令牌迁移",
+          "检查分支 diff 中的硬编码样式值"
+        ],
+        "prerequisites": [
+          "存在项目自己的令牌列表（框架默认主题或公共系统不算）",
+          "能读取令牌文件或主题定义；读取失败需说明并停止"
+        ],
+        "limits": [
+          "从不编辑，替换值属于 build-design-system",
+          "不得凭记忆填充令牌列表",
+          "值匹配优先于用途匹配即判错",
+          "缺口不得新起名字",
+          "缺口超过行数 30% 且不少于 12 行时，判定列表选错，仍交付表格但标记不可执行",
+          "遇到无列表、同名两值、来源冲突无规则可依时停止并报告"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "代码审查",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A read-only report that lands raw values (hex, px, shadows) on a token list someone else owns."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "It never edits. Replacing the values is build-design-system."
+          },
+          {
+            "field": "does",
+            "quote": "**Find the list.** Token files, theme entries, custom properties on `:root`, a component library's variable pairs."
+          },
+          {
+            "field": "does",
+            "quote": "**Find the values.** What the person named, else the branch diff, else the product code. Record each with its file, line, property and job."
+          },
+          {
+            "field": "does",
+            "quote": "**Resolve.** Follow every alias to its final value in each mode. Write down every disagreement between two sources."
+          },
+          {
+            "field": "does",
+            "quote": "**Normalise** both sides (lengths to px, colours to OKLCH compared by delta E OK) with code, never by eye."
+          },
+          {
+            "field": "does",
+            "quote": "**Classify** each row once per mode. Purpose first, then value."
+          },
+          {
+            "field": "does",
+            "quote": "Summary, Mapping, Do not use (a token whose value matches but whose job differs), Ambiguous, Gaps, For a person to decide, Source."
+          },
+          {
+            "field": "inputs",
+            "quote": "\"Check the tokens on the settings page\" is enough of an ask. Find the values and the list yourself."
+          },
+          {
+            "field": "outputs",
+            "quote": "Last line `Coverage:` with what was scanned and what was not."
+          },
+          {
+            "field": "outputs",
+            "quote": "Run on its own, the chat reply gives the answer with its numbers and one prompt the person can paste to take the next step."
+          },
+          {
+            "field": "scenarios",
+            "quote": "such as \"are we using our tokens here\", \"which hardcoded colors map to which tokens\", a token audit or planning a token migration"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "A framework's default theme is not the team's list, and neither is a public system's (Geist's names never stand in for the team's)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If a read fails, say so and stop. Never fill a list from memory."
+          },
+          {
+            "field": "limits",
+            "quote": "When gaps are over 30% of rows and number 12 or more, the list is usually the wrong one."
+          },
+          {
+            "field": "limits",
+            "quote": "A gap never gets a new name."
+          },
+          {
+            "field": "limits",
+            "quote": "Stop and report on these only. No list exists. One name has two values in the same mode."
+          },
+          {
+            "field": "limits",
+            "quote": "Nothing in the repo changed (`git status` is the same before and after)."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ui-review/SKILL.md",
+      "blob_sha": "fbc98e0b816e109fa6784babda5b5fe8cbedd518",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/skills/ui-review/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ui-review",
+        "description": "Use to critique a screen, flow, prototype or running build, accessibility included, and rank what is broken, such as \"check this page before I ship\", \"is this flow ready\", \"is it accessible\", keyboard or screen-reader checks, \"it feels off on my phone\" or \"it feels janky\". Not for token compliance, which is token-mapping."
+      },
+      "excerpt": "---\nname: ui-review\ndescription: Use to critique a screen, flow, prototype or running build, accessibility included, and rank what is broken, such as \"check this page before I ship\", \"is this flow ready\", \"is it accessible\", keyboard or screen-reader checks, \"it feels off on my phone\" or \"it feels janky\". Not for token compliance, which is token-mapping.\nmetadata:\n  summary: Reviews a screen\n---\n\n# UI review\n\nThe render is the evidence. A description, DOM text or source code only supports it. Severity, the 13 criteria and the edge cases are in `references/criteria.md`. An installed design system's own rules come first and count as agreed criteria.\n\n## Steps\n\n1. **Scope.** What the caller names, else the branch's changed screens, else the five top routes.\n2. **Lint.** Run the project's own lint on the scoped files. Record the command and exit code.\n3. **Capture** each screen at each width (the app's narrowest and widest, 390 and 1280 by default) in the states that matter, one fresh navigation per width. With `build-design-system` installed, `build-design-system/scripts/capture.mjs` does this behind a guard that blocks every write and saves each capture's accessibility tree. It needs `--writes <file>` listing the app's writes, or `--no-backend`, and writes only to its `--out` folder (keep that under `.ui-review/`). Otherwise use the host's browser tool and save the tree yourself. Run the project's accessibility scanner too when it has one.\n4. **Fix the purpose** of each screen in one line. Mark it assumed when the caller did not give it.\n5. **Probe the traps** each screen has, on a local build only: keyboard path, focus after close, loading and error states, a throttled tab, reduced motion, and a touch width. Each probe gets a measured result or a reason it did not run. Measure press feedback with the Event Timing API (a `PerformanceObserver` on `event` entries, each `duration` under 100 ms). Do not click anything that writes to shared data.\n6. **Walk the criteria** at each width. Cite each finding by number and name, or by the installed rule's ID.\n7. **Sort.** With more than one reviewer available (a panel), give each the same prompt and no persona, read only. The coordinator then sorts every finding into `blocking`, `should-fix`, `note` or `dismissed`, naming who raised it and giving one line of reason. A finding raised by two reviewers on their own is the strongest signal. Dismiss nitpicks, hypotheticals nobody traced to a real call site, and \"I would have done it differently\". Within a bucket, put surfaces that write data first, then order by places hit. Without a panel, do the same alone.\n8. **Walk the edge cases** and mark each shown or not shown.\n9. **Write the verdict last.**\n\n## Rules\n\n- A finding has a criterion, a findable location (the element by role and name, with its capture, as in `button 'Save changes' (settings-1280.png)`), the width, and the evidence. A finding that rests on taste is dropped to Left out.\n- Wrong: \"The spacing feels tight.\" Right: \"Label sits 24 px from its own field and 8 px from the next one (criterion 4, settings-390.png).\"\n- An inferred finding is written as the check that settles it. An inferred `blocking` finding makes the verdict `no, pending <the check>`.\n- A claim that something works or is fixed names a command or capture from this session.\n- Contrast, target size and keyboard problems are ranked. A change to the accessibility tree that only adds semantics is ranked. One that removes or restructures semantics goes to a person.\n- A finding or pass on responsiveness to input (criterion 13) from a screenshot is invalid. It needs a measured probe. A focus ring is the reverse. Reach the control with real Tab presses and judge the ring from the capture, because a container that draws it through `:has(:focus-visible)` leaves the focused element reporting no outline.\n- Product decisions behind a fix go to For a person to decide. Keeping the user's input is never one.\n\n## Output\n\nThe first line answers the ask in plain words. The ship line follows: `Ready to ship: no. Enter in Email cancels the invite (blocking 1, should-fix 2, 3 questions for a person).` Any `blocking` finding makes the verdict `no`, an inferred one `no, pending <the check>`, `should-fix` alone `yes, with fixes`, only notes `yes`.\n\nThen, in order:\n\n1. **Review record.** Source, tool, widths, date, criteria file, the purpose marked given or assumed, every assumption and gap.\n2. **Findings** by bucket, each with who raised it, what was seen, where, criterion, why it matters here, evidence, and the fix as a check that fails on the current build (`Fix Enter in Email so that it sends 1 POST`).\n3. **Edge cases not shown.** One line each.\n4. **For a person to decide.**\n5. **Dismissed and left out.** Each with who raised it and the reason.\n\nRun on its own, save the report to `.ui-review/<date>-<flow>.md` with captures beside it. When a coordinator asks for captures only, return the capture paths, widths and `Coverage:` line, and no findings. The chat reply gives the answer and ship lines, each command with its exit code, and one prompt the person can paste to take the next step.\n\n## Done\n\nEvery finding has a criterion, a location, evidence and only the widths where it shows. Every probe has a result or a reason. The first line, the ship line and the summary agree. The last line reads `Coverage:` with the routes, widths, themes and probes measured, then what was not.\n",
+      "card": null
+    },
+    {
+      "skill_path": "systems/glaze/SKILL.md",
+      "blob_sha": "3c696ce41c0325898ac2678cfbc0a35164c2c4f8",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/systems/glaze/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "glaze",
+        "description": "Glaze design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Glaze, or when checking UI against Glaze."
+      },
+      "excerpt": "---\nname: glaze\ndescription: Glaze design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Glaze, or when checking UI against Glaze.\n---\n\n# Glaze\n\nGlaze is compact black and white for AI products: ink and paper, greys as ink at alphas, colour only for status, and glass only on the one action a group leads with; its secondaries stay flat. Build with these components before writing markup.\n\n## Setup\nOnce, in the root layout: put the \"glaze\" class on `<body>` or the root element of the UI, with `GlazePortalProvider` inside it. Glaze's styles and tokens apply only inside that class.\nMenus, dialogs, popovers and toasts render at the end of the body; GlazePortalProvider keeps them inside the scope, and without it they lose every token. `import {GlazePortalProvider} from '@/lib/glaze/portal'`\n`<body className=\"glaze\"><GlazePortalProvider>{children}</GlazePortalProvider></body>`\n\n## Steps\n1. For a whole screen, start from a block under Blocks when one fits: install it, then swap its sample data and copy for the real ones.\n2. Pick the components the screen needs from the index below. Fetch each one's page before using it: it has the props, variants and that component's rules.\n3. Build only from those components and the tokens under Tokens, inside an element with the \"glaze\" class. Import each from the path in the index; support pieces are under Imports. Dark mode: put data-theme=\"dark\" on the glaze element or any ancestor, such as <html>. The theme does not follow the system setting (prefers-color-scheme) on its own.\n4. Frame the screen with the Page shell. If a token or component is missing, stop and say so. Do not invent one.\n5. Ask the person only when the screen needs a fact you were not given, such as a model name or a limit; decide everything else from these rules and say what you chose.\n6. Porting an existing screen: swap one piece at a time for its component, keep the behavior and copy, and delete the old styles once nothing uses them. For a whole app, run migrate-design-system when it is installed.\n7. Lint: install it once with `npx shadcn@latest add https://design.how/r/glaze/lint.json`, then run `npx eslint -c glaze.eslint.config.mjs .`. Each message names the fix.\n8. Review before you finish: run the lint and fix every error, then render the screen at 390 and 1280 wide, check it against the global rules and the anti-slop list, fix the worst defect, and check again. Done when no MUST or NEVER is broken and no raw color, size or font is left. Run ui-review when it is installed.\n\n## Priority order\nWhen rules conflict, the earlier item wins.\n1. Accessibility and keyboard behaviour\n2. Tokens by role, never raw values\n3. Existing components and recipes, never rebuilt\n4. The three signatures: glass on pressables, the shell card, pills for one-line controls\n5. Compact spacing and type\n\n## Global rules\n1. glaze-components-first MUST Use a Glaze component or recipe before writing markup; fetch its page before you build. Because each one already carries the focus ring, the states and the glass a hand-built copy forgets.\n   - Correct: `import {Button} from '@/components/glaze/ui/button'`\n2. glaze-scope MUST Wrap Glaze UI in className=\"glaze\" with GlazePortalProvider inside it, so overlays keep the tokens. Because a menu or dialog renders at the end of the body, outside the scope, and would lose every colour.\n   - Correct: `<div className=\"glaze\"><GlazePortalProvider>{children}</GlazePortalProvider></div>`\n3. glaze-tokens-only MUST Use only the roles Glaze defines, such as text-text-2, bg-paper and border-line-faint; never a hex, an arbitrary px or a dark: variant. Because the dark theme swaps the roles, and a raw value stays behind.\n   - Correct: `<p className=\"text-text-2\">`\n   - Wrong: `<p className=\"text-[#6c6c6c]\">`\n4. glaze-one-primary MUST Lead a card, footer, dialog or any group of actions with at most one primary Button (ink, coral or green glass); every other action beside it is variant=\"secondary\", flat. Because two glass pills side by side split the eye and neither reads as the next step.\n   - Correct: `<Button variant=\"secondary\">Not now</Button><Button>Join</Button>`\n   - Wrong: `<Button>Not now</Button><Button>Join</Button>`\n5. glaze-glass-on-pressables NEVER Put glass on anything a person does not press: cards, headers, badges, fields, menus. Because glass is the one sign that a thing can be pressed, and glass everywhere turns it into a theme.\n   - Correct: `<div className=\"shell\"><div className=\"panel p-3\">`\n   - Wrong: `<div className=\"glass glass-paper rounded-shell p-3\">`\n6. glaze-no-shadows NEVER Cast a shadow anywhere, overlays included; a card is a shell, an overlay is paper with a 1px ring. Because depth in Glaze is drawn inside the shape, and every shadow class draws nothing.\n   - Correct: `<div className=\"shell\">`\n   - Wrong: `<div className=\"shell shadow-md\">`\n7. glaze-pill-controls MUST Make every one-line control a pill: buttons, fields, selects, chips, the segmented control. Because the pill is how a Glaze control looks, and a squared field beside a pill button reads as another system.\n   - Correct: `<div className=\"field\">`\n   - Wrong: `<div className=\"field rounded-tag\">`\n8. glaze-mono-scale MUST Set mono at 0.8 of the sans around it: mono or <code> inline, a type-code role beside sans; a block of code, JSON or logs takes type-code-block, 12px. Because Glaze Mono's letters are 26% wider than Glaze Sans's, so at one size mono reads a size bigger.\n   - Correct: `<span className=\"mono\">run_8f2a91</span>`\n   - Wrong: `<span className=\"font-mono\">run_8f2a91</span>`\n9. glaze-focus-ink MUST Keep the 2px ink :focus-visible ring on every control and never outline: none; a field shows focus by darkening its line. Because keyboard users lose their place without it, and a coral ring would read as an error.\n10. glaze-sentence-case MUST Write sentence case and a verb with its object on actions; no emoji, no em dash. Because every screen then sounds like one person talking.\n   - Correct: `<Button>Run eval</Button>`\n   - Wrong: `<Button>OK</Button>`\n\n## Page shell\nEvery screen sits in this frame.\n- Root: `<div className=\"glaze min-h-dvh bg-page text-text-1\">` with `GlazePortalProvider` inside it\n- A card: `<div className=\"shell\">` holding `<div className=\"panel p-3\">` and an optional `<div className=\"shell-foot\">`\n- A card footer: meta first with `me-auto`, then `size=\"sm\"` Buttons: flat secondaries, then at most one primary\n- Page title: `<h1 className=\"type-title\">`, one per page\n- A phone moment: a component at `w-full max-w-sm`, sized to its content, with its one action inline (a Card footer or a row of Buttons); the screen around it supplies the header and the page colour\n\n## Anti-slop\nThe habits of generated UI that Glaze bans. Details: https://design.how/systems/glaze/foundations/anti-slop.md\n- anti-slop-no-glass-sprawl NEVER Spread the glass past what is pressed: no glass cards, headers, badges or inputs. Because glass on everything turns the signature into a theme, and nothing reads as the thing to press.\n  - Wrong: `<header className=\"glass glass-paper\">`\n- anti-slop-no-decoration NEVER Add a gradient, a blob, a texture, a grid or dot background, a glow or a backdrop blur. Because Glaze is black and white, and decoration competes with the one ink action.\n  - Wrong: `<div className=\"bg-linear-to-br from-paper to-field backdrop-blur\">`\n- anti-slop-no-shadow-reflex NEVER Reach for a shadow to make a card or a menu stand out. Because Glaze draws none; a card is a shell, an overlay is paper with a ring.\n  - Wrong: `<div className=\"rounded-overlay bg-paper shadow-lg\">`\n- anti-slop-no-stat-cards NEVER Lay out a row of equal cards each holding one number. Because equal boxes make every number equally loud, so the one that matters is lost.\n  - Wrong: `<Card>Runs</Card><Card>Evals</Card><Card>Cost</Card>`\n- anti-slop-no-icon-tiles NEVER Put an icon in ",
+      "card": {
+        "title_zh": "Glaze 设计系统规范",
+        "purpose_zh": "为项目 UI 提供 Glaze 设计系统规则：在构建或修改界面、组件、表单、样式，或将现有界面迁移到 Glaze、检查 UI 是否符合 Glaze 时使用。",
+        "does": [
+          "规定 Glaze 的初始化方式：在根元素加 glaze 类并内嵌 GlazePortalProvider",
+          "要求优先使用 Glaze 组件与配方，先取组件页再写标记",
+          "限定只用角色化 token，禁止十六进制、任意 px 与 dark: 变体",
+          "列出全局规则与反模式清单（玻璃滥用、阴影、渐变、emoji、大写等）",
+          "给出页面外壳、卡片、页脚、标题等布局框架",
+          "提供 lint 安装与运行命令，以及完成前的审查步骤"
+        ],
+        "inputs": [
+          "要构建或修改的界面、组件、表单或样式",
+          "现有待迁移界面的代码与行为、文案",
+          "屏幕所需但未提供的事实（如模型名、限额）"
+        ],
+        "outputs": [
+          "符合 Glaze 规则的界面代码与组件用法",
+          "迁移后的界面（逐件替换并删除旧样式）",
+          "lint 结果与修复后的界面",
+          "对所选设计决策的说明"
+        ],
+        "scenarios": [
+          "新建或修改界面、组件、表单与样式",
+          "将现有界面迁移到 Glaze",
+          "检查 UI 是否符合 Glaze 规范",
+          "为 AI 产品搭建黑白紧凑风格界面"
+        ],
+        "prerequisites": [
+          "根布局中在 body 或根元素加 glaze 类，并在其内放置 GlazePortalProvider",
+          "从索引路径导入各 Glaze 组件",
+          "使用前先获取每个组件的文档页",
+          "lint 需先执行 npx shadcn@latest add https://design.how/r/glaze/lint.json 安装"
+        ],
+        "limits": [
+          "Glaze 样式与 token 仅在 glaze 类作用域内生效",
+          "暗色模式需手动设置 data-theme=dark，不自动跟随系统",
+          "缺少 token 或组件时应停下说明，不得自行发明",
+          "禁止阴影、渐变、模糊、品牌强调色、大写与 700 字重",
+          "玻璃效果只能用于可按压元素",
+          "反模式清单禁止统计卡片行、图标色块、侧边色条、状态圆点等"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Glaze design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Glaze, or when checking UI against Glaze."
+          },
+          {
+            "field": "does",
+            "quote": "Once, in the root layout: put the \"glaze\" class on `<body>` or the root element of the UI, with `GlazePortalProvider` inside it. Glaze's styles and tokens apply only inside that class."
+          },
+          {
+            "field": "does",
+            "quote": "glaze-components-first MUST Use a Glaze component or recipe before writing markup; fetch its page before you build."
+          },
+          {
+            "field": "does",
+            "quote": "glaze-tokens-only MUST Use only the roles Glaze defines, such as text-text-2, bg-paper and border-line-faint; never a hex, an arbitrary px or a dark: variant."
+          },
+          {
+            "field": "does",
+            "quote": "Lint: install it once with `npx shadcn@latest add https://design.how/r/glaze/lint.json`, then run `npx eslint -c glaze.eslint.config.mjs .`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<body className=\"glaze\"><GlazePortalProvider>{children}</GlazePortalProvider></body>`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Import each from the path in the index; support pieces are under Imports."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Pick the components the screen needs from the index below. Fetch each one's page before using it: it has the props, variants and that component's rules."
+          },
+          {
+            "field": "limits",
+            "quote": "Dark mode: put data-theme=\"dark\" on the glaze element or any ancestor, such as <html>. The theme does not follow the system setting (prefers-color-scheme) on its own."
+          },
+          {
+            "field": "limits",
+            "quote": "If a token or component is missing, stop and say so. Do not invent one."
+          },
+          {
+            "field": "limits",
+            "quote": "glaze-glass-on-pressables NEVER Put glass on anything a person does not press: cards, headers, badges, fields, menus."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx shadcn@latest add https://design.how/r/glaze/lint.json"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx eslint -c glaze.eslint.config.mjs ."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "systems/lime/SKILL.md",
+      "blob_sha": "ae9e8b977175a48f60dd054625fc439b862a78c3",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/systems/lime/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "lime",
+        "description": "Lime design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Lime, or when checking UI against Lime."
+      },
+      "excerpt": "---\nname: lime\ndescription: Lime design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Lime, or when checking UI against Lime.\n---\n\n# Lime\n\nLime is a white page, warm-grey surfaces and near-black text with one acid lime on the main action, for consumer apps. Build with these components before writing markup.\n\n## Setup\nOnce, in the root layout: put the \"lime\" class on `<body>` or the root element of the UI, with `LimePortalProvider` inside it. Lime's styles and tokens apply only inside that class.\nMenus, dialogs, popovers and toasts render at the end of the body; LimePortalProvider keeps them inside the scope, and without it they lose every token. `import {LimePortalProvider} from '@/lib/lime/portal'`\n`<body className=\"lime\"><LimePortalProvider>{children}</LimePortalProvider></body>`\n\n## Steps\n1. For a whole screen, start from a block under Blocks when one fits: install it, then swap its sample data and copy for the real ones.\n2. Pick the components the screen needs from the index below. Fetch each one's page before using it: it has the props, variants and that component's rules.\n3. Build only from those components and the tokens under Tokens, inside an element with the \"lime\" class. Import each from the path in the index; support pieces are under Imports. Dark mode: put data-theme=\"dark\" on the lime element or any ancestor, such as <html>. The theme does not follow the system setting (prefers-color-scheme) on its own.\n4. Frame the screen with the Page shell. If a component is missing, build the stand-in under Coverage gaps; if none is listed, compose it from existing components and tokens and say what you built. Never invent a token.\n5. Ask the person only when the screen needs an amount, a payee or an autonomy limit you were not given; never invent one. Decide everything else from these rules and say what you chose.\n6. Porting an existing screen: swap one piece at a time for its component, keep the behavior and copy, and delete the old styles once nothing uses them. For a whole app, run migrate-design-system when it is installed.\n7. Lint: install it once with `npx shadcn@latest add https://design.how/r/lime/lint.json`, then run `npx eslint -c lime.eslint.config.mjs .`. Each message names the fix.\n8. Review before you finish: run the lint and fix every error, then render the screen at 390 and 1280 wide, check it against the global rules and the anti-slop list, fix the worst defect, and check again. Done when no MUST or NEVER is broken and no raw color, size or font is left. Run ui-review when it is installed.\n\n## Priority order\nWhen rules conflict, the earlier item wins.\n1. Accessibility and keyboard behavior\n2. Tokens by role, never raw values\n3. Existing components, never rebuilt\n4. Spacing, radius and type scales\n5. Polish: glow, motion, detail\n\n## Global rules\n1. lime-components-first MUST Use a Lime component before writing custom markup; fetch its page before you build. Because each one already carries the focus ring, states and touch size a hand-built copy forgets.\n   - Correct: `import {Button} from '@/components/lime/ui/button'`\n2. lime-scope MUST Wrap Lime UI in className=\"lime\" with LimePortalProvider inside it, so overlays keep the tokens. Because a menu or dialog renders at the end of the body, outside the scope, and would lose every color.\n   - Correct: `<div className=\"lime\"><LimePortalProvider>{children}</LimePortalProvider></div>`\n3. lime-tokens-only MUST Use only the token names Lime defines, such as --fg, --surface and --accent; never a hex value, arbitrary px or dark: variant. Because the dark theme and any retune change the roles, and a raw value stays behind.\n   - Correct: `<p className=\"text-fg\">`\n   - Wrong: `<p className=\"text-[#0f0f0d]\">`\n4. lime-one-action MUST Use one lime primary action per view; every other action is solid, secondary, outline or ghost. Because the glowing lime is how the person finds the next step in a second.\n5. lime-lime-scarce NEVER Fill a page, card or section with lime, or put white text on it; text on lime is --on-accent. Because white on lime is unreadable and a lime block drowns the one action.\n   - Wrong: `<Card className=\"bg-accent text-white\">Your goals</Card>`\n6. lime-glow-scarce NEVER Add glow beyond primary and destructive buttons, the balance chip and one featured card. Because two glowing things compete and neither reads as the action.\n   - Wrong: `<Card variant=\"glow\">Recent activity</Card> // beside the upgrade card`\n7. lime-money-sign MUST Format every amount with formatAmount or Amount, never by hand: formatAmount text in List and Table rows, the Amount pill for a sum beside a control or one that needs a tone. Because a hand-built string drops the minus, the separators or the tabular figures.\n   - Correct: `import {Amount, formatAmount} from '@/components/lime/ui/amount'`\n   - Wrong: `<span>${total}</span>`\n8. lime-ask-before-money MUST When the assistant moves money, show an ApprovalRequest first and an ActionReceipt with Undo after; when the person pays, show a review step and then Payment done with Undo. Because money that moves without a check, or with no way back, is the one mistake people do not forgive.\n   - Correct: `<ApprovalRequest title=\"Pay Maya for dinner\" amount={-24} reason=\"Your half of Friday dinner\"/>`\n9. lime-field-label MUST Wrap every input in Field with a label above it; a placeholder is not a label. Because a placeholder disappears as soon as the person types and is not read as a name.\n   - Correct: `<Field name=\"title\"><FieldLabel>Goal name</FieldLabel><Input/></Field>`\n10. lime-focus MUST Keep every control keyboard-operable with the 2px olive :focus-visible ring; never outline: none. Because keyboard and switch users lose their place without it.\n11. lime-section-heading MUST Name a section with a real heading (an h2 at text-lg font-semibold in --fg) or not at all; never a small text-sm or text-xs label above the content. Because a small grey label above content is skipped by heading navigation and makes every section look the same.\n   - Correct: `<h2 className=\"text-lg font-semibold\">Recent activity</h2>`\n   - Wrong: `<p className=\"text-sm font-medium text-fg-3\">Recent activity</p>`\n12. lime-sentence-case MUST Write sentence case and a verb with its object on actions; no emoji, no em dash, no title case. Because the copy then reads like a person talking, and every screen sounds the same.\n   - Correct: `<Button>Send money</Button>`\n   - Wrong: `<Button>OK</Button>`\n\n## Page shell\nEvery screen sits in this frame.\n- Root: `<div className=\"lime min-h-dvh bg-page text-fg\">` with `LimePortalProvider` inside it\n- One task, such as send or pay: `<main className=\"mx-auto w-full max-w-md px-4 pt-4 pb-8 sm:px-6 sm:pt-8\">`\n- Home, activity, settings: the same `main` at `max-w-2xl`\n- A Table on a wide screen: the same `main` at `max-w-5xl`\n- Header: `<header className=\"sticky top-0 z-10 flex h-14 items-center gap-2 bg-page\">`: a ghost `size=\"icon\"` Button with `aria-label=\"Back\"`, then the h1; add `border-b border-line` once content scrolls under it\n- Page title: `<h1 className=\"text-xl leading-tight font-semibold tracking-tight sm:text-2xl\">`, one per page\n- Section: `<section className=\"flex flex-col gap-3\">` led by an h2 at `text-lg font-semibold`; sections sit `gap-8` apart\n- Form: Fields in `flex flex-col gap-4` at `max-w-md`; the submit Button last, `size=\"lg\"` and `w-full` on a phone\n- Main action of a phone flow: `<div className=\"sticky bottom-0 bg-page pt-3 pb-4\">` holding `<Button size=\"lg\" className=\"w-full\">`; add the safe-area inset under a home bar\n\n## Anti-slop\nThe habits of generated UI that Lime bans. Details: https://design.how/systems/lime/foundations/anti-slop.md\n- anti-slop-no-eyebrow NEVER Put a small label, a category or a number such as 01 above a title or a section. Because the heading already names the section, and the label only adds a second voice sa",
+      "card": {
+        "title_zh": "Lime 设计系统规范",
+        "purpose_zh": "为消费类应用提供 Lime 设计系统的 UI 构建规则：白底、暖灰面、近黑文字加单一酸性青柠主操作，规定组件优先、令牌、页面骨架与反生成式 UI 清单。",
+        "does": [
+          "规定在根元素加 lime 类并内嵌 LimePortalProvider 以启用令牌",
+          "要求先取用 Lime 组件与令牌再写自定义标记，禁止原始色值与任意像素",
+          "给出页面骨架：main 宽度、粘性 header、h1、section、表单与底部主操作",
+          "规定金额格式化、资金审批与回执、输入框标签、焦点环、标题层级与句式大小写",
+          "列出反生成式 UI 禁令：无眉标、无统计卡、无图标色块、无侧边色条、无装饰与表情",
+          "要求安装并运行 lint 与 ui-review，在 390 与 1280 宽度下渲染检查"
+        ],
+        "inputs": [
+          "要构建或改造的屏幕、组件、表单或样式",
+          "现有屏幕的移植需求",
+          "Lime 组件索引与各组件页面",
+          "页面所需金额、收款方或自主限额（缺失时须询问）"
+        ],
+        "outputs": [
+          "符合 Lime 规则的 UI 代码与页面结构",
+          "lint 检查结果与修复",
+          "390 与 1280 宽度下的渲染检查结论"
+        ],
+        "scenarios": [
+          "新建或修改消费类应用的屏幕、组件、表单与样式",
+          "把已有屏幕逐块移植到 Lime 设计系统",
+          "按 Lime 规则审查现有 UI",
+          "为助手代付资金流程加入审批与撤销界面"
+        ],
+        "prerequisites": [
+          "根布局中在 body 或根元素加 lime 类，并在其内放置 LimePortalProvider",
+          "使用前先获取所用组件的文档页面",
+          "lint 需先执行 npx shadcn@latest add https://design.how/r/lime/lint.json 安装一次"
+        ],
+        "limits": [
+          "深色模式需手动加 data-theme=\"dark\"，不自动跟随系统设置",
+          "未给出的金额、收款方或自主限额必须询问，不得自行编造",
+          "不得发明令牌，不得使用十六进制色值、任意像素或 dark: 变体",
+          "每视图仅一个青柠主操作，发光仅限主按钮、危险按钮、余额芯片与一张特色卡"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Lime is a white page, warm-grey surfaces and near-black text with one acid lime on the main action, for consumer apps."
+          },
+          {
+            "field": "does",
+            "quote": "Once, in the root layout: put the \"lime\" class on `<body>` or the root element of the UI, with `LimePortalProvider` inside it."
+          },
+          {
+            "field": "does",
+            "quote": "Build only from those components and the tokens under Tokens, inside an element with the \"lime\" class."
+          },
+          {
+            "field": "does",
+            "quote": "Frame the screen with the Page shell."
+          },
+          {
+            "field": "does",
+            "quote": "Format every amount with formatAmount or Amount, never by hand"
+          },
+          {
+            "field": "does",
+            "quote": "When the assistant moves money, show an ApprovalRequest first and an ActionReceipt with Undo after"
+          },
+          {
+            "field": "does",
+            "quote": "Lint: install it once with `npx shadcn@latest add https://design.how/r/lime/lint.json`, then run `npx eslint -c lime.eslint.config.mjs .`."
+          },
+          {
+            "field": "does",
+            "quote": "render the screen at 390 and 1280 wide, check it against the global rules and the anti-slop list"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Lime's styles and tokens apply only inside that class."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Fetch each one's page before using it: it has the props, variants and that component's rules."
+          },
+          {
+            "field": "limits",
+            "quote": "Dark mode: put data-theme=\"dark\" on the lime element or any ancestor, such as <html>. The theme does not follow the system setting (prefers-color-scheme) on its own."
+          },
+          {
+            "field": "limits",
+            "quote": "Ask the person only when the screen needs an amount, a payee or an autonomy limit you were not given; never invent one."
+          },
+          {
+            "field": "limits",
+            "quote": "Never invent a token."
+          },
+          {
+            "field": "limits",
+            "quote": "Use one lime primary action per view"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "install it once with `npx shadcn@latest add https://design.how/r/lime/lint.json`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "then run `npx eslint -c lime.eslint.config.mjs .`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "systems/quartz/SKILL.md",
+      "blob_sha": "24fe40aa009119e2e292d7eaf8fe4b55d2051287",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/systems/quartz/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "quartz",
+        "description": "Quartz design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Quartz, or when checking UI against Quartz."
+      },
+      "excerpt": "---\nname: quartz\ndescription: Quartz design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Quartz, or when checking UI against Quartz.\n---\n\n# Quartz\n\nBlack and white chassis with five muted kind hues and warm trouble colors, for AI support products and agent consoles.\n\n## Setup\nOnce, in the root layout: put the \"quartz\" class on `<body>` or the root element of the UI, with `QuartzPortalProvider` inside it. Quartz's styles and tokens apply only inside that class.\nMenus, dialogs, popovers and toasts render at the end of the body; QuartzPortalProvider keeps them inside the scope, and without it they lose every token. `import {QuartzPortalProvider} from '@/lib/quartz/portal'`\n`<body className=\"quartz\"><QuartzPortalProvider>{children}</QuartzPortalProvider></body>`\n\n## Steps\n1. For a whole screen, start from a block under Blocks when one fits: install it, then swap its sample data and copy for the real ones.\n2. Pick the components the screen needs from the index below. Fetch each one's page before using it: it has the props, variants and that component's rules.\n3. Build only from those components and the tokens under Tokens, inside an element with the \"quartz\" class. Import each from the path in the index; support pieces are under Imports. Dark mode: put data-theme=\"dark\" or the class dark on the quartz element or any ancestor, such as <html>. The theme does not follow the system setting (prefers-color-scheme) on its own.\n4. Frame the screen with the Page shell. If a component is missing, build the stand-in under Coverage gaps; if none is listed, compose it from existing components and tokens and say what you built. Never invent a token.\n5. Ask the person when the screen needs a credential, an environment, the object of a destructive action or an approval policy you were not given; never invent a key, an endpoint or which tools need approval. Decide layout, copy and components from these rules and say what you chose.\n6. Porting an existing screen: swap one piece at a time for its component, keep the behavior and copy, and delete the old styles once nothing uses them. For a whole app, run migrate-design-system when it is installed.\n7. Lint: install it once with `npx shadcn@latest add https://design.how/r/quartz/lint.json`, then run `npx eslint -c quartz.eslint.config.mjs .`. Each message names the fix.\n8. Review before you finish: run the lint and fix every error, then render the screen at 390 and 1280 wide, check it against the global rules and the anti-slop list, fix the worst defect, and check again. Done when no MUST or NEVER is broken and no raw color, size or font is left. Run ui-review when it is installed.\n\n## Priority order\nWhen rules conflict, the earlier item wins.\n1. Accessibility and keyboard behavior\n2. Tokens, never raw values\n3. Existing components, never rebuilt\n4. Layout and spacing scale\n5. Polish: motion, radius, details\n\n## Global rules\n1. quartz-components-first MUST Use a component from this system before writing custom markup. Because hand-built markup skips the component's focus ring, keyboard handling and states, which people notice one at a time.\n   - Correct: `<Button onClick={open}>Open run</Button>`\n   - Wrong: `<div onClick={open} className=\"cursor-pointer\">Open run</div>`\n2. quartz-scope MUST Put className=\"quartz\" on `<body>`, once, in the root layout, with QuartzPortalProvider inside it. Because the class carries every token and the font, and the provider gives menus, dialogs and toasts a home beside the page so a modal can make the page behind inert.\n   - Correct: `<body className=\"quartz\"><QuartzPortalProvider>{children}</QuartzPortalProvider></body>`\n   - Wrong: `<div className=\"quartz\"><QuartzPortalProvider>{children}</QuartzPortalProvider></div>`\n3. quartz-tokens-only MUST Reference tokens by role; never hex, rgb or arbitrary px. Because a raw value keeps its light-theme color in the dark theme and drifts off the spacing scale.\n   - Correct: `<div className=\"bg-surface p-4\">`\n   - Wrong: `<div className=\"bg-[#f4f4f5] p-[13px]\">`\n4. quartz-kind-is-a-word MUST Name a kind with <Badge kind/> or data-kind; hue never fills a region. Because the word reads in grayscale and aloud, and a filled region makes everything inside look like that kind.\n   - Correct: `<Badge kind=\"agent\"/>`\n   - Wrong: `<Card className=\"bg-accent-field\">Agent</Card>`\n5. quartz-warm-is-trouble NEVER Use amber or red for anything but warn and fail. Because an operator scanning for trouble stops on every warm mark, so a warm Beta tag reads as a failing run.\n   - Correct: `<Badge>Beta</Badge>`\n   - Wrong: `<Badge className=\"bg-amber-200\">Beta</Badge>`\n6. quartz-prop-names SHOULD Name a prop by the question it answers: status for warn and fail, orientation for the direction a row or column runs, layout for which arrangement of the same parts, placement for where it sits on the page; variant only for a Button and a menu item's intent. Because one word for one question lets a person guess the prop on a component they have not used, and tone, kind or variant for a state sends them to the docs.\n7. quartz-fields-not-lines SHOULD Separate containers with a grey field; use a hairline only where a field cannot. Because boxes inside bordered boxes stack lines until the groups blur.\n8. quartz-keyboard MUST Keep every control keyboard-operable with a visible focus ring and an accessible name. Because a keyboard user loses their place without the ring, and a screen reader announces an unnamed icon button as \"button\".\n   - Correct: `<Button size=\"icon-sm\" aria-label=\"Close\"><Icon icon={Close}/></Button>`\n   - Wrong: `<Button size=\"icon-sm\" className=\"outline-none\"><Icon icon={Close}/></Button>`\n9. quartz-ask-before-destructive MUST Stop an agent before a destructive or irreversible action with a ToolCall awaiting permission and Deny and Allow; save typed confirmation for deleting for good a thing that holds others, such as a project (dialog-typed-confirm-irreversible). Because a prompt release, a deleted key or a sent reply cannot be taken back, and a typed name on every action trains people to type through the real one.\n   - Correct: `<ToolCall call={call} actions={<><Button variant=\"secondary\">Deny</Button><Button>Allow</Button></>}/>`\n10. quartz-ai-turn MUST Build a turn inside Conversation from AgentTurn, ToolCallList, Response and ConversationTail, with PromptQueue above PromptInput; only the running tool row shows the arc. Because each part owns one job, and a second spinner or phrase in the turn makes the thread say two things at once.\n   - Correct:\n     ```tsx\n     <AgentTurn name=\"planner\">\n       <ToolCallList calls={calls}/>\n       <Response>{text}</Response>{done && <MessageFooter>{actions}</MessageFooter>}</AgentTurn>\n     <ConversationTail>{waiting && <Activity waiting announce={false}/>}</ConversationTail>\n     ```\n11. quartz-sentence-case MUST Write sentence case, plain labels, verb plus object on actions. Because title case reads as proper nouns, and a bare OK or Submit does not say what the press will do.\n   - Correct: `<Button>Create key</Button>`\n   - Wrong: `<Button>Submit</Button>`\n12. quartz-no-decoration NEVER Add shadows on flat things, gradients, glass, pills, side bars or looping motion. Because each one competes with the status words and kind labels that carry meaning, and glass drops text contrast.\n   - Correct: `<Card>`\n   - Wrong: `<Card className=\"shadow-md bg-gradient-to-br from-accent-wash backdrop-blur\">`\n13. quartz-smallest-change SHOULD Make the smallest change; do not add files or abstractions that were not requested. Because every extra file is code the person has to review and keep.\n14. quartz-stop-when-missing MUST Stop and say so when a component or token is missing; do not invent one. Because an invented token resolves to nothing and renders unstyled, and an invented component never gets the system's fixes.\n\n## Page shell\nEvery scr",
+      "card": {
+        "title_zh": "Quartz 设计系统规范",
+        "purpose_zh": "为 AI 支持产品与 agent 控制台提供 Quartz 设计系统的 UI 构建、移植与审查规则，约束组件、token、无障碍与反套路写法。",
+        "does": [
+          "规定在根布局 body 上加 quartz 类并包裹 QuartzPortalProvider 的初始化方式",
+          "要求优先使用系统组件与 token，禁止原始颜色、尺寸与字体值",
+          "给出全局规则与优先级：无障碍、token、既有组件、间距、细节",
+          "规定页面外壳、列表页、详情页与聊天/运行页的布局结构",
+          "提供反套路清单，禁止大写、等宽滥用、破折号、点分隔、胶囊等",
+          "要求安装并运行 lint 与在 390、1280 宽度下渲染审查"
+        ],
+        "inputs": [
+          "要构建或修改的屏幕、组件、表单或样式",
+          "要移植到 Quartz 的既有屏幕",
+          "组件索引与各组件页面中的 props、变体与规则",
+          "Blocks 中的整屏区块及其示例数据"
+        ],
+        "outputs": [
+          "符合 Quartz 规则的界面代码与布局",
+          "按规则选择的组件、布局与文案说明",
+          "lint 检查结果与修复",
+          "在 390 与 1280 宽度下的渲染审查结论"
+        ],
+        "scenarios": [
+          "构建或修改任意屏幕、组件、表单与样式",
+          "将既有屏幕逐块移植到 Quartz",
+          "按 Quartz 规则检查现有 UI",
+          "搭建列表页、详情页与聊天/运行页外壳",
+          "审查生成式 UI 的反套路问题"
+        ],
+        "prerequisites": [
+          "根布局的 body 或根元素带 quartz 类，且内部有 QuartzPortalProvider",
+          "已安装组件索引中的组件，并阅读其页面",
+          "需要凭据、环境、破坏性操作对象或审批策略时先询问使用者"
+        ],
+        "limits": [
+          "主题不自动跟随系统 prefers-color-scheme，需手动设置 data-theme 或 dark 类",
+          "组件或 token 缺失时必须停下说明，不得自造",
+          "不得自造密钥、端点或需审批的工具",
+          "规则冲突时按给定优先级顺序裁决"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "installs_packages"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Quartz design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Quartz, or when checking UI against Quartz."
+          },
+          {
+            "field": "does",
+            "quote": "Once, in the root layout: put the \"quartz\" class on `<body>` or the root element of the UI, with `QuartzPortalProvider` inside it."
+          },
+          {
+            "field": "does",
+            "quote": "Reference tokens by role; never hex, rgb or arbitrary px."
+          },
+          {
+            "field": "does",
+            "quote": "When rules conflict, the earlier item wins."
+          },
+          {
+            "field": "does",
+            "quote": "Lint: install it once with `npx shadcn@latest add https://design.how/r/quartz/lint.json`, then run `npx eslint -c quartz.eslint.config.mjs .`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<body className=\"quartz\"><QuartzPortalProvider>{children}</QuartzPortalProvider></body>`"
+          },
+          {
+            "field": "limits",
+            "quote": "The theme does not follow the system setting (prefers-color-scheme) on its own."
+          },
+          {
+            "field": "limits",
+            "quote": "Stop and say so when a component or token is missing; do not invent one."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx shadcn@latest add https://design.how/r/quartz/lint.json"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx eslint -c quartz.eslint.config.mjs ."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "systems/sodium/SKILL.md",
+      "blob_sha": "4ad75f66e5609c5c05fe470a67a63689a13a08ca",
+      "source_url": "https://github.com/arla6ka/design.how/blob/c0f7df5116fc91de6dc258157003c6440249f25e/systems/sodium/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "sodium",
+        "description": "Sodium design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Sodium, or when checking UI against Sodium."
+      },
+      "excerpt": "---\nname: sodium\ndescription: Sodium design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Sodium, or when checking UI against Sodium.\n---\n\n# Sodium\n\nSodium is compact and ruled, for infrastructure and data tools: white and warm near-black grounds, 1px rules for structure, mono capitals for every interface word, Inter Display for headlines and prose, zero radius, and one sodium yellow for the thing to act on. Build with its recipes and components before writing markup.\n\n## Setup\nOnce, in the root layout: put the \"sodium\" class on `<body>` or the root element of the UI, with `SodiumPortalProvider` inside it. Sodium's styles and tokens apply only inside that class.\nMenus, dialogs, popovers and toasts render at the end of the body; SodiumPortalProvider keeps them inside the scope, and without it they lose every token. `import {SodiumPortalProvider} from '@/lib/sodium/portal'`\n`<body className=\"sodium\"><SodiumPortalProvider>{children}</SodiumPortalProvider></body>`\n\n## Steps\n1. For a whole screen, start from a block under Blocks when one fits: install it, then swap its sample data and copy for the real ones.\n2. Pick the components the screen needs from the index below. Fetch each one's page before using it: it has the props, variants and that component's rules.\n3. Build only from those components and the tokens under Tokens, inside an element with the \"sodium\" class. Import each from the path in the index; support pieces are under Imports. Dark mode: put data-theme=\"dark\" on the sodium element or any ancestor, such as <html>. The theme does not follow the system setting (prefers-color-scheme) on its own.\n4. Frame the screen with the Page shell. If a token or component is missing, stop and say so. Do not invent one.\n5. Ask the person only when the screen needs a fact you were not given, such as a region or a limit; decide everything else from these rules and say what you chose.\n6. Porting an existing screen: swap one piece at a time for its component, keep the behavior and copy, and delete the old styles once nothing uses them. For a whole app, run migrate-design-system when it is installed.\n7. Lint: install it once with `npx shadcn@latest add https://design.how/r/sodium/lint.json`, then run `npx eslint -c sodium.eslint.config.mjs .`. Each message names the fix.\n8. Review before you finish: run the lint and fix every error, then render the screen at 390 and 1280 wide, check it against the global rules and the anti-slop list, fix the worst defect, and check again. Done when no MUST or NEVER is broken and no raw color, size or font is left. Run ui-review when it is installed.\n\n## Priority order\nWhen rules conflict, the earlier item wins.\n1. Accessibility and keyboard behaviour\n2. Tokens by role, never raw values\n3. Existing components and recipes, never rebuilt\n4. The signatures: mono capitals through the label roles, rules as structure, the one yellow action, square corners\n5. Compact spacing and type\n\n## Global rules\n1. sodium-components-first MUST Use a Sodium component or recipe before writing markup; fetch its page before you build. Because each one already carries the focus ring, the states and the yellow rules a hand-built copy forgets.\n   - Correct: `import {Button} from '@/components/sodium/ui/button'`\n2. sodium-scope MUST Wrap Sodium UI in className=\"sodium\" with SodiumPortalProvider inside it, so overlays keep the tokens. Because a menu or dialog renders at the end of the body, outside the scope, and would lose every colour.\n   - Correct: `<div className=\"sodium\"><SodiumPortalProvider>{children}</SodiumPortalProvider></div>`\n3. sodium-tokens-only MUST Use only the roles Sodium defines, such as text-text-2, bg-panel and border-line; never a hex, an arbitrary px or a dark: variant. Because the dark theme swaps the roles, and a raw value stays behind.\n   - Correct: `<p className=\"text-text-2\">`\n   - Wrong: `<p className=\"text-[#55524a]\">`\n4. sodium-one-primary MUST Lead a frame, footer, dialog or any group of actions with at most one primary Button (the yellow slab, or the destructive); every other action beside it is variant=\"secondary\" or \"ghost\". Because the slab is how a person finds the next action, and two of them side by side split the eye.\n   - Correct: `<Button variant=\"secondary\">Keep</Button><Button>Run</Button>`\n   - Wrong: `<Button>Keep</Button><Button>Run</Button>`\n5. sodium-yellow-on-light NEVER Set text, an icon or a lone line in solid yellow; yellow-family text is text-accent-text. Because sodium yellow on white is 1.4:1, and light is the default theme.\n   - Correct: `<span className=\"text-accent-text\">Running</span>`\n   - Wrong: `<span className=\"text-accent-fill\">Running</span>`\n6. sodium-caps-through-roles MUST Set every interface word (button, tab, tag, table head, axis) in a label role, and every sentence in the sans. Because the role carries the mono face, the capitals and the tracking together, and a sentence in capitals reads slowly.\n   - Correct: `<span className=\"type-label-sm\">Queued</span>`\n   - Wrong: `<span className=\"uppercase\">Queued</span>`\n7. sodium-rules-not-boxes MUST Box a region once with frame and divide its parts with rules; never a box in a box and never a grid behind the page. Because rules carry Sodium's layout, and extra edges or a background grid bury them.\n   - Correct: `<main><div className=\"frame\"><div className=\"rule-row\">`\n   - Wrong: `<main className=\"dots\"><div className=\"frame\"><div className=\"frame\">`\n8. sodium-square NEVER Round a corner anywhere. Because square corners meet the 1px rules cleanly, and one rounded part reads as another system.\n   - Correct: `<div className=\"frame\">`\n   - Wrong: `<div className=\"frame rounded-lg\">`\n9. sodium-focus-ring MUST Keep the 2px focus ring on every control and never outline: none; a field shows focus on its own edge. Because keyboard users lose their place without it.\n10. sodium-sentence-case MUST Write sentence case in the source and a verb with its object on actions; the label roles set the capitals. No emoji, no em dash. Because the source then reads as plain words to a screen reader, and every screen sounds like one person.\n   - Correct: `<Button>Run pipeline</Button>`\n   - Wrong: `<Button>OK</Button>`\n\n## Page shell\nEvery screen sits in this frame.\n- Root: `<div className=\"sodium min-h-dvh bg-page text-text-1\">` with `SodiumPortalProvider` inside it\n- A region: `<section className=\"frame\">` with a `panel-head` row and parts divided by `rule-row` or `rule-col`\n- Several numbers: a status strip: one ruled row of cells, a `type-micro` label over a `type-code` value\n- Page title: `<h1 className=\"type-title\">`, one per page\n- A run's steps: `ToolCallStack` beside or under the frame, never inside it\n- A phone moment: a component at `w-full max-w-sm`, sized to its content, with no device frame; its one slab sits in a row of Buttons\n\n## Anti-slop\nThe habits of generated UI that Sodium bans. Details: https://design.how/systems/sodium/foundations/anti-slop.md\n- anti-slop-no-cell-grid NEVER Draw a cell grid or a dot field behind the page or behind content. Because the owner ruled it out: a grid behind every word fights the rules that carry the layout, and it is the first thing a generated \"technical\" screen reaches for.\n  - Wrong: `<main className=\"dots min-h-dvh\">`\n- anti-slop-no-terminal-costume NEVER Dress a screen as a terminal: green or amber on black, scanlines, a > prompt before a headline, ASCII boxes. Because Sodium takes the discipline of a terminal, not its look, and a costume makes a real tool read as a toy.\n  - Wrong: `<h1 className=\"text-ok-text\">&gt; pipelines_</h1>`\n- anti-slop-no-decoration NEVER Add a gradient, a blob, a glow or a backdrop blur; the one gradient is the light from below that the slab and edged recipes draw on a button. Because Sodium is flat fills and 1px rules, and decoration competes with the one yellow action.\n  - Wrong: `<div cla",
+      "card": {
+        "title_zh": "Sodium 设计系统规范",
+        "purpose_zh": "为基础设施与数据工具类项目提供 Sodium 设计系统的 UI 构建规则：用其组件、令牌与配方搭建或改造界面，并做 lint 与评审。",
+        "does": [
+          "规定 Sodium 的初始化方式：根元素加 sodium 类并内嵌 SodiumPortalProvider",
+          "要求优先使用 Sodium 组件与配方，先取组件页再写标记",
+          "限定只用角色令牌，禁止十六进制、任意 px 与 dark: 变体",
+          "给出全局规则与反模式清单（无圆角、无阴影、单一黄色主操作等）",
+          "提供页面外壳结构与状态条等布局约定",
+          "要求安装并运行 lint，按 390 与 1280 宽度渲染检查"
+        ],
+        "inputs": [
+          "要构建或改造的屏幕、组件、表单或样式需求",
+          "屏幕所需的事实信息（如区域、限额）",
+          "现有待迁移的界面代码"
+        ],
+        "outputs": [
+          "符合 Sodium 规则的界面代码与组件用法",
+          "lint 检查结果与修复",
+          "迁移与评审结论"
+        ],
+        "scenarios": [
+          "新建或修改界面屏幕、组件、表单与样式",
+          "将已有屏幕迁移到 Sodium 设计系统",
+          "检查现有 UI 是否符合 Sodium 规范"
+        ],
+        "prerequisites": [
+          "根布局中在 body 或根元素加 sodium 类，并在其内放置 SodiumPortalProvider",
+          "按索引路径导入 Sodium 组件",
+          "安装 lint：npx shadcn@latest add https://design.how/r/sodium/lint.json"
+        ],
+        "limits": [
+          "主题不自动跟随系统 prefers-color-scheme，需手动设 data-theme=\"dark\"",
+          "缺少令牌或组件时应停下说明，不得自行发明",
+          "禁止圆角、阴影、渐变、模糊与页面背景网格",
+          "禁止浅色背景上的黄色文字或图标，禁止第二个主操作块",
+          "禁止 emoji、破折号与夸张措辞"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Sodium design system rules for this project's UI. Use when building or changing any screen, component, form or style, when porting an existing screen onto Sodium, or when checking UI against Sodium."
+          },
+          {
+            "field": "does",
+            "quote": "Once, in the root layout: put the \"sodium\" class on `<body>` or the root element of the UI, with `SodiumPortalProvider` inside it."
+          },
+          {
+            "field": "does",
+            "quote": "Build only from those components and the tokens under Tokens, inside an element with the \"sodium\" class."
+          },
+          {
+            "field": "does",
+            "quote": "Use only the roles Sodium defines, such as text-text-2, bg-panel and border-line; never a hex, an arbitrary px or a dark: variant."
+          },
+          {
+            "field": "does",
+            "quote": "Lint: install it once with `npx shadcn@latest add https://design.how/r/sodium/lint.json`, then run `npx eslint -c sodium.eslint.config.mjs .`."
+          },
+          {
+            "field": "does",
+            "quote": "render the screen at 390 and 1280 wide, check it against the global rules and the anti-slop list, fix the worst defect, and check again."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<body className=\"sodium\"><SodiumPortalProvider>{children}</SodiumPortalProvider></body>`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Import each from the path in the index; support pieces are under Imports."
+          },
+          {
+            "field": "limits",
+            "quote": "The theme does not follow the system setting (prefers-color-scheme) on its own."
+          },
+          {
+            "field": "limits",
+            "quote": "If a token or component is missing, stop and say so. Do not invent one."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "install it once with `npx shadcn@latest add https://design.how/r/sodium/lint.json`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "then run `npx eslint -c sodium.eslint.config.mjs .`"
+          }
+        ]
+      }
+    }
+  ]
+}

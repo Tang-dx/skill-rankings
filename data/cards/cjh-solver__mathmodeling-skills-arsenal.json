@@ -1,0 +1,673 @@
+{
+  "schema": 1,
+  "repo": "cjh-solver/MathModeling-Skills-Arsenal",
+  "tree_sha": "239461e3a4b068238c45c7e562e0569f8f1ad305",
+  "truncated_paths": 23,
+  "skills": [
+    {
+      "skill_path": "skills/01-core/contest-orchestrator/SKILL.md",
+      "blob_sha": "3d9a7aecb316ac81facb864fe059d5fde6223585",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/01-core/contest-orchestrator/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "contest-orchestrator",
+        "description": "数学建模竞赛唯一主控流程：题目解析、选题与模型规划、baseline、求解、图表、论文、评审、交付门禁和 replay；支持 AUTO/COLLAB/LOCK 与主会话—fork 分支协作。"
+      },
+      "excerpt": "---\nname: contest-orchestrator\ndescription: 数学建模竞赛唯一主控流程：题目解析、选题与模型规划、baseline、求解、图表、论文、评审、交付门禁和 replay；支持 AUTO/COLLAB/LOCK 与主会话—fork 分支协作。\nmetadata:\n  version: \"4.19\"\n  changelog: |\n    v4.19（开发版）: H4 节点取消，其蓝图设计职责并入 H5（建模与求解）；H3 直接到 H5，H6-H9 编号不变；H5 内部四阶段迭代（蓝图设计→快速验证→优化迭代→完善冻结）\n    v4.18: 稳定版\n---\n\n# contest-orchestrator\n\n数学建模竞赛唯一主控入口。当前为 4.19 开发版（H4 已并入 H5）；版本标识以 `VERSION` 为准，完整发布检查尚未通过。版本发布必须完成静态检查、负例、replay、真实项目闭环和安全审计。\n\n主会话负责范围、事实、权限、冻结、节点裁决和最终交付；fork 分支负责获得授权的赛题求解、实验、图表或论文工作。正式项目、数据、replay 和交付包写入项目工作区，不写入 skill 安装目录。\n\n## 1. 启动与模式\n\n先确定任务范围，再按需读取一个工作模式。未指定模式时，使用范围路由器识别最小任务范围；不读取未选模式的完整规则。\n\n```text\npython scripts/mode_router.py --mode <mode> [--variant <variant>]\npython scripts/scope_router.py --prompt \"用户原话\" --workspace <项目根>\n```\n\n选择 `full-contest-mathorcup` 时，范围路由器加 `--mode full-contest-mathorcup`，使阶段与门禁输出采用 M1–M5。\n\n可用模式：\n\n- `full-contest-legacy`：完整竞赛流程，兼容 v4.16 稳定基线规则。\n- `full-contest-4-18`：稳定协作流程，使用 G0–G6 节点门禁。\n- `full-contest-harness`：受控自动化测试流程，使用 H0–H9。\n- `full-contest-mathorcup`：MathorCup 大数据竞赛流程，使用 M1–M5；逐节点人工确认，固定子 agent 使用 Luna/Sol 且推理强度均为 `max`，详见 `references/modes/full-contest-mathorcup.md`。\n- `subproblem`、`paper`、`figures`、`delivery-audit`、`skills-optimization`：分别处理单问、论文、图表、交付审计和技能优化。\n\n单次任务只能有一个 `active_mode`。模式文件只规定边界和阶段；题型、专业写作和图表工作由对应 skill 执行。调用外部 skill 前必须读取 `references/external_skill_adapters.md`；外部 skill 只能执行当前任务卡中的专业子任务，不得切换模式、扩大范围或替代主会话决策。\n\n### Harness 硬门禁\n\n仅当 `active_mode=full-contest-harness` 时，主 agent 必须在 H0 前实际调用 `superpowers:using-superpowers`，并按 [Harness 模式](references/modes/full-contest-harness.md) 登记固定角色、任务卡、模型与推理强度、真实调用和派发证据。任务卡显式指定节点绑定的 `model` 与 `reasoning_effort`；主会话负责裁决，固定角色承担各自专业任务；必要调用、实例或任务卡缺失时保持 `BLOCKED_INPUT` 或 `PAUSE`。H5 使用唯一主解题实例覆盖全部小问，H6 必须独立于 H5；创建角色与正式派发分开。\n\nH2、H3、H5–H9 均保留人工批准门。重要产物先组成 `review_packet`，由用户明确批准并绑定当前 SHA-256；审查包或产物变化时按影响范围回流。H8 必须实际调用 `academic-writing` 与 `mathmodel-latex-skill`，H9 必须实际调用 `bzd-review-paper` 与 `mathmodel-latex-skill`，各调用均登记可定位的 `evidence_ref`。预载协议不算实际调用。\n\n使用 `templates/harness_control.yaml` 初始化控制记录；比赛期间使用 `validation.profile=competition_fast` 和 `.contest/change_impact_card.yaml` 选择增量复核。进入下一节点或完成变更复核前运行：\n\n```text\npython scripts/check_harness_control.py <project-root> --through H<n>\n```\n\nH5 冻结后登记 `run_manifest`，运行 `scripts/check_h5_result_traceability.py <project-root> --strict`；运行命令、随机种子、结果、模型契约及适用的敏感性/鲁棒性报告均须真实登记，结果与 `canonical_report` 等证据绑定当前哈希。缺证据保持 `PAUSE`，路径、格式或哈希不一致为 `BLOCK`。H6 接口记录保留项目相对 `source_path` 和当前 `source_sha256`，结果卡与模型卡由当前独立 H6 实例核验。\n\n#### 按当前节点读取权威协议\n\n| 当前任务 | 读取范围与保留的义务 |\n|---|---|\n| H5 建模与求解 | [Harness 模式](references/modes/full-contest-harness.md) 的 H5 输入/产物分工与工具绑定；[模型总结协议](references/model_summary_protocol.md) 和[作者证据协议](references/paper_author_evidence_protocol.md)定义逐问模型、结果与读者证据交接 |\n| H6 独立验证 | [H6 验证协议](references/h6_validation_protocol.md) 与当前 `h6_verification_scope.yaml`；首次按完整小问范围核验必查项与登记抽样，后续按模型、数据、关键结果或解释变化定向复核，普通正文与排版不触发 H6 |\n| H7 图表 | [图表模式](references/modes/figures.md) 与所选视觉工作流；图表生成绑定批准的槽位、提示词/计划版本和当前证据，保留用户选图与最终登记 |\n| H8 计划、章节、整合 | [章节执行协议](references/h8_chapter_execution.md)决定当前阶段的输入与交接；[写作者优先协议](references/h8_writer_first_protocol.md)、[模型总结协议](references/model_summary_protocol.md)、[作者证据协议](references/paper_author_evidence_protocol.md)分别负责叙事、最终模型呈现与证据转写 |\n\n启用 `reader_evidence_protocol: \"1.0\"` 后，H5–H8 按作者证据协议形成真实的读者证据链。正式 H8 素材准入使用 `paper_material_readiness.yaml`；`schema_version: \"2.0\"` 的 `evidence_matrix` 必须覆盖逐问与全局要求。素材不足时一次提交完整 `evidence_gap_matrix.yaml`，由主会话协调 H5/H6/H7 补证，不让作者以泛泛表述填充篇幅。\n\n先按控制记录的 `visual_workflow` 选择准备时序：`chapter_parallel` 读取[逐章批准与并行图表协议](references/harness_chapter_parallel.md)，`writer_first_draft` 读取[初稿准备协议](references/harness_writer_preparation.md)，未声明时保持历史路径。逐章流程在 H6 获批、写作计划获批后按 `writing_order` 一次完成一章；用户批准完整章节后才派发下一章及该章图表提示词，图件制作/返修可与后续章节并行。正式 H7、H8、H9 的最终闭合要求仍保留。\n\n`paper_narrative.global.paper_spine` 是唯一最终章节主线；作者简报、章节卡和连续性包复用同一主线。作者按当前章节的冻结证据连续写作并在完整章节后检查；摘要论证卡在计划阶段冻结结构，各章回传 `abstract_contribution`，最终摘要仅由 H8C 在正文与附录定稿后撰写，并以 `scripts/check_abstract_contract.py --strict` 和 `abstract_contract_report` 闭环。\n\n### 增量回流与验证\n\n比赛期间项目文件发生变化时，先填写 `.contest/change_impact_card.yaml`，再运行 `scripts/validation_router.py <project-root>`。路由器根据变更卡输出唯一复核计划；计划外节点不得自动重跑，也不得以局部复核替代 H9 完整交付门禁。完整字段、允许文件类型、哈希和失败处理见 `references/incremental_validation_policy.md`。\n\n| 等级 | 适用变化 | 复核范围 | 默认视觉检查 |\n|---|---|---|---|\n| L0 | 正文措辞、普通排版、论文元数据或引用表述，模型和数字保护字段未变 | H8 叙事、主张覆盖、成品过程词检查 | 否 |\n| L1 | 单张图件或图表登记变化 | H7 登记、格式、来源和 SciPilot QA | 是 |\n| L2 | 单个小问的模型、代码、数据或结果变化 | 该小问 H5，定向 H6，受影响 H7/H8 | 仅受影响图表 |\n| L3 | 全局数据、符号、跨问接口、全局假设或多小问关系变化 | 从 `earliest_invalid_node` 到 H8 的完整相关链 | 涉及图表时是 |\n\n`competition_fast` 只减少与变更无关的重复验证：项目文件变化不触发技能全套测试；技能源码或检查器源码变化时，将 `skill_code_changed` 设为 `true` 并执行完整技能测试。H2、H3、H5–H9 的用户批准门、冻结哈希和 H9 完整交付门禁始终保留。上游变更后只将引用变更字段的下游产物标记为 `stale`；未受影响的产物不得重新生成。需要描述具体下游影响时，可在同一变更记录中附 `rework_patch.yaml`。\n\n范围类型：\n\n| 范围 | 行为 |\n|---|---|\n| `PLAN_ONLY` | 只生成题目理解、方案、风险和写作计划 |\n| `SUBPROBLEM` | 只处理指定小问，明确输入、输出和时间边界 |\n| `FULL_CONTEST` | 执行 A–G 全流程，正式交付使用 `STRICT` |\n| `DELIVERY_AUDIT` | 只审计项目，不修改源项目 |\n\n权限模式：\n\n- `AUTO`：在已授权范围内自主推进；时间、证据或模型风险达到止损条件时进入收敛。\n- `COLLAB`：G0–G6 关键节点暂停，等待用户确认后继续；确认包包括目标、证据、风险、影响、最小修改和回滚点。\n- `LOCK`：冻结模型、数据、参数、结果和提交版本，只允许排版、可验证修复、图表美化和交付检查。\n\n## 2. 全流程：FULL_CONTEST + STRICT\n\n以下 A–G 描述共同的产物和质量要求；实际节点、派发顺序和人工批准按已选模式执行。Harness 图文时序以 `visual_workflow` 对应协议为准。\n\n### A. 题目理解\n\n建立条件台账、问题图、复杂度画像、数据审计、符号表和模型假设。每条假设记录简化内容、数据或题面依据、误差边界和适用范围。A 阶段通过：\n\n```text\npython scripts/check_core_execution.py <replay> --phase A\n```\n\n### B. 方案与 baseline\n\n文献流程固定为“需求卡与检索提示词 → 用户检索并下载全文 → 用户的文献 agent 阅读全文并回传摘要、方法、数据和适用边界 → 主 Agent 摘要级整合与引用登记”。主 Agent 不主动联网检索、不替用户下载、不直接读取或解析文献全文。进入正式文献分析前，先生成 `literature_request.md` 与 `literature_request.yaml`，明确各小问覆盖、检索关键词和回传字段；用户回传 `literature_sources.yaml` 后，系统只读取题名、作者、来源、年份、DOI/官方链接、摘要和外部 agent 的结构化总结。所有 Harness profile 的文献总数硬范围为 6–11 篇，推荐 8–10 篇；中文文献必须逐小问覆盖，每个小问至少 1 篇；英文文献不设硬性最低数量，但建议覆盖全部小问。英文覆盖建议和推荐数量不阻断节点。每篇计入总数的文献均须有 `citation_key`、原文定位及在 H5 落位的模型、数据、参数、验证或结论用途。任一硬条件不通过时保持 `PAUSE`。\n\n正式建模前必须收到并校验本题用户返回的 `literature_sources.yaml`；语言数量、总量或小问覆盖任一不通过，状态保持 `PAUSE`，不得进入建模或求解。该文件由用户检索下载文献后，交给指定文献 agent 生成结构化摘要、方法、数据、适用边界和证据定位。\n\n文献证据通过后，才能使用题型 profile、选题评分和风险探针确定候选路线，形成 `method_transfer_map.json`、文献使用登记、`model_blueprint.yaml`、`model_contract.yaml`、接口契约和图表需求清单。需求清单仅登记正文主张、图号占位、目标小问、所需结果字段和候选来源，不得确定数据图的图型、视觉编码或版式。每个小问至少登记一条可落地的方法迁移（`adopt` 或 `adapt`）和一条实际数据、参数、测量先例或基准证据，并绑定 `citation_key`、证据定位、模型组件或数据字段及使用方式；登记不完整时不得确定模型路线、baseline 或图表需求清单。用户确认路线、文献用途和图表需求清单后，才进入正式建模。\n\n机器门禁同步检查顺序：H3 必须登记需求清单、全文分析 agent 提示词和用户回传的 `literature_sources.yaml`；H5（建模与求解，已合并原 H4 蓝图设计职责）必须登记 `method_transfer_map.json`、`model_blueprint.yaml`、只含论证需求的 `chart_requirements.yaml` 以及完整求解产物；H5 的实际派发时间不得早于 H3 的批准时间。缺任一项保持 `PAUSE`，不得以补写节点记录替代真实文件。\n\n先运行最简 baseline，只判断问题是否可解；未达到目标时才在已登记文献证据和路线约束下升级模型。\n\n求解前必须完成：\n\n- 变量、参数、中间量三集合及符号表闭环；\n- 目标函数、约束、可行域、模型类别和规模量级；\n- 求解方法、初始化、边界、终止条件和异常处理；\n- 至少一项理论性质或可靠性说明；\n- 结果文件、代码、数据和图表的源关系。\n\nB 阶段通过：\n\n```text\npython scripts/check_core_execution.py <replay> --phase B\n```\n\n### C. 求解与图表\n\n结果只能由代码、推导或可审计数据源生成，并即时写入 `results/`、CSV/JSON、敏感性结果和运行清单。记录随机算法的 seed、参数、环境、收敛或间隙；每个关键数字进入数字源登记或冻结表。\n\n图表路由固定为：\n\n| 图表类型 | 路由与登记 |\n|---|---|\n| 数据结果图 | `SciPilot → ModelViz → SciPilot`；登记 `generator=modelviz`、`semantic_qa=scipilot-figure-skill`、`formats=[svg,png]`、`insertion_format=svg`；页面排版另登记 `layout_mode` |\n| 问题分析流程图、技术路线图、原理/机制/受力/几何和公式示意图 | 使用 `tikz-scientific-figures`，选择与路由一致的目录 `template_id`，保留可编辑 .tex 源与 SVG/PNG，登记 starter 来源与哈希；通用交付检查兼容已登记的历史 `tech-route-maker` 产物，H7 新图仍遵循当前路由 |\n| Draw.io 编辑图 | 仅用户明确要求时使用，登记 `user_requested=true`，输出 SVG/PNG 并保留 `.drawio` 源文件 |\n\n画图默认做视觉检查，确认图片美观、整洁、可读、层级清楚、标注完整；非画图默认不做视觉检查，只有用户明确要求或命令显式提供 `--visual-check` 时才渲染和检查。视觉检查不能替代公式、数字、引用、来源和结构门禁。\n\n数据结果图的图表决策卡必须由 `scipilot-figure-skill` 基于冻结数据生成；未登记 `decision_card` 和 `decision_author=scipilot-figure-skill` 时，禁止调用 ModelViz、确定图型或生成图像。每张图必须满足：先有完整图表决策卡；数据同源；图号与题注对应；坐标轴/单位/符号与符号表一致；来源登记真实；输出包含 SVG、PNG 和可编辑源；LaTeX 使用 SVG 插入。禁止饼图、双 Y 轴、彩虹色图、无单位坐标轴和把分类点连成无意义折线。\n\nH7 图表 agent 在调用任何图表生成 skill 前，必须汇总生成 `visual_argument_plan.yaml`（`prepared_by=h7-figure-agent`）。该计划先回答“读者在这里需要理解什么、什么证据能降低理解成本、没有图会遗漏什么”，再决定是",
+      "card": {
+        "title_zh": "数模竞赛主控流程",
+        "purpose_zh": "数学建模竞赛唯一主控入口，负责题目解析、选题与模型规划、baseline、求解、图表、论文、评审、交付门禁与 replay，支持 AUTO/COLLAB/LOCK 模式及主会话与 fork 分支协作。",
+        "does": [
+          "按范围路由器与模式路由器确定任务范围并选择唯一 active_mode",
+          "组织 A–G 全流程：题目理解、方案与 baseline、求解与图表、论文写作、Critic 评审、交付门禁",
+          "通过控制记录与检查脚本执行节点门禁、人工批准、冻结哈希与增量复核",
+          "管理文献流程：生成文献请求、校验用户回传的 literature_sources.yaml 后进入建模",
+          "编排图表路由与视觉论证计划，登记 figure_registry 并做视觉检查",
+          "执行交付前严格门禁与 replay 校验，输出交付包"
+        ],
+        "inputs": [
+          "用户原话与项目工作区路径",
+          "模式与变体参数（--mode、--variant）",
+          "用户检索下载的文献及 literature_sources.yaml",
+          "用户对关键节点的批准记录（approval_log.yaml）",
+          "变更影响卡 .contest/change_impact_card.yaml"
+        ],
+        "outputs": [
+          "题目理解、方案、模型蓝图与契约文件",
+          "求解结果、CSV/JSON、敏感性结果与运行清单",
+          "图表文件（SVG/PNG 及可编辑源）与 figure_registry",
+          "论文正文、摘要、附录与 AI 工具使用声明",
+          "评审记录、交付门禁报告与 replay 记录"
+        ],
+        "scenarios": [
+          "参加数学建模竞赛并需要端到端主控流程",
+          "仅处理单个小问或仅做论文、图表",
+          "对已有项目做交付审计",
+          "受控自动化测试流程（Harness）",
+          "MathorCup 大数据竞赛流程"
+        ],
+        "prerequisites": [
+          "项目工作区已建立，正式产物不写入 skill 安装目录",
+          "已确定任务范围与唯一 active_mode",
+          "Harness 模式需在 H0 前实际调用 superpowers:using-superpowers",
+          "正式建模前须收到并校验用户回传的 literature_sources.yaml",
+          "关键节点需用户明确批准并绑定当前 SHA-256"
+        ],
+        "limits": [
+          "单次任务只能有一个 active_mode",
+          "主 Agent 不主动联网检索、不替用户下载、不直接读取或解析文献全文",
+          "文献总数硬范围为 6–11 篇，每个小问至少 1 篇中文文献",
+          "H8 只读取批准计划，不得新增图表来增加篇幅",
+          "当前为 4.19 开发版，完整发布检查尚未通过",
+          "缺证据保持 PAUSE，路径、格式或哈希不一致为 BLOCK"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "数据分析",
+          "文档",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "数学建模竞赛唯一主控入口。"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "主会话负责范围、事实、权限、冻结、节点裁决和最终交付；fork 分支负责获得授权的赛题求解、实验、图表或论文工作。"
+          },
+          {
+            "field": "does",
+            "quote": "以下 A–G 描述共同的产物和质量要求；实际节点、派发顺序和人工批准按已选模式执行。"
+          },
+          {
+            "field": "does",
+            "quote": "python scripts/check_core_execution.py <replay> --phase A"
+          },
+          {
+            "field": "does",
+            "quote": "正式建模前必须收到并校验本题用户返回的 `literature_sources.yaml`"
+          },
+          {
+            "field": "does",
+            "quote": "H7 图表 agent 在调用任何图表生成 skill 前，必须汇总生成 `visual_argument_plan.yaml`"
+          },
+          {
+            "field": "inputs",
+            "quote": "python scripts/scope_router.py --prompt \"用户原话\" --workspace <项目根>"
+          },
+          {
+            "field": "inputs",
+            "quote": "先填写 `.contest/change_impact_card.yaml`，再运行 `scripts/validation_router.py <project-root>`"
+          },
+          {
+            "field": "outputs",
+            "quote": "结果只能由代码、推导或可审计数据源生成，并即时写入 `results/`、CSV/JSON、敏感性结果和运行清单。"
+          },
+          {
+            "field": "scenarios",
+            "quote": "`subproblem`、`paper`、`figures`、`delivery-audit`、`skills-optimization`：分别处理单问、论文、图表、交付审计和技能优化。"
+          },
+          {
+            "field": "scenarios",
+            "quote": "`full-contest-mathorcup`：MathorCup 大数据竞赛流程，使用 M1–M5"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "正式项目、数据、replay 和交付包写入项目工作区，不写入 skill 安装目录。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "仅当 `active_mode=full-contest-harness` 时，主 agent 必须在 H0 前实际调用 `superpowers:using-superpowers`"
+          },
+          {
+            "field": "limits",
+            "quote": "单次任务只能有一个 `active_mode`。"
+          },
+          {
+            "field": "limits",
+            "quote": "主 Agent 不主动联网检索、不替用户下载、不直接读取或解析文献全文。"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/02-modeling/data-science-stack/SKILL.md",
+      "blob_sha": "7e2044dc202db8f5c71f1a43ee31d28527af0919",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/02-modeling/data-science-stack/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "data-science-stack",
+        "description": "数学建模竞赛数据科学技能（C 类数据题、预测题及 MathorCup 大数据题）：EDA、预处理与特征工程、统计推断、机器学习、时间序列、模型评估与调参。触发词：数据题、C题、MathorCup、EDA、数据预处理、特征工程、机器学习、回归、分类、聚类、时间序列、预测、ARIMA、XGBoost、统计检验。与 contest-orchestrator executor 阶段、math-modeling、scipilot-figure-skill 协作。"
+      },
+      "excerpt": "---\nname: data-science-stack\ndescription: 数学建模竞赛数据科学技能（C 类数据题、预测题及 MathorCup 大数据题）：EDA、预处理与特征工程、统计推断、机器学习、时间序列、模型评估与调参。触发词：数据题、C题、MathorCup、EDA、数据预处理、特征工程、机器学习、回归、分类、聚类、时间序列、预测、ARIMA、XGBoost、统计检验。与 contest-orchestrator executor 阶段、math-modeling、scipilot-figure-skill 协作。\nmetadata:\n  version: \"1.0\"\n---\n\n# 数学建模竞赛 · 数据科学全链路（C 题/预测题）\n\n> 定位：解决\"拿到 Excel/CSV 附件后怎么办\"的问题。目标是一场数据题从 EDA 到论文结果的全部代码与文字素材一次到位，结果只从代码生成。\n\n## Contest-Orchestrator Adapter\n\n本技能是 `contest-orchestrator` 中 C 类/预测类小问的执行器，不是独立主控。只接收当前任务卡、数据审计、`model_blueprint.yaml`/`model_contract.yaml` 和已批准数据源；输出写入项目工作区，并进入 `run_manifest`、`result_registry` 和 `numeric_source_map`。\n\n- 每个数据处理决定记录来源、处理原因、影响范围和可复算命令；不得静默删除样本、改动原始数据或捏造缺失结果。\n- 训练、验证、预测和敏感性结果必须绑定随机种子、数据版本、代码路径、指标定义和结果文件；模型选择遵循 baseline → 验证 → 必要复杂化。\n- 返回 `status`、`active_mode`、`task_card`、`artifacts`、`evidence`、`checks`、`blockers`、`next_node` 节点包。缺数据、缺标签、指标不适用或证据断裂时返回 `BLOCKED_INPUT`/`FAIL`。\n- 数据结果图只走 `scipilot-figure-skill` → `modelviz` → `scipilot-figure-skill`；本技能不替代绘图技能执行视觉检查，进入绘图路由后按图表契约默认完成视觉检查。\n- 节点包和论文可见内容不得出现元话语、内部交流、调试信息、失败过程或其他负回响。\n\n`active_mode: full-contest-mathorcup` 时，M2 的 data 实例依据 `problem_statement.md`、`data_overview.yaml`、`task_kpi.yaml` 和题面附件输出 `eda_report.md`、`features.yaml` 与分割/预处理协议；verifier 独立签署 `leakage_audit.yaml` 后才能冻结特征。M3 仅由唯一 solver 使用冻结数据管线完成各小问 baseline、同切分/同指标候选比较、参数选择和 `run_manifest.yaml`；本技能不能另起解题主线或绕过独立 `independent_validation.yaml`。填补、编码、缩放、特征选择、目标编码和调参仅在训练折拟合；时间数据按时间分割，实体相关样本按组隔离，测试集不参与拟合或路线选择。M2 不写最终模型结果，M3 的每个量化结论必须绑定数据/代码/参数/种子/结果文件与跨问接口。下文时长、阈值、图型和算法是按需参考，不是 MathorCup 的固定门禁。\n\n## 0. 何时触发\n\nMathorCup 的评估、模型能力核对和资源恢复先读取 `references/mathorcup_experiment_protocol.md`。该协议补充现有模型卡与 run manifest，不新增固定算法、数字门槛或审批阶段。\n\n题目出现以下任一信号即进入本技能流程（典型：国赛 C 题、美赛 C/E/F 题的数据部分）：\n\n- 题目附带了数据文件（.xlsx/.csv/.txt），且问题围绕这些数据\n- 问题动词是\"预测 / 分类 / 识别 / 评价 / 关联 / 画像 / 排序\"\n- 问题要求\"建立……与……之间的关系模型\"\n\n不触发：纯机理建模（微分方程）、纯优化调度（无数据依赖）——那走 `pyomo` / `heuristic-algorithms`。\n\n## 1. 总览：五步流水线\n\n```\nStep1 EDA（1-2h）→ Step2 预处理+特征工程（1-2h）→ Step3 统计推断（按需）\n→ Step4 ML 建模+评估（4-8h，核心）→ Step5 时间序列（若为预测题）\n全程产出：数据报告.md + 图（scipilot）+ 结果表（.csv）+ 代码落盘\n```\n\n每一步都必须产出**论文可直接使用的素材**（表格/图/一段话），不允许\"只探索不记录\"。\n\n## 2. Step 1：EDA（探索性分析）\n\n### 10 步清单（顺序执行，输出一份《数据报告.md》）\n\n1. **形状与类型**：`df.shape`、`df.dtypes`、列名规范\n2. **缺失值**：逐列缺失率；缺失 >20% 的列标记\"慎用或剔除\"\n3. **重复行**：`df.duplicated().sum()`\n4. **描述统计**：`df.describe()`；核对量纲差异 >3 个数量级的列（需标准化或换单位）\n5. **异常值**：每列 IQR 法 + 3σ 法交叉标记；异常比例 >5% 的列写进数据报告（保留还是剔除要论证）\n6. **分布形状**：直方图/箱线图（scipilot 出图），偏度、峰度数值\n7. **相关性**：数值列 Pearson 相关矩阵热力图 + 与目标变量的相关系数排序\n8. **分组结构**：类别列分组后目标变量的差异（分组箱线图）；**判断是否该用混合效应/分层**\n9. **时间结构**：若有时间列——趋势、季节、缺失时间段；画时序图\n10. **结论表**：一列一个结论（类型/缺失/异常/分布/相关性/处理建议），这就是数据报告正文\n\n```python\nimport pandas as pd, numpy as np\ndf = pd.read_excel('附件.xlsx')  # 单表示例；多 sheet 时逐表选择并审计\n# 或 df = pd.read_csv('data.csv', encoding='gbk')  # 中文数据常见 gbk\n\nreport = []\nfor col in df.columns:\n    s = df[col]\n    miss = s.isnull().mean()\n    if pd.api.types.is_numeric_dtype(s):\n        q1, q3 = s.quantile(0.25), s.quantile(0.75)\n        iqr = q3 - q1\n        n_out = ((s < q1 - 1.5*iqr) | (s > q3 + 1.5*iqr)).sum()\n        report.append({'列': col, '类型': '数值', '缺失率': f'{miss:.1%}',\n                       '均值': round(s.mean(), 4), '异常数': int(n_out)})\n    else:\n        report.append({'列': col, '类型': '类别', '缺失率': f'{miss:.1%}',\n                       '唯一值数': s.nunique()})\nprint(pd.DataFrame(report).to_string(index=False))\n```\n\n**EDA 雷区**：不做 EDA 直接建模（评委问\"为什么用这个模型\"时答不上）｜ 只数缺失率不处理 ｜ 不看量纲 ｜ 不记录发现（赛后无法写论文）。\n\n## 3. Step 2：预处理与特征工程\n\n按 EDA 结论执行，**每项处理都要在数据报告里留一行记录**（论文\"数据预处理\"节就靠它）。\n\n以下算子只表示处理方式。凡需从样本估计均值、众数、分位数、编码词表或尺度参数的操作，必须放入训练折内拟合的管线，再对验证/测试折调用同一变换；时间插值不得跨越预测时点或分割边界。\n\n| 问题 | 处理 | 代码 |\n|---|---|---|\n| 缺失（数值） | 均值/中位数/线性插值/模型预测填充（按缺失率选择） | `df[col].interpolate(method='linear')` |\n| 缺失（类别） | 众数填充或\"未知\"类 | `df[col].fillna(df[col].mode()[0])` |\n| 异常值 | 3σ 截尾 / IQR 缩尾 / 保留并标注（竞赛中**优先缩尾或保留**，直接删行会被质疑） | `s.clip(s.quantile(0.01), s.quantile(0.99))` |\n| 量纲差异 | 标准化（Z-score）/ 归一化（MinMax），注意**先划分训练测试再fit** | `from sklearn.preprocessing import StandardScaler` |\n| 类别编码 | LabelEncoder（有序）/ OneHot（无序）/ 频数编码（高基数） | `pd.get_dummies()` |\n| 长尾分布 | log1p 变换（目标变量偏斜时常用） | `np.log1p(y)`，预测完 `np.expm1()` 还原 |\n| 时间列 | 拆成年/月/日/星期/小时；构造滞后特征 | `df['month'] = df['date'].dt.month` |\n\n**特征工程（拿奖关键）**，按重要性排序：\n1. **领域特征**：读题找隐含变量（例：销量题 → 节假日/促销/天气；定价题 → 利润率/竞争价差）\n2. **统计特征**：历史均值/中位数/极差/标准差/趋势斜率（滚动窗口）\n3. **交互特征**：两变量乘积/比值（例：单价×销量=销售额）\n4. **降维**：相关性 >0.9 的列只留一个；PCA 用于可视化或消除多重共线性（要解释主成分含义）\n\n**铁律**：特征构造只能使用**已知信息**（比赛时刻之前的数据），严禁用未来数据构造特征（数据泄漏，评委会质疑、重算会翻车）。\n\n## 4. Step 3：统计推断（按需，不要为用而用）\n\n| 问题 | 方法 | 代码 |\n|---|---|---|\n| 两组目标变量有无显著差异 | 独立样本 t 检验 / Mann-Whitney U | `scipy.stats.ttest_ind` / `mannwhitneyu` |\n| 多组差异 | 单因素方差分析 + Tukey HSD | `scipy.stats.f_oneway` + `statsmodels.stats.multicomp.pairwise_tukeyhsd` |\n| 类别×类别独立性 | 卡方检验 | `scipy.stats.chi2_contingency` |\n| 两变量线性相关 | Pearson（正态） | `scipy.stats.pearsonr` |\n| 两变量单调相关 | Spearman（非正态/序数） | `scipy.stats.spearmanr` |\n| 数据是否正态 | Shapiro-Wilk（n<5000）/ 偏度峰度 | `scipy.stats.shapiro` |\n| 多因素对目标的关联强度 | 灰色关联度（国赛常用，手写 15 行） | 见下方模板 |\n\n```python\n# 灰色关联度分析（评价/相关性题高频使用）\ndef grey_relational_degree(X, y):\n    \"\"\"X: (n, m) 特征矩阵, y: (n,) 目标列。返回每个特征的关联度\"\"\"\n    Xn = (X - X.min(0)) / (X.max(0) - X.min(0) + 1e-9)\n    yn = (y - y.min()) / (y.max() - y.min() + 1e-9)\n    diff = np.abs(Xn - yn[:, None])\n    rho = 0.5\n    rel = (diff.min(0) + rho * diff.max(0)) / (diff + rho * diff.max(0))\n    return rel.mean(0)  # 每列一个关联度，可排序\n```\n\n## 4.5 详细 ML 手册（按需加载）\n\n- ML 类算法完整手册（XGBoost/LightGBM/RF/SVM/BP 系统展开，含问题适配框架与参数建议）：`references/cookbook-ml.md`。本文档选择树是首选入口，手册提供更细的算法适配细节。\n\n## 5. Step 4：机器学习模型库（选择树）\n\n按问题类型直接选，**首选简单可解释模型，复杂模型只做提升**（评委喜欢\"baseline 对比\"叙事）：\n\n```\n回归（预测连续值）\n├─ 线性/岭回归 → 快、可解释、适合关系建模题（\"建立X与Y的关系\"）\n├─ 随机森林 / XGBoost / LightGBM → 特征多、非线性强时主用\n└─ 对比叙事：线性做 baseline，树模型做提升，报告两者 R²\n\n分类（判别/识别/分类）\n├─ 逻辑回归 → baseline + 可解释（系数=影响）\n├─ 随机森林/XGBoost → 主用；SVM → 小样本高维\n└─ 指标：准确率 + F1 + 混淆矩阵（别只报准确率）\n\n聚类（画像/分区/划分）\n├─ K-Means → 首选，肘部法则定 K + 轮廓系数验证\n├─ DBSCAN → 密度不均/有离群点\n└─ 输出：每类中心 + 画像表（论文\"用户画像\"节直接抄）\n\n评价/排序（无监督打分）\n├─ 熵权法（客观权重）+ TOPSIS（综合排序）→ 数据驱动评价题首选\n└─ AHP（主观权重，需专家判断，评委接受度高但要有理由）\n```\n\n```python\nfrom sklearn.model_selection import train_test_split, cross_val_score\nfrom sklearn.ensemble import RandomForestRegressor, RandomForestClassifier\nfrom sklearn.linear_model import LinearRegression, LogisticRegression\nfrom sklearn.preprocessing import StandardScaler\nimport joblib, os\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.2, random_state=42)\nscaler = StandardScaler(); X_tr = scaler.fit_transform(X_train); X_te = scaler.transform(X_test)\n\n# 回归主模型 + 可解释性\nmodel = RandomForestRegressor(n_estimators=300, random_state=42)\nmodel.fit(X_tr, y_train)\nr2 = model.score(X_te, y_test)\nimp = pd.Series(model.feature_importances_, index=feature_names).sort_values(ascending=False)\nprint(f'R²={r2:.4f}  前5重要特征:\\n{imp.head(5)}')\n\n# 落盘（orchestrator 要求：结果只从代码生成，可复现）\nos.makedirs('results', exist_ok=True)\njoblib.dump({'model': model, 'scaler': scaler, 'r2': r2}, 'results/model.pkl')\n```\n\n**多模型对比表（论文必备）**：\n\n| 模型 | 训练R² | 测试R² | RMSE | 结论 |\n|---|---|---|---|---|\n| 线性回归 | 0.85 | 0.81 | 12.3 | baseline |\n| 随机森林 | 0.97 | 0.89 | 8.1 | 主模型 |\n| XGBoost | 0.98 | 0.88 | 8.4 | 与RF持平 |\n\n## 6. Step 5：时间序列（预测类题目）\n\n流程：**画图看趋势/季节 → ADF 平稳性检验 → 差分/分解 → 选模型 → 评估 → 外推预测**。\n\n```python\nimport statsmodels.api as sm\nfrom statsmodels.tsa.stattools import adfuller\nfrom statsmodels.tsa.arima.model import ARIMA\n\n# 1. 平稳性检验：p<0.05 视为平稳\np_val = adfuller(series.dropna())[1]\n\n# 2. 差分到平稳（通常 d=1）\n# 3. ARIMA 定阶：AIC 网格搜索\nbest_aic, best_order = np.inf, None\nfor p in range(0, 4):\n    for q in range(0, 4):\n        try:\n            aic = ARIMA(series, order=(p, 1, q)).fit().aic\n            if aic < best_aic: best_aic, best_order = aic, (p, 1, q)\n        except Exception: pass\nmodel = ARIMA(series, order=best_order).fit()\nprint(model.summary())\n\n# 4. 外推预测 + 置信区间\nfc = model.get_forecast(steps=12)\npred = fc.predicted_mean; ci = fc.conf_int()\n```\n\n**时间序列雷区**：\n- 不做平稳性检验直接套 ARIMA\n- 用整段数据训练再\"预测\"历史段（要先划分：前 80% 训练、后 20% 验证）\n- 有季节性的数据用普通 ARIMA（该用 SARIMA/Prophet）",
+      "card": {
+        "title_zh": "数据科学建模全链路",
+        "purpose_zh": "面向数学建模竞赛数据题（C题、预测题、MathorCup大数据题），从EDA、预处理与特征工程、统计推断、机器学习建模到时间序列预测，产出可复现的代码、结果表与论文素材。",
+        "does": [
+          "执行EDA十步清单并输出数据报告",
+          "按EDA结论做缺失值、异常值、量纲、编码等预处理与特征工程",
+          "按需做t检验、方差分析、卡方、相关与灰色关联度等统计推断",
+          "按问题类型选择回归、分类、聚类、评价排序模型并做baseline对比",
+          "用ADF检验与ARIMA等做时间序列预测与外推",
+          "做交叉验证、指标评估、调参和数值合理性检查"
+        ],
+        "inputs": [
+          "题目附件数据文件（.xlsx/.csv/.txt）",
+          "任务卡、数据审计与model_blueprint.yaml/model_contract.yaml",
+          "已批准数据源与problem_statement.md、data_overview.yaml、task_kpi.yaml"
+        ],
+        "outputs": [
+          "数据报告.md与eda_report.md",
+          "features.yaml与预处理/分割协议",
+          "结果表（.csv）与模型文件（如results/model.pkl）",
+          "run_manifest、result_registry与numeric_source_map记录",
+          "节点包（status、artifacts、evidence、checks等）"
+        ],
+        "scenarios": [
+          "国赛C题等附带数据文件的建模题",
+          "美赛C/E/F题的数据部分",
+          "MathorCup大数据题",
+          "预测类时间序列题目",
+          "数据驱动的评价与排序题"
+        ],
+        "prerequisites": [
+          "作为contest-orchestrator中C类/预测类小问的执行器使用，非独立主控",
+          "需已批准数据源与任务卡、模型契约",
+          "特征冻结前需verifier独立签署leakage_audit.yaml",
+          "绘图需经scipilot-figure-skill与modelviz路由"
+        ],
+        "limits": [
+          "不触发纯机理建模（微分方程）与纯优化调度题",
+          "不替代绘图技能执行视觉检查",
+          "不能另起解题主线或绕过independent_validation.yaml",
+          "M2不写最终模型结果",
+          "填补、编码、缩放、特征选择、目标编码和调参仅在训练折拟合",
+          "时间数据按时间分割，测试集不参与拟合或路线选择",
+          "缺数据、缺标签或证据断裂时返回BLOCKED_INPUT/FAIL",
+          "外推步数超过数据长度1/3的硬预测不可信"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "数据分析",
+          "调研",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "数学建模竞赛数据科学技能（C 类数据题、预测题及 MathorCup 大数据题）：EDA、预处理与特征工程、统计推断、机器学习、时间序列、模型评估与调参。"
+          },
+          {
+            "field": "does",
+            "quote": "10 步清单（顺序执行，输出一份《数据报告.md》）"
+          },
+          {
+            "field": "does",
+            "quote": "按 EDA 结论执行，**每项处理都要在数据报告里留一行记录**（论文\"数据预处理\"节就靠它）。"
+          },
+          {
+            "field": "does",
+            "quote": "| 多因素对目标的关联强度 | 灰色关联度（国赛常用，手写 15 行） | 见下方模板 |"
+          },
+          {
+            "field": "does",
+            "quote": "按问题类型直接选，**首选简单可解释模型，复杂模型只做提升**（评委喜欢\"baseline 对比\"叙事）："
+          },
+          {
+            "field": "does",
+            "quote": "流程：**画图看趋势/季节 → ADF 平稳性检验 → 差分/分解 → 选模型 → 评估 → 外推预测**。"
+          },
+          {
+            "field": "inputs",
+            "quote": "题目附带了数据文件（.xlsx/.csv/.txt），且问题围绕这些数据"
+          },
+          {
+            "field": "outputs",
+            "quote": "joblib.dump({'model': model, 'scaler': scaler, 'r2': r2}, 'results/model.pkl')"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "本技能是 `contest-orchestrator` 中 C 类/预测类小问的执行器，不是独立主控。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "verifier 独立签署 `leakage_audit.yaml` 后才能冻结特征。"
+          },
+          {
+            "field": "limits",
+            "quote": "不触发：纯机理建模（微分方程）、纯优化调度（无数据依赖）——那走 `pyomo` / `heuristic-algorithms`。"
+          },
+          {
+            "field": "limits",
+            "quote": "填补、编码、缩放、特征选择、目标编码和调参仅在训练折拟合；时间数据按时间分割，实体相关样本按组隔离，测试集不参与拟合或路线选择。"
+          },
+          {
+            "field": "limits",
+            "quote": "缺数据、缺标签、指标不适用或证据断裂时返回 `BLOCKED_INPUT`/`FAIL`。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "os.makedirs('results', exist_ok=True)"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/02-modeling/heuristic-algorithms/SKILL.md",
+      "blob_sha": "2e1e6870ffa0d5094b66c1075476b12bdad3c01f",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/02-modeling/heuristic-algorithms/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "heuristic-algorithms",
+        "description": "数学建模竞赛启发式与数值算法库（A/B 类复杂优化题、机理建模题专用）：遗传算法、模拟退火、粒子群、蒙特卡洛模拟、爬山/禁忌搜索、贪心、常微分方程数值求解。触发词：NP难、大规模优化、排产、路径、调度、选址、随机模拟、蒙特卡洛、排队、微分方程、机理模型、GA、SA、PSO、遗传算法、模拟退火。与 pyomo（精确求解）互补：精确求解超时或不可行时切换启发式。"
+      },
+      "excerpt": "﻿---\nname: heuristic-algorithms\ndescription: 数学建模竞赛启发式与数值算法库（A/B 类复杂优化题、机理建模题专用）：遗传算法、模拟退火、粒子群、蒙特卡洛模拟、爬山/禁忌搜索、贪心、常微分方程数值求解。触发词：NP难、大规模优化、排产、路径、调度、选址、随机模拟、蒙特卡洛、排队、微分方程、机理模型、GA、SA、PSO、遗传算法、模拟退火。与 pyomo（精确求解）互补：精确求解超时或不可行时切换启发式。\nmetadata:\n  version: \"1.0\"\n---\n\n# 数学建模竞赛 · 启发式与数值算法库\n\n> 定位：解决\"优化问题解不动/模型是微分方程\"的问题。配套 `pyomo`（精确求解）和 `data-science-stack`（数据侧），三者构成求解三角。\n\n## Contest-Orchestrator Adapter\n\n本技能只在 `contest-orchestrator` 已批准启发式/数值求解路线后执行，不负责选题或擅自替换模型。输入必须包含任务卡、`model_contract.yaml`、baseline、约束、数据源和求解预算；输出代码与结果只写项目工作区并登记到 `run_manifest`、`result_registry` 和 `numeric_source_map`。\n\n- 每个随机过程固定并记录 `seed`；重复运行、可行性、收敛、约束违约、敏感性和与 baseline 的比较必须有可定位证据。\n- 启发式不能掩盖精确模型的不可行或超时原因；切换依据、参数范围、停止条件和适用边界必须回流主会话。\n- 返回 `status`、`active_mode`、`task_card`、`artifacts`、`evidence`、`checks`、`blockers`、`next_node`。任何失败只作为当前节点事实，不写入论文成品或长期规则。\n- 默认不生成截图或自动视觉检查；图表另走 `modelviz` → `scipilot-figure-skill`，用户明确要求时才开启视觉检查。\n- 节点包和论文可见内容不得出现元话语、内部交流、调试、失败过程、旧版本或未确认方案等负回响。\n\n## Robustness Check Tool（B 题优化加固协同变更）\n\n`scripts/robustness_check.py` 为 GA/SA/PSO 等启发式算法提供随机种子敏感性和参数鲁棒性检查。\n\n- **输入**：`robustness_plan.yaml`，包含 `model_contract_sha256`、`subproblem_id`、算法类型、随机种子列表、参数扫描范围、目标方向（min/max）\n- **输出**：`robustness_report.yaml`，`schema_version=1.0`，每个种子/参数组合登记 `best_fitness`、`feasible`、`constraint_violation`、`iterations_to_converge`、`decision_change`\n- **状态契约**：只有 `status: verified` 且所有运行有真实数值或明确 `not_applicable_reason` 时，才允许通过 contest-orchestrator 的 H6 验证；`completed`/`manual_required` 为空证据通路，会被主控检查器拒绝\n- **CV 统计量限制**：变异系数（CV）只能作为统计量，不能单独产生\"可用于论文\"的结论；必须配合可行性、约束违约、收敛曲线和决策变化证据\n- **调用方式**：`python scripts/robustness_check.py <robustness_plan.yaml> --out <robustness_report.yaml>`\n- **与 contest-orchestrator 的集成**：H5 节点启发式优化子问题必须生成此报告；`check_model_evidence.py` 的 `_check_sensitivity_report()` 会自动校验报告的 `subproblem_id` 绑定、状态和数值完整性\n\n## 0. 何时触发\n\n- 优化问题规模大（决策变量 >10³ 或组合爆炸），`pyomo`/`scipy.optimize` 精确求解超时或不可行（典型：路径规划、排产调度、选址分配、装箱）\n- 目标函数非凸/不可导/黑盒（无法用梯度方法）\n- 题目要求随机模拟（排队、库存、可靠性、风险）\n- 题目机理是微分方程（传染病、热传导、种群、电路、物理过程）\n\n## 1. 算法选择决策树（先想清楚再用）\n\n```\n优化问题\n├─ 规模小、线性/凸 → pyomo 精确求解（LP/MILP/QP），别用启发式\n├─ 规模大、组合优化 → 遗传算法（离散编码）或模拟退火（邻域搜索）\n├─ 连续变量、非凸 → 粒子群 或 遗传算法（实数编码）\n├─ 有明确贪心结构 → 贪心/局部搜索 + 扰动重试（先做，往往够用）\n├─ 需要评估不确定性 → 蒙特卡洛模拟\n└─ 动态/多阶段决策 → 动态规划 或 遗传算法（决策序列编码）\n\n微分方程问题 → scipy.integrate.solve_ivp（第 7 节）\n```\n\n**纪律**：先用贪心/局部搜索跑通拿到结果（baseline），再用 GA/SA 提升并报告对比——论文叙事\"贪心 baseline → 启发式提升 X%\"是评委喜欢的结构。绝不直接上启发式而没有任何对比。\n\n## 1.5 详细算法手册（按需加载）\n\n- 优化类算法完整手册（GA/PSO/SA/LP/IP/DP 系统展开）：`references/cookbook-optimization.md`\n- 启发式算法使用条件与防炫技指南（前置条件、各算法适用场景、硬要求、炫技检测清单、vs 精确求解决策流程、论文写作建议）：`references/heuristic_usage_guide.md`\n- 统计与不确定类手册（假设检验/ANOVA/实验设计/蒙特卡洛/贝叶斯/成分数据/时间序列/灰色关联）：`references/cookbook-statistical.md`\n- 需要系统方法论时加载对应手册；本文档的决策树与代码模板是首选入口，手册提供更细的问题适配框架。\n\n## 2. 遗传算法（GA）——组合优化主武器\n\n适用：TSP/路径、排产、选址、调度、背包类。要点：**编码决定一切**（排列编码/二进制/实数），适应度=目标函数，选择=锦标赛，交叉/变异按问题定制。\n\n```python\nimport numpy as np\n\ndef ga_solve(fitness, n_var, bounds=None, n_pop=100, n_gen=200,\n             pc=0.8, pm=0.1, seed=42, maximize=True):\n    \"\"\"通用实数编码 GA。fitness(x)->float 为目标函数。\"\"\"\n    rng = np.random.default_rng(seed)\n    lo, hi = (np.zeros(n_var), np.ones(n_var)) if bounds is None else bounds\n    pop = rng.uniform(lo, hi, (n_pop, n_var))\n    best_fit, best_x, history = -np.inf, None, []\n    for g in range(n_gen):\n        fits = np.array([fitness(x) for x in pop])\n        if not maximize: fits = -fits\n        # 锦标赛选择（取每组随机两个中适应度更优者）\n        order = np.argsort(-fits)[:n_pop // 2]\n        parents = pop[order]\n        # 均匀交叉 + 高斯变异\n        children = []\n        while len(children) < n_pop - len(parents):\n            a, b = parents[rng.integers(len(parents), size=2)]\n            mask = rng.random(n_var) < pc\n            child = np.where(mask, a, b)\n            child = child + rng.normal(0, 0.1, n_var) * (hi - lo) * (rng.random() < pm)\n            children.append(np.clip(child, lo, hi))\n        pop = np.vstack([parents, np.array(children)[:n_pop - len(parents)]])\n        if fits.max() > best_fit:\n            best_fit, best_x = fits.max(), pop[np.argmax(fits)].copy()\n        history.append(best_fit)\n    return best_x, best_fit, history  # history 用于画收敛曲线\n```\n\n**论文呈现**：\n- 收敛曲线图（x=代数，y=最优适应度）——证明算法收敛、代数设置合理\n- 参数敏感性表：种群/交叉率/变异率扰动 ±50% 后结果波动 <5% 即可宣称鲁棒\n- 与贪心/精确小规模解对比表\n\n**GA 雷区**：❌ 变异率过大（退化成随机搜索）｜ ❌ 无收敛曲线 ｜ ❌ 不设随机种子（不可复现）｜ ❌ 编码不解释（评委看不懂就不信）。\n\n## 3. 模拟退火（SA）——连续/离散邻域搜索\n\n适用：目标函数崎岖、邻域定义自然的问题。核心是**温度调度**：高温大探索、低温小扰动。\n\n```python\nimport numpy as np\n\ndef sa_solve(neighbor, energy, x0, t0=100, t_min=1e-3, alpha=0.95, seed=42):\n    \"\"\"neighbor(x)->x' 邻域函数；energy(x)->float 能量（越小越好）\"\"\"\n    rng = np.random.default_rng(seed)\n    x, e = x0, energy(x0)\n    best_x, best_e = x, e\n    t = t0; history = []\n    while t > t_min:\n        xn = neighbor(x); en = energy(xn)   # 只调一次邻域（随机邻域重复调用会得到不同邻居）\n        if en < e or rng.random() < np.exp(-(en - e) / max(t, 1e-9)):\n            x, e = xn, en\n            if e < best_e: best_e, best_x = e, xn\n        t *= alpha\n        history.append(best_e)\n    return best_x, best_e, history\n```\n\n**雷区**：❌ 邻域函数每步算两次 energy（浪费 2 倍时间）——先 `xn = neighbor(x)` 再 `en = energy(xn)`｜ ❌ 退火太快（alpha<0.9）探索不足｜ ❌ 初始温度过高导致前期纯随机（看收敛曲线判断）。\n\n## 4. 粒子群（PSO）——连续优化快速收敛\n\n```python\nimport numpy as np\n\ndef pso_solve(fitness, n_var, bounds, n_p=50, n_iter=200, w=0.7, c1=1.5, c2=1.5, seed=42):\n    rng = np.random.default_rng(seed)\n    lo, hi = bounds\n    x = rng.uniform(lo, hi, (n_p, n_var))\n    v = rng.uniform(-(hi-lo)*0.1, (hi-lo)*0.1, (n_p, n_var))\n    pbest, pbest_f = x.copy(), np.array([fitness(xi) for xi in x])\n    gbest, gbest_f = pbest[np.argmax(pbest_f)].copy(), pbest_f.max()\n    history = []\n    for _ in range(n_iter):\n        r1, r2 = rng.random((n_p, n_var)), rng.random((n_p, n_var))\n        v = w*v + c1*r1*(pbest - x) + c2*r2*(gbest - x)\n        x = np.clip(x + v, lo, hi)\n        f = np.array([fitness(xi) for xi in x])\n        better = f > pbest_f\n        pbest[better], pbest_f[better] = x[better], f[better]\n        if pbest_f.max() > gbest_f:\n            gbest, gbest_f = pbest[np.argmax(pbest_f)].copy(), pbest_f.max()\n        history.append(gbest_f)\n    return gbest, gbest_f, history\n```\n\n**何时选 PSO 而非 GA**：连续变量、目标函数光滑但有多个局部最优（如参数辨识、曲线拟合）。离散问题优先 GA。\n\n## 5. 蒙特卡洛模拟（MC）——不确定性/随机过程\n\n适用：排队系统、库存策略、设备可靠性、风险评价、随机性强的预测。**核心纪律：随机种子固定 + 大样本 + 报告置信区间**。\n\n```python\nimport numpy as np\n\ndef monte_carlo_sim(run_once, n=10000, seed=42):\n    \"\"\"run_once()->单个场景结果；返回均值/分位数/95%区间\"\"\"\n    rng = np.random.default_rng(seed)\n    results = np.array([run_once(rng) for _ in range(n)])\n    return {'mean': results.mean(), 'std': results.std(),\n            'p5': np.percentile(results, 5), 'p95': np.percentile(results, 95),\n            'hist': results}  # hist 画直方图/分布曲线\n\n# 示例：M/M/1 排队模拟（验证理论值 λ/μ 利用率）\ndef mm1_once(rng, lam=8.0, mu=10.0, T=1000):\n    t, n, busy = 0.0, 0, 0.0\n    next_arr, next_dep = rng.exponential(1/lam), np.inf\n    while t < T:\n        if next_arr < next_dep:\n            t, n, next_arr = next_arr, n+1, next_arr + rng.exponential(1/lam)\n        else:\n            t, n, next_dep = next_dep, n-1, next_dep + rng.exponential(1/mu)\n            if n == 0: next_dep = np.inf\n        if n > 0: busy += min(next_arr, next_dep) - t\n    return busy / T  # 服务台利用率 ≈ ρ = λ/μ\n```\n\n**论文呈现**：直方图/累计分布 + 与理论值/解析解对比表（MC 对解析解的验证是评委最爱看的\"模型检验\"）。\n\n## 6. 快速手段：贪心 / 局部搜索 / 禁忌\n\n- **贪心**：按某个启发规则逐步决策（例：最短路 Dijkstra、排产按最短加工时间）。5 分钟跑通，作为 baseline。\n- **局部搜索**：贪心解 + 邻域交换，迭代到局部最优（2-opt 解 TSP 效果极好）。\n- **禁忌搜索**：局部搜索 + 禁忌表防循环，比 SA 快但实现稍复杂。\n- **决策建议**：**先贪心拿结果 → 2-opt/局部搜索提升 → 时间富余再 GA/SA**。多数题目到第二步已够省奖。\n\n## 7. 常微分方程数值求解（机理建模）\n\n适用：题目机理可写为 ODE（传染病 SIR、热传导、冷却、种群、电路、药物浓度）。**先写微分方程再数值求解，图+结果一起出**。\n\n```python\nimport numpy as np\nfrom scipy.integrate import solve_ivp\n\ndef ode_model(t, y, params):\n    S, I, R = y\n    beta, gamma = params\n    dS = -beta * S * I\n    dI = beta * S * I - gamma * I\n    dR = gamma * I\n    return [dS, dI, dR]\n\n# SIR：S(0)=0.99, I(0)=0.01\nsol = solve_ivp(ode_model, [0, 60], [0.99, 0.01, 0.0],\n                args=([0.3, 0.1],), method='RK45', dense_output=True)\nt = np.linspace(0, 60, 300)\nS, I, R = sol.sol(t)\n# 关键量：感染峰值时间与峰值（论文必写）\n",
+      "card": {
+        "title_zh": "启发式与数值算法库",
+        "purpose_zh": "面向数学建模竞赛的启发式与数值算法代码库，提供遗传算法、模拟退火、粒子群、蒙特卡洛、贪心/局部搜索及常微分方程数值求解模板，并配套鲁棒性检查、数值合理性检查与论文呈现规范。",
+        "does": [
+          "提供GA、SA、PSO、蒙特卡洛、贪心/局部搜索、ODE数值求解的Python代码模板",
+          "给出算法选择决策树与先贪心baseline再启发式提升的纪律",
+          "提供robustness_check.py做随机种子敏感性与参数鲁棒性检查",
+          "规定收敛曲线、对比表、参数敏感性、可复现等论文呈现规范",
+          "规定代码注释规范与数值合理性检查（inf/nan、量级、收敛、约束违约）",
+          "与contest-orchestrator、pyomo、data-science-stack等技能对接"
+        ],
+        "inputs": [
+          "任务卡、model_contract.yaml、baseline、约束、数据源和求解预算",
+          "robustness_plan.yaml（含model_contract_sha256、subproblem_id、算法类型、随机种子列表、参数扫描范围、目标方向）",
+          "优化问题或微分方程模型及目标函数"
+        ],
+        "outputs": [
+          "求解代码与结果（写入项目工作区并登记run_manifest、result_registry、numeric_source_map）",
+          "robustness_report.yaml（含best_fitness、feasible、constraint_violation、iterations_to_converge、decision_change）",
+          "收敛曲线、对比表、参数敏感性表等论文呈现材料",
+          "返回status、active_mode、task_card、artifacts、evidence、checks、blockers、next_node"
+        ],
+        "scenarios": [
+          "大规模组合优化：路径规划、排产调度、选址分配、装箱",
+          "目标函数非凸/不可导/黑盒的连续优化",
+          "题目要求随机模拟：排队、库存、可靠性、风险",
+          "机理为微分方程：传染病、热传导、种群、电路",
+          "精确求解超时或不可行时切换启发式"
+        ],
+        "prerequisites": [
+          "需在contest-orchestrator已批准启发式/数值求解路线后执行",
+          "输入必须包含任务卡、model_contract.yaml、baseline、约束、数据源和求解预算",
+          "每个随机过程需固定并记录seed",
+          "需Python环境及numpy、scipy等依赖"
+        ],
+        "limits": [
+          "不负责选题或擅自替换模型",
+          "启发式不能掩盖精确模型的不可行或超时原因",
+          "默认不生成截图或自动视觉检查",
+          "CV只能作为统计量，不能单独产生可用于论文的结论",
+          "只有status为verified且所有运行有真实数值或明确not_applicable_reason才允许通过H6验证",
+          "注释中禁止出现内部讨论、AI思考过程、元话语、负向回响、AI协作痕迹"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "数据分析",
+          "自动化",
+          "学习辅导",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "数学建模竞赛启发式与数值算法库（A/B 类复杂优化题、机理建模题专用）：遗传算法、模拟退火、粒子群、蒙特卡洛模拟、爬山/禁忌搜索、贪心、常微分方程数值求解。"
+          },
+          {
+            "field": "does",
+            "quote": "def ga_solve(fitness, n_var, bounds=None, n_pop=100, n_gen=200,"
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/robustness_check.py` 为 GA/SA/PSO 等启发式算法提供随机种子敏感性和参数鲁棒性检查。"
+          },
+          {
+            "field": "does",
+            "quote": "**纪律**：先用贪心/局部搜索跑通拿到结果（baseline），再用 GA/SA 提升并报告对比"
+          },
+          {
+            "field": "inputs",
+            "quote": "输入必须包含任务卡、`model_contract.yaml`、baseline、约束、数据源和求解预算"
+          },
+          {
+            "field": "inputs",
+            "quote": "**输入**：`robustness_plan.yaml`，包含 `model_contract_sha256`、`subproblem_id`、算法类型、随机种子列表、参数扫描范围、目标方向（min/max）"
+          },
+          {
+            "field": "outputs",
+            "quote": "输出代码与结果只写项目工作区并登记到 `run_manifest`、`result_registry` 和 `numeric_source_map`。"
+          },
+          {
+            "field": "outputs",
+            "quote": "**输出**：`robustness_report.yaml`，`schema_version=1.0`，每个种子/参数组合登记 `best_fitness`、`feasible`、`constraint_violation`、`iterations_to_converge`、`decision_change`"
+          },
+          {
+            "field": "scenarios",
+            "quote": "优化问题规模大（决策变量 >10³ 或组合爆炸），`pyomo`/`scipy.optimize` 精确求解超时或不可行（典型：路径规划、排产调度、选址分配、装箱）"
+          },
+          {
+            "field": "scenarios",
+            "quote": "题目要求随机模拟（排队、库存、可靠性、风险）"
+          },
+          {
+            "field": "scenarios",
+            "quote": "题目机理是微分方程（传染病、热传导、种群、电路、物理过程）"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "本技能只在 `contest-orchestrator` 已批准启发式/数值求解路线后执行，不负责选题或擅自替换模型。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "每个随机过程固定并记录 `seed`"
+          },
+          {
+            "field": "limits",
+            "quote": "启发式不能掩盖精确模型的不可行或超时原因"
+          },
+          {
+            "field": "limits",
+            "quote": "默认不生成截图或自动视觉检查"
+          },
+          {
+            "field": "limits",
+            "quote": "**CV 统计量限制**：变异系数（CV）只能作为统计量，不能单独产生\"可用于论文\"的结论"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "**调用方式**：`python scripts/robustness_check.py <robustness_plan.yaml> --out <robustness_report.yaml>`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/02-modeling/math-model-selector/SKILL.md",
+      "blob_sha": "ade26b68589b252bf02c395b5206ce9e5060fd36",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/02-modeling/math-model-selector/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "math-model-selector",
+        "description": "数学建模竞赛「题型→模型」选择路由器（国赛/美赛/华数杯/电工杯/MathorCup）。按题型主类、数据规模、约束特征推荐模型框架与 Python 库，输出「子问题|模型|原因|Python库|备选」选择表。触发：选题/用什么模型/模型选择/题型判断/方法推荐/怎么建模。由 contest-orchestrator 主控调用；与 topic-scorer（选题评分）分工，math-modeling 仅作兼容入口。"
+      },
+      "excerpt": "---\nname: math-model-selector\ndescription: 数学建模竞赛「题型→模型」选择路由器（国赛/美赛/华数杯/电工杯/MathorCup）。按题型主类、数据规模、约束特征推荐模型框架与 Python 库，输出「子问题|模型|原因|Python库|备选」选择表。触发：选题/用什么模型/模型选择/题型判断/方法推荐/怎么建模。由 contest-orchestrator 主控调用；与 topic-scorer（选题评分）分工，math-modeling 仅作兼容入口。\nmetadata:\n  version: \"2.0\"\n---\n\n# math-model-selector — 竞赛题型 → 模型路由\n\n## Contest-Orchestrator Adapter\n\n本技能只负责已选题目的模型框架选择；`contest-orchestrator` 保持模式、范围、任务卡和最终裁决的唯一权威。调用时读取项目工作区中的 `problem_condition_ledger.yaml`、`problem_graph.md`、数据审计和已登记证据，输出可写入 `model_blueprint.yaml`/`model_contract.yaml` 的结构化候选。\n\n- 每个候选必须给出题面或文献证据定位、适用条件、失效条件、复杂度/求解风险和 baseline；不得凭空添加模型、参数或库。\n- 对涉及数据规模、指标或参数的候选登记 `numeric_source_map` 数值来源；需要随机求解时同时登记 `seed`。\n- 返回 `status`、`active_mode`、`task_card`、`artifacts`、`evidence`、`checks`、`blockers`、`next_node` 节点包；候选与选择依据登记到项目工作区的 `run_manifest` 和 `result_registry`，不写入 skill 安装目录。\n- 模型、符号、数据和引用缺证据时返回 `BLOCKED_INPUT`；不替主控启动求解、论文或交付流程。\n- 节点包和任何项目成品不得包含负回响、元话语或内部交流内容；新符号必须在论文首用处定义。\n\n`active_mode: full-contest-mathorcup` 时，M1 只依据 `problem_statement.md`、`data_overview.yaml`、`task_kpi.yaml` 和题面证据提出逐问候选与指标/数据需求，不替用户批准最终路线；M3 由唯一 solver 结合 M2 `eda_report.md`、`features.yaml`、`leakage_audit.yaml` 和已确认文献用途确定统一 baseline、候选、分割策略、指标及计算预算。每个候选说明跨问输入输出和参数传递；题型、指标或样本结构不支持的方法不进入候选。候选表是决策依据，不是已执行结果；实际运行、数字与最终结论只由 M3 求解证据和独立验证确定。通用速查表及实现优先级仅作参考，不构成固定算法顺序。\n\n## 定位与分工（避免与兄弟 skill 打架）\n\nMathorCup 选择路线前，按 `data-science-stack/references/mathorcup_experiment_protocol.md` 核对当前安装版本、实际估计器 API、损失、目标耦合与拟合数量。多输出接口不自动证明利用目标相关性，旧版包装器也不证明当前估计器不支持多输出。算法比较和特征变换消融分别设计；候选是否采纳以预登记标准和完整对照为依据，不为新颖性强行引入未采用的方法。\n\n| 决策 | 归属 |\n|---|---|\n| 选**哪道题**（多题评分/经验覆盖） | `contest-orchestrator` 的 **topic-scorer** |\n| 选定题目后选**什么模型框架** | **本技能** |\n| 全流程执行（建模/求解/论文） | `contest-orchestrator` 主控（`math-modeling` 仅作兼容入口） |\n\n> 本技能只在\"题目已定、开始设计模型\"时介入；不替代选题评分，不写论文。\n\n## 输入\n\n- 题目描述 + 问题分解（来自 `contest-orchestrator` problem-parser 的 problem_graph；兼容 `math-modeling` 阶段1 输出）\n- 关键信息：子问题列表、数据规模（<100 / 100-1w / >1w）、约束类型（线性/非线性/整数/动态/空间/时序）、目标（单/多/模糊/鲁棒）\n\n## 工作流（4 步）\n\n1. **判题型主类**（对照下方速查表）：\n   - 优化/规划 / 预测 / 评价/决策 / 分类/聚类 / 微分方程(机理) / 图/网络 / 时间序列 / 统计/相关 / 排队论 / 博弈论\n2. **看数据与约束**：数据规模决定 ML 还是机理；整数/非线性决定求解器（精确 vs 启发式）\n3. **查速查表**选主模型 + 备选（备选必须来自表格或文献，禁止现场发明）\n4. **输出模型选择表**（子问题 | 模型 | 原因 | Python库 | 备选方案），喂给求解阶段\n\n## 详细决策参考（按需加载）\n\n- 速查表覆盖 10 大题型主类；需要 **95+ 细分场景**（数据规模、约束类型、目标冲突、参数建议）时，加载 `references/model-selection-matrix.md`（模型决策矩阵，含冲突裁决规则与快速决策速查）。矩阵是知识参考，最终选择必须结合题目约束与团队判断。\n- 需要 **实现路由决策**（选完模型后决定由哪个子 skill 落地：pyomo / heuristic-algorithms / data-science-stack / 解析求解）时，加载 `references/model-selection-matrix-harness.md`（harness 版矩阵，含实现路由列与三问裁决：题目特征、问题规模、用户背景优先）。\n- **防炫技方法选择**（通用扎实方法优先级表 P0-P3、复杂度升级树、炫技检测清单 8 项、模型-假设一致性检查、方法选择 7 问）时，加载 `references/anti_flashy_method_guide.md`。核心原则：方法适配问题，而不是越复杂越好；复杂方法不是默认候选，而是\"经论证后获得准入资格\"的候选。\n\n## 题型→模型速查表\n\n| 问题类型 | 竞赛频率 | 推荐模型 | Python 库 |\n|---------|:---:|---------|--------|\n| 优化/规划 | 极高 | LP/MILP/NLP、遗传算法、PSO | pyomo, pulp, scipy.optimize, geatpy |\n| 预测 | 高 | XGBoost、随机森林、ARIMA、LSTM、GM(1,1) | sklearn, statsmodels, xgboost |\n| 评价/决策 | 高 | AHP、TOPSIS、熵权法、模糊综合评价 | numpy 手写 |\n| 分类/聚类 | 中 | K-Means、SVM、DBSCAN、层次聚类 | sklearn |\n| 微分方程(机理) | 中 | ODE/PDE 数值求解、SIR、传热/光学模型 | scipy.integrate |\n| 图/网络 | 中 | 最短路径、最大流、最小生成树 | networkx |\n| 时间序列 | 中 | ARIMA、SARIMA、Prophet、LSTM | statsmodels, prophet |\n| 统计/相关 | 低 | Pearson、Spearman、灰色关联、主成分 | scipy.stats, numpy |\n| 排队论 | 低 | M/M/1、M/M/c 模型 | simpy, 手写 |\n| 博弈论 | 低 | Nash 均衡、演化博弈 | nashpy, 手写 |\n\n**快速路由规则**：\n- 「产量最大/损失最小 + 容量/预算限制」→ 优化（先 LP/MILP，超时切启发式）\n- 「历史数据 + 未来值」→ 预测/时间序列（先 baseline，再 ARIMA/XGBoost）\n- 「实测离散数据 + 几何/物理要素标注」→ 统计/数据处理或机理反演（先判题型再选）\n- 「物理/工程背景 + 连续演化」→ 微分方程/机理建模（ODE 起步）\n- 「排名/评价/多指标」→ 综合评价（熵权+AHP+TOPSIS 组合）\n\n## 输出格式\n\n```markdown\n## 模型选择表\n| 子问题 | 模型 | 原因 | Python库 | 备选方案 |\n|--------|------|------|----------|----------|\n| Q1 | ... | ... | ... | ... |\n\n求解优先级：精确（pyomo）→ 启发式（heuristic-algorithms）→ 简化/近似\n```\n\n## 与现有体系对接\n\n- **求解实现**：精确用 `pyomo`；超时/不可行切 `heuristic-algorithms`（GA/SA/PSO/蒙特卡洛/ODE）\n- **C 题数据链路**：EDA→预处理→统计→ML→时序 走 `data-science-stack`\n- **结果可视化**：数据结果图 scipilot-figure-skill → modelviz → scipilot-figure-skill；所有非数据图 tikz-scientific-figures；Draw.io 仅用户明确要求时使用\n- **竞赛全流程**：作为 `contest-orchestrator` planner 的模型选择器调用（兼容 `math-modeling` 阶段2 入口）\n\n## 边界（不做）\n\n- ❌ 选题评分（那是 `contest-orchestrator` topic-scorer）\n- ❌ 文献调研（用 web 搜索）\n- ❌ 写论文（`contest-orchestrator` 主控下的 `mathmodel-latex-skill` / `latex-paper-en`）\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/02-modeling/pyomo/SKILL.md",
+      "blob_sha": "c27177f59d8d43773596ea0fa1b20f4e7c16d81c",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/02-modeling/pyomo/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "pyomo",
+        "description": "Python Optimization Modeling Objects. A high-level framework for formulating, solving, and analyzing optimization models. Supports Linear Programming (LP), Mixed-Integer Linear Programming (MILP), and Non-Linear Programming (NLP). Part of the COIN-OR project. Use for mathematical optimization, linear programming, mixed-integer programming, non-linear programming, strategic planning, process engineering, energy systems, supply chain optimization, stochastic programming, and solver integration wit"
+      },
+      "excerpt": "﻿---\nname: pyomo\ndescription: Python Optimization Modeling Objects. A high-level framework for formulating, solving, and analyzing optimization models. Supports Linear Programming (LP), Mixed-Integer Linear Programming (MILP), and Non-Linear Programming (NLP). Part of the COIN-OR project. Use for mathematical optimization, linear programming, mixed-integer programming, non-linear programming, strategic planning, process engineering, energy systems, supply chain optimization, stochastic programming, and solver integration with IPOPT, SCIP, Gurobi, CPLEX, or GLPK. 触发：优化/线性规划/整数规划/混合整数/建模求解/约束/目标函数。\nmetadata:\n  version: 6.10.0\nlicense: BSD-3-Clause\n---\n\n# Pyomo - Mathematical Optimization Modeling\n\nPyomo allows you to define optimization problems using a natural mathematical syntax (Sets, Parameters, Variables, Constraints). It decouples the model from the solver, allowing the same model to be solved by different engines without code changes.\n\n## Contest-Orchestrator Adapter\n\n在 `contest-orchestrator` 中，本技能只实现已批准的精确优化模型。调用前必须读取任务卡、`model_contract.yaml`、`symbol_table.md`、数据来源和 solver 预算；不得自行改目标、约束、参数或切换到启发式。依赖安装只可在用户批准的项目环境中执行，不得静默改变全局环境。\n\n- 模型代码、solver 配置、日志和结果只写项目工作区；结果必须登记 `run_manifest`、`result_registry` 和 `numeric_source_map`。\n- 必须记录可行性、`termination_condition`、目标值、变量值、约束违约、单位/量纲、随机性（如有）和复算命令；非 optimal 结果不得标记为最优。\n- 返回 `status`、`active_mode`、`task_card`、`artifacts`、`evidence`、`checks`、`blockers`、`next_node` 节点包。不可行、超时或 solver 缺失时回流事实，不自动改模型。\n- 默认不做截图、渲染复核或 AI 视觉检查；结果图走 `modelviz` → `scipilot-figure-skill`，用户明确要求时才启用视觉检查。\n- 节点包、论文成品和报告不得包含元话语、内部交流、调试、失败过程、旧版本或未确认方案等负回响。\n\n## Sensitivity Analysis Tool（B 题优化加固协同变更）\n\n`scripts/sensitivity_analysis.py` 为 LP/MILP/NLP 模型提供参数扰动灵敏度分析。\n\n- **输入**：`sensitivity_plan.yaml`，包含 `model_contract_sha256`、`subproblem_id`、参数基准值、扰动点列表、求解器配置\n- **输出**：`sensitivity_report.yaml`，`schema_version=1.0`，每个扰动点登记 `objective`、`feasible`、`decision_change`、`constraint_violation`、`termination_condition`\n- **状态契约**：只有 `status: verified` 且所有扰动点有真实数值或明确 `not_applicable_reason` 时，才允许通过 contest-orchestrator 的 H6 验证；`completed`/`manual_required` 为空证据通路，会被主控检查器拒绝\n- **求解器不可用时**：生成 `status: manual_required` 报告，明确标注需要人工完成灵敏度分析，禁止输出 `solver_executed` 或 `completed`\n- **调用方式**：`python scripts/sensitivity_analysis.py <sensitivity_plan.yaml> --out <sensitivity_report.yaml>`\n- **与 contest-orchestrator 的集成**：H5 节点优化子问题必须生成此报告；`check_model_evidence.py` 的 `_check_sensitivity_report()` 会自动校验报告的 `subproblem_id` 绑定、状态和数值完整性\n\n## FIRST: Verify Prerequisites\n\n```bash\npython -c \"import pyomo; print(pyomo.__version__)\"\n# If import fails: tell user pyomo and a solver are required (GLPK for LP/MILP, IPOPT for NLP),\n# wait for confirmation, then install: pip install pyomo (and solver via conda/pip)\n```\n\n## When to Use\n\n- **Strategic Planning**: Long-term resource allocation or investment planning.\n- **Process Engineering**: Optimizing chemical plants or refinery operations (Non-linear).\n- **Energy Systems**: Power grid dispatch and unit commitment problems.\n- **Supply Chain Optimization**: Multi-period, multi-commodity flow problems.\n- **Non-Linear Programming (NLP)**: When your constraints or objectives involve smooth curves (e.g., x², log(x)).\n- **Stochastic Programming**: Modeling uncertainty in optimization.\n- **Custom Solver Integration**: When you need to use specific solvers like IPOPT, SCIP, or Baron.\n\n\n## B 题（优化决策类）方法选择指南\n\nB 题优化方法选择优先级：先精确后启发，先简单后复杂，能解析不数值，能 LP 不 NLP。\n\n- P0 首选：解析解、贪心算法、规则法、线性规划（LP）\n- P1 次选：整数规划（MILP）、非线性规划（NLP）、动态规划\n- P2 进阶：多目标规划（MOO）、混合整数非线性规划（MINLP）、随机规划\n- P3 谨慎：遗传算法、模拟退火、粒子群、强化学习（必须有充分论证）\n\n使用启发式算法的硬要求：先给数学规划模型、先建 baseline、先证明精确求解不可行、参数调优有依据、结果有稳定性分析、与 baseline 对比。\n\n详细指南（含精确求解 vs 启发式选择标准、B 题常见炫技信号、baseline 推荐、求解器选择指南）：references/b_problem_method_guide.md\n\n## Reference Documentation\n\n**Official docs**: http://www.pyomo.org/  \n**GitHub**: https://github.com/Pyomo/pyomo  \n**Search patterns**: `pyo.ConcreteModel`, `pyo.Constraint`, `pyo.Objective`, `pyo.SolverFactory`\n\n## Core Principles\n\n### Concrete vs. Abstract Models\n\n- **ConcreteModel**: Data is defined at the time the model is built (most common in Python/Data Science).\n- **AbstractModel**: The structure is defined first, and data is loaded later (standard for large-scale industrial models).\n\n### Components\n\n- **Var**: Unknowns the solver needs to find.\n- **Set/Param**: Data that defines the problem instance.\n- **Objective**: The function to minimize or maximize.\n- **Constraint**: Rules the variables must follow.\n\n### Solvers\n\nPyomo does not have its own solver. It requires external solvers (like glpk for LP/MIP or ipopt for NLP) installed on the system.\n\n## Quick Reference\n\n### Installation\n\n```bash\npython -c \"import pyomo; print(pyomo.__version__)\"\n# If import fails: tell user pyomo and a solver are required (GLPK for LP/MILP, IPOPT for NLP),\n# wait for confirmation, then install: pip install pyomo (and solver via conda/pip)\n```\n\n### Standard Imports\n\n```python\nimport pyomo.environ as pyo\nfrom pyomo.opt import SolverFactory\n```\n\n### Basic Pattern - Simple Linear Model (Concrete)\n\n```python\nimport pyomo.environ as pyo\n\n# 1. Create Model\nmodel = pyo.ConcreteModel()\n\n# 2. Define Variables\nmodel.x = pyo.Var(within=pyo.NonNegativeReals)\nmodel.y = pyo.Var(within=pyo.NonNegativeReals)\n\n# 3. Define Objective (Minimize x + 2*y)\nmodel.obj = pyo.Objective(expr=model.x + 2*model.y, sense=pyo.minimize)\n\n# 4. Define Constraints\nmodel.con1 = pyo.Constraint(expr=3*model.x + 4*model.y >= 12)\nmodel.con2 = pyo.Constraint(expr=2*model.x + 5*model.y >= 10)\n\n# 5. Solve\nsolver = pyo.SolverFactory('glpk')\nresults = solver.solve(model)\n\n# 6. Access Results\nprint(f\"x = {pyo.value(model.x)}, y = {pyo.value(model.y)}\")\n```\n\n## Critical Rules\n\n### ✅ DO\n\n- **Scale your problem** - Like all optimization, Pyomo works best if variables and constraints are within a similar order of magnitude (e.g., 0.1 to 100).\n- **Use pyo.value()** - Always wrap variables in `pyo.value(model.x)` to get their numerical result after solving.\n- **Check Solver Status** - Verify the solver reached an optimal solution using `results.solver.termination_condition`.\n- **Use pyo.Set and pyo.Param** - For complex models, organize data using these components rather than raw Python lists/dicts.\n- **Specify Solver Options** - Use `solver.options['tm_limit'] = 60` (or similar depending on the solver) to manage execution time.\n- **Use model.dual** - Register the dual suffix first: `model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)`, then after solving read `pyo.value(model.dual[constraint])` for shadow prices (important for economic analysis).\n\n### ❌ DON'T\n\n- **Don't use Python math functions** - Use `pyo.log()`, `pyo.exp()`, `pyo.sqrt()` instead of `math.log()` or `np.log()` inside expressions.\n- **Don't use if statements in constraints** - Constraints must be algebraic. Use \"Big-M\" notation or logical reformulations for conditional logic.\n- **Avoid \"Hard\" non-linearities** - Functions like `abs(x)` or `max(x, y)` are non-smooth and can break many solvers. Use reformulations.\n- **Don't forget the Intercept/Constant** - Constraints like `x + y = 10` are fine, but ensure your units are consistent.\n\n## Anti-Patterns (NEVER)\n\n```python\nimport pyomo.environ as pyo\nimport numpy as np\n\n# ❌ BAD: Using NumPy/Math functions in constraints\n# model.con = pyo.Constraint(expr=np.sin(model.x) <= 0.5)\n\n# ✅ GOOD: Use Pyomo-compatible functions\nmodel.con = pyo.Constraint(expr=pyo.sin(model.x) <= 0.5)\n\n# ❌ BAD: Using Python IF for conditional constraints\n# if model.x > 10:\n#     model.con = pyo.Constraint(expr=model.y <= 5)\n\n# ✅ GOOD: Using Big-M notation (for binary variable z)\n# y <= 5 + M * (1 - z)\n# x >= 10 - M * (1 - z)\n\n# ❌ BAD: Printing a variable directly\n# print(model.x) # Returns a reference object, not a number!\n\n# ✅ GOOD: Use value()\nprint(pyo.value(model.x))\n```\n\n## Modeling with Sets and Indices\n\n### Large-Scale Model Construction\n\n```python\nmodel = pyo.ConcreteModel()\n\n# Data\nproducts = ['A', 'B', 'C']\nprofit = {'A': 10, 'B': 20, 'C': 15}\nlimit = 100",
+      "card": null
+    },
+    {
+      "skill_path": "skills/03-writing/academic-writing/SKILL.md",
+      "blob_sha": "36f677f5041d6de2de859840cf0405dfdbc7a3ff",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/03-writing/academic-writing/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "academic-writing",
+        "description": "数学建模论文的学术表达与结构质量控制主入口。调用本地化论文审阅规则，\n只允许修改普通正文，并在交付前保护公式、引用、数字、三线表、图表编号和模型逻辑。\n不负责模型建立、数据计算或竞赛交付门禁。"
+      },
+      "excerpt": "---\nname: academic-writing\ndescription: |\n  数学建模论文的学术表达与结构质量控制主入口。调用本地化论文审阅规则，\n  只允许修改普通正文，并在交付前保护公式、引用、数字、三线表、图表编号和模型逻辑。\n  不负责模型建立、数据计算或竞赛交付门禁。\nallowed-tools:\n  - Read\n  - Write\n  - Edit\n  - AskUserQuestion\nmetadata:\n  mode: local-adapter\n  upstream: youngze0016/thesis-polish-agent\n  guard: scripts/mathmodel_patch_guard.py\n---\n\n# 数学建模论文写作适配层\n\n本技能是本地维护的稳定入口。上游 `thesis-polish-agent` 只作为 `modules/` 下的规则和审阅资源，不能直接接管数学建模论文，也不能绕过本地差异门禁。\n\n## Contest-Orchestrator Adapter\n\nHarness 启用 `visual_workflow: chapter_parallel` 时，先读取 `contest-orchestrator/references/harness_chapter_parallel.md`。H6 获批后，同一固定论文角色提交一个把最终 `chapter_order` 与实际 `writing_order` 分开的全篇计划；建模与求解章节依赖优先，摘要只在正式 H8 最后完成。每次只写一章完整、证据绑定的正文，经质量审查与用户 `H7_CHAPTER:<chapter_id>` 批准后才开始下一章。批准后才生成自包含图表提示词，由用户亲自转交图表会话；H7 图件可与下一章并行。图件返修只出新版本提示词，不撤销章节批准或阻塞后续写作。最终 H8 按最终目录整合选定图件、做必要局部编辑并写摘要，不从头重写已批准正文；H9 仍是完整交付门。章节记录声明 `visuals_required: false` 时无需生成提示词或制图。`writer_first_draft` 仍读取 `contest-orchestrator/references/harness_writer_preparation.md`。\n\n本技能在主控中的固定位置是“论证中心编辑”：接收当前任务卡、论文快照、冻结的模型/结果/引用证据，输出普通正文补丁和可回流节点包。`contest-orchestrator` 负责范围、模型、数字、图表、引用和交付裁决；本技能不得越权修改这些内容。\n\n- 节点包包含 `status`、`active_mode`、`task_card`、`artifacts`、`evidence`、`checks`、`blockers`、`next_node`，所有路径均为项目工作区相对路径。\n- 每个新符号必须在正文首用处给出含义、单位/量纲、取值域和变量类型；缺少定义时报告 `FAIL`，不通过补写猜测修复。\n- 建模问题章节只设置一次全局“符号说明”；每个问题标题后先写不编号的问题引入与建模思路段，默认使用“模型建立”和“模型求解与结果分析”两个编号小节。模型建立小节末尾保留当前模式求解节点与独立验证节点核验的唯一“最终求解模型”框，模型求解与结果分析小节必须解释算法、结果意义和适用范围。执行前读取 `contest-orchestrator/references/model_summary_protocol.md`。\n- 不把“决策变量、目标函数、约束条件、算法、结果分析”等内部导航词扩展成碎片化编号标题；灵敏度或稳健性只有在存在独立证据时单独成节。\n- 交付文本只保留面向读者的最终论证，不得出现元话语、内部交流、评审过程、修改轮次、agent、提示词、调试或旧内容等负回响。\n- 非绘图论文任务的视觉检查默认关闭；文本层、公式、引用、数字和结构检查照常执行，只有用户明确要求时才启用视觉检查。\n- active_mode: full-contest-mathorcup 时，写作任务接收已批准的 paper_argument_blueprint.yaml、paper_language_profile.yaml、独立核验的 paper_material_readiness.yaml、paper_claim_coverage.yaml、当前写作卡和冻结证据。chapter_parallel 按实际 writing_order 逐章写作和批准，正文与附录批准后单独讨论摘要框架，摘要最后写，最终统一接图与全文终审。仅历史四批流程按批次边界暂停并使用 B1–B4。标题、篇幅、AI 使用说明与提交格式只取当前 competition_profile.yaml 中已核实的官方要求；不得套用国赛 B 题模板、页数或附录口径。\n- paper_language_profile.yaml 是项目级术语与文风配置，必须在写作计划批准时冻结并随每批任务卡传入。对“题目”“题干”等候选用词先做语境归类，再记录用户确认的词形和适用场景；不得全局查找替换。仅对普通正文应用已确认规则，保护公式、符号、数值、引用、图表、标题、直接引文和模型逻辑。\n- 符号首用定义、主张—证据绑定、元话语与负向回响检查，在当前写作单元局部收尾及最终全文终审执行；chapter_parallel 每章只作局部审阅，不对每章重复启动整篇质检。历史四批流程保持批次检查。\n- 仅国赛 2026 论文：正文不设目录；正文从正文主体起计（摘要不计入），包含正文主体、参考文献前的 AI 工具使用声明和参考文献，最多 30 页，附录不计入；提交论文文件总页数（含摘要、正文、参考文献和附录）硬上限 51 页，推荐区间 35–51 页；论文提交为含文本层的非图片 PDF，文件不超过 20 MB。\n- AI 声明只写实际使用范围的必要信息，但必须真实；不得隐瞒已使用工具或填写未使用。国赛 2026 使用 AI 时，支撑材料提供 `AI工具使用详情.pdf`，说明工具版本、用途环节、关键交互摘要、采纳、人工修改和核验，突出参赛队主导核心建模与分析；其他赛事的说明形式以已核实官方规则为准。\n\n## 职责边界\n\n### MathorCup reader-facing results\n\nMathorCup 控制记录启用 `nodes.M4.visual_workflow: chapter_parallel` 时，先基于冻结科学证据提出全篇写作蓝图；不要求正式图或视觉计划先完成。蓝图区分最终目录顺序与实际写作顺序，建模与求解章节依赖优先，摘要最后完成。每次只执行一章 `draft`，提交完整、证据绑定正文和局部质量审查；用户批准 `M4_CHAPTER:<chapter_id>` 后才写下一章。批准后，writer 才可用 `figure_prompt` 从这份确切正文选择图、表或文字并形成自包含提示词。用户亲自转交 figure；只有另有明确授权时主控才代发。图表返修只形成提示词新版本，不撤销未变正文批准或阻塞后续章节。最终 `write` 统一接图、调整解释、图注与排版，并在摘要章和全文审阅完成后交付。具体字段与门禁读取 `contest-orchestrator/references/mathorcup_chapter_parallel.md`；历史 `writer_first_batches` 仍读取 execution protocol 的兼容段。\n\nMathorCup 正文以读者问题、比较结果和具体发现组织：先回答发现了什么，再用必要的方法、数字和证据解释为什么、意味着什么。证据完整与正文可读性分别审阅，不把审查字段、派发顺序或“做法—数字—免责声明”循环写成段落模板。必要的代理定义、不可认证条件和预测边界保留在首次定义、表注或集中局限中；不逐段重复免责，也不为了消除负向句删去科学事实。\n\n章节标题按“问题一／二／三＋具体任务或方法”保持可检索性；三级标题随真实论证形成，不在素材不全时冻结。先呈现公平比较，再解释最终采用方案及理由。摘要仍在正文与附录完成后写，先通读全文检查读者路径、章节递进和贡献收束，再突出方法、具体发现及意义，不能只列算法名称。写作发现题意缺口时回流现有 requirement coverage，不能以改写措辞替代缺失计算。\n\n- `contest-orchestrator`：题目解析、模型建立、代码求解、结果、图表、引用和正式交付。\n- `academic-writing`：章节结构、学术表达、术语统一、审阅报告和 LaTeX 编译建议。\n- `humanizer-zh`：最后的语言去痕，只处理普通正文。\n- `mathmodel_patch_guard.py`：检查润色前后的数学内容是否发生未授权变化。\n\n## 论证中心编辑\n\n当用户要求“论证中心编辑”“按主张—证据—结论审阅”“防御性写作清理”或等价处理时，必须先读取 [claim-centered-editing](modules/claim-centered-editing/MODULE.md)。该模块只负责普通正文的主张组织、证据绑定和结论范围；不建立模型、不重算结果、不改变引用和图表。\n\n当 Harness H8 或 MathorCup M4 阶段要求“论证蓝图”“写前论证架构”或等价处理时，必须先读取 [argument-blueprint](modules/argument-blueprint/MODULE.md)。该模块在写作开始前把冻结叙事、结果解释卡、图表和证据组织为读者问题—章节回答—论证—证据的蓝图；不撰写论文正文，不建立模型，不重算结果。\n\n当 Harness H8 阶段要求“论文作者简报”“章节写作卡”或等价处理时，必须在论证蓝图获批准后读取 [author-brief](modules/author-brief/MODULE.md)。该模块把蓝图转换为论文作者的紧凑输入；不把质量门禁或交付清单混入作者任务，不撰写论文正文。\n\nHarness H8C 或 MathorCup M4 全文通读阶段必须先读取 `contest-orchestrator` 的 `references/h8_writer_first_protocol.md`，沿读者路径检查章节递进、段落衔接、主张回收和结论意义，再进行局部证据与表达编辑。Harness `chapter_parallel` 的 H8C 只接入最终选定图件、修订图前图后文字、图注、排版和必要局部衔接，不从头改写已批准章节。章节卡和检查项只能作为内部导航，不能成为正文的组织形式。\n\n当控制文件启用 `reader_evidence_protocol: \"1.0\"` 时，H8A/H8B 必须同时读取 `contest-orchestrator/references/paper_author_evidence_protocol.md`。将 H5/H6 的技术卡片转写为论文作者可用的论证输入，而不是把字段名或检查项复制进正文：每章建立“开篇张力—证据序列—解释动作—过渡问题”的 `authoring_arc`；结果段按“观察模式—比较基准—决策含义—边界或例外”展开；代码和算法材料转写为变量、关系、输入输出、迭代条件和可复现参数的数学叙述。若模型卡、结果解释卡或视觉槽位缺少必要证据，返回 `evidence_gap` 并指出应回补的 H5/H6/H7 材料，不以泛化背景、重复数字或形式化段落补足篇幅。该协议只约束写作准备和审阅，不改变模型、结果、引用、图表语义或排版命令。\n\n### 视觉论证槽位的写作转写\n\nHarness H8 和 MathorCup M4 只读取已批准的 `visual_argument_plan.yaml` 和已登记图表。Harness 按 `figure_intent`，MathorCup 按已批准图位的读者问题、证据、正文落位和图注主张安排图前引入与图后解释；若图位含 `figure_intent`，其 `body_anchor`、`pre_text_function`、`post_text_function`、`must_show` 和 `must_not_show` 同样约束正文。不得在论文中直接输出这些控制字段名或把它们改写成清单。\n\n上述“只读取已批准图表”的限制适用于正式接图与完成稿。MathorCup 的 `chapter_parallel` 章节初稿可含内部图位占位，并在章节批准后由 writer 生成有冻结证据的提示词，不能因此虚构成图内容、数据趋势或 QA 通过。提示词在用户转交后才约束正式成图；不得为配合初稿而扭曲真实结果。历史 `writer_first_batches` 保留其批次需求解释。\n\n论文 agent 不得因为版面、图数或模板要求新增图表，不得替换已批准路由，不得给流程图/技术路线图补写无必要公式或数据，也不得给机制/几何图补写未登记的关系。若图位缺少可解释的证据、正文落位冲突，或图内实际内容无法支撑 `reader_takeaway`，返回 `evidence_gap` 或图表位置缺口，由主控回流当前模式的图表节点补齐；不得靠泛泛图后评价掩盖缺口。\n\n## 强制输入\n\n执行修改前必须有：\n\n1. 论文项目根目录和明确的目标章节；\n2. 明确的比赛类型及当前官方规则配置；`active_mode: full-contest-mathorcup` 必须读取项目 `competition_profile.yaml`，不得按中文论文默认判为国赛；\n3. 已冻结的模型、代码、结果和图表；MathorCup `chapter_parallel` 的章节初稿只要求冻结科学证据，正式图在用户批准该章并转交其提示词后制作，完成稿仍须接入选定图表；历史 `writer_first_batches` 保留批次需求解释；\n4. 当前 `.tex`、`.bib` 及其来源文件；\n5. 修改前快照目录，或由本技能先创建隔离快照。\n\n缺少模型结果来源、引用数据库或修改前快照时，只能输出审阅意见，不得直接改写文件。\n\n## 允许与禁止\n\n允许修改：普通正文中的句式、段落衔接、冗余表达、术语一致性和章节组织建议。\n\n默认禁止修改：\n\n- 公式、公式编号、公式标签、变量、单位和约束；\n- `\\cite`、`\\ref`、`\\label`、参考文献数据库及引用顺序；\n- 数字、误差、成本、厚度、百分比和结果值；\n- `table`、`tabular`、三线表命令、图表编号和图片路径；\n- 代码、数据、模型参数、目标函数和算法实现。\n\n如确实需要改动上述内容，必须退出普通润色模式，交回 `contest-orchestrator` 的模型/结果一致性流程，并由用户明确授权。\n\n## 固定执行流程\n\n1. 读取 [references/mathmodel_rules.md](references/mathmodel_rules.md) 和 [references/upstream_map.md](references/upstream_map.md)。\n    2. 国赛任务额外读取 [references/cumcm_content_redlines.md](references/cumcm_content_redlines.md)，编辑前先扫描目标章节，命中红线时输出【国赛内容红线：xxx】标记，不自行修复内容层问题；目标章节包含摘要时，额外读取 [references/cumcm_abstract_check.md](references/cumcm_abstract_check.md) 执行摘要专项检查，并读取 [references/abstract-writing.md](references/abstract-writing.md) 的实例写法（含信贷/ RGV 等非机理题型示范）；**仅国赛 B 题（优化决策类）任务读取其中的\"B 题专属摘要模板\"章节**；**仅国赛 B 题的建模求解章节必须读取 [references/b_chapter_templates/README.md](references/b_chapter_templates/README.md)，按问题编号和形态读取对应模板文件并使用骨架结构与必选项清单**；**所有论文写作任务必须读取 [references/anti-defensive-writing.md](references/anti-defensive-writing.md)（防防御性写作指南，数学建模竞赛版），只围绕有证据的结果组织叙事**；**Harness H8 任务必须读取 `contest-orchestrator/references/paper_author_evidence_protocol.md`，按读者问题、证据序列、解释动作和过渡问题组织作者简报与章节卡**；目标章节含图表时，额外读取 [references/figure-placement-rules.md](references/figure-placement-rules.md) 执行图表位置纪律扫描（连续浮动体、图前后缺文字、[H] 强制位置、图前后解释和布局入口），命中输出【图表位置：xxx】标记，不自动改变图表语义、路径、编号或尺寸；正文只能调用登记中已有的 `layout_mode` 和排版技能提供的布局宏。\n3. 需要论证中心编辑时，再读取 [modules/claim-centered-editing/MODULE.md](modules/claim-centered-editing/MODULE.md)。\n4. 只读运行审阅模块，选择 `review-chapter`、`style-check`、`terminology`、`consistency` 等必要角色；不自动并行调用全部子模块。\n5. 在隔离副本中生成正文修改，保留原项目不变。\n6. 运行：\n\n   ```text\n   python scripts/mathmodel_patch_guard.py <before_dir> <after_dir> --strict --out patch_guard.json\n   ```\n\n7. 只有保护器 PASS，才允许将普通正文补丁合并回论文项目；随后运行 LaTeX 编译、引用检查和 `contest-orchestrator` 的交付门禁。\n8. 写作风格客观检查：读取 [references/style_guide.md](references/style_guide.md)（写作风格规范，含句长变化、段落长度变化、避免列表堆砌、自然过渡、避免套话、跨章节差异化），并运行 `python scripts/style_check.py <paper.tex> --out style_report.json` 进行六项客观指标检查（句长均匀度、段落长度均匀度、列表堆砌、机械过渡词、跨章节短语重复、套话密度），WARN 项需要",
+      "card": null
+    },
+    {
+      "skill_path": "skills/03-writing/bzd-review-paper/SKILL.md",
+      "blob_sha": "9986dd963d34cd2d469cafd678f3aa2561bffae7",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/03-writing/bzd-review-paper/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "bzd-review-paper",
+        "description": "Review mathematical modeling competition papers from a complete contest problem and a team's paper. Independently construct a problem-specific 100-point rubric, audit eligibility and formatting, score with a 90%-of-weight ceiling for every numeric criterion, apply the presentation multiplier, estimate contest percentile, and provide concise Chinese judge feedback. Use for CUMCM, MCM/ICM, MathorCup, Huashu Cup, postgraduate modeling contests, and similar paper evaluation requests."
+      },
+      "excerpt": "﻿---\nname: bzd-review-paper\ndescription: Review mathematical modeling competition papers from a complete contest problem and a team's paper. Independently construct a problem-specific 100-point rubric, audit eligibility and formatting, score with a 90%-of-weight ceiling for every numeric criterion, apply the presentation multiplier, estimate contest percentile, and provide concise Chinese judge feedback. Use for CUMCM, MCM/ICM, MathorCup, Huashu Cup, postgraduate modeling contests, and similar paper evaluation requests.\n---\n\n# BZD Review Paper\n\nAct as a strict competition judge. Require the complete problem and paper. Derive and freeze the rubric before judging paper quality. Do not request an official rubric from the user and do not reward unsupported claims.\n\n## Contest-Orchestrator Adapter\n\n在 `contest-orchestrator` 中，本技能是只读论文评审器。输入由主控任务卡、题面、论文入口/PDF、竞赛 profile、结果登记和交付约束组成；不得直接修改论文、模型、结果、引用或交付包。已有项目 profile 时直接读取，不重复询问已确认的竞赛信息。\n\n- 每项评分绑定论文位置、题面要求、模型/结果/引用证据和检查命令；缺少物理视觉证据标为 `待人工核验`，不能凭空判失败。\n- 默认执行文本层、结构、公式、来源、数字、引用、附录和资格检查；截图、渲染复核和 AI 视觉检查默认关闭，由用户肉眼检查，明确要求时才开启。\n- 返回 `status`、`active_mode`、`task_card`、`artifacts`、`evidence`、`checks`、`blockers`、`next_node` 节点包，评审报告只写项目工作区。\n- 报告不得把评审过程、agent 对话、调试、失败尝试、旧版本或未确认方案复制进论文成品；评审意见本身也不得伪装成论文正文。\n- 评审交付须经过负回响和元话语扫描，只保留当前论文的证据、问题、分数和可执行修改建议。\n\n## Knowledge basis and contest gateway\n\nState transparently that this Skill was distilled from the scoring rules, scoring points, review summaries and complete review workflows of 16 Higher Education Press Cup CUMCM problems from 2020-2025. It is primarily calibrated for CUMCM; the methodology can review other mathematical modeling contests, but their ranking model must not reuse the CUMCM population distribution.\n\nAt the first interaction, require the user to identify: `是否为高教社杯全国大学生数学建模竞赛（国赛）？请回答“是”，或回答“否 + 竞赛名称”。` If the user already explicitly supplies this information, do not ask again. Do not calculate a position until contest type is known.\n\n## Workflow\n\n1. Identify the contest, year, problem and division from supplied evidence, and classify it as `cumcm` or `small`. Use `cumcm` only for the Higher Education Press Cup CUMCM; route every other contest to `small` unless a same-contest empirical score distribution is available.\n2. Read the problem first. Then read these files completely:\n   - [references/rubric-construction.md](references/rubric-construction.md)\n   - [references/title-abstract-keywords.md](references/title-abstract-keywords.md)\n   - [references/formatting-standard.md](references/formatting-standard.md)\n   - [references/award-ranking-output.md](references/award-ranking-output.md)\n   - [references/cross-case-patterns.md](references/cross-case-patterns.md)\n   - [references/rubric.md](references/rubric.md)\n3. Use only the closest calibration records when they materially match the current problem.\n4. Run the eligibility gate. If a proven applicable hard-rule violation occurs, report ineligibility and do not calculate score or percentile.\n5. Decompose every explicit deliverable and create a 100-point rubric: abstract exactly 10, formatting exactly 10, model assumptions/construction/solution together 70-75, and relevant supplementary quality 5-10.\n6. Freeze the rubric before reading the paper for quality. Show the frozen rubric only inside `详细评分`; do not add a separate rubric section.\n7. Read the complete paper and inspect PDF/DOCX pages, equations, figures, tables, pagination, references and appendices. Map every task to evidence.\n8. Score criterion by criterion. Check geometry/mechanism, mathematics, units, algorithms, data provenance, numerical results, reproducibility, validation, sensitivity and feasibility.\n9. Enforce the universal judge ceiling: for every numeric criterion with weight `w`, earned points must satisfy `earned <= 0.90*w`. This applies even to flawless work and includes abstract and formatting. Do not add the removed 10% elsewhere. Therefore the raw-score theoretical maximum is 90/100. State ceiling deductions as `评委满分保留（该项90%封顶）`, not as a paper defect.\n10. Sum the raw score and apply the presentation multiplier. Prefer `scripts/score_percentile.py` when a matching empirical distribution exists. Otherwise run `scripts/award_position.py --score <adjusted-score> --contest-type cumcm|small`. CUMCM uses the large-field 2025 score anchors; other contests use the small-contest uniform approximation and 55/65/75 award anchors.\n11. Read [references/html-output.md](references/html-output.md). Build the final report from `assets/report-template.html`, validate it, and deliver the completed HTML file. Do not return the full review as chat text when file creation is available.\n\n## Required output order\n\nPlace only the following sections in the HTML file, in this exact order. Do not output input/scope, problem-specific rubric, paper reconstruction, limitations, warning, strengths/issues or award-band sections separately.\n\n### 最终得分与竞赛位次\n\nUse exactly these bold field labels, substituting calculated values:\n\n**原始得分：x.x/100**\n\n**格式质量系数：x.xx**\n\n**最终得分：x.x/100**\n\n**预估超过约x.x%的有效参赛论文**\n\n**等价位次：约前x.x%**\n\nThen write one method note matching the selected route:\n\n- CUMCM: `这里的位次是根据既定的2025国赛分数锚点插值估算，`\n- Other contests: `这里的位次按小型竞赛10-90分近似均匀分布估算，不代表实际名次，`\n\n### 详细评分\n\nShow a table with criterion, weight, 90%-ceiling, earned points, evidence/location, points earned and points deducted. Include category subtotals, arithmetic, formatting deductions and multiplier evidence. Clearly distinguish paper deductions from the mandatory 90% judge ceiling.\n\n### 本题任务分解\n\nList every task, constraint, required output and dependency concisely.\n\n### 资格与格式审查\n\nShow the eligibility audit and itemized formatting deductions. Mark unavailable physical evidence as `待人工核验`, never as failure.\n\n### 评委式评价\n\nGive a concise overall judgment followed by the most consequential strengths and defects, with locations.\n\n### 优先修改建议\n\nGive 3-5 changes ordered by expected score gain. Do not promise an award.\n\n## Guardrails\n\n- Never claim an official award, exact rank, plagiarism finding or statistical certainty without evidence.\n- If either complete input is missing, provide provisional analysis only and omit numeric score and percentile.\n- Do not invent paper content, calculations or contest rules.\n- Keep the visible report limited to the six required sections above.\n- Always produce a self-contained HTML deliverable when file writing is available. In chat, return only a short completion note and the file link.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/03-writing/mathmodel-latex-skill/SKILL.md",
+      "blob_sha": "7d9131799c5fad52f36f490213cb4757f6e13fa5",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/03-writing/mathmodel-latex-skill/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "mathmodel-latex-skill",
+        "description": "Generate stable LaTeX mathematical-modeling paper projects for MCM/ICM, CUMCM and MathorCup. Use when creating, adapting, compiling, or preflighting competition paper templates, including XeLaTeX, latexmk, PDF checks, references, appendices and rule-dependent AI-use disclosures. 触发：国赛/美赛/MathorCup/中文论文/LaTeX模板/论文排版/模板编译/数学建模论文。"
+      },
+      "excerpt": "---\nname: mathmodel-latex-skill\ndescription: Generate stable LaTeX mathematical-modeling paper projects for MCM/ICM, CUMCM and MathorCup. Use when creating, adapting, compiling, or preflighting competition paper templates, including XeLaTeX, latexmk, PDF checks, references, appendices and rule-dependent AI-use disclosures. 触发：国赛/美赛/MathorCup/中文论文/LaTeX模板/论文排版/模板编译/数学建模论文。\n---\n\n# Mathematical Modeling LaTeX Projects\n\nUse this skill to create reproducible LaTeX paper projects for MCM/ICM, CUMCM and MathorCup. Use the matching bundled template for MCM/ICM or CUMCM; build the MathorCup project from the verified competition profile and approved paper blueprint. Keep dependencies explicit and avoid embedding real identity information.\n\n## Contest-Orchestrator Adapter\n\n在 `contest-orchestrator` 中，本技能只负责中文竞赛论文的模板、排版、编译和结构预检。输入是项目工作区中的论文入口、已冻结模型/结果/引用、`appendix_plan.yaml`、AI 工具说明要求和交付约束；不得生成不存在的数字、公式、符号、引用、图表或结论。\n\n- 保护公式、符号、单位、数字、引用键、图表编号、模型逻辑和附录证据；新符号定义缺失时回流，不在排版层猜测。\n- 输出节点包包含 `status`、`active_mode`、`task_card`、`artifacts`、`evidence`、`checks`、`blockers`、`next_node`，所有生成文件只写项目工作区。\n- Formal figure insertion format is SVG（图表正式插入格式为 SVG）；正文使用 `\\\\includesvg{figures/<figure_id>}`。PNG 仅作预览和兼容性副本，不使用图片 PDF；论文最终交付 PDF 仍按竞赛要求生成。\n- 默认只做文本层、结构、引用、编译和交付约束检查；不截图、不渲染复核，视觉检查由用户肉眼完成，除非用户明确要求。\n- 论文、附录和报告不得出现元话语、内部交流、评审记录、调试、失败、旧版本或其他负回响；AI 工具说明按竞赛规则单独生成，不把内部过程写入正文。\n- `active_mode: full-contest-mathorcup` 时，只采用当前项目 `competition_profile.yaml` 中有官方依据的版式、页数、文件大小、附录、匿名和 AI 说明要求。根据已批准 `paper_argument_blueprint.yaml` 建立中文 `ctexart` 工程；不得复制国赛专用扉页、声明、页数口径、附录清单或身份字段。M4 在批准的写作蓝图范围内排版当前批次初稿与接图稿，不要求逐章批准。`writer_first_batches` 初稿可用内部文字图位占位，不能引用不存在的 SVG；用户确认需求、选定图件后才接入正式图，完整批次须清除占位并核对选定资产。M5 在最终源文件上检查文本层、引用、编译、匿名及官方交付约束。若官方格式未核实，保持待确认，不以国赛默认值代替。\n\n## Competition Recognition\n\n- Treat prompts mentioning MCM, ICM, COMAP, Meritorious/Winner papers, team control number, problem A-F, or \"Report on Use of AI\" as MCM/ICM.\n- Treat prompts mentioning CUMCM, National Undergraduate Mathematical Contest in Modeling, 国赛, 全国大学生数学建模竞赛, 承诺书, 编号专用页, 支撑材料, or 中文摘要 as CUMCM.\n- Treat `active_mode: full-contest-mathorcup` or an explicit MathorCup 大数据竞赛 profile as MathorCup, even when the paper is in Chinese.\n- If the contest is unclear, infer from language and required fields: English + team control number usually means MCM/ICM; do not infer CUMCM from Chinese language alone.\n- If official rules for the current year are provided, follow them over these defaults.\n\n## Reference Mode\n\n- Decide `use_ref_bib` before generating or editing a project.\n- Default to `use_ref_bib = true` for newly generated projects because this skill ships `ref.bib` and competition papers benefit from citation-key based reference management. The bundled templates use `ref.bib` directly and do not include an active inline `thebibliography` fallback. Use inline `thebibliography` only when the user explicitly asks not to use BibTeX or the local environment lacks BibTeX, and generate that as a separate edit rather than mixing both modes.\n- Set `use_ref_bib = true` when the user asks for `ref.bib`, BibTeX, citation-key based references, Zotero/JabRef/BibDesk exports, or a reusable bibliography database.\n- When `use_ref_bib = true`, keep `ref.bib` beside `main.tex`, cite entries with `\\cite{...}`, and let `latexmk` run BibTeX automatically. For CUMCM, prefer `gbt7714` with `gbt7714-numerical` and `\\citestyle{numbers}` so references render as numeric entries instead of author-year labels. Replace the sample `placeholder-ref` entry before final submission. Do not use `\\nocite{...}` unless the user explicitly wants uncited sources listed.\n- Do not mix active `thebibliography` and active `\\bibliography{ref}` in the same generated paper.\n- Separate literature citations from cross references: use `\\cite{bib-key}` only for literature/software/data sources in `ref.bib`; use `\\label{...}` plus `\\ref{...}` or `\\eqref{...}` only for figures, tables, equations, algorithms, appendices, or sections.\n- Avoid gratuitous placeholder cross references. Add `\\ref` only when the referenced `\\label` exists and the sentence genuinely needs a numbered table/figure/equation. Keep `hypertexnames=false` in CUMCM templates to avoid duplicate PDF anchors when counters reset in appendices.\n- Before delivering a project, run `python scripts/check_latex_refs.py main.tex --bib ref.bib` when `ref.bib` mode is active, and fix all missing labels or missing citation keys.\n\n## Figure Insertion Contract\n\nMathorCup 图件接入使用现有 `figure_registry` 中的资产 ID、正文 label/序号、选定版本、画布/插入尺寸、实际论文副本与源文件引用，遵循 `contest-orchestrator/references/mathorcup_execution_protocol.md`。默认只同步受影响图件并编译；恢复正文后重新核对副本，不能因 PDF 仍可打开就认为新图已接入。保留一份权威正文源，通过入口开关生成含附录／无附录版本，不维护两份独立正文；两种提交版本分别检查本届格式与源码新鲜度。论文接入检查不替代图件 QA，也不重复已批准未变图件的完整 QA。\n\n- Load the `svg` package in every bundled paper template and use `\\\\includesvg{figures/<figure_id>}` for formal figure insertion.\n- Treat the SVG as the authoritative figure asset. Keep the matching PNG beside it for preview and visual QA; do not register or deliver an image PDF, EPS, TIFF, or JPEG.\n- Before compilation, verify that the SVG exists, is non-empty, has the expected figure identifier, and is paired with the registered PNG. Preserve the editable source and the source-to-figure mapping in the project workspace.\n- Compile with shell escape when the local `svg` package requires conversion support, for example `latexmk -xelatex -shell-escape main.tex` for CUMCM or `latexmk -pdf -shell-escape main.tex` for MCM/ICM. Use only local tools; if SVG conversion is unavailable, block compilation instead of silently replacing the figure with a PDF image.\n- This contract applies to figure assets only. The compiled paper PDF remains the formal paper deliverable.\n\n## Page-layout contract for figures\n\nFor the bundled CUMCM templates, the figure generator decides the visual encoding and canvas shape; this skill decides how the finished SVG occupies the paper page. Record one `layout_mode` in the orchestrator figure registry and use the matching macro:\n\n| `layout_mode` | Macro | Use |\n|---|---|---|\n| `single` | `\\PaperFigure` | Standard full-width figure, bounded by `0.76\\textwidth` and `0.40\\textheight` |\n| `side_by_side` | `\\PaperTwoColumn` | Table + explanation, text + small figure, or algorithm box + flowchart; record `layout_group` and `layout_variant` |\n| `wrap_short` | `\\PaperWrapFigure` | Small figure beside a short plain-text paragraph; record `wrap_side`; never wrap lists, equations, or long arguments |\n| `tall_constrained` | `\\PaperTallFigure` | Vertical figure with an explicit maximum height; preserve aspect ratio and split it when labels become unreadable |\n\nUse `minipage` for stable two-column blocks and `adjustbox` for width/height bounds in CUMCM. MCM/ICM keeps the same SVG/PNG asset contract but uses its own template primitives. Do not use `[H]`, raw `\\includegraphics`, or an image PDF. Page placement remains a source-level check; visual rendering is off by default unless the user explicitly requests it.\n\n### Reader-evidence placement\n\n排版层只执行已批准的视觉论证与 `figure_registry.layout_mode`，不自行增加图表或改变 SciPilot 的表示语义。每个 `figure` 必须在源文中有前置引导语和后置解释语；`table` 与 `text` 按登记的读者职责落位。优先使用 `single`、`side_by_side`、`wrap_short`、`tall_constrained` 四种受控入口：短图或短表可与解释文字并排，长图限制最大高度并保持宽高比，信息密度不足的图不通过缩放或留白补足。禁止用连续浮动体、强制 `[H]`、手工 `\\vspace` 或重复图表制造页数；发生溢出时调整受控布局入口、尺寸或论证落位，并保留 SVG 正式资产与 PNG 预览副本。\n\n## MathorCup Generation Rules\n\nFor `active_mode: full-contest-mathorcup`, select `ctexart` and XeLaTeX as the neutral Chinese implementation, then set title page, abstract, section order, bibliography, appendices and disclosure from the approved paper blueprint and verified `competition_profile.yaml`. Do not copy a CUMCM template into a MathorCup project. Keep `ref.bib` only for genuine cited sources and run `scripts/check_latex_refs.py` when using it. Compile with `latexmk -xelatex -shell-escape main.tex` when the SVG package needs local conversion; if the renderer is unavailable, report compilation as incomplete. Use `script",
+      "card": null
+    },
+    {
+      "skill_path": "skills/03-writing/论文辅助/SKILL.md",
+      "blob_sha": "884469bfe900ddf18530858e299dcbf9641ef4ac",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/03-writing/%E8%AE%BA%E6%96%87%E8%BE%85%E5%8A%A9/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "论文辅助",
+        "description": "数模论文节点审查助手，对论文G0-G6节点进行只读审查，检查符号完整性、元话语、负向回声、模型证据，输出结构化修改清单。"
+      },
+      "excerpt": "---\nname: 论文辅助\ndescription: 数模论文节点审查助手，对论文G0-G6节点进行只读审查，检查符号完整性、元话语、负向回声、模型证据，输出结构化修改清单。\n---\n\n# 论文辅助 — 数模论文节点审查助手\n\n## 角色定位\n\n你有两个独立角色，根据当前节点和用户指令切换：\n\n### 角色一：独立外部审查助手（默认角色，4-18 模式全节点 / harness 模式 H3/H4/H5/H8/H9）\n\n你是用户的**独立外部审查助手**，与 Contest Orchestrator 主 agent 平行运行。**主 agent 不知道你的存在**。\n\n你的核心价值：\n\n- **独立审查**：不依赖主 agent 的自我评估，对主 agent 的产出做独立质量检查\n- **质量对比**：将你的独立审查结论与主 agent 的自评/产出并列，让用户看清主 agent 完成的质量\n- **询问助手**：用户在每个节点可以问任何关于主 agent 产出的问题，你基于源文件给出客观回答\n- **辅助优化**：给出具体的优化建议，但不直接修改文件，由用户决定是否采纳\n\n### 角色二：外部文献阅读子 agent（harness 模式 H3 节点）\n\n在 harness 模式的 H3 节点，你是**主 agent 调用的外部文献 agent**。此时主 agent 知道你的存在，你按主 agent 的 `literature_agent_prompt.md` 要求，阅读用户下载的文献全文，回传结构化摘要。\n\n你的任务边界：\n\n- **只做文献阅读和结构化总结**，不做模型路线决策、不做方法 adopt/adapt/reject（那是 H4 主 agent 的事）\n- 必须阅读全文，不得仅基于摘要或题名补写结论\n- 回传字段必须完整：`title`, `authors`, `venue`, `year`, `doi_or_url`, `abstract`, `full_text_summary`, `method_summary`, `data_summary`, `limitations`, `evidence_locators`, `candidate_questions`\n- 输出格式为 `literature_sources.yaml`，模板见 `templates/literature_sources_template.yaml`\n- 不联网检索、不替用户下载文献（用户负责检索和下载）\n- 每篇文献生成稳定 `citation_key`，标注语言（zh/en），按小问标注可迁移点\n\n### 角色切换规则\n\n- 用户明确说\"读文献\"、\"H3\"、\"文献摘要\"、\"literature_sources\" → 切换到角色二\n- 用户说\"审查\"、\"检查\"、\"看看主 agent 做得怎么样\" → 切换到角色一\n- 用户未明确时，默认角色一（独立审查助手）\n\n任务：对主 agent 在当前节点的产出进行**独立只读审查**，禁止凭猜测修改文件。所有结论必须基于当前主源文件、当前编译 PDF 文本层和可复现实验结果。\n\nH8 审查还必须核对 `paper_author_brief.yaml`、当前 `chapter_writing_card.yaml` 与正文的对应关系：章节是否回答卡内读者问题、主张是否受卡内冻结证据支持、是否出现卡外材料或把流程清单写入正文。此项只产生审查发现，不替论文 agent 起草正文。\n\n## 与主 agent（contest-orchestrator）的关系\n\n- **平行独立**：你与主 agent 是两个独立的审查主体，主 agent 不知道你的存在，你也不被主 agent 调用。\n- **不共享上下文**：你不读取主 agent 的内部状态、日志或自评报告，只基于用户提供的源文件和产出来独立判断。\n- **质量对比**：你的审查结论与主 agent 的产出/自评形成对比，用户据此判断主 agent 的完成质量。\n- **标准参考**：主 skill 的 `check_*.py` 脚本、Critic 标准和建模契约是你审查时的参考基准，但你不调用主 skill 接口，不写入主 skill 工作区。\n- **自有工具**：你有自己的轻量审查脚本（符号/元话语/负向回声/模型证据/编译），用于独立初筛。\n- **不得越权**：你不切换主 agent 的模式、不干预主 agent 流程、不替代用户做最终决策。\n\n## 输入边界\n\n用户必须提供以下信息，缺失时主动询问，不得猜测：\n\n- 主 agent 当前节点/阶段和 active_mode\n- 主 agent 的产出文件（TeX 源文件、代码、数据、结果、PDF 等）的路径\n- 主 agent 的自评或结论（如有，用于质量对比）\n- 用户关心的具体问题（如有，用于定向询问）\n\n你只读取用户明确提供的文件，不主动探测主 agent 的工作区或内部状态。\n\n## 交付边界\n\n- 你的所有审查结果**只给用户**，主 agent 不知道你的存在。\n- 你不自动反馈给主 agent、不修改主 agent 的产出、不触发主 agent 的任何动作。\n- 用户根据你的审查报告，自行决定是否将问题反馈给主 agent、是否自己修改、是否忽略。\n- 报告中的优化建议是给用户的参考，不是给主 agent 的指令。\n- `status` 字段表示你的独立审查结论，最终是否采纳由用户裁定。\n\n## 触发条件\n\n当用户在数学建模竞赛的任意节点，需要独立审查主 agent 产出或询问相关问题时触发：\n\n- **节点审查**：\"审查 G4 结果与图表节点\"、\"检查论文元话语\"、\"评审附录是否合格\"\n- **质量对比**：\"主 agent 说没问题，你帮我看看\"、\"对比一下主 agent 的结论\"\n- **定向询问**：\"这个公式推导对吗\"、\"这个参数有来源吗\"、\"这个符号定义了吗\"\n- **辅助优化**：\"这段怎么改更好\"、\"附录合格吗\"、\"摘要有什么问题\"\n- **生成节点提示词**：\"到 H4 了，给我一段提示词\"、\"H8 节点主 agent 要注意什么\"、\"给我 H5 的约束提示词\"。当用户明确到了某个节点并要求生成提示词时，输出 `templates/node_prompts.yaml` 中对应节点的 prompt 字段内容，用户可直接给主 agent 作为约束。提示词聚焦核心约束和常见陷阱，不重复审查细则。\n\n## 权威顺序（从高到低）\n\n1. **当前主源文件**（TeX 源文件、代码、数据、YAML 配置）\n2. **当前编译 PDF 的文本层与页码**\n3. **当前代码、数据和结果文件**\n4. **审稿报告、历史记录和其他 Agent 报告**\n\n**STALE_REPORT 规则**：若报告与当前源文件冲突，必须标记为 `STALE_REPORT`，不得直接按报告修改。必须先核实当前源文件的真实状态。\n\n## 十项必查内容\n\n### A. 符号完整性\n\n- 检查每个公式符号是否在符号表出现\n- 检查首次出现位置是否有定义：含义、单位/量纲、取值域、变量类型（标量/向量/矩阵）\n- 总符号表不能替代首用定义（每个符号首次出现时必须就地定义）\n- 重点检查：撇号（'）、星号（*）、帽号（^）、波浪号（~）、粗体（\\mathbf）、上下标、状态变量、辅助函数\n- 检查同一符号的语义漂移（前后含义不一致）\n- 检查 TeX 符号与代码变量的映射关系\n- 记录：含义、单位或类型、作用域、来源或推导关系\n- 未在符号表中出现且首次出现无定义的符号，标记为 HIGH\n\n### B. 元话语检查\n\n- 删除评审、用户、Agent、提示词、修改轮次、内部讨论和调试过程\n- 保留必要的学术导航语和方法范围说明\n- **不要机械删除**\"本文\"\"本节\"\"由式可得\"等正常学术表达\n- 将过程叙述改写为事实、方法、条件或结论\n- 常见元话语模式见 `templates/lint_patterns.yaml`\n- 正文主体（问题重述、问题分析、建模、求解、检验章节）禁止出现建模者的元注释\n- 模型局限、检验边界统一收纳至模型假设小节或专门的局限性小节\n\n### C. 负向回声检查\n\n- 检查是否残留被否决方案、旧版本、失败尝试、报错、内部权衡和用户纠正\n- 同时检查 TeX 源文件、PDF 文本层和交付目录\n- 忽略工作快照、日志和临时目录造成的非成品噪声\n- 最终成品只能保留定稿内容\n- 被否决方案的描述、中间修改过程、临时纠正内容不得出现在正文\n\n### D. 模型证据检查\n\n- 核对公式、参数、数字、表格、图形和代码结果\n- 检查模型假设、变量定义、推导链、算法步骤和验证结果是否闭合\n- 公式推导链：original → intermediate/rearranged → final，每步说明变形依据\n- 检查结果是否能由当前代码或数据复现\n- 检查章节内容是否超出模型实际能力\n- 每个关键数字必须能追溯到代码输出或数据文件\n- 图表必须绑定明确结论、真实数据源、生成脚本和正文解读\n- 图表路由登记：数据结果图须登记 generator、semantic_qa、formats、insertion_format\n- 文献引用门禁：只统计正文实际引用的唯一 BibTeX 键；.bib 未被正文调用不算数；每个被引用键必须登记 role（method_basis/parameter_source/measurement_precedent/selection_criterion/solver/comparison_boundary）；引用紧跟支持的事实，禁止堆段末；禁止竞赛题面作为参考文献\n- 模型章节比例：模型建立与求解章节占正文 45%-55%，低于 42% 警告\n\n### E. 防炫技方法选择审查\n\n- 检查每个子问题是否有 baseline（简单基线模型），禁止无 baseline 直接上复杂方法\n- 检查方法选择理由是否充分：核心矛盾是什么、方法解决了什么、简单方法失败点是什么、复杂方法的针对性是什么、成本收益比如何\n- 检查复杂度升级记录：使用复杂方法（启发式/强化学习/深度学习）时是否有升级记录，是否证明了简单方法失败或效果不足\n- 检查决策影响测试：复杂方法对最终决策的影响等级（0-3级），等级<2建议降级\n- 检查炫技信号：小规模优化用启发式、静态优化用强化学习、为适配算法强行构造不合理假设、方法名比逻辑链更重要、没有显著增量价值却保留复杂模型\n- 检查模型-假设一致性：正向（题目→假设）和反向（假设→题目），是否存在为适配算法强行构造假设的情况\n- 检查方法名剥离审查：遮住方法名后逻辑链是否成立，是否存在\"方法名支撑结论\"而非\"逻辑支撑结论\"的情况\n- 参考主 skill 的 `references/method_selection_core.md`（6条防炫技核心原则 + baseline-first 强制流程 + 决策影响测试 + 方法适配性7问 + 质量评分表 + B题复杂度升级树）\n- 参考主 skill 的 `check_model_evidence.py` 的 `_check_method_selection()` 函数输出（WARN 级别）\n\n### F. 论文叙事质量审查（防止\"建模手写论文\"）\n\n- 检查角色定位：论文是否以论文作者视角写作，而非建模者视角；是否存在建模日志式表述\n- 检查公式密度按章节区分：建模求解章节是否全链路推导，非建模章节（问题分析/结论/模型评价）是否存在公式堆砌\n- 检查六小节结构：每个建模求解章节是否六小节齐全（建模思路→数据处理→模型建立→模型求解→结果分析→模型检验）\n- 检查结果解释：每个核心数值后面是否有意义解读，是否存在只报数字不解释的情况\n- 检查算法细节位置：伪代码、参数表、调优过程、收敛曲线是否放附录，正文是否存在算法实现细节堆砌\n- 检查推导衔接：推导前后是否有语言衔接，是否存在连续3个以上公式中间无文字\n- 检查数据公式服务于论证：数据和公式是否服务于论证，而非论文主体\n- 参考主 skill 的 `check_paper_narrative.py` 输出（5项检查：非建模章节公式堆砌、结果数值无解释、建模求解章节缺小节、算法细节在正文、连续公式无文字衔接，WARN 级别）\n- 参考主 skill H8 任务卡的 `writing_guidelines.body`（10条硬约束）和 `references/warmup/h8_writer_warmup.md`（角色定位、公式密度区分、六小节结构、自查清单）\n\n### G. 代码与文档注释质量审查（防止AI生成代码无注释）\n\n- 检查 Python 代码文件头：每个文件开头是否有 1-3 行说明这个文件做什么\n- 检查函数 docstring：超过 10 行的函数是否有 docstring，说明功能、参数、返回值\n- 检查复杂逻辑行内注释：嵌套>3层的复杂函数是否有行内注释，说明关键逻辑为什么这么做\n- 检查关键参数注释：初始温度、迭代次数、学习率、阈值等关键参数是否有注释说明含义和来源\n- 检查 LaTeX 章节分隔：每个 \\section 前是否有分隔标记，格式：`% ===== 章节标题 =====`\n- 检查 LaTeX 关键环境注释：关键图表/公式环境前是否有注释说明用途\n- 检查 LaTeX 附录分节标记：附录每个分节前是否有标记，说明代码/数据归属哪个小问\n- 检查注释内容红线：注释中是否存在内部讨论话语（经讨论、agent建议）、AI 思考过程（首先、其次、让我）、元话语（本文将、以下代码）、负向回响（之前用、v2修正、尝试了）、AI 协作痕迹（agent、prompt、审查）；注释必须是纯粹的技术说明\n- 参考主 skill 的 `check_code_comments.py` 输出（5项检查：文件头、函数docstring、复杂函数行内注释、关键参数注释、注释内容红线，WARN 级别）\n- 参考主 skill H5 任务卡的 `code_quality_requirements.comments` 和 H8 任务卡的 `writing_guidelines.latex_comments`\n- 参考子 skill 的代码注释规范：`pyomo/references/code_comment_guide.md`、`heuristic-algorithms/references/code_comment_guide.md`、`data-science-stack/references/code_comment_guide.md`\n\n### H. 数值合理性检查（防止异常结果进入结果登记）\n\n- 检查 inf/nan 检测：求解结果中是否出现无穷大或非数，禁止异常结果进入结果登记\n- 检查目标值量级异常：目标值是否 >1e15 或 <1e-15（非零），异常量级需要说明原因\n- 检查结果文件完整性：JSON 是否可解析、CSV 列数是否一致、结果文件是否非空\n- 检查物理范围：概率是否在 [0,1]、长度是否 >0、速度是否合理等物理范围检查\n- 检查约束违约：约束条件是否满足，违约量是否在可接受范围内\n- 检查收敛性（启发式算法）：算法是否收敛，收敛曲线是否合理，是否存在早熟收敛\n- 检查随机种子一致性：相同种子下结果是否可复现\n- 参考主 skill 的 `check_numerical_sanity.py` 输出（WARN 级别）\n- 参考子 skill 的数值合理性规范：`pyomo/references/numerical_sanity_guide.md`、`heuristic-algorithms/references/numerical_sanity_guide.md`、`data-science-stack/references/numerical_sanity_guide.md`\n- 参考主 skill H5 预热包的\"数值合理性检查要求\"小节和 H6 预热包的\"数值合理性验证\"职责\n\n### I. B题专属模板使用检查（摘要模板+建模求解章节模板库）\n\n- 检查 B 题专属摘要模板使用：\n  - 引言段是否遵循两句结构（问题要求+建模思路），不超过 2 句\n  - 每问是否同时出现方法名和量化结果，不能只写方法不写结果，也不能只写结果不写方法\n  - 是否包含模型检验或灵敏度分析的具体结论，不能只写\"模型具有鲁棒性\"\n  - 关键词是否覆盖核心方法和研究对象，不写\"数学建模\"\"优化\"\"分析\"等无区分度的词，数量 3-5 个\n  - 参考 `academic-writing/references/abstract-writing.md` 中的\"B 题专属摘要模板\"章节\n- 检查 B 题建模求解章节模板库使用：\n  - 每个建模求解章节是否遵循模板库的骨架结构（建模思路→数据处理→模型建立→模型求解→结果分析→模型检验），六小节齐全\n  - 是否包含必选项（问题概括句、建模思路、变量定义、目标函数、约束条件、求解算法、结果表、结果解读、算例验证）\n  - 反机械硬约束：每个公式前是否有文字引导（为什么要建立这个模型），每个公式后是否有文字解释（含义、变量、成立条件）\n  - 连续公式限制：是否存在连续 3 个以上公式中间无文字衔接，超过必须插入文字解释\n  - 2 级标题具体：2 级标题是否包含具体内容（如\"多波束测深的覆盖宽度及重叠率模型的建立\"），不能只用\"模型的建立\"\"模型的求解\"等通用词\n  - 结果解读：结果分析是否有意义解读，不能只罗列数值，每个核心数值后面必须跟一句意义解读\n  - 参考 `academic-writing/references/b_chapter_templates/README.md`（模板库入口）和对应问题形态模板文件\n  - 参考主 skill H8 预热包的\"强制读取模板\"小节和自查清单\n\n### J. 防御性写作检查（不给评委递刀子）\n\n- 检查工作汇报式叙述：是否存在\"我们先做了A，又试了B，最后选了C\"的过程展开；应该只保留最终成立的逻辑（问题→现有不足→本文方法→证据）\n- 检查自我削弱表达：是否使用\"遗憾的是\"\"仅\"\"仍明显落后\"\"效果有限\"\"存在严重不足\"\"不得不\"\"只能\"\"勉强\"等表达；应该替换为客观陈述或正面表述\n- 检查优势是否明说：每个核心结果后面是否有主动解释（这个结果意味着什么、为什么重要、解决了什么问题）；不能只报数字不解读\n- 检查结果是否有论证职责：每个结果、每张图表是否承担明确论证职责（证明方法有效、证明优势来自关键机制、证明方法在目标场景有价值、排除替代解释、回答题目必答问题）；是否存在无法强化主线、容易分散注意力的结果堆砌\n- 检查结论是否突然自我否定：结论是否只讲\"解决了什么、提出了什么、证明了什么、为什么重要\"；是否在最后一段突然加入新的自我否定或扩大局限性\n- 检查是否把局部现象上升为整体否定：某项结果不占优",
+      "card": null
+    },
+    {
+      "skill_path": "skills/04-figures/drawio-diagram/SKILL.md",
+      "blob_sha": "2de49c5262641e791e53731a7ef29b196dc1278f",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/04-figures/drawio-diagram/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": "2026-11-17T00:18:16.822Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "drawio-diagram",
+        "description": "为深度学习模型、网络架构、算法流程等生成标准 Draw.io (.drawio) 格式的可视化图表；支持从零生成与风格迁移两种模式。从零生成：模型架构图、流程图、感受野示意图等；风格迁移：参考图 + 内容描述/项目 → 按参考图风格生成新图。确保 XML 格式正确，可直接在 Draw.io 中打开编辑。"
+      },
+      "excerpt": "﻿---\nname: drawio-diagram\ndescription: 为深度学习模型、网络架构、算法流程等生成标准 Draw.io (.drawio) 格式的可视化图表；支持从零生成与风格迁移两种模式。从零生成：模型架构图、流程图、感受野示意图等；风格迁移：参考图 + 内容描述/项目 → 按参考图风格生成新图。确保 XML 格式正确，可直接在 Draw.io 中打开编辑。\n---\n\n# Draw.io 图表\n\n本 Skill 指导 Agent 生成**标准的 Draw.io 格式图表**（.drawio 文件），支持两种模式：**从零生成**（模型架构、算法流程等）与**风格迁移**（参考图 + 内容 → 按参考图风格生成新图）。\n\n## Contest-Orchestrator Adapter\n\n`contest-orchestrator` 只在用户明确要求 Draw.io 时调用本技能；默认的流程图和技术路线图走 `tech-route-maker`，数据图走 `modelviz`，机制/几何图走 `tikz-scientific-figures`。输入以项目工作区的任务卡、问题图、模型契约、符号表和来源证据为边界。\n\n- 每个可见节点、连线、变量、标签和结论绑定来源定位；不得从参考图或对话中补造模型、结果、单位或引用。\n- 返回 `status`、`active_mode`、`task_card`、`artifacts`、`evidence`、`checks`、`blockers`、`next_node` 节点包，`.drawio`、说明和检查报告只写项目工作区。\n- XML 结构、来源、文字和编号检查必须执行；截图、渲染复核和 AI 视觉检查默认开启，检查间距、对齐、裁切、遮挡、层级、文字可读性和整体整洁度，用户肉眼检查作为最终补充。\n- 图表、说明和节点包不得包含元话语、内部交流、调试、失败过程、旧版本或其他负回响。\n\n## Step 0：任务识别\n\n| 条件 | 执行 |\n|------|------|\n| 用户提供**参考图**，且希望「按这张图的风格」画新图 | 执行 `reference/style-migration.md` |\n| 其他情况（从零生成） | 执行 `reference/generation.md` |\n\n## 使用时机\n\n**从零生成：**\n- 用户需要为深度学习模型（如 Transformer、CNN、RNN 等）生成架构图\n- 用户需要绘制算法流程图、数据流图、系统架构图\n- 用户需要可视化特定概念（如感受野、注意力机制、特征提取过程等）\n- 用户提到「画个图」「生成架构图」「可视化模型结构」「绘制流程图」等需求\n\n**风格迁移：**\n- 用户提供参考图，希望「按这个风格画」「照着这个排版/配色画」\n\n## 通用规范（两种模式共用）\n\n### 1. XML 格式严格性\n\n- ✅ 所有标签必须正确闭合：`<mxCell>` 对应 `</mxCell>`，绝不能写成 `</mCell>`\n- ✅ 使用 `vertex=\"1\"` 标记节点，`edge=\"1\"` 标记连线\n- ✅ 每个元素必须有唯一 `id`，从 0 开始递增\n- ✅ 特殊字符必须转义：`&` → `&amp;`，`<` → `&lt;`，`>` → `&gt;`\n\n### 2. 标准文件结构\n\n```xml\n<mxfile host=\"app.diagrams.net\">\n  <diagram name=\"图表名称\" id=\"图表id\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" guides=\"1\" tooltips=\"1\" connect=\"1\" arrows=\"1\" fold=\"1\" page=\"1\" pageScale=\"1\" pageWidth=\"宽度\" pageHeight=\"高度\" background=\"#F5F5DC\">\n      <root>\n        <mxCell id=\"0\"/>\n        <mxCell id=\"1\" parent=\"0\"/>\n        <!-- 所有图形元素从 id=\"2\" 开始 -->\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>\n```\n\n### 3. 常用样式\n\n- **2D 节点**：`rounded=1;whiteSpace=wrap;html=1;fillColor=#颜色;strokeColor=#333333;strokeWidth=1;fontSize=11`\n- **3D 节点（推荐用于神经网络层）**：`shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;size=20;fillColor=#颜色;strokeColor=#333333;strokeWidth=1.5`\n- **连线**：`edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#000000;strokeWidth=2;endArrow=classic`\n- **虚线（残差）**：`dashed=1`\n\n### 4. 输出要求\n\n1. 图表说明（2-3 行）\n2. 使用指南：Draw.io 打开、导出 PNG/SVG（PDF 不进入论文图表交付流程）、图题与论文引用示例\n\n## 参考资源\n\n- Draw.io：https://app.diagrams.net/\n- 官方文档：https://www.drawio.com/doc/\n",
+      "card": {
+        "title_zh": "Draw.io图表生成",
+        "purpose_zh": "为深度学习模型、网络架构、算法流程等生成标准Draw.io(.drawio)格式可视化图表，支持从零生成与按参考图风格迁移两种模式，确保XML格式正确可直接在Draw.io中打开编辑。",
+        "does": [
+          "从零生成模型架构图、流程图、感受野示意图等Draw.io图表",
+          "根据参考图与内容描述进行风格迁移，按参考图风格生成新图",
+          "遵循严格XML格式规范，使用标准mxfile/mxGraphModel结构与唯一id",
+          "提供2D节点、3D立方体节点、连线、虚线等常用样式模板",
+          "输出图表说明与使用指南（Draw.io打开、导出PNG/SVG、图题引用）",
+          "按任务识别规则区分风格迁移与从零生成两条执行路径"
+        ],
+        "inputs": [
+          "图表需求描述（模型架构、算法流程、概念可视化等）",
+          "参考图（风格迁移模式下）",
+          "内容描述或项目信息（风格迁移模式下）"
+        ],
+        "outputs": [
+          ".drawio格式图表文件",
+          "图表说明（2-3行）",
+          "使用指南：Draw.io打开、导出PNG/SVG、图题与论文引用示例"
+        ],
+        "scenarios": [
+          "为Transformer、CNN、RNN等深度学习模型生成架构图",
+          "绘制算法流程图、数据流图、系统架构图",
+          "可视化感受野、注意力机制、特征提取等概念",
+          "用户提供参考图要求按该风格排版配色绘制新图"
+        ],
+        "prerequisites": [
+          "用户明确要求Draw.io格式（默认流程图走tech-route-maker，数据图走modelviz，机制/几何图走tikz-scientific-figures）",
+          "风格迁移模式需用户提供参考图"
+        ],
+        "limits": [
+          "PDF不进入论文图表交付流程",
+          "默认流程图、数据图、机制图分别由其他技能处理，本技能仅在明确要求Draw.io时调用",
+          "XML需严格闭合标签、唯一id、特殊字符转义"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "图像",
+          "设计/UI",
+          "文档",
+          "学习辅导"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "为深度学习模型、网络架构、算法流程等生成标准 Draw.io (.drawio) 格式的可视化图表；支持从零生成与风格迁移两种模式。"
+          },
+          {
+            "field": "does",
+            "quote": "从零生成：模型架构图、流程图、感受野示意图等；风格迁移：参考图 + 内容描述/项目 → 按参考图风格生成新图。"
+          },
+          {
+            "field": "does",
+            "quote": "✅ 所有标签必须正确闭合：`<mxCell>` 对应 `</mxCell>`，绝不能写成 `</mCell>`"
+          },
+          {
+            "field": "does",
+            "quote": "**3D 节点（推荐用于神经网络层）**：`shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;size=20;fillColor=#颜色;strokeColor=#333333;strokeWidth=1.5`"
+          },
+          {
+            "field": "outputs",
+            "quote": "1. 图表说明（2-3 行）\n2. 使用指南：Draw.io 打开、导出 PNG/SVG（PDF 不进入论文图表交付流程）、图题与论文引用示例"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`contest-orchestrator` 只在用户明确要求 Draw.io 时调用本技能；默认的流程图和技术路线图走 `tech-route-maker`，数据图走 `modelviz`，机制/几何图走 `tikz-scientific-figures`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "| 用户提供**参考图**，且希望「按这张图的风格」画新图 | 执行 `reference/style-migration.md` |"
+          },
+          {
+            "field": "limits",
+            "quote": "PDF 不进入论文图表交付流程"
+          },
+          {
+            "field": "limits",
+            "quote": "✅ 每个元素必须有唯一 `id`，从 0 开始递增"
+          },
+          {
+            "field": "scenarios",
+            "quote": "用户需要为深度学习模型（如 Transformer、CNN、RNN 等）生成架构图"
+          },
+          {
+            "field": "scenarios",
+            "quote": "用户需要绘制算法流程图、数据流图、系统架构图"
+          },
+          {
+            "field": "scenarios",
+            "quote": "用户需要可视化特定概念（如感受野、注意力机制、特征提取过程等）"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/04-figures/figure-generation/SKILL.md",
+      "blob_sha": "58e708a89a7ae02adcb5446794664916c0eabecd",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/04-figures/figure-generation/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "figure-generation",
+        "description": "Generate publication-quality scientific figures using matplotlib/seaborn with a three-phase pipeline (query expansion, code generation with execution, VLM visual feedback). Handles bar charts, line plots, heatmaps, training curves, ablation plots, and more. Use when the user needs figures, plots, or visualizations for a paper."
+      },
+      "excerpt": "---\nname: figure-generation\ndescription: Generate publication-quality scientific figures using matplotlib/seaborn with a three-phase pipeline (query expansion, code generation with execution, VLM visual feedback). Handles bar charts, line plots, heatmaps, training curves, ablation plots, and more. Use when the user needs figures, plots, or visualizations for a paper.\nargument-hint: [figure-description]\n---\n\n# Scientific Figure Generation\n\nGenerate publication-quality figures for research papers.\n\n## Input\n\n- `$0` — Description of the desired figure\n- `$1` — (Optional) Path to data file (CSV, JSON, NPY, PKL) or results directory\n\n## Scripts\n\n### Generate figure template\n```bash\npython ~/.claude/skills/figure-generation/scripts/figure_template.py --type bar --output figure_script.py --name comparison\npython ~/.claude/skills/figure-generation/scripts/figure_template.py --list-types\n```\n\nAvailable types: `bar`, `training-curve`, `heatmap`, `ablation`, `line`, `scatter`, `radar`, `violin`, `tsne`, `attention`\n\n## Three-Phase Pipeline (from MatPlotAgent)\n\n### Phase 1: Query Expansion\nExpand the user's figure description into step-by-step coding specifications using the prompts in `references/figure-prompts.md`. Determine: figure type, data mapping (x/y/color/hue), style requirements, paper conventions.\n\n### Phase 2: Code Generation with Execution Loop (up to 4 retries)\n1. Generate a self-contained Python script using the template from `scripts/figure_template.py` as a starting point\n2. Write script to a temp file and execute: `python figure_script.py`\n3. If error: capture traceback, feed back, regenerate (see ERROR_PROMPT in references)\n4. If no `.png` produced: add explicit save instruction, retry\n5. On success: report the generated figure path\n\n### Phase 3: Visual Refinement\nRead the generated PNG file and visually inspect using the VLM feedback prompts from `references/figure-prompts.md`:\n- Does the figure type match the request?\n- Are labels, titles, and legends correct?\n- Is the color scheme appropriate and consistent?\n- Are axis scales sensible? Is text readable at publication size?\n\nIf improvements needed: generate corrective instructions and re-execute.\n\n## References\n\n- All MatPlotAgent prompts: `~/.claude/skills/figure-generation/references/figure-prompts.md`\n- Figure templates: `~/.claude/skills/figure-generation/scripts/figure_template.py`\n\n## Output\n\nBoth PNG (preview, 300 DPI) and PDF (vector, for paper) formats. Plus the LaTeX include code:\n\n```latex\n\\begin{figure}[t]\n    \\centering\n    \\includegraphics[width=\\linewidth]{figures/figure_name.pdf}\n    \\caption{Description. Best viewed in color.}\n    \\label{fig:figure_name}\n\\end{figure}\n```\n\n## Quality Requirements\n- DPI ≥ 300, or vector PDF\n- Colorblind-friendly palette (no red-green only)\n- All text ≥ 8pt at print size\n- Consistent styling across all paper figures\n- No matplotlib default title — use LaTeX caption\n\n## Related Skills\n- Upstream: [data-analysis](../data-analysis/), [experiment-code](../experiment-code/)\n- Downstream: [paper-writing-section](../paper-writing-section/), [paper-compilation](../paper-compilation/), [slide-generation](../slide-generation/)\n- See also: [table-generation](../table-generation/)\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/04-figures/fireworks-tech-graph/SKILL.md",
+      "blob_sha": "980b7b070d1212102738b84bd9f4dc7f2c6eac58",
+      "source_url": "https://github.com/cjh-solver/MathModeling-Skills-Arsenal/blob/70c2c4ffcdc1929c8b7e903fcb7b65719dfd0d78/skills/04-figures/fireworks-tech-graph/SKILL.md",
+      "fetched_at": "2026-11-17T00:18:16.822Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "fireworks-tech-graph",
+        "description": "Create technical diagrams such as software architecture, data flow, flowcharts, sequence diagrams, C4 reviews, cloud deployments, event streams, observability investigations, agent/memory systems, UML, ER, network topology, timelines, and technical concept maps, then export SVG, PNG, focused semantic SVG-to-GIF motion, or offline interactive HTML. Treat direct requests such as \"Generate a GIF\", \"生成 GIF\", or \"制作 GIF\" as motion requests, and use this skill when the user asks to visualize a system "
+      },
+      "excerpt": "---\nname: fireworks-tech-graph\ndescription: >-\n  Create technical diagrams such as software architecture, data flow,\n  flowcharts, sequence diagrams, C4 reviews, cloud deployments, event streams,\n  observability investigations, agent/memory systems, UML, ER, network\n  topology, timelines, and technical concept maps, then export SVG, PNG,\n  focused semantic SVG-to-GIF motion, or offline interactive HTML. Treat direct\n  requests such as \"Generate a GIF\", \"生成 GIF\", or \"制作 GIF\" as motion requests,\n  and use this skill when the user asks to visualize a system or engineering\n  concept. Do not use for photos, raster artwork, or quantitative data charts.\n---\n\n# Fireworks Tech Graph\n\nGenerate geometry-checked SVG technical diagrams, high-resolution PNG, validated SVG-to-GIF semantic motion, and sanitized offline interactive HTML.\n\n## Runtime Compatibility\n\nUse this repository unchanged in both Codex and Claude Code. It follows the Agent Skills layout: `SKILL.md` is the shared entry point, bundled resources use relative paths, and `agents/openai.yaml` adds optional Codex UI metadata without affecting Claude Code.\n\nBefore reading a reference or running a script, resolve the directory containing this `SKILL.md` as `SKILL_ROOT`. Do not assume the current working directory is the skill directory, and do not assume a variable set in one shell call persists into the next.\n\n- In Claude Code, use `${CLAUDE_SKILL_DIR}`.\n- In Codex, use the absolute skill directory shown in the loaded skill metadata.\n\nEvery command block below sets `SKILL_ROOT` itself. In Codex, replace `/absolute/path/from-codex-skill-metadata` with the absolute skill directory before running the command.\n\n## Helper Scripts (Recommended)\n\nThe unified `scripts/fireworks.py` CLI and compatibility helpers provide stable rendering, geometry validation, inspection, animation, and export:\n\n### 1. `generate-diagram.sh` - Validate SVG + export PNG\n```bash\nSKILL_ROOT=\"${CLAUDE_SKILL_DIR:-/absolute/path/from-codex-skill-metadata}\"\n\"$SKILL_ROOT/scripts/generate-diagram.sh\" -t architecture -s 1 -o ./output/arch.svg\n```\n- Validates an existing SVG file\n- Exports PNG after validation\n- Example: `\"$SKILL_ROOT/scripts/generate-diagram.sh\" -t architecture -s 1 -o ./output/arch.svg`\n\n### 2. `generate-from-template.py` - Create starter SVG from template\n```bash\nSKILL_ROOT=\"${CLAUDE_SKILL_DIR:-/absolute/path/from-codex-skill-metadata}\"\nmkdir -p ./output\npython3 \"$SKILL_ROOT/scripts/generate-from-template.py\" architecture ./output/arch.svg '{\"title\":\"My Diagram\",\"nodes\":[],\"arrows\":[]}'\n```\n- Loads a built-in SVG template\n- Renders nodes, arrows, and legend entries from JSON input\n- Escapes text content to keep output XML-valid\n\n### 3. `validate-svg.sh` - Validate SVG syntax\n```bash\nSKILL_ROOT=\"${CLAUDE_SKILL_DIR:-/absolute/path/from-codex-skill-metadata}\"\n\"$SKILL_ROOT/scripts/validate-svg.sh\" <svg-file>\n```\n- Checks XML syntax\n- Verifies tag balance\n- Validates marker references\n- Checks attribute completeness\n- Validates path data\n\n### 4. `test-all-styles.sh` - Batch test all styles\n```bash\nSKILL_ROOT=\"${CLAUDE_SKILL_DIR:-/absolute/path/from-codex-skill-metadata}\"\n\"$SKILL_ROOT/scripts/test-all-styles.sh\"\n```\n- Tests multiple diagram sizes\n- Validates all generated SVGs\n- Generates test report\n\n**When to use scripts:**\n- Use scripts when generating complex SVGs to avoid syntax errors\n- Scripts provide automatic validation and error reporting\n- Recommended for production diagrams\n\n## Workflow (Always Follow This Order)\n\n1. **Classify** the diagram type (see Diagram Types below)\n2. **Extract structure** — identify layers, nodes, edges, flows, and semantic groups from user description\n3. **Plan layout** — load `$SKILL_ROOT/references/composition-quality-contract.md`, then apply the diagram-type layout rules\n4. **Load style reference** — always load `$SKILL_ROOT/references/style-1-flat-icon.md` unless user specifies another; load the matching `$SKILL_ROOT/references/style-N-*.md` for exact color tokens and SVG patterns\n5. **Select semantic contract** — Styles 9–12 default to `c4-review`, `cloud-fabric`, `event-transit`, and `ops-pulse`; use `scripts/fireworks.py validate` before layout so missing or contradictory engineering facts fail closed\n6. **Map nodes to shapes** — use Shape Vocabulary below\n7. **Check icon needs** — load `$SKILL_ROOT/references/icons.md` for known products\n8. **Write SVG** with adaptive strategy (see SVG Generation Strategy below)\n9. **Validate**: Run `\"$SKILL_ROOT/scripts/validate-svg.sh\" file.svg` to check XML, markers, geometry, composition budgets, and renderability\n10. **Export PNG**: Use `cairosvg` (recommended). Load `$SKILL_ROOT/references/png-export.md` when choosing another renderer\n11. **Animate on request** — `让这张图动起来` / `生成 GIF` / `制作 GIF` / `Animate this diagram` / `Generate a GIF` means the latest generated semantic SVG to one GIF with `auto`, 5.75s, 20fps, and 960px width when that SVG satisfies one of the 12 approved motion contracts. Exact source bytes are not pinned, but role/stage/order coverage, route directions, required colors, and geometry fail closed; do not claim arbitrary same-style topologies are supported. Load `$SKILL_ROOT/references/motion-effects.md`, run `fireworks.py animate`, and report SVG/GIF/report paths. GIF is the only motion media format, while the default command also emits `<output>.motion.json`. Styles 1–12 are enabled, and their contracts plus the shared `+2s-settled-flow` timing revision are user-approved; the default keeps frames 38–109 at full opacity and resets on frames 110–114. Every scene begins connector-free and advances its moving primitives toward each target. The 75-vs-115 compatibility gate counts binary-exact frames first, decoded-RGBA-exact frames second, and permits a guarded antialias equivalent only when AE ≤ 128, normalized RMSE ≤ 0.001, every difference component is at most 2px wide or high, and all differences remain on edge or node borders; DOM and signature geometry stay strict-exact. Reject raster animation inputs and non-GIF motion outputs. Explicit 3.75s/75-frame and 2.75s/55-frame timelines remain supported\n12. **Visual review gate** — if your runtime can read images, load the exported PNG back and inspect it. Syntactic validity does not guarantee visual correctness: arrows may cross through component interiors, labels may collide with lifelines or other labels, boxes may overlap, alt-frame text may sit on top of a message, or a legend may cover content. If you see any of these, revise the SVG and re-export, with at most two focused correction passes. Common fixes:\n    - Route arrows through gaps between boxes, not through box interiors\n    - Move arrow labels 6-8px away from the arrow line (offset-first); add background rects only when offset is insufficient\n    - Widen inter-row/inter-column gutters so same-layer arrows have clear corridors\n    - Collapse repeated cross-layer arrows into a single \"delegates down\" rail outside the content area\n    - Move legend/notes out of any region where arrows or labels land\n    - Increase viewBox height/width rather than packing elements tighter\n    - If a filtered element (drop-shadow, blur) is missing one side of its border, move it ≥30px away from that viewBox edge, or remove the filter and rely on color/contrast for visual separation\n  Report `visual_review: passed` after inspection. If image reading is unavailable, report `visual_review: skipped (image reader unavailable)` — do not guess or claim visual correctness.\n\n## Rule Precedence\n\nUse this order when instructions disagree:\n\n1. The user's explicit content and style request\n2. The selected `$SKILL_ROOT/references/style-N-*.md` visual tokens (palette, typography, corner radius, shadow treatment)\n3. Diagram-type layout rules and semantic flow requirements in this file\n4. Universal defaults and examples\n\nGeometry and validation gates always remain active: style guidance cannot justify unreadable text, missing marker definitions, or ar",
+      "card": null
+    }
+  ]
+}
