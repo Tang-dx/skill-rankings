@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "repo": "staryone/motlab",
+  "tree_sha": "683ea05e479e9eab0a4e77528572c0873c86a692",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/motlab-assets/SKILL.md",
+      "blob_sha": "3644599a67e9087661c14486835c8a5c65a99663",
+      "source_url": "https://github.com/staryone/motlab/blob/4402ff674ced07b8f8a350472ecb2f308c76b2e0/skills/motlab-assets/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "motlab-assets",
+        "description": "Make reusable assets as code for motlab videos, without any AI image, video or 3D generator: icons, illustrations, vector logos, rigged 2D characters, 3D objects, transitions, textures and backgrounds, kept in one kit so every video looks the same. Outputs transparent PNG plus SVG, or GLB, FBX and OBJ with PBR textures. Use whenever someone asks for assets, an asset kit, a mascot, an icon set, a 3D model or textures, even if they never say motlab."
+      },
+      "excerpt": "---\nname: motlab-assets\ndescription: Make reusable assets as code for motlab videos, without any AI image, video or 3D generator: icons, illustrations, vector logos, rigged 2D characters, 3D objects, transitions, textures and backgrounds, kept in one kit so every video looks the same. Outputs transparent PNG plus SVG, or GLB, FBX and OBJ with PBR textures. Use whenever someone asks for assets, an asset kit, a mascot, an icon set, a 3D model or textures, even if they never say motlab.\n---\n\n# motlab-assets\n\nBuild assets as code and keep them in a **kit**: one folder with the style rules, the source of every asset and its\nrendered files. A motlab video copies the kit into its project and draws from it, so the tenth video looks like the\nfirst. Nothing here uses an AI image, video or 3D model: you write SVG, canvas, three.js and Blender code, and\nordinary renderers (Chrome, Blender) draw the pixels.\n\n**The source is the asset.** Every asset has a source file you wrote (`source.svg`, `parts.svg` + `rig.json`,\n`build.py`, `transition.js`). PNG, GLB, FBX, OBJ and texture maps are outputs of that source. A change is made in the\nsource and the outputs are rendered again; never edit an output by hand. That is what keeps variations consistent.\n\n**Good references in, good assets out.** Work from the user's references: brand guidelines, logos, product photos,\nsketches, screenshots, a 3D viewer recording, style examples. If a reference is too small or missing, ask for a better\none. Don't draw a logo or a real product from memory.\n\n## Tools\n\n- This skill's folder: `scripts/` and `templates/` below.\n- The motlab engine: run `motlab --help` once; it prints the engine folder. The motlab skill's scripts are in\n  `<engine>/skills/motlab/scripts/`: `blender/kit.py` and `blender/mesh_from_sdf.py` (3D), `grid.py` (read coordinates\n  off a reference), `get_font.py` (Google Fonts). `motlab stills` renders every PNG on the 2D and light 3D paths.\n- Python 3 with numpy, scipy and Pillow (the motlab skill's `requirements.txt`). Commands say `python`; on macOS and\n  Linux it may be `python3`.\n- Blender, only for the main 3D path (below).\n\n## The workflow\n\n1. **Brief.** Ask what the assets are for (which videos, which brand or series), what is needed now, the sizes and\n   orientation they will be used at, and which files the user wants besides PNG (SVG, GLB, FBX, OBJ, textures). Ask\n   where the kit lives; the default is `kits/<name>/` in the user's workspace, outside any one video.\n2. **Read the kit, if there is one.** Read `kit.json`, `style.md` and `tokens.json` first. New assets follow them. If a\n   new asset needs a rule the kit does not have yet, add it to `style.md` and say so.\n3. **References.** List and measure everything (size, format). Run `python scripts/palette.py <refs>` for the main\n   colours. Write down what you can measure: line weight, corner radius, proportions, light direction, materials.\n4. **Lock the style before building many assets.** For a new kit, write `tokens.json` and `style.md`\n   (`references/kit.md`), build one hero asset, render it, and show the user a sheet with it next to the references.\n   Wait for their OK here: a wrong style copied into twenty assets is twenty fixes. After that, build the rest without\n   stopping.\n5. **Build each asset** from its reference file:\n   - 2D (icons, illustrations, logos, backgrounds, patterns, 2D characters, transitions): `references/2d.md`.\n   - 3D (objects, products, simple characters, textures): `references/3d.md`. **Offer the two 3D paths first** (below).\n6. **Render and export.** Each asset's folder gets its outputs (`references/kit.md` has the names). PNGs are transparent\n   and at least 2x the largest size the asset will be shown at.\n7. **Check it yourself.** `python scripts/sheet.py <sheet.jpg> <asset outputs> <refs>` and look at it: shapes against the\n   references, edges on the checker (halos, missing alpha), sharpness at full size. `python scripts/palette.py check\n   tokens.json <pngs>` for colour drift. For 3D, re-import every exported file (`asset3d.py check`) and look at the GLB\n   through `templates/model.html`, which is how a motlab scene will show it.\n8. **Hand over.** Update `kit.json`, rebuild the kit's `sheet.jpg`, and show the user the sheet and the list of files.\n   Say what you could not check (an FBX opened in another program, a rig in motion, a texture at close range).\n9. **Revisions.** The user names the asset and the change. Edit its source, render again, check again, and report what\n   changed. Before a change that touches many assets, copy the kit to `backup/<n>/` inside it.\n\n## The two 3D paths\n\nWhen the user wants a 3D asset, say what each path gives and let them choose:\n\n| | Light path | Main path |\n|---|---|---|\n| Needs | Python + Chrome only | Blender (4.2 or newer; tested on 5.2) |\n| Model from | distance functions (`mesh_from_sdf.py`) | distance functions, Blender modelling, a GLB/OBJ the user owns, MPFB humans |\n| Files | GLB, OBJ + MTL, PNG | GLB, FBX, OBJ + MTL, baked PBR textures (base colour, roughness, normal, AO), PNG |\n| Materials | one flat colour, roughness and metalness per part | any Blender material, baked into textures |\n| Rig | none | Rigify or MPFB armatures in FBX and GLB |\n| PNG | three.js turntable (`templates/model.html`) | Cycles turntable, path traced |\n| Time | seconds | about 30 s for the test mug: bake 7.5 s, export 2.3 s, four 1024 px views 16.5 s (RTX 3060 Laptop) |\n\nFor the main path, check the machine before promising anything, and tell the user what you found:\n\n1. **Blender.** Find it: `blender` on PATH, `C:\\Program Files\\Blender Foundation\\Blender <version>\\blender.exe`,\n   `/Applications/Blender.app/Contents/MacOS/Blender`, `/opt/homebrew/bin/blender`. If it is missing, say so and how to\n   get it (blender.org, or `winget install BlenderFoundation.Blender` on Windows), and offer the light path meanwhile.\n2. **Add-ons.** Run `blender -b -P scripts/blender/check_blender.py`. It prints the version, the GPU Cycles will use,\n   and whether MPFB (human characters), a Blender MCP add-on and Rigify are installed and on. MPFB is needed only for\n   human characters; without it, build characters from shapes.\n3. **Blender MCP.** Also look for Blender MCP tools in this session (tool names with `blender` in them). If they are\n   there, use them to show the user the model live in their own Blender window while it is built. If not, say it is\n   not installed and carry on: every export and render goes through `blender -b -P build.py` either way, because\n   `build.py` is the asset's source, a background run gives the same result every time, and MCP export calls can time\n   out on large files. Point the user to the MCP's install guide only if they want the live view. Through the MCP,\n   `kit.py` and `asset3d.py` import and run in the user's Blender (bake and export of a small mug took 2.3 s), but\n   operators that need an active object, such as `bpy.ops.mesh.primitive_cylinder_add`, fail there: build meshes with\n   `bmesh` and the data API instead.\n\n## Kit layout\n\n```\nkits/<name>/\n  kit.json        what is in the kit: assets, their sources and outputs, licences\n  style.md        the style rules, in numbers where possible\n  tokens.json     colours, fonts, line weight, radii, shadow, light and lens\n  refs/           copies of the references the kit was built from\n  2d/<asset>/     source.svg, asset.html, <asset>@4x.png\n  chars/<name>/   parts.svg, rig.json, turnaround.svg, <name>@4x.png, poses.png\n  3d/<asset>/     build.py, mesh/, <asset>.glb, <asset>.fbx, <asset>.obj + .mtl, textures/, turntable/\n  transitions/<name>/  transition.js, transition.html, frames/ (PNG sequence with alpha)\n  sheet.jpg       every asset on one sheet\n```\n\n`references/kit.md` has the formats of `kit.json`, `tokens.json` and `style.md`.\n\n## Using a kit in a motlab video\n\nCopy (never move) the kit into the video's project: `<video>/assets/kits/<name>/`, because the viewer and the renderer\nonl",
+      "card": null
+    },
+    {
+      "skill_path": "skills/motlab/SKILL.md",
+      "blob_sha": "65d33a870c409af1bbc0e10a09d4a5f5c82e93b1",
+      "source_url": "https://github.com/staryone/motlab/blob/4402ff674ced07b8f8a350472ecb2f308c76b2e0/skills/motlab/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "motlab",
+        "description": "Make and edit videos as code with the motlab engine, with no AI video or image generation: product and app ads, logo animations, explainers, tutorials, screen-recording and footage edits, social clips. The agent builds every scene from the user's references and opens the motlab viewer; the user leaves notes there and exports the video. Use whenever someone asks for a video, animation, motion ad, promo, explainer, reel or short, mentions motlab, or gives notes on one."
+      },
+      "excerpt": "---\nname: motlab\ndescription: Make and edit videos as code with the motlab engine, with no AI video or image generation: product and app ads, logo animations, explainers, tutorials, screen-recording and footage edits, social clips. The agent builds every scene from the user's references and opens the motlab viewer; the user leaves notes there and exports the video. Use whenever someone asks for a video, animation, motion ad, promo, explainer, reel or short, mentions motlab, or gives notes on one.\n---\n\n# motlab\n\nBuild a video as code and put it in the motlab viewer, where the user plays it, steps through it frame by frame and\npoints at what to change. Everything is code, so a note such as \"slower here\" means changing a number and reloading.\nNo AI model makes any picture or video.\n\n**The split of work.** The user gives a folder of high-quality references (pictures, logos, screenshots, footage,\nfonts, music, voiceover, sound effects) and their direction. You do everything up to the render: it redraws and\nanimates what is in the references, edits the footage, plans the shots, builds every scene, places the sound and\nrevises from the user's notes. The user reviews in the viewer and renders. Good references in, good video out. If a\nreference is too small, blurry or missing, ask for a better one rather than inventing it.\n\n**The first thing the user sees is the real video.** No rough storyboard, animatic or approval step before building.\nPlan the shots, build all of them properly, and open the viewer. The review happens on the real scenes.\n\n**You never render the video.** Don't run `motlab render` or `motlab video` on the project, and don't offer to.\nWhen the user is happy, they press Export in the viewer and pick a resolution. `motlab stills` (single frames to check\nyour own work) and `motlab events` are fine. Render only if the user asks for it in chat in so many words.\n\n## The engine\n\n`motlab` is a command on PATH. Run `motlab --help` once at the start: it lists the commands and prints the engine\nfolder (its README, the `example/` project and `src/page/footage.js`).\n\nIf `motlab` is not found, ask the user how they installed it. From npm (`npm install -g @motlab/cli`), run\n`npx @motlab/cli setup --skill none`; it adds the command when npm's folder is not on PATH. From a clone (the\nfolder with `install.js` and `bin/motlab.js`), run `node install.js --skill none` there; it puts the command on PATH.\nIf they have neither, follow `docs/install-for-agents.md` from https://github.com/staryone/motlab. Until the command is on PATH, call\n`node <engine>/bin/motlab.js`. Never hard-code the engine path anywhere else. If a render or still fails because Chrome\nor ffmpeg is missing, run `motlab doctor` and show the user what it reports. When the user asks to update motlab or\nits skills, run `motlab update`. For an npm install it prints the two commands that update it; run them if the user\nagrees. If it stops because the engine folder has local changes or commits of its own, show the user its message and\nask; never stash, reset or discard their changes. The new skills load in a new session.\n\n## The workflow\n\n1. **Brief and references.** Ask what the video is for, where it will be seen, how long it should be, whether it\n   needs a voiceover, and the **orientation**: landscape 16:9 (1920x1080 pages), portrait 9:16 (1080x1920) or square\n   1:1 (1080x1080). Then go through the user's folder:\n   - List everything. Measure images (`python3 -c \"from PIL import Image; ...\"` or `ffprobe`), probe footage and audio\n     with `ffprobe` (size, frame rate, rotation, length, audio track), and note the music's length and tempo.\n   - Check resolution against how close the camera will get. Ask for better files or rebuild as vector shapes. Get logos\n     as real files: one cut from a screenshot or redrawn from memory is only acceptable if the user says so and checks it.\n   - If the user has an asset kit (made with the motlab-assets skill: a folder with `kit.json`, `style.md` and\n     `tokens.json`), copy it into `<video>/assets/kits/<name>/`, read its `style.md` and `tokens.json` before planning, and\n     use its assets and colours rather than drawing new ones. New assets the video needs belong in the kit, through that\n     skill.\n   - Read any brand guidelines. Use the brand's fonts if they are there; otherwise pick any Google Font that fits the\n     video's vibe (`references/fonts.md`).\n   - Decide the style: the ad preset (`references/style-rules.md`) for product, app and brand ads, or when the user asks\n     for it; otherwise the references set the look, and `references/craft.md` applies to everything.\n2. **Know where it ends.** Find out what the viewer is meant to do afterwards (download, visit, sign up) or which shot\n   the video hands over to, and plan the end from there.\n3. **Plan the shots.** Number them (5 to 10 for a short piece, more for longer edits) and give each a duration (on the\n   music's phrases, if the music is there already), what is on screen, what moves, and how it turns into the next shot. If you cannot say how a\n   shot becomes the next one, the transition is a plain cut and the shot needs rethinking (`craft.md` §9). Post the list\n   in chat in a few lines so the user knows what is coming, then go straight on to building. Don't wait for approval.\n4. **Build every scene.** Write the real scenes in `<video>/scenes/` and list them in `<video>/project.json`. Keep the page contract (below). Keep all of a page's beat times together in one\n   constant near the top, so changing the timing means editing one place. Footage goes in as a layer (`references/footage.md`). Copy templates and scripts from this skill's\n   folder next to the scenes as needed. Every scene is finished work, built to `craft.md` (and the preset, if on): no\n   placeholder frames, rough sketches or shots left for later.\n5. **Sound, now or later.** Music and effects can come after the picture. The first build may be silent, or carry\n   only the music if the user already gave it. When music arrives later, re-time the shots to its phrases if the user\n   wants that. Build the effects mix with `mix.py` from the pages' `EVENTS` (`references/sound-and-music.md`), save it\n   in `<video>/audio/`, and list it in `project.json` with the music, voiceover and any footage sound, so the viewer\n   plays it and Export includes it.\n6. **Check stills yourself.** `motlab stills <page> <outDir> 0.5 1.2 …` (it serves the folder with `project.json`, so\n   the page can load files from the whole project), then `python3 scripts/contact_sheet.py <outDir> sheet.jpg` and look at it. Look\n   inside every transition at three or four moments as well as at the still parts, and put the references next to the\n   stills: a wrong shape, a flipped layout or parts that pass through each other are easy to miss otherwise. Fix what `craft.md` would flag\n   before the user sees it.\n7. **Open the viewer.** Run `motlab edit <video>`; it ends at once and prints the address. Give it to the user. Say in\n   a few lines what is in it and what you could not check: you saw stills, not playback, and you cannot hear the sound. Give the\n   user the \"listen by ear\" moments `mix.py` printed.\n8. **Revision rounds.** The user plays the video, steps through it frame by frame, clicks the spot and comments, or\n   leaves notes in the viewer and says \"kerjakan semua catatan\". When they say \"this one\", \"here\", \"yang ini\" or \"di\n   sini\", or mention notes, read `<video>/selection.json` first (and look at `<video>/selection/<n>.png` for each note\n   with a box or point), then grab that frame with\n   `motlab stills <scene> <dir> <frame time>` (see below) so you see what they see. Apply every open note, check stills\n   around the change, re-run `mix.py` if beats moved, and tell the user to reload. Report what changed in plain words.\n   Before a round that changes a lot, copy `scenes/` to `backup/<n>/`. Never delete or edit the user's reference files.\n   Many rounds are nor",
+      "card": {
+        "title_zh": "motlab 代码视频制作",
+        "purpose_zh": "用代码构建和编辑视频场景，在 motlab 查看器中逐帧审阅、按用户批注修改，由用户导出成片；全程不使用 AI 生成画面或视频。",
+        "does": [
+          "根据用户提供的参考素材规划镜头并编写每个场景的代码",
+          "把场景写入 scenes/ 并登记到 project.json，管理音频与转场",
+          "用 motlab stills 生成静帧并拼成联系表自查画面",
+          "用 mix.py 依据页面 EVENTS 生成音效混音",
+          "启动 motlab edit 查看器供用户播放、逐帧查看和留批注",
+          "读取 selection.json 与批注截图，按批注修改场景并备份 scenes/"
+        ],
+        "inputs": [
+          "用户提供的参考素材文件夹（图片、logo、截图、视频、字体、音乐、配音、音效）",
+          "视频用途、投放场景、时长、是否需要配音、画幅方向等需求说明",
+          "品牌规范与可选素材包（kit.json、style.md、tokens.json）",
+          "用户在查看器中留下的批注与 selection.json"
+        ],
+        "outputs": [
+          "scenes/ 下的场景页面与 project.json 项目文件",
+          "audio/ 下的音效混音文件",
+          "静帧图片与联系表用于自查",
+          "在 http://127.0.0.1:4173 启动的 motlab 查看器",
+          "由用户导出到 out/ 的 mp4 视频文件"
+        ],
+        "scenarios": [
+          "产品与应用广告、品牌广告",
+          "logo 动画与动效广告",
+          "讲解视频与教程",
+          "录屏与实拍素材剪辑",
+          "社交平台短视频与 reel"
+        ],
+        "prerequisites": [
+          "motlab 命令已在 PATH 上，或按 npm 全局安装、克隆安装或官方文档安装",
+          "需要 Chrome 与 ffmpeg，缺失时运行 motlab doctor 查看报告",
+          "用户提供高质量参考素材，素材不足时应索取而非自行编造",
+          "需要 python3 与 PIL、ffprobe 用于测量素材"
+        ],
+        "limits": [
+          "不使用任何 AI 模型生成图片或视频",
+          "代理不负责渲染，渲染由用户在查看器按 Export 完成",
+          "付费服务（如 ElevenLabs、Suno）仅在用户明确要求时使用",
+          "查看器与渲染器只服务项目文件夹，外部素材需复制进 assets/",
+          "代理只能看静帧，无法听声音，也无法确认实际播放效果",
+          "不得删除或修改用户的参考文件"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "视频",
+          "自动化",
+          "设计/UI",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Build a video as code and put it in the motlab viewer, where the user plays it, steps through it frame by frame and points at what to change."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "No AI model makes any picture or video."
+          },
+          {
+            "field": "does",
+            "quote": "Write the real scenes in `<video>/scenes/` and list them in `<video>/project.json`."
+          },
+          {
+            "field": "does",
+            "quote": "`motlab stills <page> <outDir> 0.5 1.2 …` (it serves the folder with `project.json`, so the page can load files from the whole project)"
+          },
+          {
+            "field": "does",
+            "quote": "Build the effects mix with `mix.py` from the pages' `EVENTS` (`references/sound-and-music.md`), save it in `<video>/audio/`"
+          },
+          {
+            "field": "does",
+            "quote": "Run `motlab edit <video>`; it ends at once and prints the address."
+          },
+          {
+            "field": "does",
+            "quote": "read `<video>/selection.json` first (and look at `<video>/selection/<n>.png` for each note with a box or point)"
+          },
+          {
+            "field": "does",
+            "quote": "Before a round that changes a lot, copy `scenes/` to `backup/<n>/`."
+          },
+          {
+            "field": "inputs",
+            "quote": "The user gives a folder of high-quality references (pictures, logos, screenshots, footage, fonts, music, voiceover, sound effects) and their direction."
+          },
+          {
+            "field": "inputs",
+            "quote": "Ask what the video is for, where it will be seen, how long it should be, whether it needs a voiceover, and the **orientation**"
+          },
+          {
+            "field": "scenarios",
+            "quote": "product and app ads, logo animations, explainers, tutorials, screen-recording and footage edits, social clips"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`motlab` is a command on PATH. Run `motlab --help` once at the start"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If a render or still fails because Chrome or ffmpeg is missing, run `motlab doctor` and show the user what it reports."
+          },
+          {
+            "field": "limits",
+            "quote": "**You never render the video.** Don't run `motlab render` or `motlab video` on the project, and don't offer to."
+          },
+          {
+            "field": "limits",
+            "quote": "Never delete or edit the user's reference files."
+          }
+        ]
+      }
+    }
+  ]
+}

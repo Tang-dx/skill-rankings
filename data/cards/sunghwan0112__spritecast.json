@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "repo": "Sunghwan0112/spritecast",
+  "tree_sha": "b9137703a1984365345eb8a831eef2a1727e9fbd",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/spritecast/SKILL.md",
+      "blob_sha": "27c66f2f1f21283330f23be44d91d537f2098ef5",
+      "source_url": "https://github.com/Sunghwan0112/spritecast/blob/1b36ead4e78cad86d6ee82a9761fb77d27c8e737/skills/spritecast/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "spritecast",
+        "description": "Make game sprites at their real size and exact camera angle (2:1 or true isometric, 3/4 top-down, front view) in the user's art style - props, furniture and objects, standing figures, characters walking, running, jumping, slashing and throwing in 8 facings (painted, or as pixel art about 96 px tall for arcade games; props as pixel art too, from every side) and seated in 8 facings, seated on the user's own chairs and benches with the chair's front piece in front of them - from a 3D guide an image"
+      },
+      "excerpt": "---\nname: spritecast\ndescription: Make game sprites at their real size and exact camera angle (2:1 or true isometric, 3/4 top-down, front view) in the user's art style - props, furniture and objects, standing figures, characters walking, running, jumping, slashing and throwing in 8 facings (painted, or as pixel art about 96 px tall for arcade games; props as pixel art too, from every side) and seated in 8 facings, seated on the user's own chairs and benches with the chair's front piece in front of them - from a 3D guide an image model redraws; then cut out, fitted to the guide, given a baked shadow and an anchor, and fixed by hand on a local touch-up page. Use when the user asks for an isometric or top-down prop, furniture, object or character sprite, a walk cycle or another animation (run, jump, attack, throw, a Mixamo FBX clip), pixel-art sprites or a sprite sheet of a character, fixing pixel sprites by hand, a seated or sitting character, putting a character on a chair or bench, or fixing a sprite's cut-out, halo or what covers what.\nlicense: MIT\ncompatibility: Claude Code (runs Python, Playwright and a local Chrome/Chromium on the user's machine; calls the OpenAI Images API with the user's own key)\n---\n\n# SpriteCast: isometric props and characters at true scale\n\nImage models draw isometric objects at slightly wrong angles and sizes. This skill gives the model a guide it cannot misread: the\nobject built from simple blocks at its real size, rendered with an exact 2:1 isometric camera. The model only redraws the guide in the\nart style of a reference picture; the result is laid back onto the guide, so the angle, size and footprint stay exact.\n\nScripts: `${CLAUDE_SKILL_DIR}/scripts/isoprop.py` (steps `render`, `draw`, `finish`, `preview`). The spec format is in\n[reference/spec.md](reference/spec.md); how to build good guides in [reference/tips.md](reference/tips.md) - read both before writing a spec.\n\n## Setup (once)\n1. Run `python3 ${CLAUDE_SKILL_DIR}/scripts/doctor.py` (any Python 3.9+; `python` on Windows). It lists what is there and what each\n   thing is for; its last line `PYTHON=<path>` is the interpreter to use for every script below. If it says \"not ready\", tell the user\n   in a line what is missing and run it again with `--fix` (a venv in ~/.cache/spritecast/, the packages, about 10 s). No Chrome or Edge: ask first, then `--fix --browser`\n   (Playwright's Chromium, ~150 MB). For characters add `--characters` (the 224 MB cut-out\n   model, once). If it says the Python cannot make a venv, pass on its one-line fix.\n2. Keys: `OPENAI_API_KEY` for `draw`, `TRIPO_API_KEY` for characters. They come from the plugin's settings (the user gives them in\n   `/plugin` → SpriteCast; a session-start hook hands them to the scripts), else from the environment. Missing: tell the user to put it\n   in the plugin's settings and restart Claude Code. Never ask the user to paste a key into the chat, never write it into a file,\n   never print it.\n3. **A first-time user, or \"try it\" / \"체험\":** `PYTHON isoprop.py try [--out DIR]` - free, no key: an example's guide rendered on\n   their computer and finished with the drawing that came with it → show them `preview.png` and `render.png`, then offer to make\n   their own prop.\n\n## Making a prop\n1. **Ask only what is missing**: what it is, its real size if it matters, which way it faces, the game's view (`camera`: 2:1\n   isometric by default, true isometric, 3/4 top-down, front; or their own angle), whether it must turn (`views`), and the art style (a bundled style name\n   - `cozy` - or the user's own reference picture: one finished prop in the look they want, ideally on a flat background).\n2. **Write the spec** (`<name>.json` in the user's asset folder): footprint in metres, the blocks at real size, a `description` of the\n   finished object (materials, colours, details), `facing`. Real-world sizes matter: look them up if unsure (a dining chair seat\n   ~45 cm, a door 2.0-2.1 m).\n3. **Render the guide (free)**: `python ${CLAUDE_SKILL_DIR}/scripts/isoprop.py render <spec>`. Look at `render.png` and\n   `render-shadow.png` yourself, then show the user `render.png`. Fix the blocks until the shape, proportions and facing are right -\n   this is the cheap step; everything after it follows the guide.\n4. **Draw (paid)**: run `draw <spec>` without `--yes` first - it prints the model and the cost (about $0.07 at `high`). Tell the user\n   the cost and wait for a yes before running it with `--yes`. With `views`, the first view is drawn first and the others follow it\n   (about $0.09 each) - check the first before drawing the rest when it is a new design. Several props: say the total. Never redraw without asking\n   (`--again`); a drawing that came out wrong is usually a guide or description problem - fix that first.\n5. **Finish and check**: `finish <spec>` then `preview <spec>`. If `finish` warns (or `sprite.json` `fit.ok` is false), the model\n   drew another angle or shape: it was NOT squeezed to fit. Tell the user, say why (often an angled style picture pulled it off the\n   guide's view), fix the description, and ask before drawing again. Look at `preview.png`; show it to the user. If the drawing added or\n   moved parts, adjust the description (say what must NOT be there) and ask before drawing again.\n6. Hand over `sprite.png`, `shadow.png`, `sprite.json` (anchor, footprint corners, px per metre, shadow offset) and say how to place it\n   in their engine: put the sprite so its anchor sits on the footprint's front corner; draw the shadow under all sprites.\n\n## More detail with a 3D model (Tripo)\nWhen the user wants more detail than blocks give (curves, carving, tapered legs) and has `TRIPO_API_KEY`: after the block guide is\nright, `model <spec>` (prints the cost; ~20 Tripo credits, ~2 min; ask first, then `--yes`) makes a Tripo model from the description\nand puts it in the spec at the blocks' HEIGHT, in its own proportions - the shape is the model's, never pressed into the blocks' box (blocks → `blocks_draft`). Then `yaws <spec>` (free): look at yaws.png and set\n`model.yaw` to the turn whose front faces where the blocks' did. Then render, show, draw as usual. Blocks alone are fine when the\narrangement matters more than detail.\n\n## Characters\nA standing person: a `character` spec (see spec.md) instead of blocks - a mannequin at their real height, one view per facing, the\nfirst facing drawn first and the rest from it. Ask the height, the build, the facings (4 diagonals unless their game uses 8) and what\nthey wear. Look at every facing yourself before showing them: the outline check can't see a body turned the wrong way inside a right\noutline (a back view with the front of the clothes). Redraw just that one: `draw <spec> --yes --again --only <facing>` (ask first).\nPoses (`character.pose`): stand, wave, point, hold, arms-crossed, walk (a single mid-stride picture) - say the pose in the description too\n(\"waving hello\"). Anything else, or \"raise the arm higher\": write the angles (`{\"base\": ..., \"arm\": {...}}`, spec.md \"Custom poses\"),\nrender (free), look, adjust the numbers, and only then draw. Their shadows are cast from the finished drawing (hair, clothes), each pixel moved by the 3D guide's height under it, so every foot starts its own shadow; solid props keep the 3D shadow. No animation: for\nwalk cycles or other animation say this plugin doesn't make them (it needs a rigged 3D model and every frame\ndrawn to match).\n\n## Walking characters\n**Ask first: eight facings or four.** `\"facings\": 4` in the spec renders and draws only the diagonals (south-east, south-west, north-east, north-west): about half the drawing (a walk ~$1 instead of ~$2; pixel art ~$0.7 instead of ~$1.35). Most isometric games draw only these four; offer it whenever cost matters. The exported character (`export.py`) still takes all eight directions - `play(\"walk\", \"east\")` shows the nearest facing drawn, keeping the one shown last between two as near, so walking straight across d",
+      "card": {
+        "title_zh": "等距精灵生成",
+        "purpose_zh": "用3D方块或人偶作精确视角与真实尺寸的引导，让图像模型按用户画风重绘，再抠图、贴合、加阴影与锚点，产出等距/俯视道具与角色精灵。",
+        "does": [
+          "按规格渲染2:1等距、真等距、3/4俯视或正视的方块引导图",
+          "调用OpenAI图像模型按参考画风重绘引导图并贴合回引导",
+          "抠图、加烘焙阴影与锚点，输出sprite.png、shadow.png、sprite.json",
+          "生成站立角色多朝向精灵，支持姿势与像素画尺寸",
+          "用Tripo或Meshy建模并生成八向行走动画帧与精灵表",
+          "提供本地预览页与手工修图流程"
+        ],
+        "inputs": [
+          "道具或角色的规格JSON（尺寸、方块、描述、朝向、视角）",
+          "用户画风参考图或内置风格名",
+          "OPENAI_API_KEY、TRIPO_API_KEY（角色动画另需MESHY_API_KEY可选）",
+          "角色动画需一张正面直立无姿势的成品插画或自带rig_glb"
+        ],
+        "outputs": [
+          "render.png与render-shadow.png引导渲染图",
+          "sprite.png、shadow.png、sprite.json（锚点、占地角、每米像素、阴影偏移）",
+          "preview.png预览图",
+          "角色动画的out/sheet.png、GIF与out/walk-all.mp4"
+        ],
+        "scenarios": [
+          "制作等距或俯视的道具、家具、物件精灵",
+          "制作站立角色多朝向精灵或像素画精灵表",
+          "制作八向行走等动画帧与精灵表",
+          "手工修复像素精灵的抠图、光晕或遮挡问题",
+          "制作坐姿角色并放到用户自己的椅子或长凳上"
+        ],
+        "prerequisites": [
+          "Python 3.9+，先运行doctor.py检查环境，可用--fix安装venv与依赖",
+          "需要本地Chrome/Chromium或经同意安装Playwright Chromium",
+          "draw需OPENAI_API_KEY，角色需TRIPO_API_KEY，密钥来自插件设置或环境变量",
+          "角色动画需先读reference/character.md并准备正面直立插画"
+        ],
+        "limits": [
+          "不制作动画：行走循环等需绑定3D模型并逐帧绘制，插件不生成",
+          "付费步骤需用户确认，draw约$0.07起，多朝向每张约$0.09",
+          "finish警告表示模型画错角度或形状，不会被强行挤压贴合",
+          "四朝向只渲染对角线方向，约为八朝向一半绘制量",
+          "镜像朝向会翻转不对称细节，需谨慎使用"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "游戏",
+          "图像",
+          "设计/UI",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "The model only redraws the guide in the art style of a reference picture; the result is laid back onto the guide, so the angle, size and footprint stay exact."
+          },
+          {
+            "field": "does",
+            "quote": "Scripts: `${CLAUDE_SKILL_DIR}/scripts/isoprop.py` (steps `render`, `draw`, `finish`, `preview`)."
+          },
+          {
+            "field": "does",
+            "quote": "Hand over `sprite.png`, `shadow.png`, `sprite.json` (anchor, footprint corners, px per metre, shadow offset)"
+          },
+          {
+            "field": "does",
+            "quote": "A standing person: a `character` spec (see spec.md) instead of blocks - a mannequin at their real height, one view per facing"
+          },
+          {
+            "field": "does",
+            "quote": "then cut out, fitted to the guide, given a baked shadow and an anchor, and fixed by hand on a local touch-up page."
+          },
+          {
+            "field": "inputs",
+            "quote": "Keys: `OPENAI_API_KEY` for `draw`, `TRIPO_API_KEY` for characters."
+          },
+          {
+            "field": "outputs",
+            "quote": "Look at `preview.png`; show it to the user."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when the user asks for an isometric or top-down prop, furniture, object or character sprite, a walk cycle or another animation"
+          },
+          {
+            "field": "scenarios",
+            "quote": "a seated or sitting character, putting a character on a chair or bench, or fixing a sprite's cut-out, halo or what covers what."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run `python3 ${CLAUDE_SKILL_DIR}/scripts/doctor.py` (any Python 3.9+; `python` on Windows)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "No Chrome or Edge: ask first, then `--fix --browser` (Playwright's Chromium, ~150 MB)."
+          },
+          {
+            "field": "limits",
+            "quote": "No animation: for walk cycles or other animation say this plugin doesn't make them (it needs a rigged 3D model and every frame drawn to match)."
+          },
+          {
+            "field": "limits",
+            "quote": "If `finish` warns (or `sprite.json` `fit.ok` is false), the model drew another angle or shape: it was NOT squeezed to fit."
+          }
+        ]
+      }
+    }
+  ]
+}

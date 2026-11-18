@@ -1,0 +1,1071 @@
+{
+  "schema": 1,
+  "repo": "boringmarketer/boring-marketing-skills",
+  "tree_sha": "67a33ac0511b178173b26600e145a2c220726f5d",
+  "truncated_paths": 20,
+  "skills": [
+    {
+      "skill_path": "skills/ads-incrementality-check/SKILL.md",
+      "blob_sha": "a13bfbda5ac465d8c571e2c71d799f2d6bda1527",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/ads-incrementality-check/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ads-incrementality-check",
+        "description": "Test whether an ad campaign makes the phone ring or only takes credit for calls that would come anyway, using a planned pause and the business's own phone log as the denominator. Plans the pause window, cleans the call log into four daily measures, controls for season and day of week, reads before against during against after, and turns the result into a keep, cut or resume decision with a cost per extra call. Use when Performance Max, branded search or Google Business Profile actions claim most"
+      },
+      "excerpt": "---\nname: ads-incrementality-check\ndescription: Test whether an ad campaign makes the phone ring or only takes credit for calls that would come anyway, using a planned pause and the business's own phone log as the denominator. Plans the pause window, cleans the call log into four daily measures, controls for season and day of week, reads before against during against after, and turns the result into a keep, cut or resume decision with a cost per extra call. Use when Performance Max, branded search or Google Business Profile actions claim most of the conversions, when the platform reports leads the business can't find, or before resuming or raising a campaign's budget.\nwhen_to_use: are my ads actually working, is performance max taking credit for my calls, pause test, incrementality test, would these calls come anyway, google says hundreds of conversions but the phone isn't busier, should I turn performance max back on, are branded search ads worth it, test if my facebook ads work, lift test, do my ads bring new customers\nargument-hint: \"[campaign to test] | plan | read <call log CSV>\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: growth\n    reads: [learnings, assets, brand-manifest]\n    writes: [assets]\n    optional-keys: [GOOGLE_ADS_DEVELOPER_TOKEN, META_ACCESS_TOKEN]\n    enhances_with:\n      - toolset: ads\n        gains: \"pulls the campaign's spend and claimed conversions for the exact test windows instead of reading them off screenshots\"\n---\n\n# Ads Incrementality Check\n\nAn ad platform's conversion count tells you who the ad touched before they acted. It does\nnot tell you who the ad brought. This skill answers the question an owner is paying for:\nwhen the campaign is off, does the phone ring less? It uses a planned pause and a record\nthe ad platform doesn't control, the business's own phone log. Done means a readout a\nskeptic would sign: the measures, the windows, everything else that changed, a verdict\n(brings calls, doesn't, can't tell yet) and the money decision that follows. The method is\na floor: a better design for the business in front of you wins, stated in one line.\n\nThree hard rules:\n\n1. **The pause is the owner's decision.** Plan it, show what it could cost if the\n   campaign does bring calls, and get a yes. Never pause or resume a campaign without one.\n2. **Platform conversions are the claim, never the evidence.** Evidence comes from the\n   phone log, the job system, the inbox or the order system.\n3. **No verdict the data can't carry.** A short window, overlapping changes or too few\n   calls a day earn \"can't tell yet\", which is a complete answer.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for ads-incrementality-check`\n(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this\nfile was read from, e.g. `.agents/skills/ads-incrementality-check`. If the script or python3 is\nunavailable, read the brand folder directly: `./brands/<slug>/` when `./brands/active`\nnames one, else `./brand/`; then `MARKETING.md`, `preferences.md` and the files in\n`reads:`. If none exist, proceed standalone and ask only for: the campaign under suspicion, its monthly\nspend, what the platform credits it with, and a call log export covering at least 60 days.)\n\nIf `learnings.md` holds an earlier pause result for this business, plan around how this\ntest differs from it. Mention it only if it changed the plan, as one line in the Sources\nand assumptions note.\n\n## When to run it\n\nAny one of these is reason enough:\n\n- One campaign is credited with most of the account's conversions, and those conversions\n  are Google-hosted: \"Business profile\" calls, \"Clicks to call\", \"Get directions\".\n- Platform conversions climb while booked jobs stay flat.\n- Branded search (people typing the business's name), retargeting, or Meta results that\n  lean on view-through conversions.\n- Before resuming a paused campaign or raising its budget.\n\n**Why local actions over-claim.** Google counts a local action when it follows an ad\ninteraction within the click-through window (30 days by default), including a later tap on\nthe business's organic Business Profile. Profile calls that can be tied to an ad\ninteraction land in \"Calls from ads\". A known local business gets profile calls every day.\nA Performance Max campaign that serves on Maps and on the business's own name touches many\nof those people first and collects the credit. Nothing here is fraud. It is attribution\ndoing what it was built to do, and it is why a count can't answer this question.\n\n**The case this skill came from.**\nA home service business ran Performance Max, and Google credited it with most of the account's conversions over three months, almost all Business Profile calls.\nThe campaign was then paused. Four measures from the business's own records:\n\n| Measure, per day | During the pause |\n|---|---|\n| Google Business Profile call clicks | About the same |\n| Inbound calls, raw | Slightly up |\n| Answered inbound calls 30 seconds or longer, main line | Slightly up |\n| Unique callers | Unchanged |\n\nGoogle's claim worked out to several calls a day caused by the campaign.\nNot one of the four measures fell. An earlier recommendation to turn the campaign back on, made from\nGoogle's count, was reversed. The readout also said what it couldn't settle: the pause window was\nshorter than the month before, season wasn't controlled, and it measured calls, not jobs. The\ndecision was to keep it paused and recheck after a full month.\n\n## Phase 1: Pick the denominator\n\nFor a business where most leads phone in, the phone log is the truth. Pull 60 days or\nmore before the test from the phone system (Quo or OpenPhone, CallRail, RingCentral, Google\nVoice, a carrier portal) and read it into four daily measures:\n\n1. **Inbound calls, raw.** Coarse. Includes spam, misdials and customers calling about\n   jobs already booked.\n2. **Answered inbound calls 30 seconds or longer, on the lines the public uses.** Strips\n   spam, misdials and hang-ups. The single best measure.\n3. **Unique callers.** One customer calling five times is one caller.\n4. **Google Business Profile call clicks**, from the profile's Performance view, by day\n   or week. This is the surface the campaign claims, so it must be in the table.\n\nTwo more when the data allows: **new callers** (numbers not seen in the log before), the\nclosest thing to new customers, and **booked jobs per week** from the job system, the money\nmeasure, slower and noisier.\n\nRun the script on the export. It guesses the columns, prints its guesses, and accepts\noverrides:\n\n```\npython3 ${CLAUDE_SKILL_DIR}/scripts/call_log.py pause-test calls.csv \\\n  --before 2026-03-02:2026-03-29 --during 2026-03-30:2026-04-26 \\\n  --after 2026-04-27:2026-05-24 --line \"Main\" --exclude staff-numbers.txt --utc-offset -6\n```\n\nThe columns it guessed and the numbers it excluded go in `notes.md`, never in the readout.\n\nCleaning that changes the answer:\n\n- Filter to the public lines and inbound calls. Drop staff, vendor and known spam numbers.\n- Don't count with an automatic call classifier until you've checked its coverage. In the\n  case above, the classifier had marked every call in the month \"uncertain\", so it couldn't support any comparison.\n- Expect status calls. A large share of customer calls can be about jobs already in motion (arrival time, invoice, parts).\n  Ads don't move those calls. They dilute the signal, which is why unique and new callers\n  sit beside the raw count.\n\n**If the business sells online,** the denominator is orders, signups or booked demos from\nthe store, payment or CRM system, split into new and returning customers. Branded search,\nretargeting and view-through conversions are the usual suspects, and the rest of the\nmethod is unchanged.\n\n`references/pause-test-worksheet.md` has the spreadsheet layout for doing this by hand.\n\n## Phase 2: Plan the pause\n\nWrite the plan ",
+      "card": {
+        "title_zh": "广告增量性暂停测试",
+        "purpose_zh": "用计划性暂停和商家自有电话记录，检验广告是否真的带来电话，还是只抢走本来就会来的电话，并给出保留、削减或恢复的决策。",
+        "does": [
+          "规划暂停窗口、前后对照期与事先写好的决策规则",
+          "把电话记录清洗成四项每日指标：原始来电、30秒以上接通、独立来电者、商家资料点击",
+          "按整周、季节与星期几控制，比较暂停前、中、后",
+          "把平台声称的转化与电话记录对照，给出结论与每次额外来电成本",
+          "输出保留、削减或恢复的预算决策及注意事项"
+        ],
+        "inputs": [
+          "待测广告活动及其月度花费",
+          "平台声称的转化数",
+          "至少60天的电话记录导出（CSV）",
+          "商家资料表现数据",
+          "可选：Google Ads 或 Meta 的访问令牌以只读拉取花费与转化"
+        ],
+        "outputs": [
+          "暂停测试计划（窗口、成本预估、决策规则）",
+          "四项每日指标的前中后对照读数",
+          "结论：带来电话、带来部分、没带来、暂无法判断",
+          "每次额外来电成本与预算决策",
+          "假设与局限说明"
+        ],
+        "scenarios": [
+          "平台声称大量转化但电话并未变忙",
+          "Performance Max 或品牌搜索被指抢走商家资料来电",
+          "恢复或提高广告预算前的验证",
+          "判断品牌搜索广告是否值得",
+          "Facebook 广告效果存疑时做提升测试"
+        ],
+        "prerequisites": [
+          "商家同意暂停广告活动",
+          "可导出的电话记录，覆盖至少60天",
+          "可选：Google Ads 开发者令牌或 Meta 访问令牌"
+        ],
+        "limits": [
+          "暂停与恢复必须由商家决定，不得擅自操作",
+          "平台转化数只作声称，不作证据",
+          "窗口过短、同期有其他变化或每日来电过少时只能给暂无法判断",
+          "每日真实来电低于约5次时，20%的下降会淹没在噪声中",
+          "自动通话分类器未经覆盖核查不得用于计数"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "数据分析",
+          "调研",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill answers the question an owner is paying for: when the campaign is off, does the phone ring less?"
+          },
+          {
+            "field": "does",
+            "quote": "Pull 60 days or more before the test from the phone system (Quo or OpenPhone, CallRail, RingCentral, Google Voice, a carrier portal) and read it into four daily measures"
+          },
+          {
+            "field": "inputs",
+            "quote": "ask only for: the campaign under suspicion, its monthly spend, what the platform credits it with, and a call log export covering at least 60 days."
+          },
+          {
+            "field": "outputs",
+            "quote": "a verdict (brings calls, doesn't, can't tell yet) and the money decision that follows."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**The pause is the owner's decision.** Plan it, show what it could cost if the campaign does bring calls, and get a yes."
+          },
+          {
+            "field": "limits",
+            "quote": "**No verdict the data can't carry.** A short window, overlapping changes or too few calls a day earn \"can't tell yet\", which is a complete answer."
+          },
+          {
+            "field": "limits",
+            "quote": "Don't count with an automatic call classifier until you've checked its coverage."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 ${CLAUDE_SKILL_DIR}/scripts/call_log.py pause-test calls.csv"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "The columns it guessed and the numbers it excluded go in `notes.md`, never in the readout."
+          },
+          {
+            "field": "hosts",
+            "quote": "(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this file was read from"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ai-search/SKILL.md",
+      "blob_sha": "fe8432f3444dab3513dbcda6e9ff325028e11e55",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/ai-search/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ai-search",
+        "description": "Checks whether ChatGPT, Perplexity, Gemini and Google's AI answers name and cite a business for the questions its buyers ask, scores that over the answers actually observed, finds why the winners win, fixes what's fixable on existing pages and listings, and monitors the result. Works for online businesses and, with city-specific question sets that include Google Maps' Ask feature, for local ones. Use when someone asks whether AI assistants recommend them, why a competitor gets recommended instea"
+      },
+      "excerpt": "---\nname: ai-search\ndescription: Checks whether ChatGPT, Perplexity, Gemini and Google's AI answers name and cite a business for the questions its buyers ask, scores that over the answers actually observed, finds why the winners win, fixes what's fixable on existing pages and listings, and monitors the result. Works for online businesses and, with city-specific question sets that include Google Maps' Ask feature, for local ones. Use when someone asks whether AI assistants recommend them, why a competitor gets recommended instead, or how to get cited.\nwhen_to_use: ai search audit, am I cited by ChatGPT, does ChatGPT recommend my business, AI Overviews visibility, share of model, AEO, GEO, generative engine optimization, why does Perplexity recommend my competitor, AI recommends my competitor instead of me, Ask Maps, llms.txt, get cited by AI, AI citation monitoring, answer engine optimization\nargument-hint: \"[brand/domain or nothing] | optimize | monitor\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: growth\n    reads: [positioning, keyword-plan, competitors#competitor-profiles, voc, brand-manifest]\n    writes: []\n    optional-keys: [FIRECRAWL_API_KEY, EXA_API_KEY]\n    enhances_with:\n      - toolset: web-scrape\n        gains: \"fetches the winning pages in full to read their answer blocks, dates and schema\"\n---\n\n# AI Search (AEO/GEO)\n\nA growing share of buyers never see a homepage. They see a paragraph an AI assistant wrote about the category, with a few sources cited, or a short list of three to five local businesses with a reason for each. This skill measures whether the business is in that paragraph, diagnoses why the winners are, fixes what's fixable on pages and listings the business already has, and tracks the result. Done means an audit another person could re-run with the same questions, a fix plan ordered by citation leverage, and an honest account of what was observed and what was a proxy. The method is a floor. A better path is welcome with a one-line reason. MONITOR's zero-question contract and the measurement rules below don't flex.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for ai-search`\n(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this file was read from, e.g. `.agents/skills/ai-search`. If the script or python3 is unavailable, read the brand folder directly: `./brands/<slug>/` when `./brands/active` names one, else `./brand/`; then `MARKETING.md`, `preferences.md` and the files in `reads:`. If none exist, proceed standalone and ask only for the domain and one sentence on what it sells.)\n\nLoad `references/aeo-facts.md` before any mode (check its header; refresh if stale). Load `references/aeo-judgment.md` before diagnosis and before any OPTIMIZE recommendation. For a local business, also load `references/local-ai-facts.md` (check its header) and `references/local-prompt-sets.md`.\n\n**Is this a local business?** If it serves customers in places (a trade, a clinic, a shop, a restaurant), run the Local branch wherever it appears below. Otherwise skip it.\n\n## Modes\n\n| Trigger | Mode |\n|---|---|\n| Default: a domain, a brand name, or nothing | **AUDIT** |\n| \"optimize\", \"fix\", \"llms.txt\", \"make us citable\" | **OPTIMIZE** |\n| \"monitor\", \"what changed\", or any scheduled or non-interactive run | **MONITOR** |\n\nMONITOR asks zero questions. OPTIMIZE without a prior audit runs a compressed AUDIT first. Quick Mode: a narrow ask (\"are we cited for this one question?\") gets a single capture and a one-paragraph answer, no files unless asked.\n\n## Measurement rules (all modes)\n\nThese are what make an audit worth re-running:\n- **Sample, don't sweep.** 10 to 15 questions is the useful range. Freeze them verbatim in the audit; MONITOR repeats exactly that list.\n- **Count over what you observed.** Report \"named in 7 of 12 observed answers\", never \"58% visible\" over questions you attempted. A question whose answer you couldn't capture is NOT OBSERVED, never ABSENT.\n- **Four states per answer and entity:** CITED (its own site is a source), MENTIONED (named, but its site isn't a source, so others tell its story), ABSENT (the answer was observed and it isn't there), NOT OBSERVED.\n- **Answers vary run to run.** Repeated runs of the same prompt share only a minority of their sources (figures in `references/aeo-facts.md`). Run the top questions twice or across engines, and treat one run as a sample.\n- **Claims are about the answers collected,** not about \"what ChatGPT thinks\". Say which engine, which date, which location.\n- **A failed capture is never a finding.** A timeout, an out-of-credit error or a page that wouldn't load is NOT OBSERVED. One audit tool once counted errors as gaps and told well-known brands they were missing from answers they were in. Never write \"you're invisible\" over a run with failed or unobserved captures, and never claim a site is blocked or unreadable because your own fetch failed.\n\n## Mode 1: AUDIT\n\n### Phase 1. Build the question set\n\n**If `keyword-plan.md` exists,** start from its commercial and comparison families. Rewrite each keyword as the question a buyer would type into an assistant, because the phrasing changes which sources get retrieved. \"crm for freelancers\" and \"what's the best CRM for a solo freelancer?\" pull different citation sets; keep both when they plausibly diverge.\n\nKeep the set on one topic when you can. Fifteen questions on the topic the business is committing to beat fifteen spread across everything it sells, because the result has to pick a fix. Include the AI-native forms: the long, conversational questions with near-zero Google volume (from `keyword-plan.md`, `voc.md`, call notes, reviews and forums). They often decide who gets recommended.\n\n**If not,** derive from `positioning.md` across four kinds, skewed toward where the money is:\n1. **Category:** \"best <category> for <buyer>\" (3 to 5)\n2. **Comparison:** \"<brand> vs <competitor>\", \"<leader> alternatives\" (2 to 4)\n3. **Problem:** the pain in the buyer's words before they know the category exists (3 to 4)\n4. **Brand:** \"what is <brand>\", \"is <brand> worth it\", \"<brand> alternatives\" (2 to 3)\n\n**Run the entity probe first.** Before the set, ask each engine \"what is <brand>?\" and \"what is <domain>?\". If the answer describes a different company, a product with a similar name, or something unrelated, that's the first finding: until the engines tie the name to the site, no content fix compounds. The alternatives question shows who the engines think the brand competes with, which is sometimes not who the brand thinks.\n\nExample, a proposal tool for freelancers: \"best proposal software for freelance designers\", \"<competitor> vs <brand>\", \"how do I stop clients ghosting after I send a quote\", \"is <brand> worth it for a solo freelancer\".\n\n**Local branch.** Every question names the place: the city, or a neighborhood when the business is in a big metro. A question without a place gets answered for wherever the engine guesses the user is, which makes the result mislabeled evidence. Add two kinds that matter locally: **urgent** (\"emergency plumber in Dallas open now\") and **cost** (\"how much does water heater replacement cost in Dallas\"). Load `references/local-prompt-sets.md` for the full template set and the sample business.\n\n**Competitor set:** 2 or 3 names from `competitors#competitor-profiles`, the true peers, not the aspirational leader. If there's no competitors file, ask once which 2 or 3 to score against. For a local business, the top 3 of the map pack for the main service are usually the right set. That's the only question AUDIT asks.\n\n### Phase 2. Capture the answers\n\nAsk the user once, before capture: \"If you can paste real ChatGPT, Perplexity and Gemini answers for your top 3 to 5 questions, I'll score those as ground truth.\" Pasted answers override the proxy layers for those questions. Don't",
+      "card": null
+    },
+    {
+      "skill_path": "skills/audience-research/SKILL.md",
+      "blob_sha": "18ca33c6d44d1991ea79abd9387c0338b9f07a6d",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/audience-research/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "audience-research",
+        "description": "Mine where your audience actually talks (reviews, Reddit, YouTube comments, communities) and produce two brand files, audience.md (segments, awareness, jobs-to-be-done, watering holes) and voc.md (verbatim pain/desire/objection language with sources). Use it before positioning or copy work, when launching into a new market, or when copy keeps missing because nobody knows how customers actually describe the problem."
+      },
+      "excerpt": "---\nname: audience-research\ndescription: Mine where your audience actually talks (reviews, Reddit, YouTube comments, communities) and produce two brand files, audience.md (segments, awareness, jobs-to-be-done, watering holes) and voc.md (verbatim pain/desire/objection language with sources). Use it before positioning or copy work, when launching into a new market, or when copy keeps missing because nobody knows how customers actually describe the problem.\nwhen_to_use: research my audience, who is my audience, voice of customer, what do customers say, mine reviews, customer language, refresh my audience research, why isn't my copy landing, audience for X\nargument-hint: \"[product URL or description; optionally 'refresh' to diff against existing research]\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: foundation\n    reads: [positioning#market-assessment, brand-manifest]\n    writes: [audience, voc]\n    optional-keys: [FIRECRAWL_API_KEY, EXA_API_KEY, SCRAPECREATORS_API_KEY, TREG_TOKEN]\n    enhances_with:\n      - toolset: social-data\n        gains: \"mines documented Reddit and community material with deeper live evidence\"\n---\n\n# Audience Research\n\nFind the rooms where your buyers complain, compare, and confess, and bring back their\nexact words. Done means two files: an audience profile where every claim traces to\nevidence, and a verbatim language bank that lets every downstream skill enter the\nconversation already happening in the customer's head. The judgment this skill carries:\nknowing which sources are signal for which business, and refusing to launder paraphrase\nas voice-of-customer. The method is a floor, not a ceiling. When the category in front\nof you argues for different sources or sequence, take them and say why.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for audience-research`\n(If the script or python3 is unavailable, read the files named in `reads:` directly,\nsection-anchored where specified. If none exist, proceed standalone. Ask only for what\nthe task strictly requires.)\n\nIf `positioning.md#market-assessment` exists, use its declared `Category:` and the known\ncompetitors as mining seeds. If `audience.md` or `voc.md` already exist (check `brand.yaml`), default to\n**Refresh mode** unless the user asks to start over.\n\n## Modes\n\n- **Full research** (default): Phases 1-4 below. Needs a product URL or a one-line\n  description + category.\n- **Refresh** (\"refresh my audience research\"): diff new mining against existing files.\n  See Refresh mode.\n- **Interview fallback**: no URL, web access failing, or the user explicitly wants a fast\n  draft. See Interview fallback. The audience.md header carries `Data: MODEL KNOWLEDGE`, and\n  the chat note says in plain words that this is a draft from category knowledge, not mined\n  research. Never let it masquerade as mined research.\n- **Quick Mode**: a narrow ask (\"what do customers say about onboarding?\", \"mine pricing\n  objections\") gets a targeted mine of 2-3 sources on that theme only, appended to voc.md\n  under the matching section. No source map ceremony, no full synthesis. Deliver, then\n  one line of what's-next.\n\n## Phase 1: Source map\n\nFrom the product category, pick **5-8 mining sources**. This is a judgment call, not a\nchecklist: the wrong sources return polite noise; the right ones return rage, longing,\nand exact vocabulary.\n\nHighest-signal sources by business type:\n\n| Business type | Mine first | Also strong | Usually weak |\n|---|---|---|---|\n| B2B SaaS | G2 + Capterra (2-4★), category subreddits, **competitor G2 reviews** | LinkedIn comment threads, niche Slack/Discord (if public), HN threads | Twitter praise, vendor case studies |\n| E-com / consumer product | Amazon reviews (own + competitor, 2-4★), Reddit | Trustpilot, YouTube review comments, TikTok comments | Instagram comments (performative) |\n| Mobile / app | App Store + Play Store reviews (sort: recent, not helpful), Reddit | YouTube tutorial comments | The app's own community (survivor bias) |\n| Services / agency | Reddit (\"anyone hired a...?\" threads), X/LinkedIn discussions | Google/Clutch reviews, podcast episode comments | Testimonial pages |\n| Local service business | Google reviews (2 to 4 stars) of the business and the top 3 in its map pack, Reddit trade and city threads (\"anyone used a good plumber in...?\"), Angi, Yelp and BBB complaints | Nextdoor and neighborhood groups when public, Thumbtack | The business's own testimonials page |\n| Creator / info product | **YouTube comments on category videos** (not the creator's own), Reddit | X replies under big accounts in the niche, Udemy/Skool reviews of competing courses | The creator's own audience (already converted) |\n\nRules that govern the map:\n\n- **Local example (sample business Hartline Plumbing, Dallas TX).** Mine its Google reviews and those of the top three plumbers in the map pack, one Dallas thread search (\"plumber\", \"water heater\", \"overcharged\"), and the one-to-three-star Angi or Yelp reviews. The switching triggers are usually showing up late, surprise bills and no callback. Those words become the language for ads and the first screen.\n- **Competitor reviews outrank your own.** Your reviews tell you about your product;\n  competitor reviews tell you about the market. Competitor 1-star reviews are switching\n  triggers verbatim. Default: at least one miner on a competitor review surface.\n- **Find the real subreddits, don't guess.** Search `site:reddit.com [category problem\n  language]` and verify the sub is alive (posts in the last week, comments per post >3)\n  before assigning a miner to it. A dead sub burns a slot. We use Exa for this search:\n  it matches on meaning, so a thread that describes the problem in the customer's own\n  words comes up even when no keyword matches (free tier, then pay as you go). Without\n  it, the `site:reddit.com` search in WebSearch does the job.\n- **One source per distinct *conversation type*.** Reviews = post-purchase judgment.\n  Reddit/forums = pre-purchase confusion and comparison. YouTube comments = aspiration\n  and skepticism. Social = identity and hot takes. You want coverage across types, not\n  five review sites.\n- 5-8 sources is the budget. If the category is tiny (niche B2B), 4 deep sources beat 8\n  thin ones. Say so and proceed.\n- Hard caps: each miner ≤ 5 page fetches on its source and ≤ 8 minutes,\n  no sub-agents. A miner that hits its cap returns its pack as-is, labelled\n  `budget-capped`.\n\nKeep the source map as working notes (source, type, why); it becomes Watering Holes in\naudience.md, not chat output. Do not ask permission to mine unless access is ambiguous\n(private community, login wall).\n\n## Phase 2: Parallel mining\n\n**Check the web first.** Before dispatching, make sure your own WebSearch works (the\nPhase 1 subreddit search counts; otherwise run one). If it is denied or errors, the\nminers will be blocked too: don't dispatch them, go to Interview fallback and say why in\none line. If miners come back blocked anyway, do the same with whatever they returned.\n\nWe use Firecrawl to read the review and forum pages: full-page reads, so every quote\ncomes from the page itself and not a summary. It has a free tier of 1,000 credits a month\nwith no card, and Hobby starts at $16 a month (billed yearly) for 5,000. Without it,\nWebFetch reads the public pages; where it returns only a summary, take the quote from the\nsearch result with its full URL or report the skip.\n\nFan out **one subagent per source**, all in parallel, using the Task/Agent tool\n(`general-purpose`). Each subagent's brief must include:\n\n1. The source URL(s)/search strategy, the product, category, and known competitors.\n2. Instruction to read `${CLAUDE_SKILL_DIR}/references/voc-mining-judgment.md` before\n   mining. It carries the signal/noise rules (2-4★ first, specificity weighting,\n   astroturf detection, \"I wish it...\" flags).\n3. Budget: ≤ 5 pag",
+      "card": null
+    },
+    {
+      "skill_path": "skills/brand-voice/SKILL.md",
+      "blob_sha": "a78095f892c96ca5a1f1a43417c2592af861f4ec",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/brand-voice/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "brand-voice",
+        "description": "Extracts or builds a falsifiable brand voice profile, backed by verbatim evidence from the brand's real content, that every other content skill reads, so output sounds like the brand instead of a model. Use when starting a project, when copy sounds generic or AI-written, when output must match a specific person or brand, or to check recently published content for voice drift."
+      },
+      "excerpt": "---\nname: brand-voice\ndescription: Extracts or builds a falsifiable brand voice profile, backed by verbatim evidence from the brand's real content, that every other content skill reads, so output sounds like the brand instead of a model. Use when starting a project, when copy sounds generic or AI-written, when output must match a specific person or brand, or to check recently published content for voice drift.\nwhen_to_use: what's my voice, analyze my brand voice, make this sound like me, voice guide, brand personality, analyze my website, this sounds generic, this sounds like AI, voice drift check, is this on brand, define my voice\nargument-hint: \"[URL to auto-scrape | pasted content to extract | 'drift check' + recent content]\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: foundation\n    reads: [positioning, audience]\n    writes: [voice-profile]\n    optional-keys: [FIRECRAWL_API_KEY, EXA_API_KEY]\n---\n\n# Brand Voice\n\nProduce a voice profile specific enough that a stranger holding only the profile writes\ncontent the brand's audience would attribute to the brand, and tight enough that every\nline rules something out. The judgment this skill carries: voice claims are\nevidence-backed and falsifiable, never horoscope; the Voice Test Loop, not\ninterrogation, is how the profile gets accurate. The method is a floor, not a ceiling.\nWhen the content in front of you argues for a better path, take it and say why.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for brand-voice`\n(If the script or python3 is unavailable, read the files named in `reads:` directly. If\nnone exist, proceed standalone: ask only for what the task strictly requires.)\n\nPositioning shapes stance (a rebel brand and a trusted-advisor brand land differently on\nevery spectrum); audience shapes jargon tolerance and register. Use them as priors,\nnever as substitutes for evidence.\n\n**Before writing or updating any profile, load `references/voice-extraction-judgment.md`**.\nIts falsifiability rule, exhibit-citation requirement, and competitor-paste test are\nthe quality bar for every line of the profile.\n\n## Modes\n\n| Mode | When | Signal |\n|---|---|---|\n| **Extract** | They have content they're proud of | Pasted content, file paths, \"analyze these\" |\n| **Build** | No crawlable surface exists, or existing content is deliberately being abandoned | \"I don't have content\" AND no site/socials to mine |\n| **Auto-Scrape** | A crawlable surface exists, whether or not they mentioned it | URL in the message, or a domain/handle findable in brand.yaml / positioning.md / stack.md |\n| **Drift Check** | Saved profile exists; they want recent content audited | \"drift check,\" \"is this still on brand,\" recent posts + existing profile |\n\n**Tools pick the mode (extract, don't interview):** when the web-scrape capability is\npresent, check for a crawlable surface BEFORE asking anything. The message, then\nbrand.yaml, positioning.md, stack.md for a domain or social handles. Found one →\nAuto-Scrape is the first pass, even if they said \"help me define my voice\": crawl,\nextract, present the drafted profile for correction. Build's questions then fill only\nthe gaps the corpus couldn't answer (usually the anti-model and hard lines). A person\nwith a live website should never face an interview a crawler could have skipped.\n\nIf `./brand/voice-profile.md` already exists and the request isn't Drift Check, this is\nan **update**: read the existing profile, apply the requested change or re-extract on\nnew evidence, run the Voice Test Loop on what changed, then save (auto-version per\n`start-here/references/brand-memory.md`; show a 3-line summary of what changed, with no confirmation ceremony).\n\nIf no surface is findable and the mode is still ambiguous, ask ONE question: \"Do you\nhave published content that sounds like you, or are we building from scratch? (A URL\nworks too: I'll do the research.)\"\n\n---\n\n## The six dimensions\n\nEvery mode analyzes (or constructs) the same six dimensions. These are the skeleton of\nthe profile.\n\n1. **Tone:** position on five spectrums: Formal↔Casual, Serious↔Playful, Reserved↔Bold,\n   Simple↔Sophisticated, Warm↔Direct. A position is only useful with its mechanism\n   (\"casual in syntax, never in punctuation\" beats \"pretty casual\").\n2. **Vocabulary:** signature words and coinages, banned words, jargon level and what\n   jargon signals (peer vs seller), profanity policy.\n3. **Rhythm:** sentence-length distribution (the mix, not the average), paragraph shape,\n   fragment use, where the prose speeds up and slows down.\n4. **Structure:** how pieces open (story / claim / question), how they transition, how\n   they close (CTA / open loop / cold stop), formatting habits.\n5. **Personality:** the 3-4 traits that show up as observable behavior in the prose:\n   self-deprecating about what? confident how? teacher or peer? What's the recurring\n   move?\n6. **POV & address:** I vs we, how the reader is addressed, the relationship stance\n   (peer slightly ahead / guide / insider / rebel).\n\n---\n\n## Mode: Extract\n\nInput: 3-5 pieces the user considers \"most them\": posts, emails, transcripts, pages.\nUnder ~1,500 words total, say the corpus is too thin for reliable patterns and offer to\nAuto-Scrape the gaps or proceed with caveats.\n\nProcess:\n1. Read everything once for gestalt, then once per dimension.\n2. Pull verbatim exhibits (5-60 words each) as you go. Every pattern you think you see\n   must be pinned to a quote. Target 10-20 exhibits.\n3. Write the profile (template below), citing exhibit IDs per the falsifiability rule.\n4. Run the Voice Test Loop.\n\nWhat separates a good extraction from a mediocre one: the mediocre one describes what\nthe content is ABOUT; the good one describes what the writer DOES. The repeated move,\nthe thing they never do, the habit they probably don't know they have. If you can't name\nthree habits the brand itself would be surprised to see articulated, read the corpus\nagain.\n\n## Mode: Build\n\nNo corpus exists, so don't fake one with 15 questions. Most answers to voice\nquestionnaires are aspirational noise. Ask the four that actually constrain the profile,\ninfer everything else, and let the Voice Test Loop catch inference errors (it's cheaper\nfor the user to react to three sample paragraphs than to answer eleven more questions):\n\n1. **Identity belief:** \"What do you believe about your space that most competitors\n   wouldn't say out loud?\" (This becomes the spine. A voice with nothing to assert\n   defaults to mush.)\n2. **Anti-model:** \"Name a brand or creator you do NOT want to sound like. What\n   specifically grates?\" (Negative space is more diagnostic than positive aspiration.)\n3. **Admired voices:** \"2-3 voices you admire (any field) and the one specific thing\n   each does that you'd steal.\"\n4. **Audience:** \"Who are you talking to, and how do THEY talk?\" (Skip if `audience.md`\n   already answers it.)\n\nOptionally, a fifth if their answers leave it genuinely open: \"Any hard lines:\nprofanity, humor, hot takes, emoji?\"\n\nThen construct: derive the spectrums from belief + anti-model, vocabulary from\nadmired-voice mechanics + audience language, rhythm and structure as your best inference\nfrom the register they used answering you. Mark the profile `Evidence: INTAKE (exhibits\npending first published content)` and cite their verbatim answers as interim exhibits.\nRun the Voice Test Loop. In Build mode it's load-bearing, since the samples are the\nfirst evidence that ever existed.\n\n## Mode: Auto-Scrape\n\nA URL in, a profile out. The research is performed, not described: **fan out parallel\nsubagents, one per source type**, using the Task/Agent tool (`general-purpose`). Unless\nyou are already running inside an onboarding agent: then do the sources yourself, in\norder, within a small research budget (depth one, no sub-agents). Launch all applicable agents in a\nsingle parallel batch:\n\n| Agent | Source",
+      "card": {
+        "title_zh": "品牌语气画像",
+        "purpose_zh": "从品牌真实内容中提取或构建可证伪的品牌语气画像，以逐字证据支撑，供其他内容技能读取，使产出听起来像品牌而非模型。",
+        "does": [
+          "从用户提供的3-5篇内容中提取六维度语气画像并附逐字证据",
+          "无内容时通过四个关键问题构建画像",
+          "有可抓取来源时并行抓取网站、社交、播客、通讯内容",
+          "对近期内容做语气漂移检查并输出报告",
+          "运行Voice Test Loop校验画像准确性",
+          "更新已有voice-profile并自动版本化"
+        ],
+        "inputs": [
+          "URL或粘贴的内容",
+          "3-5篇最能代表品牌的内容",
+          "四个构建问题（身份信念、反面模型、欣赏的声音、受众）",
+          "近期发布内容（漂移检查用）",
+          "已有voice-profile.md"
+        ],
+        "outputs": [
+          "voice-profile.md语气画像文件",
+          "结构化证据包（来源、逐字引文、观察、缺口）",
+          "语气漂移报告至./campaigns/voice-drift/{YYYY-MM-DD}-drift-report.md",
+          "每篇内容的六维度评分与判定"
+        ],
+        "scenarios": [
+          "项目启动时定义品牌语气",
+          "文案听起来泛泛或像AI生成时",
+          "需要匹配特定人物或品牌语气时",
+          "定期检查已发布内容是否语气漂移",
+          "为其他内容技能提供语气基础"
+        ],
+        "prerequisites": [
+          "可选环境变量FIRECRAWL_API_KEY、EXA_API_KEY",
+          "漂移检查需已有保存的voice-profile.md",
+          "抓取模式需WebSearch/WebFetch或Firecrawl等能力"
+        ],
+        "limits": [
+          "语料少于约1500词时提示过薄，需回退到提取或构建模式",
+          "漂移检查1篇仅为抽查",
+          "登录墙来源跳过并标注",
+          "无抓取能力时WebFetch仅返回摘要"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "调研",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Produce a voice profile specific enough that a stranger holding only the profile writes content the brand's audience would attribute to the brand"
+          },
+          {
+            "field": "does",
+            "quote": "Pull verbatim exhibits (5-60 words each) as you go. Every pattern you think you see must be pinned to a quote."
+          },
+          {
+            "field": "does",
+            "quote": "Ask the four that actually constrain the profile, infer everything else, and let the Voice Test Loop catch inference errors"
+          },
+          {
+            "field": "does",
+            "quote": "fan out parallel subagents, one per source type"
+          },
+          {
+            "field": "inputs",
+            "quote": "Input: 3-5 pieces the user considers \"most them\": posts, emails, transcripts, pages."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "optional-keys: [FIRECRAWL_API_KEY, EXA_API_KEY]"
+          },
+          {
+            "field": "limits",
+            "quote": "Under ~1,500 words total, say the corpus is too thin for reliable patterns"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "If `./brand/voice-profile.md` already exists and the request isn't Drift Check, this is an **update**"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/competitive-intel/SKILL.md",
+      "blob_sha": "d1e6ad6ab90412a7a69656b040d6effca4ac2050",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/competitive-intel/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "competitive-intel",
+        "description": "Tear down 3-6 competitors with parallel research agents (homepage messaging, pricing, ads they pay to run, lead magnets, launches, AI-citation presence) and synthesize the exploitable gaps into ./brand/competitors.md. Use when you need to know what competitors actually say and sell before positioning, pricing, or writing copy; also runs a non-interactive diff mode for scheduled competitor watching, an ad-recon mode for paid-ads counter-positioning, and a local mode for service businesses (the to"
+      },
+      "excerpt": "---\nname: competitive-intel\ndescription: Tear down 3-6 competitors with parallel research agents (homepage messaging, pricing, ads they pay to run, lead magnets, launches, AI-citation presence) and synthesize the exploitable gaps into ./brand/competitors.md. Use when you need to know what competitors actually say and sell before positioning, pricing, or writing copy; also runs a non-interactive diff mode for scheduled competitor watching, an ad-recon mode for paid-ads counter-positioning, and a local mode for service businesses (the top 3 in the map pack and the top paid ads for a service and city, their promises, prices, review pace, and the top complaints across their reviews).\nwhen_to_use: competitor analysis, tear down my competitors, who am I up against, what are competitors charging, competitor watch, what changed with competitors, spy on competitor ads, ad recon, competitive landscape, why is competitor X winning, competitor teardown, who's beating me on Google Maps, local competitors, other plumbers in my area, what do my competitors' customers complain about\nargument-hint: \"[competitor names/URLs or a category] | watch | ads <category>\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: foundation\n    reads: [positioning#market-assessment, competitors, brand-manifest]\n    writes: [competitors, assets, brand-manifest]\n    optional-keys: [FIRECRAWL_API_KEY, EXA_API_KEY, SCRAPECREATORS_API_KEY, TREG_TOKEN]\n    enhances_with:\n      - toolset: social-data\n        gains: \"adds documented creator, social, and ad-library recon to public-page teardowns\"\n---\n\n# Competitive Intel\n\nCompetitor pages tell you what they claim; their ads tell you what they'll pay to claim; their pricing tells you who they're built for; their reviews tell you where they break. This skill collects all four in parallel, with verbatim evidence, and turns them into the three gaps you can actually exploit. Done means: a competitors.md another skill can act on without re-researching, where every claim traces to a quote or URL. The method is a floor, not a ceiling. When the category in front of you argues for a better path, take it and say why.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for competitive-intel`\n(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this\nfile was read from, e.g. `.agents/skills/competitive-intel`. If the script or python3 is\nunavailable, read the brand folder directly: `./brands/<slug>/` when `./brands/active`\nnames one, else `./brand/`; then `MARKETING.md`, `preferences.md` and the files in\n`reads:`. If none exist, proceed standalone and ask only for the category or\ncompetitor names (or, for a local business, the main service and city).)\n\n## Modes\n\n| Trigger | Mode |\n|---|---|\n| Default: names, URLs, a category, or nothing | **TEARDOWN** |\n| \"watch\", \"diff\", \"what changed\", or any non-interactive/scheduled invocation | **WATCH** |\n| \"ads\", \"ad recon\", \"what ads are they running\" | **AD RECON** |\n| A local service business (brand files say so, or the request names a city, \"near me\" or Google Maps) | **LOCAL** |\n\nWATCH and AD RECON are below the teardown sections. WATCH asks zero questions. It is what the weekly competitor-watch routine calls.\n\n---\n\n## Mode 1: TEARDOWN (default)\n\n### Phase 1: Build the roster\n\nTarget 3-6 competitors. Resolve in this order:\n\n1. **User named them** → use those, but sanity-check each is a real alternative for the brand's buyer, not just a famous name in the space.\n2. **competitors.md exists** → confirm the roster in one question (\"Re-tear these five, or change the list?\"). This is the only question the mode asks.\n3. **Neither** → for a local service business, switch to **LOCAL** mode (review sites\n   and \"alternatives\" searches don't list plumbers; the map does). Otherwise discover from the `Category:` line in `positioning#market-assessment`: search \"best `<category>` tools\", \"`<category>` alternatives\", and the G2/Capterra category page. Pick by ICP overlap, not size.\n\nWe use Exa for the discovery searches: it finds the pages a keyword search misses, such as a smaller peer or an up-and-comer (free tier, then pay as you go). Without it, the same searches in WebSearch work.\n\nRoster judgment: one aspirational leader (sets the category's vocabulary), two or three true peers (fight for the same buyer this quarter), one up-and-comer (shows where the category is moving). A roster of five peers tells you nothing about trajectory; a roster of five giants tells you nothing actionable. More than six competitors dilutes the synthesis. Depth beats coverage.\n\n### Phase 2: Parallel evidence collection\n\n**Check the web first.** Phase 1's discovery search counts; otherwise run one WebSearch yourself before dispatching. If it is denied or errors, the subagents will be blocked too: don't dispatch. Write `competitors.md` from model knowledge instead (roster and known positioning, every price and count `UNVERIFIED`), labeled `Data: MODEL KNOWLEDGE (not checked live)` in the file, and say in one line in chat that allowing WebSearch and WebFetch (`/permissions`) and re-running makes it live.\n\nDispatch **one subagent per competitor, all in parallel** (Task tool, `general-purpose`). Budget per subagent: ≤ 40 fetches, ≤ 8 minutes, no sub-agents. Six surfaces is ~6-12 fetches, not a crawl. Each subagent gets the brief below plus the competitor's name and domain, and returns the evidence pack: facts, verbatim quotes, URLs. **No analysis in the packs**; synthesis happens centrally so claims can be compared across competitors. The packs are working data: save them to `./campaigns/competitive-intel/<date>-evidence.md` and never paste them into chat.\n\nScraping rules for every subagent:\n- We use Firecrawl for the page reads (`firecrawl_scrape`, `firecrawl_search`): full-page reads, including the JavaScript-rendered pricing pages that a plain fetch returns as a shell (free tier of 1,000 credits a month, no card). Without it, use WebFetch + WebSearch, and if a fetch returns a shell, pull the page from a search cache and say so.\n- Enhanced (`SCRAPECREATORS_API_KEY` set): for creator, social, and ad-library recon,\n  use only endpoints that ScrapeCreators documents at docs.scrapecreators.com;\n  baseline: use WebFetch/WebSearch on public pages and report any gaps. Or treg, one token\n  for many data APIs (pay per call), if you'd rather not open a separate account for social\n  and ad data.\n- Quotes are **verbatim**: exact headline text, exact price strings (\"$49/mo billed annually\"), exact CTA labels. Paraphrase destroys the synthesis (you can't cluster claims you've already rewritten).\n- A number you can't confirm is marked `UNVERIFIED`, never estimated. An unreachable surface is reported as `NOT FOUND (checked: <urls>)`. Absence of ads or a changelog is itself a finding.\n\n**Subagent brief: six surfaces per competitor** (the default set; drop or add a surface when the category argues for it, saying which and why):\n\n1. **Homepage messaging.** H1 headline, subhead, primary CTA, verbatim. Above-the-fold proof elements (logos, counts, testimonials, review badges). Who the page addresses (role/segment named or implied). Secondary nav items that reveal strategy (e.g., \"Enterprise\", \"vs. <competitor>\" pages).\n2. **Pricing + packaging.** Every tier: name, price, billing toggle, the 2-3 features that gate it. Free tier or trial, and trial length. \"Contact sales\" present and at what point. Annual-only pricing, seat minimums, usage meters. If pricing is hidden, say so. Hidden pricing is data.\n3. **Lead magnets / conversion offers.** What they trade for an email: guides, templates, free tools/calculators, webinars, newsletters, demos. Note gating depth (email-only vs full form) and where the offers sit (nav, blog footers, exit intent).\n4. **Paid ads.** Meta Ad Library (`facebook.com/ads/library`: search the advertis",
+      "card": null
+    },
+    {
+      "skill_path": "skills/content-atomizer/SKILL.md",
+      "blob_sha": "d3c5b31d7ed4e4beab4eaaf10e374142089f4778",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/content-atomizer/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "content-atomizer",
+        "description": "Turns one piece of finished content (blog post, newsletter, podcast, video) into platform-native social assets for the 2-3 platforms the brand actually operates, with depth on a few platforms instead of rephrased spray across eight. Use when source content exists and needs distribution, when a post's comments need ranked reply drafts, or when a week of posts should be planned from one source."
+      },
+      "excerpt": "---\nname: content-atomizer\ndescription: Turns one piece of finished content (blog post, newsletter, podcast, video) into platform-native social assets for the 2-3 platforms the brand actually operates, with depth on a few platforms instead of rephrased spray across eight. Use when source content exists and needs distribution, when a post's comments need ranked reply drafts, or when a week of posts should be planned from one source.\nwhen_to_use: repurpose this, atomize this content, turn this into social posts, LinkedIn post from this, X post from this, thread from this, draft replies to these comments, reply to my comments, content calendar from this, schedule this across platforms\nargument-hint: \"[source content, file path, or URL | 'replies' + pasted comments | 'calendar' + source]\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: distribution\n    reads: [voice-profile#platform-adaptations, learnings, algo-cache]\n    writes: []\n    optional-keys: [ZERNIO_API_KEY, BUFFER_ACCESS_TOKEN, FIRECRAWL_API_KEY, TREG_TOKEN]\n---\n\n# Content Atomizer\n\nTurn one finished piece into the few platform-native assets it actually deserves, and nothing else. The judgment this skill carries: platform selection and native depth are the work; volume is the failure mode. Rephrased-spray content is a strategy for being ignored at scale; platform-specific evidence lives in `references/platform-facts.md`. This skill is a floor, not a ceiling. If the content in front of you deserves a better path than the one below, take it and say why in one line.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for content-atomizer`\n(If the script or python3 is unavailable, read the files named in `reads:` directly, section-anchored where specified. If none exist, proceed standalone and ask only for what the task strictly requires.)\n\nWhat each input does here:\n- **voice-profile#platform-adaptations**: the per-platform voice table. It is the ONLY source of voice adjustment in this skill; never invent a parallel adaptation table. No profile means ask one question (\"how formal, and any words you'd never use?\") and write in a clean neutral register.\n- **learnings**: platform performance priors. Apply them. Mention one only when it changed the work, as a single line in the note (\"Your carousels outperformed text posts 3/3 in May, so LinkedIn gets one\").\n- **algo-cache**: per-brand dated platform facts, if /performance-review or a prior refresh has written any. Where it conflicts with this skill's reference file, the fresher `last-verified` wins.\n\n**Freshness gate (run before generating):** load `references/platform-facts.md`. If today is past `last-verified + ttl-days`, refresh per the instruction in its header, update the file, and say so in one line in the note. Never generate against stale algorithm facts silently.\n\n## Modes\n\n| Mode | Trigger | Output |\n|---|---|---|\n| **Atomize** (default) | Source content + \"repurpose / atomize / post from this\" | 3-6 native pieces across 2-3 platforms |\n| **Engagement replies** | \"draft replies,\" pasted comments, a post URL + \"respond\" | Ranked reply drafts + relationship flags |\n| **Calendar** | \"content calendar,\" \"week of posts from this\" | Atomize output + dated `schedule.md` |\n| **Full fan-out** | Explicit only: \"all platforms,\" \"everything,\" \"max distribution\" | Wide coverage, after a one-line warning |\n\nQuick Mode applies: \"give me an X post from this\" means one X post, fast. Skip platform selection, skip the brief, deliver and lint it.\n\n---\n\n## Phase 1: Platform judgment (this is the skill)\n\nBefore writing anything, decide where this content should go and how deep. Two questions, in order.\n\n### 1a. Which platforms does this brand operate?\n\nEvidence, in priority order: filled rows in the voice-profile platform-adaptations table (an empty or templated row means they don't really post there), platform entries in learnings, platforms named in the request. If still unclear, ask ONE question: \"Which 2-3 platforms do you actually post on?\" Do not default to all eight. A platform the user doesn't operate gets nothing, because orphan posts on a dead account are worse than absence.\n\n### 1b. What does THIS content deserve on each operated platform?\n\nPer platform, assign one of four treatments:\n\n- **Native deep**: the content's strongest material, rebuilt in the platform's native format from scratch. The piece should read like it was conceived for the platform.\n- **Native light**: one standalone post carrying a single extractable insight.\n- **Link-in-reply**: a self-contained post that delivers the core value, with the source link in the first reply (on X, links in the post body cost 30-50% of reach; see platform-facts). The post must work for someone who never clicks.\n- **Skip**, and say why. \"This has nothing for TikTok\" is a correct, complete answer. Skipping is not under-delivery; spraying is.\n\nFit judgment by content shape:\n\n| Source material | Strong fit | Weak fit |\n|---|---|---|\n| Framework / numbered process | LinkedIn carousel or document, X thread | Short video (compresses badly) |\n| First-person story with a turn | X long-form post, LinkedIn text, TikTok/Reel script | Carousel (kills the pacing) |\n| Original data / research | X post + chart, LinkedIn text, Reddit deep post | Instagram (unless /creative builds the visual) |\n| Contrarian argument | X standalone post, Threads | LinkedIn (argue with evidence there, not edge) |\n| Tutorial / how-to | TikTok/Shorts script, carousel | Threads, Bluesky |\n| Opinion / commentary | Threads, X, Bluesky | YouTube |\n\n**Default budget: 2-3 platforms, 1-2 pieces each (3-6 total).** Depth beats coverage. Every piece justifies itself by treatment, not quota; exceed the budget when the source and the brand's footprint genuinely earn it, stating why. Full fan-out only on explicit request, prefaced once with: \"Heads up: broad fan-out of one source underperforms native depth on the platforms you actually run, and current rankers demote rephrased cross-posts. Doing it as asked.\"\n\nState the plan in 3-5 lines (platform, treatment, why, plus skips with reasons) before generating. If the user redirects, that's the cheapest possible edit.\n\n**Worked example** (illustrative; source: Hartline Plumbing's 2,400-word guide to water heater replacement costs in Dallas, a sample business; the brand operates LinkedIn + X and has a dormant Instagram):\n\n```\nPlan: \"What a water heater swap actually cost our Dallas customers in 2026\"\n  LinkedIn   native deep   the cost-by-tank-size breakdown is carousel-shaped; your\n                           carousels beat text 3/3 in May\n  X          native light + link-in-reply   the headline number stands alone; the\n                           job-by-job detail stays in the guide, linked in reply 1\n  Instagram  skip          account dormant since March; cost charts need /creative\n                           visuals to be worth posting there at all\n3 pieces total. Say the word if you want wider coverage.\n```\n\n## Phase 2: Extract\n\nMine the source once, before writing anything. Pull only elements that survive standalone. If a point needs the surrounding article to make sense, it isn't an atom, it's a fragment.\n\n- **Core insight**: the one sentence someone should repeat to a colleague\n- **Supporting points**: 3-7, each carrying its own evidence\n- **Stories**: concrete scenes with a turn, not \"we learned a lot\"\n- **Data points**: specific numbers with their context attached\n- **Contrarian takes**: positions a smart peer could actually dispute\n- **Quotable lines**: sentences that earn a screenshot\n\nIf the source is a URL, fetch it (Firecrawl if `FIRECRAWL_API_KEY` is set, else WebFetch). For audio/video, work from the transcript and note timestamps next to extracted moments, because they become clip references.\n\nWrite the extraction to `brief.md` (skip in Quick Mode). Honest sparseness b",
+      "card": {
+        "title_zh": "内容原子化分发",
+        "purpose_zh": "把一篇已完成内容（博客、通讯、播客、视频）拆成品牌实际运营的2-3个平台的原生社交素材，并可为评论生成排序回复草稿或规划一周内容日历。",
+        "does": [
+          "判断品牌实际运营的平台，并为每个平台指定原生深度、原生轻量、链接放回复或跳过四种处理",
+          "从源内容中提取核心洞见、支撑点、故事、数据、反常识观点和可引用句，写入brief.md",
+          "按各平台原生格式改写内容，如X独立帖与长文、LinkedIn轮播或文本、短视频口播脚本",
+          "为粘贴的评论生成排序回复草稿并标注关系标记",
+          "从单一源内容生成带日期的schedule.md内容日历",
+          "生成前检查平台事实文件的时效性，过期则刷新并说明"
+        ],
+        "inputs": [
+          "源内容、文件路径或URL",
+          "粘贴的评论（回复模式）",
+          "品牌voice-profile、learnings、algo-cache等上下文文件",
+          "用户指定的平台或社区",
+          "可选密钥：ZERNIO_API_KEY、BUFFER_ACCESS_TOKEN、FIRECRAWL_API_KEY、TREG_TOKEN"
+        ],
+        "outputs": [
+          "2-3个平台上的3-6条原生社交内容",
+          "brief.md提取简报（快速模式跳过）",
+          "排序回复草稿与关系标记",
+          "带日期的schedule.md内容日历"
+        ],
+        "scenarios": [
+          "已有博客或通讯需要分发到社交平台",
+          "把一篇内容改写成LinkedIn帖子或X帖子/线程",
+          "为帖子评论起草回复",
+          "从一篇源内容规划一周发帖日历",
+          "用户明确要求全平台最大分发"
+        ],
+        "prerequisites": [
+          "存在./brand/、./brands/或MARKETING.md时运行brand_context.py加载品牌上下文",
+          "有voice-profile#platform-adaptations平台语气表，否则需询问正式程度与禁用词",
+          "生成前加载references/platform-facts.md并检查是否超过last-verified+ttl-days",
+          "写作钩子或CTA前加载references/slop-patterns.md",
+          "源内容为URL时用Firecrawl（若设置FIRECRAWL_API_KEY）或WebFetch抓取"
+        ],
+        "limits": [
+          "默认预算为2-3个平台、每平台1-2条，共3-6条，深度优先于覆盖量",
+          "全平台分发仅在用户明确要求时执行，并先给出一行警告",
+          "不生成用户不运营的平台内容",
+          "YouTube长视频和邮件不是原子化目标，应转交/creative和/newsletter",
+          "Reddit内容仅在用户指定其真实参与的社区时生成",
+          "Instagram视觉制作需转交/creative",
+          "不得在平台事实过期时静默生成"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "内容运营",
+          "写作",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Turns one piece of finished content (blog post, newsletter, podcast, video) into platform-native social assets for the 2-3 platforms the brand actually operates"
+          },
+          {
+            "field": "does",
+            "quote": "Per platform, assign one of four treatments:"
+          },
+          {
+            "field": "does",
+            "quote": "Write the extraction to `brief.md` (skip in Quick Mode)."
+          },
+          {
+            "field": "does",
+            "quote": "Ranked reply drafts + relationship flags"
+          },
+          {
+            "field": "does",
+            "quote": "Atomize output + dated `schedule.md`"
+          },
+          {
+            "field": "does",
+            "quote": "If today is past `last-verified + ttl-days`, refresh per the instruction in its header, update the file, and say so in one line in the note."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Only if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Freshness gate (run before generating):** load `references/platform-facts.md`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the source is a URL, fetch it (Firecrawl if `FIRECRAWL_API_KEY` is set, else WebFetch)."
+          },
+          {
+            "field": "limits",
+            "quote": "**Default budget: 2-3 platforms, 1-2 pieces each (3-6 total).** Depth beats coverage."
+          },
+          {
+            "field": "limits",
+            "quote": "Full fan-out only on explicit request, prefaced once with:"
+          },
+          {
+            "field": "limits",
+            "quote": "A platform the user doesn't operate gets nothing, because orphan posts on a dead account are worse than absence."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for content-atomizer`"
+          },
+          {
+            "field": "hosts",
+            "quote": "python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/creative/SKILL.md",
+      "blob_sha": "c9317f1e51baac0d70cf44089eb620da8833b256",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/creative/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "creative",
+        "description": "AI creative production engine for product photos, product video, social graphics, talking heads, ad creative, and video ads cut from real or generated footage in code and rendered to MP4 for free, through one tiered pipeline with a vision-QA loop that looks at every asset before you see it. Ad creative is built from 336 live Meta ads we viewed (21 formats with real examples, a hook bank, a script that pulls competitors' live ads from the Meta Ad Library, a batch plan that mixes long-running stil"
+      },
+      "excerpt": "---\nname: creative\ndescription: AI creative production engine for product photos, product video, social graphics, talking heads, ad creative, and video ads cut from real or generated footage in code and rendered to MP4 for free, through one tiered pipeline with a vision-QA loop that looks at every asset before you see it. Ad creative is built from 336 live Meta ads we viewed (21 formats with real examples, a hook bank, a script that pulls competitors' live ads from the Meta Ad Library, a batch plan that mixes long-running stills with fresh UGC, and a visual check every ad must pass). Use whenever visual assets or ad creative need to be made, edited, planned, or batch-produced for a brand or campaign.\nwhen_to_use: generate an image, product shot, product video, hero video, social graphic, YouTube thumbnail, talking head, UGC video, lip sync, ad creative, ugc ads, ad concepts, static ads, video ad, hooks for ads, make ads, edit my product photo, animate this image, make visuals for this campaign, motion ad, kinetic text ad, turn my reviews into a video ad, video ad from screenshots, captions on my video, hyperframes, remotion, ad formats that work, us vs them ad, review stack ad, hook ideas for ads\nargument-hint: \"[what to make, or blank to be routed]\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: execution\n    reads: [creative-kit, positioning#chosen-angle, voice-profile#voice-summary]\n    writes: [creative-kit]\n    optional-keys: [REPLICATE_API_TOKEN, OPENAI_API_KEY, HF_API_KEY_ID, HF_API_KEY_SECRET, ELEVENLABS_API_KEY]\n---\n\n# Creative Engine\n\nOne engine for every visual asset a brand ships. The judgment: match motion and style\nto positioning, spend pennies finding direction before spending dollars on finals, and\nnever present an asset you haven't looked at yourself. Done = downloaded files,\nQA-checked, brand-consistent, named so downstream skills can find them. This is the\nfloor, not the ceiling. When the situation argues for a better path, take it and say why.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for creative`\n(If the script or python3 is unavailable, read the files named in `reads:` directly,\nsection-anchored where specified. If none exist, proceed standalone. Ask only for\nwhat the task strictly requires.)\n\nIf learnings.md holds creative priors (hook formats, style winners), apply them. Mention one\nonly when it changed the work, as a single line in the note.\n\n## Setup: 30 seconds, once\n\n1. **Token:** check `$REPLICATE_API_TOKEN` (env or `.env`). Missing → **prompt-only\n   mode**, defined in `references/api-workflow.md` §6: same workflow, deliverable is\n   the exact prompt + model + settings instead of the file. Never block on the token.\n2. **Stack freshness:** if `./brand/creative-stack.md` is missing or older than the registry's\n   `ttl-days`, run `bash ${CLAUDE_SKILL_DIR}/scripts/verify_models.sh` before the first\n   paid call. It rewrites `./brand/creative-stack.md` (a different file from the `stack.md` that start-here keeps) with a pass/fail table.\n3. **Brand kit:** read `./brand/creative-kit.md`. Missing → for a one-off asset,\n   proceed and offer to build it after; for campaign work, build it first (below).\n\n## What we use\n\nNone of this is required. With no key, prompt-only mode writes the exact prompt, model\nand settings for any tool you already have. When you want the files made for you, this is\nthe stack we run, one pick per job. Keys are listed in TOOLS.md; payloads and per-model\nprices live only in `references/MODEL_REGISTRY.md`.\n\n- **Images.** We use GPT Image 2.6 (OpenAI): Flare for fast drafts, Sunburst for finals and\n  for keeping a product consistent across edits. It holds the `image-complex-prompt` and\n  `image-instruct-edit` roles (exact layout, edits to a real photo, native-looking phone\n  photos, animated GIFs). It is pay per image, through the OpenAI API (`OPENAI_API_KEY`) or\n  Replicate. Everyday stills stay on `image-default`. Ad text is set in HTML over the image,\n  not generated inside it. Without a key, the prompt-only deliverable works in any image tool.\n- **Video.** We use Seedance 2.5 (ByteDance) through Higgsfield or Replicate, pay per\n  clip. That means 2.5 where your provider lists it, otherwise 2.0. The registry's\n  verified rows are Seedance 2.0, and 2.5 sits there as a \"newer, verify before use\" row\n  until it passes the registry's checks. For ads, Higgsfield Marketing Studio is our pick\n  for presenter or UGC-style video and for exploring many static formats fast (an AI\n  presenter presents, never reviews); Seedance 2.5 covers b-roll, foley and talking-object\n  skits. Setup, test results and what its API covers are in `references/ad-formats.md`.\n  Without a key, you get the prompt and settings for any video tool.\n- **Voiceover and talking heads.** We use ElevenLabs for the voice, for cloning and a\n  consistent voice across a campaign. It has a free tier, then plans (`ELEVENLABS_API_KEY`).\n  Without it, the lip-sync model's built-in voice or any quick text-to-speech tool\n  covers a script test.\n- **Video ads cut in code.** We use HyperFrames (by HeyGen, Apache-2.0): the agent\n  writes HTML and a GSAP timeline, and the CLI renders MP4 on your machine. Free, no key,\n  no per-render fee; it needs Node 22+ and FFmpeg. It cuts real or generated footage\n  together with captions, review cards, offers and end cards, and renders hook variants\n  from one project.\n  Remotion (React to MP4) is the alternative; check its license for your company size.\n  Mode: `modes/motion-ads.md`.\n- **One key for many models.** Replicate is the path the registry's payloads and the\n  async pattern are written for (`REPLICATE_API_TOKEN`). Higgsfield is the one-key\n  alternative: one API for 50+ image and video models, Seedance included, pay as you go\n  (`HF_API_KEY_ID` and `HF_API_KEY_SECRET`). On Higgsfield keep the role and the prompt,\n  and take the parameters and calls from its own docs.\n\n## References: when to load what\n\n| File | Load when |\n|------|-----------|\n| `references/model-routing.md` | Before model selection: job→model defaults, the i2v/i2i/t2v decision, style capsules, moodboarding, platform map, when to leave Replicate. |\n| `references/MODEL_REGISTRY.md` | Before ANY generation: the only source of payloads and prices. Resolve roles here. |\n| `references/api-workflow.md` | First generation of a session: async pattern, download-within-1h, file naming, campaign manifest, QA mechanics, handoffs. |\n| `references/VISUAL_INTELLIGENCE.md` | Constructing prompts for anything that matters: visual psychology, anti-slop checklist (Part 4 powers the QA rubric), style taxonomy, consistency techniques. |\n| `references/ad-formats.md` | Choosing, making or iterating ad creative: 21 formats from 336 live Meta ads with real examples and counts, the three routes (real, model, code), Higgsfield, production lessons, the translation for any business type, GPT Image 2.6 GIFs. |\n| `references/hooks.md` | Writing the first second of an ad: 12 opening patterns seen in live ads, when each fits, fill-ins for any business, making hook variants. |\n| `references/motion-ads-starter.html` | Starting a video ad cut in code: a checked 9:16 composition (hook clip with a text box at frame 0, body with captions, review card over footage, end card on a real photo, hook variants) that passes the render checks and the Reels, TikTok and Shorts safe zones. |\n| `scripts/ad_library.py` | Looking at what competitors run before planning ads: pulls live US Meta Ad Library ads for a brand or category, downloads them, writes an index and a board (ad-creative mode, step 1). |\n\n## Modes\n\nRoute by what's being made. Each mode file carries the craft for that asset type;\nthey all share the registry, the API workflow, and the QA loop.\n\n| Request smells like | Mode file |\n|---------------------|-----------|\n| Product stills, e-commerce shots, ",
+      "card": {
+        "title_zh": "创意生产引擎",
+        "purpose_zh": "为品牌或营销活动制作、编辑、规划、批量生产视觉素材与广告创意，含产品图、产品视频、社交图、口播、广告创意及代码剪辑视频广告，并带视觉质检循环。",
+        "does": [
+          "按请求路由到产品图、产品视频、社交图、口播、广告创意、代码剪辑视频广告等模式",
+          "按角色而非模型ID选择图像、视频、语音模型，并查注册表获取参数与价格",
+          "视频走分层流水线：源帧、草稿变体、用户选定、正式生成、仅在明确要求时用高级模型",
+          "无密钥时进入仅提示词模式，交付精确提示词、模型与设置",
+          "用脚本拉取竞品在Meta广告库的实时广告并下载、建索引与看板",
+          "生成后做视觉质检，交付已下载、质检、品牌一致、命名规范的文件"
+        ],
+        "inputs": [
+          "要制作的素材或广告需求描述（可为空以自动路由）",
+          "品牌上下文文件（./brand/、./brands/ 或 MARKETING.md）",
+          "品牌创意套件 ./brand/creative-kit.md",
+          "环境变量或 .env 中的 API 密钥（如 REPLICATE_API_TOKEN、OPENAI_API_KEY 等）",
+          "竞品品牌或品类（用于拉取 Meta 广告库）"
+        ],
+        "outputs": [
+          "下载并质检过的图像、视频、音频等素材文件",
+          "仅提示词模式下的提示词、模型与设置",
+          "广告创意方案、钩子变体、批量计划",
+          "竞品广告索引与看板",
+          "活动清单（manifest）与花费说明"
+        ],
+        "scenarios": [
+          "为品牌或活动制作产品图、产品视频、社交图与缩略图",
+          "规划与批量生产付费广告创意、静态广告、钩子与A/B变体",
+          "用代码把真实或生成素材剪成带字幕、评价卡、片尾卡的视频广告",
+          "制作口播、UGC风格主持人视频与唇形同步",
+          "调研竞品在Meta广告库的实时广告后再做广告规划"
+        ],
+        "prerequisites": [
+          "可选：设置 REPLICATE_API_TOKEN 等密钥；缺失则进入仅提示词模式",
+          "首次付费调用前若创意栈文件缺失或过期，运行 verify_models.sh 校验模型",
+          "读取品牌创意套件；一次性素材可先做后补，活动工作需先建",
+          "代码剪辑视频广告需 Node 22+ 与 FFmpeg"
+        ],
+        "limits": [
+          "无密钥时只能交付提示词、模型与设置，不能直接生成文件",
+          "Seedance 2.5 在注册表中仍为需先验证的新行，已验证行为 2.0",
+          "高级三模型并行仅在用户明确要求 hero 时使用，不得静默升级",
+          "广告文字用 HTML 叠加在图上，不在图内生成",
+          "Remotion 需按公司规模核查许可证",
+          "生成文件需在1小时内下载"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "图像",
+          "视频",
+          "内容运营",
+          "自动化",
+          "设计/UI"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "AI creative production engine for product photos, product video, social graphics, talking heads, ad creative, and video ads cut from real or generated footage in code and rendered to MP4 for free"
+          },
+          {
+            "field": "does",
+            "quote": "Route by what's being made. Each mode file carries the craft for that asset type; they all share the registry, the API workflow, and the QA loop."
+          },
+          {
+            "field": "does",
+            "quote": "Missing → **prompt-only mode**, defined in `references/api-workflow.md` §6: same workflow, deliverable is the exact prompt + model + settings instead of the file."
+          },
+          {
+            "field": "does",
+            "quote": "pulls live US Meta Ad Library ads for a brand or category, downloads them, writes an index and a board"
+          },
+          {
+            "field": "does",
+            "quote": "never present an asset you haven't looked at yourself. Done = downloaded files, QA-checked, brand-consistent, named so downstream skills can find them."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Token:** check `$REPLICATE_API_TOKEN` (env or `.env`). Missing → **prompt-only mode**"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "if `./brand/creative-stack.md` is missing or older than the registry's `ttl-days`, run `bash ${CLAUDE_SKILL_DIR}/scripts/verify_models.sh` before the first paid call."
+          },
+          {
+            "field": "limits",
+            "quote": "Without a key, the prompt-only deliverable works in any image tool."
+          },
+          {
+            "field": "limits",
+            "quote": "The registry's verified rows are Seedance 2.0, and 2.5 sits there as a \"newer, verify before use\" row until it passes the registry's checks."
+          },
+          {
+            "field": "limits",
+            "quote": "Ad text is set in HTML over the image, not generated inside it."
+          },
+          {
+            "field": "limits",
+            "quote": "Remotion (React to MP4) is the alternative; check its license for your company size."
+          },
+          {
+            "field": "limits",
+            "quote": "download-within-1h"
+          },
+          {
+            "field": "hosts",
+            "quote": "python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for creative"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`scripts/ad_library.py` | Looking at what competitors run before planning ads: pulls live US Meta Ad Library ads for a brand or category, downloads them, writes an index and a board"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/direct-response-copy/SKILL.md",
+      "blob_sha": "d97b2060c3b45a0d9d2350a9e4aa287eb6269320",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/direct-response-copy/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "direct-response-copy",
+        "description": "Write copy that converts (landing pages, sales pages, emails, ads, headlines, CTAs) in the customer's own words, matched to the ad or email that sends the traffic. A claim gate keeps every shipped line to verified facts (stronger ideas go on a To make this true list), and a private score-and-rewrite loop lifts the draft. Includes local-service patterns for copy that makes the phone ring. Approved page copy hands off to /landing-page to build. Use when someone needs to sell in writing, wants copy"
+      },
+      "excerpt": "---\nname: direct-response-copy\ndescription: Write copy that converts (landing pages, sales pages, emails, ads, headlines, CTAs) in the customer's own words, matched to the ad or email that sends the traffic. A claim gate keeps every shipped line to verified facts (stronger ideas go on a To make this true list), and a private score-and-rewrite loop lifts the draft. Includes local-service patterns for copy that makes the phone ring. Approved page copy hands off to /landing-page to build. Use when someone needs to sell in writing, wants copy scored, or has ads that get clicks but no sales or calls.\nwhen_to_use: write copy for, write a landing page, make this convert, help me sell, punch this up, sales page, headline variants, score this copy, rewrite this email, write ad copy, write the offer, rewrite our homepage hero, write the homepage hero, hero headline, headline and subhead, write a tagline, button copy\nargument-hint: \"[format + offer, e.g. 'landing page for my invoicing tool' or 'service page for same-day water heater replacement in Dallas']\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: execution\n    reads: [voice-profile, positioning#chosen-angle, audience#pain-language, voc, learnings]\n    writes: [assets]\n    optional-keys: [FIRECRAWL_API_KEY, EXA_API_KEY]\n    enhances_with:\n      - toolset: web-scrape\n        gains: \"reads the product, competitor and review pages in full for customer language\"\n---\n\n# Direct Response Copy\n\nCopy that converts sounds like a smart friend explaining something they figured out,\nwhile it quietly answers every doubt the reader has. This skill writes that copy in the\ncustomer's own words, matches it to whatever sent the reader, keeps every claim to what\nthe business can back, and scores it privately before it ships. It's a floor, not a\nceiling. When the situation argues for a better path, take it and say why.\n\nFrameworks (awareness levels, Schwartz, Caples, the seven scoring dimensions) are for\nthinking. The copy, the notes and the chat summary say things in plain words, and scores\nnever appear in the deliverable unless the user asked for a score.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for direct-response-copy`\n(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this\nfile was read from, e.g. `.agents/skills/direct-response-copy`. If the script or python3 is\nunavailable, read the brand folder directly: `./brands/<slug>/` when `./brands/active`\nnames one, else `./brand/`; then `MARKETING.md`, `preferences.md` and the files in\n`reads:`. If none exist, proceed standalone and ask only for the offer, who it's for, and what proof exists.)\n\nIf `learnings.md` holds relevant priors (headline patterns, offers, past test results),\napply them and say which: \"Applied: price-led headlines beat speed-led on your March\nservice pages.\"\n\n## Entry points\n\n| Request | Path |\n|---|---|\n| New copy (default) | Phases 0 to 5; for pages, then offer the /landing-page handoff |\n| \"Score this\" or \"why isn't this converting\" | Load the copy and `references/calibration-anchors.md`, score, give the scorecard and the top fixes. Rewrite only if asked. A live URL goes to /landing-page TEARDOWN; a local business's phone-first check goes to /first-screen-check |\n| Single quick asset (5 subject lines, one ad, a headline and first screen) | Quick Mode: skip the Phase 0 fan-out, brief.md and `./brand/assets.md`; generate, run the gate once, save the copy file, deliver |\n| \"Build the page\" (copy approved) | Route to /landing-page BUILD FROM COPY |\n\n**Iteration:** if `./campaigns/{name}/` already holds copy, read it first and ask: revise,\nadd a piece, or start fresh. When revising, score the existing copy first so the rewrite\ntargets real weaknesses.\n\n## Phase 0. Find the words before writing any\n\nRobert Collier's rule: enter the conversation already going on in the reader's mind. The\nbest headlines are usually found, often verbatim, in customer language.\n\n1. **Read `./brand/voc.md` and `positioning#chosen-angle` if they exist.** Pull verbatim\n   pains, desires and objections. \"I'm doing my books at midnight on the 30th\" is a\n   headline; \"users struggle with bookkeeping\" is not.\n2. **If voc.md is absent and a product URL exists**, run a quick parallel pass, 2-3\n   subagents at once: the product or service page (claims, pricing, mechanism, who it's\n   for); 1-2 competitor pages (the saturated promises your copy must not sound like); one\n   review source that fits (G2, an app store, Amazon or a Reddit thread for products;\n   Yelp, BBB or review snippets for a local business). Each returns verbatim quotes with\n   URLs, not prose. WebFetch and WebSearch do this for free. We use Firecrawl to read the\n   pages in full (free tier of 1,000 credits a month, no card) and Exa to find the\n   competitor and review pages a keyword search misses (free tier, then pay as you go).\n   Without them the free tools read what they can reach. Park findings in `./campaigns/{name}/brief.md` (full runs only).\n3. **If neither exists**, write from the user's input, label the deliverable\n   `Data: MODEL KNOWLEDGE (verify claims before spending)`, and suggest /audience-research\n   to build voc.md. Point at `preferences.md` or `MARKETING.md` for banned words by name;\n   never restate a banned phrase.\n\nLabel mined deliverables `Data: LIVE (n sources)`.\n\n## Phase 1. Frame the job\n\nFirst time? `references/worked-example.md` shows three before-and-afters (a local\nservice, a SaaS, a coach) so you can see the bar. Establish five things. Ask only for\nwhat's missing.\n\n**Format.** Landing page (one offer, one primary CTA, scannable), sales page (long-form,\nstory-driven, full objection handling), email (one idea, one CTA, the subject line is the\nheadline), ad, social post, text message, or other. For ads and social, don't trust\nremembered character limits: pull current limits from `voice-profile#platform-adaptations`\nor `./brand/algo-cache.md`, and refresh per its TTL if stale.\n\n**Where the reader came from, and what they were promised.** A reader arrives carrying a\npromise from the ad, email, post or search that sent them. The first screen has to repeat\nthat promise in the same words, or they leave. Get the ad text, keyword, subject line or\npost, and write the headline to match it. Local businesses miss this constantly.\nIn a check of local sites on a phone (Nov 2026), most businesses running ads that promise 24/7 or same-day service didn't say it on the first screen of the page the ad opens.\n\n**Awareness level (Schwartz).** This decides the lead:\n\n| Level | They know | Lead with |\n|---|---|---|\n| 1 Unaware | nothing | identity, emotion, story |\n| 2 Problem-aware | the pain | the problem named vividly, then that a fix exists |\n| 3 Solution-aware | fixes exist | your unique mechanism |\n| 4 Product-aware | your product | differentiation, proof, objections handled |\n| 5 Most-aware | they want it | the offer itself |\n\nLess aware means longer copy. Most-aware means get out of the way.\n\n**The so-what chain.** Ask \"so what?\" of every feature until you reach time, money or\nworry, usually three levels down: \"automatic reminders\" so \"invoices get paid without you\nasking\" so \"you stop sending awkward emails to clients you like\". Write from the bottom.\n\n**Fact sheet and proof inventory.** List every fact the copy may use, each with its\nsource: the brief or the user's messages, the business's site, its reviews, or research\nyou verified. Then what proof exists: testimonials, data, case studies, review counts,\nphotos, credentials. Never write a claim bigger than its proof. If the proof is thin, the\ncopy gets quieter, not louder. Pull the angle from `positioning#chosen-angle`; if none\nexists and the market is saturated, suggest /positioning-angles first.\n\n### The claim gate (hard rule)\n\nShipped copy (headline, subhead, body, bullets, offer, guara",
+      "card": {
+        "title_zh": "直效转化文案",
+        "purpose_zh": "用客户自己的话写落地页、销售页、邮件、广告、标题与CTA文案，让文案与引流广告或邮件承诺一致，并用事实清单约束每条宣称，再私下打分改写。",
+        "does": [
+          "按客户原话写落地页、销售页、邮件、广告、标题和按钮文案",
+          "让首屏重复广告或邮件给出的承诺，匹配读者来源",
+          "按认知层级选择开头，用事实清单和证据约束每条宣称",
+          "对现有文案打分并给出主要修改点，按需改写",
+          "为本地服务写能带来电话的文案模式",
+          "把已批准的页面文案交给 /landing-page 建页"
+        ],
+        "inputs": [
+          "格式与报价（如落地页、服务页）",
+          "目标读者与现有证据材料",
+          "品牌资料：voice-profile、positioning、audience、voc、learnings",
+          "广告、关键词、邮件主题或帖子原文",
+          "可选 FIRECRAWL_API_KEY、EXA_API_KEY"
+        ],
+        "outputs": [
+          "成品文案（标题、副标题、正文、要点、报价、CTA下文案）",
+          "To make this true 清单（尚不成立但更强的想法）",
+          "文案评分卡与主要修改点（仅在被要求时）",
+          "brief.md 调研摘录（完整流程）"
+        ],
+        "scenarios": [
+          "需要以文字销售产品或服务",
+          "广告有点击但无销售或无来电",
+          "给现有文案打分或改写邮件",
+          "写首页主标题、标题变体或按钮文案",
+          "本地服务页面需要让电话响起"
+        ],
+        "prerequisites": [
+          "存在 ./brand/、./brands/ 或 MARKETING.md 时先运行 brand_context.py 加载品牌上下文",
+          "无品牌资料时仅询问报价、目标读者和现有证据",
+          "voc.md 缺失且有产品网址时，用 WebFetch/WebSearch 或 Firecrawl/Exa 抓取产品、竞品与评价页原话"
+        ],
+        "limits": [
+          "框架只用于思考，成品与聊天摘要用平实语言，分数不写入交付物除非用户要求",
+          "已发布文案只能使用事实清单上的事实，不得编造机制、保证或未上线功能",
+          "事实须精确，不得放大数字或把多数说成全部",
+          "无品牌资料时标注 Data: MODEL KNOWLEDGE 并建议先做受众调研",
+          "不写推荐语，只引用真实且获授权的评价"
+        ],
+        "hosts": [
+          "claude-code",
+          "通用"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Write copy that converts (landing pages, sales pages, emails, ads, headlines, CTAs) in the customer's own words, matched to the ad or email that sends the traffic."
+          },
+          {
+            "field": "does",
+            "quote": "This skill writes that copy in the customer's own words, matches it to whatever sent the reader, keeps every claim to what the business can back, and scores it privately before it ships."
+          },
+          {
+            "field": "does",
+            "quote": "The first screen has to repeat that promise in the same words, or they leave."
+          },
+          {
+            "field": "does",
+            "quote": "Load the copy and `references/calibration-anchors.md`, score, give the scorecard and the top fixes. Rewrite only if asked."
+          },
+          {
+            "field": "does",
+            "quote": "Approved page copy hands off to /landing-page to build."
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"[format + offer, e.g. 'landing page for my invoicing tool' or 'service page for same-day water heater replacement in Dallas']\""
+          },
+          {
+            "field": "inputs",
+            "quote": "reads: [voice-profile, positioning#chosen-angle, audience#pain-language, voc, learnings]"
+          },
+          {
+            "field": "inputs",
+            "quote": "optional-keys: [FIRECRAWL_API_KEY, EXA_API_KEY]"
+          },
+          {
+            "field": "outputs",
+            "quote": "Park findings in `./campaigns/{name}/brief.md` (full runs only)."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when someone needs to sell in writing, wants copy scored, or has ads that get clicks but no sales or calls."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Only if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run: `python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for direct-response-copy`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If none exist, proceed standalone and ask only for the offer, who it's for, and what proof exists."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/email-sequences/SKILL.md",
+      "blob_sha": "88f75e5b0d36a1d28f9ecc0dbc6de65c3dab0ff4",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/email-sequences/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "email-sequences",
+        "description": "Build email (and text) sequences that turn leads into customers, including welcome, nurture, conversion, launch, re-engagement and post-purchase, plus local-service follow-ups (quote and treatment-plan follow-up, appointment reminders, review ask, seasonal reminder, win-back, missed-call text-back) and a cold outbound mode for prospecting sequences. Covers every reasonable reading of the request and leads with the revenue lever. Checks SPF, DKIM and DMARC on the real sending domain and can push "
+      },
+      "excerpt": "---\nname: email-sequences\ndescription: Build email (and text) sequences that turn leads into customers, including welcome, nurture, conversion, launch, re-engagement and post-purchase, plus local-service follow-ups (quote and treatment-plan follow-up, appointment reminders, review ask, seasonal reminder, win-back, missed-call text-back) and a cold outbound mode for prospecting sequences. Covers every reasonable reading of the request and leads with the revenue lever. Checks SPF, DKIM and DMARC on the real sending domain and can push drafts to Kit or Beehiiv. Use when a lead magnet needs a welcome sequence, an offer needs a sales sequence, quotes or treatment plans aren't closing, a list needs re-engaging, or an agency needs a cold email sequence.\nwhen_to_use: write welcome emails, welcome email, first email after signup, write an email to my subscribers, email sequence for, nurture sequence, convert my list, onboarding emails, launch sequence, drip campaign, follow-up emails, quote follow-up, follow up on estimates, ask customers for reviews, seasonal reminder emails, win back old customers, missed call text, cart abandonment emails, check my email deliverability, push this sequence to Kit, cold email sequence, cold outbound, outbound email sequence, prospecting emails, treatment plan follow-up, cut no-shows\nargument-hint: \"[sequence type + what it sells, e.g. 'welcome sequence for my checklist → $89 course' or 'quote follow-up for water heater installs'; or 'preflight <domain>']\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: execution\n    reads: [voice-profile, positioning#chosen-angle, audience#segments, voc, learnings]\n    writes: [assets, learnings]\n    optional-keys: [BEEHIIV_API_KEY, KIT_API_KEY, LOOPS_API_KEY, RESEND_API_KEY, MAILCHIMP_API_KEY, HUBSPOT_API_KEY]\n    enhances_with:\n      - toolset: esp\n        gains: \"grounds subject lines and timing in the list's own click history, and stages the sequence as drafts in Kit or Beehiiv\"\n---\n\n# Email Sequences\n\nThe gap between \"opted in\" (or \"got a quote\") and \"bought\" is where the money is made or\nlost. This skill designs the sequence that bridges it, sized and paced to the offer,\nwritten in the brand's voice with the customer's words, and checks the real sending\ndomain before it ships. Done means per-email files on disk, a machine-readable summary,\na deliverability pass/fix list when the real sending domain is known, and (with an ESP\nkey) the sequence staged as drafts. It's a floor, not a ceiling. When the situation argues for a\nbetter path, take it and say why.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for email-sequences`\n(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this\nfile was read from, e.g. `.agents/skills/email-sequences`. If the script or python3 is\nunavailable, read the brand folder directly: `./brands/<slug>/` when `./brands/active`\nnames one, else `./brand/`; then `MARKETING.md`, `preferences.md` and the files in\n`reads:`. If none exist, proceed standalone and ask only for what the task strictly requires.)\n\nAlso check `./brand/assets.md` and `./campaigns/*/brief.md` for an existing lead magnet. If\n/lead-magnet already ran, build the delivery email around the real asset. If\n`learnings.md` holds email entries (subject patterns, send-time results), apply them and\ncite which priors shaped the output.\n\n**Quick Mode:** a narrow ask (\"rewrite email 3\", \"3 subject lines for this\", \"preflight\nmydomain.com\") gets exactly that. Deliver, one-line what's next.\n\n**Iteration:** if `./campaigns/<name>/emails/` exists, read it and ask whether to revise\nspecific emails, extend the sequence, or start a new one. Never regenerate shipped emails\nwholesale.\n\n## Phase 0. Diagnose before you design\n\nConfirm (from brand memory where possible): the trigger event, the paid offer and price,\nthe bridge logic (why free leads naturally to paid), and the top 2-3 objections, from\n`voc.md` verbatim if it exists. Customers state their objections better than founders\nguess them.\n\n### Cover every reasonable reading, lead with the money\n\nMany requests hold more than one job. Before picking a sequence, list the readings a\nsharp operator would see, cover each one briefly, and put the one that moves the most\nrevenue first, even when the user named a smaller one.\n\nA dental office asks to \"cut no-shows and follow up on implant consults that didn't\nschedule\". Three readings:\n\n1. **Consults done, treatment not started.** Patients who sat for an implant consult and\n   hold an unaccepted plan worth thousands each. The revenue lever: lead with it.\n2. **Inquiries that never booked the consult.** A short booking sequence.\n3. **No-shows on booked appointments.** Confirmations, reminders and a same-day rebook\n   text.\n\nThen look at the calendar for a timely reason to write. Dental benefits that reset with\nthe plan year make an October or November \"use them before they reset\" email worth\nadding. Tax refunds, the first freeze, back to school and year-end budgets do the same\njob for other businesses.\n\nWhen covering every reading would make the deliverable long, write the lead sequence in\nfull and give the others as a short map with their first email written.\n\n### Sequence type\n\n| Type | Job | Trigger |\n|---|---|---|\n| Welcome | Deliver value, build the relationship, earn the first pitch | Opt-in |\n| Nurture | Stay valuable between campaigns | Welcome done, no purchase |\n| Conversion | Sell one offer to a warm list | Ready to pitch |\n| Launch | Time-bound open and close | Launch date |\n| Re-engagement | Re-permission or sunset cold subscribers | No clicks in 90-180 days |\n| Post-purchase | Onboard, reduce refunds, set up the next purchase | Purchase |\n| Local follow-ups | Quote or treatment-plan follow-up, reminders, review ask, seasonal, win-back, missed call | See the Local section |\n| Cold outbound | Get a reply from prospects who never opted in | See Cold outbound mode |\n\n### Length and pacing: a diagnostic, not a constant\n\nThe 7-email welcome is the default that works. This tells you when to compress or stretch:\n\n| Signal | Pulls toward |\n|---|---|\n| Impulse price (under $50), high-intent trigger (trial, cart, demo request) | **4-email fast track** |\n| The offer has sold before, the list knows the brand, one decision-maker | **7 standard** |\n| Considered purchase (over $500), low awareness (`audience#segments`), several stakeholders, a cold-ish list | **10+ considered** |\n| Small list (under 1,000) | Shorter and heavier on replies; at this size you can actually converse |\n| Weak engagement history | Shorter, value-dense, re-earn attention before any pitch |\n\n- **4-email fast track** (days 0/1/3/5): DELIVER, VALUE, BRIDGE + SOFT PITCH, DIRECT PITCH.\n  Momentum beats trust-building when intent is already high.\n- **7 standard** (days 0/2/4/6/8/10/12): DELIVER, CONNECT, VALUE, VALUE, BRIDGE, SOFT\n  PITCH, DIRECT PITCH.\n- **10+ considered** (days 0-21+): proof emails (a case walk-through, the method, objection\n  deep-dives) between VALUE and BRIDGE, spacing widened after email 5.\n\nFront-load while attention is hot (the opt-in moment is the peak), then widen. Daily\ncadence is earned only by a deadline. With AI inbox triage and tabbed inboxes, consistency\nand list hygiene move results more than send-time tweaks.\n\n### The other frameworks (same craft rules)\n\n- **Conversion:** OPEN, DESIRE, PROOF, OBJECTION, URGENCY (only if real), CLOSE, every 2\n  days; compress the last three into 3 days when there's a deadline.\n- **Launch:** optional SEED (days -3/-1), cart open twice (day 0 morning and evening,\n  different angles), value deep-dive, proof, objections and FAQ, 48 hours, 24 hours, final\n  hours. 6-10 emails; the intensity is justified by the deadline and only the deadline.\n- **Re-engagement:** define \"cold\" on **clicks, not opens** (Apple Mail Privacy Protection\n  makes o",
+      "card": {
+        "title_zh": "邮件序列生成",
+        "purpose_zh": "为潜在客户到付费的转化设计邮件与短信序列，覆盖欢迎、培育、转化、发布、唤回、购后及本地服务跟进，并检查真实发送域名的送达率。",
+        "does": [
+          "按触发事件与报价诊断，选择序列类型、长度与节奏",
+          "撰写每封邮件并落盘为单封文件，附机器可读摘要",
+          "对真实发送域名做SPF、DKIM、DMARC检查并给出修复清单",
+          "设计本地服务跟进序列：报价跟进、评价邀请、季节提醒、唤回、未接来电回拨、治疗方案跟进、预约提醒",
+          "提供冷外联模式：基于信号的开场白、发送计划与停止规则",
+          "有ESP密钥时把序列作为草稿推送到Kit或Beehiiv"
+        ],
+        "inputs": [
+          "序列类型与所售产品/价格",
+          "品牌资料（./brand/、./brands/或MARKETING.md）",
+          "客户原话与异议（voc.md）",
+          "真实发送域名（用于送达率预检）",
+          "ESP API密钥（可选，用于推送草稿）"
+        ],
+        "outputs": [
+          "每封邮件一个文件",
+          "机器可读的序列摘要",
+          "送达率检查与修复清单",
+          "ESP中的草稿序列（有密钥时）"
+        ],
+        "scenarios": [
+          "潜在客户下载磁贴后需要欢迎序列",
+          "有报价或治疗方案但未成交需要跟进",
+          "名单长期无点击需要唤回或清理",
+          "代理商需要冷邮件外联序列",
+          "检查发送域名送达率或推送序列到Kit/Beehiiv"
+        ],
+        "prerequisites": [
+          "存在./brand/、./brands/或MARKETING.md时运行brand_context.py加载品牌上下文",
+          "已知触发事件、付费报价与价格、桥接逻辑及前2-3个异议",
+          "推送草稿需对应ESP的API密钥"
+        ],
+        "limits": [
+          "送达率检查仅在真实发送域名已知时进行",
+          "冷外联不做超过几分钟的逐客户调研",
+          "短信营销需遵守注册号码与同意等规则",
+          "未接来电与评价系统本身属于其他技能，本技能只写文案与时机"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Build email (and text) sequences that turn leads into customers, including welcome, nurture, conversion, launch, re-engagement and post-purchase"
+          },
+          {
+            "field": "does",
+            "quote": "Checks SPF, DKIM and DMARC on the real sending domain and can push drafts to Kit or Beehiiv."
+          },
+          {
+            "field": "does",
+            "quote": "Done means per-email files on disk, a machine-readable summary, a deliverability pass/fix list when the real sending domain is known, and (with an ESP\nkey) the sequence staged as drafts."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Only if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for email-sequences`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Confirm (from brand memory where possible): the trigger event, the paid offer and price,\nthe bridge logic (why free leads naturally to paid), and the top 2-3 objections"
+          },
+          {
+            "field": "hosts",
+            "quote": "(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this\nfile was read from"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "optional-keys: [BEEHIIV_API_KEY, KIT_API_KEY, LOOPS_API_KEY, RESEND_API_KEY, MAILCHIMP_API_KEY, HUBSPOT_API_KEY]"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "writes: [assets, learnings]"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/find-local-clients/SKILL.md",
+      "blob_sha": "15eadec0631f0a660d3e20251ba141a6d29d58ed",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/find-local-clients/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "find-local-clients",
+        "description": "For agencies and freelancers. Picks one trade and one town, gathers the businesses from free sources (search results, license lists, directories, the map pack checked by hand), and ranks who is losing the most customers, with a can-pay tier and the single biggest problem per business backed by evidence anyone can re-check. Use when you need local clients to pitch, want a prospect list for a trade and a town, or ask which businesses in a town need marketing help."
+      },
+      "excerpt": "---\nname: find-local-clients\ndescription: For agencies and freelancers. Picks one trade and one town, gathers the businesses from free sources (search results, license lists, directories, the map pack checked by hand), and ranks who is losing the most customers, with a can-pay tier and the single biggest problem per business backed by evidence anyone can re-check. Use when you need local clients to pitch, want a prospect list for a trade and a town, or ask which businesses in a town need marketing help.\nwhen_to_use: find me clients, find local clients, prospect list, who should I pitch, find plumbers to pitch, businesses losing customers, which roofers need marketing help, build a lead list for my agency, rank local businesses, which businesses in my town need help, find clients for my agency\nargument-hint: \"[trade] [town], e.g. plumbers Dallas TX\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: growth\n    reads: [positioning#chosen-angle, learnings]\n    writes: []\n    optional-keys: [GOOGLE_PLACES_API_KEY, FIRECRAWL_API_KEY, TREG_TOKEN]\n    enhances_with:\n      - toolset: web-scrape\n        gains: \"reads business sites built in JavaScript that a plain fetch returns empty\"\n---\n\n# Find Local Clients\n\nThis skill takes one trade in one town and ranks every business in it by how many customers it is losing, with a can-pay tier and the one problem worth pitching. Done means a list an agency could start emailing tomorrow, where every row names its biggest problem in the owner's words and carries evidence someone else can re-check in two minutes.\n\nThe best prospect is not the worst business. It is an established business that already gets demand (reviews, ads, a crew to feed) and leaks it at a step you can fix and prove. A 3.4-star shop has a problem with the work, not the marketing. A business with no reviews and no site can't pay. The sweet spot is a busy business that already pays for marketing and loses customers close to the phone. This is a floor, not a ceiling. When the town in front of you argues for a better path, take it and say why in one line.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for find-local-clients`\n(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this file was read from, e.g. `.agents/skills/find-local-clients`. If the script or python3 is unavailable, read the brand folder directly: `./brands/<slug>/` when `./brands/active` names one, else `./brand/`; then `MARKETING.md`, `preferences.md` and the files in `reads:`. If none exist, proceed standalone and ask only for the trade, the town, and, if they want, what they sell.)\n\nThe brand files here are the agency's own. `positioning#chosen-angle` says what the agency sells, so problems it can fix rank above problems it can't. If `learnings.md` has `[find-local-clients]` or `[pitch-the-fix]` entries (which problems got replies), apply them. One line in the note, and only if one changed a ranking or a pick.\n\nProspect facts go in the campaign folder only. Never save a business, an owner or a score to the assistant's own memory or notes (prospect data stays in the workspace). Before any fan-out, run one WebSearch in the main thread. If it is denied, work only from a list the user provides and say so in the note. Never build a business list from model knowledge; a list from memory is an invented list.\n\n## Phase 1: Pick the cell\n\nA cell is one trade in one town. Default size: 40 to 120 businesses. Smaller and the ranking means little; bigger and the hand checks in Phase 4 take all week. A big metro needs narrowing to a county, a suburb cluster or one side of town.\n\nIf the user hasn't picked a trade, apply three checks and recommend one:\n\n1. **Ticket size.** A job worth $500 or more, or work that recurs (maintenance plans, cleanings). One extra job a month has to pay your fee in the owner's head.\n2. **Urgency.** Emergencies and seasons force a fast call, so a leak at the phone costs real money. Plumbing, HVAC, roofing after storms, garage doors, restoration, towing, locksmiths.\n3. **Owner-run.** Crews of about 3 to 30 with one decision maker. Franchise locations often can't touch their own site or ads; list them, but mark them `franchise` and keep them out of the top ten unless the user sells to franchisees.\n\nWrite the cell to `./campaigns/prospects-{trade}-{town}/cell.md`: trade, town and its edges, the search phrases you'll use, and today's date. That file is also the working log: the searches run, sources skipped, and which fields were checked by hand for which businesses. It is saved, not pasted.\n\n## Phase 2: Gather the businesses\n\nFree sources, in the order that gives the cleanest list. Load `references/free-sources-facts.md` for the details and the dated facts behind each one.\n\n1. **The state license list**, where the trade is licensed. It is the most complete list there is and it names the license holder, who is often the owner. Some boards publish the whole list as a free download; Texas plumbing is one.\n2. **Search results.** WebSearch 4 to 6 phrasings a customer would type: \"[trade] [town]\", \"emergency [trade] [town]\", \"[trade] near [neighborhood]\", \"best [trade] in [town]\", plus the money service (\"water heater replacement [town]\"). Record names, sites and phones.\n3. **Directories.** BBB (years in business, management names, complaint count), the trade association's member directory, the Chamber of Commerce, Angi and Nextdoor where they load. Yelp often blocks fetches; skip it when it does and say so.\n4. **Optional: the Google Places API** with the user's own key. It is the terms-friendly way to pull rating, review count, website, phone and open-or-closed for the whole cell in one run: `python3 ${CLAUDE_SKILL_DIR}/scripts/places_search.py \"plumber in Dallas, TX\" \"emergency plumber Dallas, TX\" > places.csv`. The free monthly allowance covers several cells. It returns at most five reviews per place and no owner replies, so Phase 4 is still by hand.\n5. **Optional: treg** (`TREG_TOKEN`). We use treg when we want SERP, lead or ad data from several providers without opening an account at each: one token, pay per call. Without it, steps 1 to 3 and the hand checks in Phase 4 build the same list. The hard rule below applies to anything pulled this way.\n\n**Hard rule:** no Google Maps scrapers (Apify, Outscraper, home-made bots), no logged-in tricks, no bulk automated browsing of Maps. Google's terms forbid scraping Maps content. A person looking at a profile and writing notes is fine; a bot pulling 500 profiles is not. If you use the Places API, keep the place IDs (the terms allow that) and treat the other fields as a snapshot for this run.\n\nMerge duplicates by phone number or domain. Drop permanently closed listings. Save `businesses.csv` with: name, site, phone, sources, license holder, place ID, franchise flag, notes.\n\n## Phase 3: First pass on everyone (cheap fields)\n\nFor every business in the cell:\n\n- **Rating and review count** from the Places export, the search snippet or a quick look at the profile.\n- **The site:** does it load, on HTTPS, with a mobile layout and a phone number someone can tap near the top? `python3 ${CLAUDE_SKILL_DIR}/scripts/site_check.py businesses.csv > sites.csv` reads every homepage the way a phone does and flags the obvious breaks. It reads HTML, not pixels, so treat \"phone near top\" as a proxy until Phase 4 confirms it by eye. A site built in JavaScript can read as empty to it. We use Firecrawl to read those sites (free tier of 1,000 credits a month, no card). Without it, check them by eye in Phase 4.\n- **Size signals** for the can-pay tier (below): locations, years in business, team page, fleet photos, financing or a maintenance plan, open job posts.\n\nThen set the town's baseline. The **leaders** are the three businesses with the most reviews (skip national brands). Their median rating, median rev",
+      "card": {
+        "title_zh": "本地客户线索挖掘",
+        "purpose_zh": "面向代理机构与自由职业者，针对某城镇某行业，从免费来源收集商家并按流失客户程度排序，给出可付费层级与单个最大问题及可复核证据。",
+        "does": [
+          "选定一个行业加一个城镇作为单元格，默认40到120家商家",
+          "从州执照名单、搜索结果、目录等免费来源收集商家并去重",
+          "对全部商家做首轮廉价字段检查：评分、评论数、网站可用性、规模信号",
+          "对入围20到30家做人工复核：评论、广告、手机首屏、AI答案",
+          "按流失客户阶段打分0到100并划分A/B/C可付费层级",
+          "为每家写出一个最值得推销的问题并附可复核证据"
+        ],
+        "inputs": [
+          "行业与城镇（如 plumbers Dallas TX）",
+          "可选：品牌文件夹或 MARKETING.md 中的定位与经验",
+          "可选：GOOGLE_PLACES_API_KEY、FIRECRAWL_API_KEY、TREG_TOKEN",
+          "用户提供的商家名单（当搜索被拒时）"
+        ],
+        "outputs": [
+          "cell.md 工作日志（行业、城镇、搜索词、日期）",
+          "businesses.csv（名称、网站、电话、来源、执照持有人、place ID、加盟标记、备注）",
+          "sites.csv（网站检查结果）",
+          "按分数排序的潜在客户名单，含可付费层级与单个问题及证据"
+        ],
+        "scenarios": [
+          "为代理机构在某城镇某行业建立可开始发邮件的潜在客户名单",
+          "询问某城镇哪些商家需要营销帮助",
+          "为某行业某城镇生成推销名单并排序",
+          "判断哪些本地商家正在流失客户"
+        ],
+        "prerequisites": [
+          "需要指定一个行业和一个城镇",
+          "需要能运行 WebSearch；若被拒则只能使用用户提供的名单",
+          "可选安装 python3 以运行品牌上下文、Places 搜索与网站检查脚本",
+          "可选提供 Google Places、Firecrawl 或 treg 的密钥以增强数据"
+        ],
+        "limits": [
+          "禁止使用 Google Maps 爬虫、登录技巧或批量自动浏览 Maps",
+          "不得凭模型记忆构建商家名单",
+          "Yelp 常阻止抓取，需跳过并说明",
+          "Places API 每家最多返回5条评论且无业主回复，仍需人工复核",
+          "AI 答案每周变化，只能轻权重计分",
+          "商家数据只存于活动文件夹，不写入助手记忆"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "调研",
+          "内容运营",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill takes one trade in one town and ranks every business in it by how many customers it is losing, with a can-pay tier and the one problem worth pitching."
+          },
+          {
+            "field": "does",
+            "quote": "A cell is one trade in one town. Default size: 40 to 120 businesses."
+          },
+          {
+            "field": "does",
+            "quote": "Free sources, in the order that gives the cleanest list."
+          },
+          {
+            "field": "does",
+            "quote": "For every business in the cell:"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"[trade] [town], e.g. plumbers Dallas TX\""
+          },
+          {
+            "field": "inputs",
+            "quote": "optional-keys: [GOOGLE_PLACES_API_KEY, FIRECRAWL_API_KEY, TREG_TOKEN]"
+          },
+          {
+            "field": "outputs",
+            "quote": "Write the cell to `./campaigns/prospects-{trade}-{town}/cell.md`: trade, town and its edges, the search phrases you'll use, and today's date."
+          },
+          {
+            "field": "outputs",
+            "quote": "Save `businesses.csv` with: name, site, phone, sources, license holder, place ID, franchise flag, notes."
+          },
+          {
+            "field": "outputs",
+            "quote": "`python3 ${CLAUDE_SKILL_DIR}/scripts/site_check.py businesses.csv > sites.csv`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before any fan-out, run one WebSearch in the main thread. If it is denied, work only from a list the user provides and say so in the note."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the script or python3 is unavailable, read the brand folder directly"
+          },
+          {
+            "field": "limits",
+            "quote": "**Hard rule:** no Google Maps scrapers (Apify, Outscraper, home-made bots), no logged-in tricks, no bulk automated browsing of Maps."
+          },
+          {
+            "field": "limits",
+            "quote": "Never build a business list from model knowledge; a list from memory is an invented list."
+          },
+          {
+            "field": "limits",
+            "quote": "It returns at most five reviews per place and no owner replies, so Phase 4 is still by hand."
+          },
+          {
+            "field": "hosts",
+            "quote": "(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this file was read from"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/first-screen-check/SKILL.md",
+      "blob_sha": "af0fd38f6d4a475e1f9887f6d1c321d4f4edef16",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/first-screen-check/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": "2026-11-18T00:18:43.834Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "first-screen-check",
+        "description": "Looks at a local business's site, or the page its ad opens, the way a customer sees it on a phone, and reports what the first screen is missing (the number with tap-to-call, the promise the ad made, the star rating and other proof, a way to book) plus the site faults that quietly break trust, as a short ranked list with one thing to fix first. Use when the site or the ads aren't making the phone ring, when someone wants a page checked on a phone, or when sizing up a prospect's site before a pitc"
+      },
+      "excerpt": "---\nname: first-screen-check\ndescription: Looks at a local business's site, or the page its ad opens, the way a customer sees it on a phone, and reports what the first screen is missing (the number with tap-to-call, the promise the ad made, the star rating and other proof, a way to book) plus the site faults that quietly break trust, as a short ranked list with one thing to fix first. Use when the site or the ads aren't making the phone ring, when someone wants a page checked on a phone, or when sizing up a prospect's site before a pitch.\nwhen_to_use: check my site on a phone, why isn't my website getting calls, first screen check, is my phone number easy to find, check the page my ad goes to, does my page match my ad, my ads get clicks but no calls, what's wrong with this website, check a plumber's site, check a prospect's site, mobile site check\nargument-hint: \"[site URL or the URL an ad opens] [optional: the ad's text or promise]\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: execution\n    reads: [positioning#chosen-angle, competitors]\n    writes: [assets]\n    optional-keys: [FIRECRAWL_API_KEY]\n    enhances_with:\n      - toolset: web-scrape\n        gains: \"reads pages that build themselves with JavaScript and can return a phone-size screenshot when no local browser is installed\"\n---\n\n# First Screen Check\n\nMost local customers meet a business on a phone, from a Google search, a map listing or\nan ad, and decide in the first screen whether to call, go back, or call the next\nresult. This skill looks at that screen the way they do and reports what's missing,\nranked by how many calls it costs, with one fix to make first. Done means a short list\nan owner can act on today, each item backed by what the page actually shows. The checks\nare a floor. When the business in front of you argues for a different order, change it\nand say why.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for first-screen-check`\n(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this\nfile was read from, e.g. `.agents/skills/first-screen-check`. If the script or python3 is\nunavailable, read the brand folder directly: `./brands/<slug>/` when `./brands/active`\nnames one, else `./brand/`; then `MARKETING.md`, `preferences.md` and the files in\n`reads:`. If none exist, proceed standalone. Ask only for the URL, and for the\nad's text if the page is an ad's landing page.)\n\nChecking a prospect's site rather than the user's own? Don't load or write brand files\nfor it. The report lands in `./campaigns/` and nothing else changes.\n\nNo URL given, or only a placeholder (example.com, yourdomain.com)? Ask for the URL in one\nline. Never run the checks or the redirect and structured-data commands against a\nplaceholder.\n\n## What the data says\n\nFrom hundreds of local business sites checked on a phone in November 2026.\nThe sample is self-selected (businesses that people chose to look up, mostly US home\nservices), so read the shares as \"common\", not as a census.\n\n- Very few passed every check. Most had 3 or more gaps.\n- Most businesses running ads that promise 24/7 or same-day service don't say it on the first screen of the page the ad opens, and many never say it anywhere on that page.\n- Most have 4.5 stars or better and 100 or more reviews, and most of those don't show the rating on the first screen.\n\nThe common failures aren't about design taste. They are things the business already has (a promise it pays to advertise, a rating it earned) that never\nreach the screen where the customer decides. Look for those first.\n\n## Phase 1: Pick the page and the promise\n\n**The page.** Check the page customers actually land on, not the one the owner thinks\nof as \"the site\". In order of how much traffic it usually carries:\n\n1. The page each ad opens (its final URL). Paid clicks are the most expensive visitors.\n2. The page the Google Business Profile's website button opens (often the homepage,\n   sometimes a location page).\n3. The page that ranks for \"<main service> <city>\".\n\nIf several differ, check the ad page and the profile page. Two good checks beat five\nthin ones.\n\n**The promise.** Write down, word for word, what the customer was promised before\nthey tapped: the ad's headline and description, the profile's hours (\"Open 24 hours\"),\nand any offer (\"$49 drain cleaning\", \"free estimates\"). Free ways to get the ad text:\n\n- The user pastes it, or a screenshot from their ad account.\n- Google's Ads Transparency Center (adstransparency.google.com): search the business\n  name or domain, set the region, and read the text ads. It searches by advertiser, not\n  by keyword.\n- A search for \"<service> <city>\" on a phone in the service area. Ads change by location\n  and hour, so say when and where you looked.\n\nNo ad running? The promise is whatever the profile and the search snippet said:\nthe hours, the services, the rating shown beside the listing.\n\n## Phase 2: See the first screen on a phone\n\nTake the best path the agent has. The report says only whether it rests on a phone\nscreenshot or on the page HTML.\n\n**A. A browser on the machine (best).** Playwright takes a phone-size screenshot from\nthe command line. The first time on a machine, download its browser with\n`npx playwright install chromium`; without it the screenshot command fails with\n\"Executable doesn't exist\".\n\n```bash\nnpx playwright install chromium   # once per machine\nnpx playwright screenshot --viewport-size \"390,664\" --wait-for-timeout 3000 --timeout 45000 <url> first-screen.png\nnpx playwright screenshot --viewport-size \"390,664\" --full-page --timeout 45000 <url> full-page.png\n```\n\n390 by 664 is what an iPhone 13 shows inside the browser bars. The 3-second wait lets\nlate popups, chat bubbles and cookie banners load, because the customer sees those too.\n(`--device \"iPhone 13\"` also works but runs WebKit, which needs\n`npx playwright install webkit` first.) Read both images. Count how many phone screens\ntall the full page is and where the number, the promise and the rating first appear.\n\nA browser extension or MCP browser works the same way: set the window to 390 wide,\nload, wait, capture.\n\n**B. No browser, Firecrawl keyed.** We use Firecrawl for this: its scrape returns a\nphone-size screenshot and the rendered HTML with no browser installed, and it reads pages\nthat build themselves with JavaScript (free tier of 1,000 credits a month, no card). Ask for\nthe mobile screenshot and the rendered HTML. Same reading as A. Without it, path A or C\ndoes the same check.\n\n**C. Neither (fallback).** Read the HTML in order. If python3 is available, run:\n\n```bash\npython3 ${CLAUDE_SKILL_DIR}/scripts/page_facts.py <url> --promise \"24/7\" --promise \"same-day\"\n```\n\nIt prints facts only: redirect hops, the H1 and where it starts, the opening words in\nreading order (menus left out), tap-to-call links, phone numbers, where each promise\nword and \"reviews\" first appear (as a word position), forms and their fields, the\nstructured data, the weight of the first images, and widgets that tend to cover the\nscreen. Without python3, WebFetch the page and read the same things by hand.\n\n**Estimating the first screen from HTML.** It usually holds the header, the headline and\nsomewhere between 20 and 70 words of copy, fewer when a big photo, video or offer banner\nsits above the headline. Anything the script places past about word 80 is usually below the\nfirst screen. In Sources and assumptions, say once in plain words that the first screen is\nestimated from the page HTML and that popups and JavaScript-built parts can't be seen this\nway.\n\nTwo traps that make a page look better or worse than it is:\n- **Call tracking swaps numbers.** The HTML can carry one number and the rendered page\n  another. That is normal. What matters is that the number on screen rings the business\n  and is the same one the customer can tap.\n- **Rating badges load by JavaScri",
+      "card": {
+        "title_zh": "手机首屏检查",
+        "purpose_zh": "以顾客在手机上看到的样子检查本地商家网站或广告落地页，报告首屏缺失内容（可点击电话、广告承诺、评分等信任证据、预约入口）及破坏信任的站点故障，输出按修复优先级排序的简短清单。",
+        "does": [
+          "确定顾客实际落地的页面（广告最终URL、Google商家资料网站按钮、本地服务关键词排名页）",
+          "记录顾客点击前看到的承诺原文（广告标题描述、营业时间、优惠）",
+          "用手机尺寸截图或HTML估算首屏内容，判断电话、承诺、评分、预约等是否出现",
+          "按8项首屏检查逐条核对，并检查价格造假、硬编码评分、404链接、超大首图、重复城镇页、号码不一致等站点故障",
+          "按损失电话数排序，给出先修一项的简短清单"
+        ],
+        "inputs": [
+          "网站URL或广告打开的URL",
+          "可选：广告文案或承诺内容",
+          "品牌上下文文件（./brand/、./brands/或MARKETING.md，存在时）",
+          "可选：FIRECRAWL_API_KEY"
+        ],
+        "outputs": [
+          "按损失电话数排序的简短修复清单，含先修一项",
+          "每项结论依据页面实际显示内容",
+          "说明结论基于手机截图还是页面HTML"
+        ],
+        "scenarios": [
+          "检查自己的网站在手机上为何不带来电话",
+          "检查广告落地页是否与广告承诺一致",
+          "在推销前评估潜在客户网站",
+          "检查电话号码是否容易找到",
+          "广告有点击但无来电时诊断原因"
+        ],
+        "prerequisites": [
+          "需要提供网站URL，占位符URL不可用于检查",
+          "路径A需本机浏览器及Playwright（首次需npx playwright install chromium）",
+          "路径B需Firecrawl密钥（可选，免费额度1000积分/月）",
+          "路径C需python3运行page_facts.py，否则用WebFetch手工阅读",
+          "品牌上下文仅在相关目录或文件存在时加载"
+        ],
+        "limits": [
+          "首屏从HTML估算时看不到弹窗和JavaScript生成部分",
+          "评分徽章由JavaScript加载，HTML缺失不能证明屏幕上缺失",
+          "PageSpeed Insights无密钥API常返回配额错误",
+          "数据样本为自选样本（多为美国家庭服务），份额只能读作常见而非普查",
+          "检查项只是底线，可按业务情况调整顺序并说明理由",
+          "检查潜在客户网站时不加载也不写入品牌文件"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "调研",
+          "内容运营",
+          "产品规划",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill looks at that screen the way they do and reports what's missing, ranked by how many calls it costs, with one fix to make first."
+          },
+          {
+            "field": "does",
+            "quote": "Check the page customers actually land on, not the one the owner thinks of as \"the site\"."
+          },
+          {
+            "field": "does",
+            "quote": "Playwright takes a phone-size screenshot from the command line."
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"[site URL or the URL an ad opens] [optional: the ad's text or promise]\""
+          },
+          {
+            "field": "outputs",
+            "quote": "Done means a short list an owner can act on today, each item backed by what the page actually shows."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "No URL given, or only a placeholder (example.com, yourdomain.com)? Ask for the URL in one line."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The first time on a machine, download its browser with `npx playwright install chromium`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "B. No browser, Firecrawl keyed."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If python3 is available, run:"
+          },
+          {
+            "field": "limits",
+            "quote": "say once in plain words that the first screen is estimated from the page HTML and that popups and JavaScript-built parts can't be seen this way."
+          },
+          {
+            "field": "limits",
+            "quote": "The sample is self-selected (businesses that people chose to look up, mostly US home services), so read the shares as \"common\", not as a census."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx playwright screenshot --viewport-size \"390,664\" --wait-for-timeout 3000 --timeout 45000 <url> first-screen.png"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "optional-keys: [FIRECRAWL_API_KEY]"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/google-ads-tracking/SKILL.md",
+      "blob_sha": "57907de373490dc97810de7d1ca5a6c8fa66b6a7",
+      "source_url": "https://github.com/boringmarketer/boring-marketing-skills/blob/bd5aaedab44368d76326d98d488697158b886679/skills/google-ads-tracking/SKILL.md",
+      "fetched_at": "2026-11-18T00:18:43.834Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "google-ads-tracking",
+        "description": "Audit and repair the conversion signal in a local service business's Google Ads account so it counts the calls, phone taps, form fills and bookings that are real leads, and bids on them. Maps every path a lead takes, reads which conversion actions are primary and which goals actually bid, fixes the tag and proves it with Tag Assistant, then decides the bid strategy and whether more budget would help at all. Use when Google Ads shows zero or strange conversions, when campaigns bid on clicks, befo"
+      },
+      "excerpt": "---\nname: google-ads-tracking\ndescription: Audit and repair the conversion signal in a local service business's Google Ads account so it counts the calls, phone taps, form fills and bookings that are real leads, and bids on them. Maps every path a lead takes, reads which conversion actions are primary and which goals actually bid, fixes the tag and proves it with Tag Assistant, then decides the bid strategy and whether more budget would help at all. Use when Google Ads shows zero or strange conversions, when campaigns bid on clicks, before switching to Maximize conversions, before raising a budget, or when taking over an account from someone else.\nwhen_to_use: google ads not tracking calls, zero conversions in google ads, are my conversions set up right, google ads tracking audit, track phone calls from google ads, call tracking for google ads, primary vs secondary conversions, should I switch to maximize conversions, should I raise my google ads budget, google ads recommendations, check my conversion tag, I took over a google ads account\nargument-hint: \"[business name or site URL] [audit | fix | budget]\"\nmetadata:\n  boring:\n    version: 4.1.1\n    layer: distribution\n    reads: [stack, learnings, brand-manifest]\n    writes: []\n    optional-keys: [GOOGLE_ADS_DEVELOPER_TOKEN]\n    enhances_with:\n      - toolset: ads\n        gains: \"reads conversion actions, goal biddability, bid strategies and impression share straight from the Google Ads API instead of from screenshots\"\n---\n\n# Google Ads Tracking\n\nGoogle Ads can only bid toward what it can see. In most local service accounts it sees\ncalls tapped inside the ad, a stray offline upload and Google's own Business Profile\nactions, and nothing from the person who clicked the ad, read the page and called.\nThis skill finds what is counted, decides what should bid, fixes the tag, and proves the\nfix with a recorded conversion. Done means every lead path is counted once, the actions\nthat bid are real leads that fire often enough to learn from, and the budget call rests on\nimpression share, not a hunch. The method is a floor: when the account in front of you\nargues for a better path, take it and say why in one line.\n\nTwo hard rules:\n\n1. **Nothing changes in the account without a yes for that exact change.** Show the object,\n   the field, before and after. Never press \"Apply all\" on Recommendations.\n2. **A fix is proven by data, not by a saved setting.** The repair is done when the new\n   action records a real conversion from ad traffic, usually within 7 days. A green tag\n   check proves the tag loads. It does not prove Google counts the lead.\n\n## Context\n\nOnly if `./brand/`, `./brands/` or `MARKETING.md` exists (nothing to load otherwise), run:\n`python3 ${CLAUDE_SKILL_DIR}/../start-here/scripts/brand_context.py --for google-ads-tracking`\n(`${CLAUDE_SKILL_DIR}` is this skill's folder; outside Claude Code use the folder this\nfile was read from, e.g. `.agents/skills/google-ads-tracking`. If the script or python3 is\nunavailable, read the brand folder directly: `./brands/<slug>/` when `./brands/active`\nnames one, else `./brand/`; then `MARKETING.md`, `preferences.md` and the files in\n`reads:`. If none exist, proceed standalone and ask only for: the site URL, how leads arrive (calls,\nforms, booking), whether the phone number on the site is the real number or a tracking\nnumber, and view access to Google Ads.)\n\n**Load `references/google-ads-facts.md` first** and check its header. UI labels, call\ntracking options and API enums drift. If today is past last-verified plus ttl-days,\nrefresh it per its instruction; if that isn't possible, the Sources and assumptions note\nsays the UI labels are as of last-verified.\n\nSample used below: **Hartline Plumbing, Dallas TX (hartlineplumbing.com), a sample\nbusiness.** About 40 leads a month, most by phone, a quote form few people use.\n\n## Modes\n\n| Say | What runs |\n|---|---|\n| Nothing | All five phases in order. Every account change waits for a yes (hard rule 1). |\n| `audit` | Phases 1 to 3 plus the read half of Phase 5 (bid strategy, impression share). Read only: nothing in the account changes. |\n| `fix` | Phase 4, using the plan from an earlier audit. With no audit on file it runs Phases 1 to 3 first. Ends when the 7-day proof is in. |\n| `budget` | Phase 5, for an account whose tracking is already proven. If Phase 4 isn't proven yet, it says so and starts there. |\n\n## Phase 1: Map the lead paths (10 minutes)\n\nList every way a customer becomes a lead after seeing an ad, and what in Google Ads\nshould count it. Fill this in for the business before opening the account:\n\n| Path | What the customer does | Counted by |\n|---|---|---|\n| Call from the ad | Taps the call button on the ad or the location asset | \"Calls from ads\" |\n| Click, then tap the number | Clicks the ad, lands on the site, taps the phone number on a phone | A website call action set to \"Someone makes a call by clicking a number on my website\" |\n| Click, then dial | Reads the number on a desktop or copies it, dials later | A forwarding-number action (\"Someone calls a number shown on my website\") or a call tracking tool's number, sent to Google Ads |\n| Click, then form | Submits the quote form | A website action that fires on confirmed success |\n| Click, then book | Books in an online scheduler | A website action on the scheduler's booking-confirmed event |\n| Saw the ad, called from the Business Profile | Finds the profile later and calls | \"Calls from ads\" when the profile is linked and call history is on, plus local actions (\"Clicks to call\", \"Get directions\") when location assets run |\n| Became a paid job | Booked and paid | An offline upload from the job or invoicing system, days later |\n\nThen ask the owner one number: **how many calls and form leads did the business get last\nmonth, from the phone system and the inbox, not from Google?** That is the yardstick for\nPhase 2. Without it, a Google conversion count can't be judged as too low or too high.\n\n## Phase 2: Read what Google sees (free, Google Ads UI)\n\n1. **Goals > Conversions > Summary.** For every conversion action record, in\n   `./campaigns/<business-slug>/notes.md` (working data, not pasted): name,\n   source (website, calls from ads, Google hosted, import), category, Primary or\n   Secondary, the Tracking status column, conversions and all conversions for the last 30\n   and 90 days, count setting, click-through window.\n2. **Which goals bid.** Note which goals are account-default, then open each campaign's\n   settings and check whether it uses account-default goals or its own.\n3. **Campaigns table.** Add the columns Bid strategy type, Conversions, All conv., Search\n   impr. share, Search lost IS (rank), Search lost IS (budget).\n4. **Compare** the primary conversion count with the owner's lead count from Phase 1.\n\nRead what you found against this table. Most broken accounts show two or three rows.\n\n| What you see | What it means | Where it's fixed |\n|---|---|---|\n| No website actions, or website actions with 0 in 90 days | Google can't see anyone who clicked, read the page and then called or filled the form. On mobile that's most leads. | Phase 4 |\n| The only primary actions fire a few times a quarter | Bidding is learning from almost nothing | Phase 3 |\n| Hidden website actions that never recorded, left by a site builder or a past agency | Clutter, not harm | Leave them hidden. Deleting can't be undone and gains nothing |\n| The same event counted twice (the Ads tag and a GA4 import of the same event, both primary) | Inflated conversions that teach bidding the wrong lesson | Keep one as primary |\n| Local actions or \"Business profile\" calls are primary and make up most conversions | The count includes calls that would have come anyway | Phase 3, then `/ads-incrementality-check` |\n| Bid strategy type reads Maximize clicks | The campaign buys clicks; conversions don't steer it | Phase 5 |\n| \"Calls from ads\" counts 5-second calls | Spam and misdials count as leads | Set a ",
+      "card": null
+    }
+  ]
+}
