@@ -1,0 +1,429 @@
+{
+  "schema": 1,
+  "repo": "therandomsecurityguy/signet",
+  "tree_sha": "14d1c58412f9d09ca57894451df42d8702f14ed0",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/signet-registry/SKILL.md",
+      "blob_sha": "c5bc87a2d357d0d24aa1d73ad2a0fc592e9b7efb",
+      "source_url": "https://github.com/therandomsecurityguy/signet/blob/edfad64090e449749e5576c021a28dd3c3573900/skills/signet-registry/SKILL.md",
+      "fetched_at": "2026-11-19T00:19:11.330Z",
+      "generated_at": "2026-11-19T00:19:11.330Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "signet-registry",
+        "description": "Discover, inspect, load, trust, and use skills and agents from the Signet registry via the MCP gateway. Use when you need to find a capability that already exists, load its real implementation, verify its certification/provenance before relying on it, or onboard onto the Signet registry as a new agent."
+      },
+      "excerpt": "---\nname: signet-registry\ndescription: Discover, inspect, load, trust, and use skills and agents from the Signet registry via the MCP gateway. Use when you need to find a capability that already exists, load its real implementation, verify its certification/provenance before relying on it, or onboard onto the Signet registry as a new agent.\n---\n# Signet Registry\n\n## Goal\nUse the Signet registry as the single source of truth for agents and skills.\nFollow the canonical happy path — **discover → inspect → load → trust → use** —\nso you never duplicate a capability that already exists, and you only rely on\nartifacts whose certification and provenance you have checked.\n\n## Use this skill when\n- You need a capability (skill, runbook, process knowledge) and want to check whether it already exists before writing it yourself.\n- You want to load the real implementation of a skill or agent.\n- You need to verify that a skill/agent is current, certified, and trustworthy before using it.\n- You are onboarding onto the Signet registry as a new agent.\n\n## Connect\nAll reads go through the MCP gateway (`service/mcp`) at `http://localhost:3000/mcp`\n(Streamable HTTP transport) with `Authorization: Bearer <token>`.\nSee `docs/mcp-onboarding.md` for per-harness config (Claude Code, Cursor, opencode, generic MCP clients).\n\n## Canonical flow\n\n### 1. Discover\nFind what already exists. Do not write a new skill until you have searched.\n- `registry.search` — search skills and agents by name, key, or description. Start here.\n- `registry.list_skills` / `registry.list_agents` — browse the full catalog.\n\nExample: `registry.search` with `{ \"query\": \"infra bootstrap\", \"type\": \"all\" }`.\n\n### 2. Inspect\nUnderstand a candidate before loading it.\n- `registry.get_skill` — get a skill and its linked artifacts (and active version).\n- `registry.get_agent` — get an agent and its linked skills/artifacts/harnesses.\n\nCheck the metadata: does it do what you need? Is there an active version?\n\n### 3. Load and verify bytes\nFetch the real implementation bytes and make them prove themselves.\n- `registry.get_artifact` — fetch an artifact (content-addressed file) by sha256/URN. The response re-hashes the bytes; treat `digest_verified: false` as untrusted.\n\n### 4. Trust\nVerify the publication before relying on the artifact.\n- `registry.verify_publication` — envelope digests, frozen-envelope artifact, detached signatures, and transparency proofs for a version. Treat anything other than `verification_status: verified` as untrusted.\n- `registry.get_attestations` — build provenance and SBOM attestations attached to the version.\n- `registry.get_provenance` — PROV-O provenance chain and audit replay.\n- Validation evidence: `registry.get_skill` / `registry.get_agent` list the\n  version's `governance_artifacts`; the `validation_report` entries linked via\n  `sg:validatedBy` are machine-readable reports of the W3C SHACL execution\n  that gated publication — `validator: shacl-v1`, the engine identity,\n  `conforms`, and per-layer violations (graph shape + policy, with\n  `shapes_format`/`shapes_sha256` fingerprints). Fetch one by its `sha256`\n  with `registry.get_artifact` if you need the per-layer detail.\n\nCheck: is the version `certified` (not just `draft`/`published`) — and\n`validation_status: passed`? Validation executes W3C SHACL over the\npublication graph; `Violation`-severity results (graph-shape or policy\nlayer) block publication, so a certified version passed those checks. Are\nthe verification verdicts clean (frozen-envelope digest match, signatures\nvalid)?\nIf trust signals are missing, or the version is deprecated/revoked (some\nenvironments deny revoked reads outright), do not use it — surface that to\nthe human instead.\n\n### 5. Use\nOnly after discover → inspect → load → trust:\n- Apply the loaded skill/agent content to your task.\n- Cite the `skill_key`/`agent_key` and version you used so the human can trace it.\n\n## Recertify\nCertification is not permanent. If you rely on a skill long-term, note that it\nmay need recertification (versions can be deprecated, revoked, or superseded).\nRe-run the trust step when a skill changes.\n\n## Tools reference (read-only)\n- `registry.search`\n- `registry.list_agents` / `registry.get_agent`\n- `registry.list_skills` / `registry.get_skill`\n- `registry.get_artifact`\n- `registry.verify_publication`\n- `registry.get_attestations`\n- `registry.get_provenance`\n\nThe MCP gateway is a read-only trust surface. It does not publish, certify,\nrevoke, or supersede registry state — those go through the management-plane API\n(`service/api`) with operator credentials, not from agent workflows.\n\n## Output checklist\n- [ ] Searched the registry before writing anything new\n- [ ] Inspected the candidate's metadata and active version\n- [ ] Loaded the real artifact bytes\n- [ ] Verified certification status and provenance chain\n- [ ] Cited the skill/agent key and version used\n",
+      "card": {
+        "title_zh": "Signet注册表技能",
+        "purpose_zh": "通过MCP网关从Signet注册表发现、检查、加载、验证并复用已有的技能与代理，避免重复造轮子，并只依赖已核验认证与来源的制品。",
+        "does": [
+          "按名称、键或描述搜索技能与代理，或浏览完整目录",
+          "查看技能或代理的元数据、关联制品与活跃版本",
+          "按sha256/URN获取制品真实字节并校验摘要",
+          "核验发布签名、透明性证明、认证状态与来源链",
+          "在完成发现、检查、加载、信任后应用技能内容并引用键与版本",
+          "提示长期依赖的技能可能需要重新认证"
+        ],
+        "inputs": [
+          "搜索查询词与类型（技能/代理/全部）",
+          "技能键或代理键",
+          "制品sha256或URN",
+          "MCP网关地址与Bearer令牌"
+        ],
+        "outputs": [
+          "技能与代理的搜索结果及目录列表",
+          "技能/代理元数据、关联制品与活跃版本",
+          "制品内容字节及digest_verified校验结果",
+          "verification_status、认证状态、验证报告与来源链",
+          "所使用技能/代理的键与版本引用"
+        ],
+        "scenarios": [
+          "编写新技能前先检索是否已有现成能力",
+          "需要加载某技能或代理的真实实现",
+          "依赖前核验技能/代理是否已认证且可信",
+          "以新代理身份接入Signet注册表",
+          "长期依赖某技能时检查其是否被弃用或撤销"
+        ],
+        "prerequisites": [
+          "MCP网关运行于http://localhost:3000/mcp（Streamable HTTP传输）",
+          "请求需携带Authorization: Bearer令牌",
+          "按docs/mcp-onboarding.md完成对应宿主配置"
+        ],
+        "limits": [
+          "网关为只读信任面，不发布、认证、撤销或取代注册表状态",
+          "发布等管理操作需通过service/api管理面与操作员凭据，不在代理工作流内",
+          "digest_verified为false或verification_status非verified时应视为不可信",
+          "版本非certified或validation_status未通过时不应使用",
+          "已弃用或撤销的版本不可使用，部分环境直接拒绝读取"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "network",
+          "needs_secret"
+        ],
+        "tags": [
+          "调研",
+          "文档",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Discover, inspect, load, trust, and use skills and agents from the Signet registry via the MCP gateway."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "so you never duplicate a capability that already exists, and you only rely on artifacts whose certification and provenance you have checked."
+          },
+          {
+            "field": "does",
+            "quote": "`registry.search` — search skills and agents by name, key, or description. Start here."
+          },
+          {
+            "field": "does",
+            "quote": "`registry.get_artifact` — fetch an artifact (content-addressed file) by sha256/URN. The response re-hashes the bytes; treat `digest_verified: false` as untrusted."
+          },
+          {
+            "field": "does",
+            "quote": "`registry.verify_publication` — envelope digests, frozen-envelope artifact, detached signatures, and transparency proofs for a version."
+          },
+          {
+            "field": "does",
+            "quote": "Cite the `skill_key`/`agent_key` and version you used so the human can trace it."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "All reads go through the MCP gateway (`service/mcp`) at `http://localhost:3000/mcp` (Streamable HTTP transport) with `Authorization: Bearer <token>`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "See `docs/mcp-onboarding.md` for per-harness config (Claude Code, Cursor, opencode, generic MCP clients)."
+          },
+          {
+            "field": "limits",
+            "quote": "The MCP gateway is a read-only trust surface. It does not publish, certify, revoke, or supersede registry state"
+          },
+          {
+            "field": "limits",
+            "quote": "If trust signals are missing, or the version is deprecated/revoked (some environments deny revoked reads outright), do not use it"
+          },
+          {
+            "field": "hosts",
+            "quote": "See `docs/mcp-onboarding.md` for per-harness config (Claude Code, Cursor, opencode, generic MCP clients)."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".cursor/skills/devagent-traceability-sync/SKILL.md",
+      "blob_sha": "beda69bc8dd32d83c7f2a06e865ff903d8ab3804",
+      "source_url": "https://github.com/therandomsecurityguy/signet/blob/edfad64090e449749e5576c021a28dd3c3573900/.cursor/skills/devagent-traceability-sync/SKILL.md",
+      "fetched_at": "2026-11-19T00:19:11.330Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "devagent-traceability-sync",
+        "description": "Keeps `../../../../_devagents/signet/projects/` synchronized with real implementation work in this repository. Use when finishing a meaningful worksession, shipping a vertical slice, adding docs or infra, or moving code so future agents and humans can reconstruct what changed, where, how it was validated, and what was deferred."
+      },
+      "excerpt": "---\nname: devagent-traceability-sync\ndescription: Keeps `../../../../_devagents/signet/projects/` synchronized with real implementation work in this repository. Use when finishing a meaningful worksession, shipping a vertical slice, adding docs or infra, or moving code so future agents and humans can reconstruct what changed, where, how it was validated, and what was deferred.\n---\n# Devagent Traceability Sync\n\n## Goal\nLeave a reliable implementation trail in `../../../../_devagents/signet/projects/` whenever a meaningful unit of work lands.\n\n## Use this skill when\n- finishing a worksession\n- adding a new subsystem or infra slice\n- moving folders/services and updating docs\n- completing a phase or backlog chunk\n\n## Required outputs in this repo\n\n### Worksession folder\nCreate or update:\n- `../../../../_devagents/signet/projects/worksession-XX/README.md`\n- `../../../../_devagents/signet/projects/worksession-XX/summary.md`\n\n### Index\nUpdate:\n- `../../../../_devagents/signet/projects/README.md`\n\n## What the summary must capture\n- goal of the worksession\n- what was implemented\n- where the code/docs live\n- validation performed\n- what was deferred\n\n## Workflow\n1. Decide whether the work belongs to an existing worksession or a new one.\n2. Update the worksession `README.md` with scope and out-of-scope boundaries.\n3. Write `summary.md` with concrete file paths and validation notes.\n4. Update `../../../../_devagents/signet/projects/README.md` so the new worksession is discoverable.\n5. If human or agent docs changed, mention them in the summary.\n6. Re-read the `_devagents` files to confirm links and filenames are real.\n\n## Repository-specific expectations\n- Use chronological folders such as `worksession-01/`, `worksession-03/`, `worksession-04/`.\n- Keep the summary factual, not aspirational.\n- Mention deferred work explicitly when the user chose not to do something.\n- If a README claims a `summary.md` exists, make sure it actually exists.\n\n## Good summary structure\n- `## Summary`\n- `### Goal`\n- `### Implemented`\n- `### Validation`\n- `### Deferred`\n\n## Validation\n- re-read the created/updated `_devagents` files\n- make sure `README.md` indexes point to real folders/files\n- verify filenames are spelled consistently\n\n## Output checklist\n- [ ] worksession README exists\n- [ ] worksession summary exists\n- [ ] `../../../../_devagents/signet/projects/README.md` updated\n- [ ] changed docs/infra/code mentioned\n- [ ] validation and deferred items recorded\n",
+      "card": null
+    },
+    {
+      "skill_path": ".cursor/skills/local-infra-bootstrap/SKILL.md",
+      "blob_sha": "2f6989a526d4fd81e5f84157d101418049c41e18",
+      "source_url": "https://github.com/therandomsecurityguy/signet/blob/edfad64090e449749e5576c021a28dd3c3573900/.cursor/skills/local-infra-bootstrap/SKILL.md",
+      "fetched_at": "2026-11-19T00:19:11.330Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "local-infra-bootstrap",
+        "description": "Creates or extends local development infrastructure for this repository. Use when adding a new service, Dockerfile, service env files, root compose wiring, compose overrides, shared volumes, Makefile shortcuts, or local-development docs for signet."
+      },
+      "excerpt": "---\nname: local-infra-bootstrap\ndescription: Creates or extends local development infrastructure for this repository. Use when adding a new service, Dockerfile, service env files, root compose wiring, compose overrides, shared volumes, Makefile shortcuts, or local-development docs for signet.\n---\n# Local Infra Bootstrap\n\n## Goal\nSet up fast local development infrastructure with:\n- per-service `infra/` files\n- root compose orchestration\n- shared mounts and networking\n- repeatable operator commands\n- matching human and agent docs\n\n## Use this skill when\n- adding a new service such as `service/api`\n- containerizing an existing service\n- wiring shared `data/` or cross-service mounts\n- adding `docker-compose.override.yml`\n- introducing `make up` / `make down` / `make logs`\n\n## Layout rules for this repo\n\n### Per service\nKeep service-specific infra inside the service:\n- `service/<name>/infra/Dockerfile`\n- `service/<name>/infra/.env`\n- `service/<name>/infra/.env.example`\n\n### System level\nKeep cross-service orchestration in `infra/`:\n- `infra/docker-compose.yml`\n- `infra/docker-compose.override.yml`\n- `infra/.env`\n- `infra/.env.example`\n- `infra/Makefile`\n- `infra/README.md`\n- `infra/AGENTS.md`\n\n## Local development defaults\n- bind-mount source code for fast iteration\n- bind-mount `data/` for shared runtime state\n- use a named `node_modules` volume for Node services\n- keep local-only ergonomics in the override file, not the base compose file\n- prefer `make` as the main operator entrypoint\n\n## Workflow\n1. Identify the service runtime:\n   - working directory\n   - dev command\n   - build command\n   - env file needs\n2. Create the per-service Dockerfile and env files.\n3. Wire the service into `infra/docker-compose.yml`.\n4. Put local-only tweaks into `infra/docker-compose.override.yml`.\n5. Add or update `infra/Makefile`.\n6. Document the workflow for humans and agents.\n7. Validate compose rendering and, if possible, bring up the stack.\n\n## Repository-specific implementation notes\n\n### Existing stack expectations\n- `service/api` is the management plane (lifecycle + governance over\n  `service/registry`); `service/mcp` is the read-only AI-facing plane;\n  `service/webapp/knowledge-manager` is the browser surface\n- `service/registry` is the canonical core library (no standalone HTTP\n  runtime); `service/tessera-sidecar` and `service/tessera-runtime` are the\n  Go transparency services used by compose and the chart\n- local run paths: `scripts/demo-local.sh` (host processes, no Docker),\n  `infra/` compose, and the Helm chart with `charts/signet/values-local.yaml`\n  (kind/OrbStack)\n- shared runtime data lives under `data/`; the chart mounts one shared PVC in\n  api + mcp so graph state and CAS stay visible to both planes\n\n### Node service advice\n- set `HOST=0.0.0.0` if the service must be reachable from Docker port publishing\n- use a named `node_modules` volume to avoid host/container mismatch\n- if file watching is flaky in containers, use `CHOKIDAR_USEPOLLING=1` in the override file\n\n### Compose layering\n- base compose: topology, networks, shared wiring\n- override compose: local TTY, host mappings, delegated mounts, watch-specific env\n\n## Validation\nRun from `infra/`:\n\n```bash\nmake config\nmake up\nmake ps\nmake logs S=mcp\n```\n\nIf the main service is MCP, also validate from `service/mcp/`:\n\n```bash\nnpm run lint\nnpm run typecheck\nnpm test\n```\n\nIf you touched the chart or the host demo path, also run:\n\n```bash\nhelm lint charts/signet -f charts/signet/values-local.yaml\nscripts/demo-local.sh demo\n```\n\n## Output checklist\n- [ ] service Dockerfile exists\n- [ ] service `.env` and `.env.example` exist\n- [ ] service is wired into base compose\n- [ ] local-only tweaks live in override compose\n- [ ] `Makefile` exposes normal operator commands\n- [ ] `infra/README.md` and `infra/AGENTS.md` are updated\n- [ ] service README references the infra entrypoint\n",
+      "card": null
+    },
+    {
+      "skill_path": ".cursor/skills/repo-move-reference-repair/SKILL.md",
+      "blob_sha": "ad6b827710106e361becde4183379e5f42a72e83",
+      "source_url": "https://github.com/therandomsecurityguy/signet/blob/edfad64090e449749e5576c021a28dd3c3573900/.cursor/skills/repo-move-reference-repair/SKILL.md",
+      "fetched_at": "2026-11-19T00:19:11.330Z",
+      "generated_at": "2026-11-19T00:19:11.330Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "repo-move-reference-repair",
+        "description": "Repairs code and documentation after a folder, service, or package is moved or renamed. Use when paths change in this repository, especially for `service/*`, `infra/`, `domain/`, or docs moves that require import fixes, tsconfig updates, README repairs, AGENTS updates, `_devagents` traceability updates, and verification."
+      },
+      "excerpt": "---\nname: repo-move-reference-repair\ndescription: Repairs code and documentation after a folder, service, or package is moved or renamed. Use when paths change in this repository, especially for `service/*`, `infra/`, `domain/`, or docs moves that require import fixes, tsconfig updates, README repairs, AGENTS updates, `_devagents` traceability updates, and verification.\n---\n# Repo Move Reference Repair\n\n## Goal\nAfter a move or rename, make the repository consistent again across:\n- runtime imports\n- build config\n- service docs\n- agent docs\n- `_devagents` history\n\n## Use this skill when\n- a directory moved, such as `connect/mcp` -> `service/mcp`\n- a package or service was renamed\n- docs still reference an old path\n- TypeScript import depth changed after a move\n\n## Workflow\n1. Confirm the old path and new path explicitly.\n2. Search for both paths across the repo.\n3. Update code references first:\n   - relative imports\n   - `tsconfig.json`\n   - `package.json` scripts\n   - runtime env defaults that depend on relative paths\n4. Update documentation references next:\n   - root `README.md`\n   - service `README.md`\n   - `AGENTS.md`\n   - `infra/*`\n   - `../../../../_devagents/signet/projects/**/*`\n5. Re-run verification from the moved service/package.\n6. Do a final search for the old path and explain any remaining generated matches.\n\n## Files to check in this repo\n- `README.md`\n- `service/*/README.md`\n- `service/*/package.json`\n- `service/*/tsconfig.json`\n- `service/*/src/**/*`\n- `service/*/scripts/**/*`\n- `service/*/AGENTS.md`\n- `charts/**/*`\n- `.github/workflows/*.yml`\n- `infra/**/*`\n- `docs/**/*`\n- `../../../../_devagents/signet/projects/**/*`\n\n## Repository-specific checks\n\n### TypeScript service move\nWhen `service/mcp` or another TS service moves:\n- re-check relative imports to sibling services such as `service/registry`\n- re-check `rootDir` / `include` in `tsconfig.json`\n- re-check `dist/...` paths in `package.json` scripts\n- if Docker is involved, re-check build context and `dockerfile` paths\n\n### Docs and traceability\nWhen a path changes, update all three layers:\n- human docs: `README.md`, `service/*/README.md`, `infra/README.md`\n- agent docs: `AGENTS.md`, `infra/AGENTS.md`\n- devagent history: `../../../../_devagents/signet/projects/README.md` and affected `worksession-*`\n\n### Common miss cases\n- examples in code fences\n- `_devagents` path history\n- `README.md` titles that still use the old folder name\n- generated start/build script paths\n\n## Validation\n- search for the old path again\n- run the moved service's validation commands\n- if a server moved, verify its health endpoint or startup logs\n- if a chart path or workflow changed, run\n  `helm lint charts/signet -f charts/signet/values-local.yaml` and\n  `actionlint .github/workflows/*.yml`\n\nFor `service/mcp`, the default validation is:\n\n```bash\nnpm run lint\nnpm run typecheck\nnpm test\n```\n\n## Output checklist\n- [ ] old path removed from source/docs\n- [ ] imports compile\n- [ ] docs point to the new path\n- [ ] `_devagents` chronology still makes sense\n- [ ] verification ran successfully\n\n## Example\nIf `service/mcp` moves again:\n- update `service/mcp/src/**/*` relative imports\n- update `service/mcp/tsconfig.json`\n- update `service/mcp/package.json`\n- update root/service/infra READMEs\n- update `../../../../_devagents/signet/projects/worksession-*`\n- run MCP validation from the new location\n",
+      "card": {
+        "title_zh": "仓库移动引用修复",
+        "purpose_zh": "在文件夹、服务或包被移动或重命名后，修复代码与文档中的旧路径引用，使运行时导入、构建配置、服务文档、代理文档和 _devagents 历史重新保持一致。",
+        "does": [
+          "确认旧路径与新路径，并在仓库中搜索两者",
+          "优先更新代码引用：相对导入、tsconfig.json、package.json 脚本、依赖相对路径的运行时环境默认值",
+          "再更新文档引用：根 README、服务 README、AGENTS.md、infra、_devagents 项目记录",
+          "从移动后的服务或包重新运行验证",
+          "最后再次搜索旧路径，并解释残留的生成匹配",
+          "针对 TypeScript 服务移动检查同级服务导入、rootDir/include、dist 路径及 Docker 构建上下文"
+        ],
+        "inputs": [
+          "旧路径与新路径",
+          "仓库中的代码、配置与文档文件",
+          "移动后服务的验证命令"
+        ],
+        "outputs": [
+          "更新后的代码导入与构建配置",
+          "指向新路径的文档",
+          "_devagents 历史记录更新",
+          "验证结果与旧路径残留说明"
+        ],
+        "scenarios": [
+          "目录被移动，如 connect/mcp 改为 service/mcp",
+          "包或服务被重命名",
+          "文档仍引用旧路径",
+          "移动后 TypeScript 导入深度变化",
+          "图表路径或工作流变更后需校验"
+        ],
+        "prerequisites": [
+          "已明确旧路径与新路径",
+          "可运行仓库搜索",
+          "可执行移动后服务的验证命令（如 npm run lint、typecheck、test）",
+          "涉及图表或工作流时需 helm 与 actionlint"
+        ],
+        "limits": [
+          "仅针对该仓库的路径与文件结构",
+          "验证命令示例针对 service/mcp 的 npm 脚本",
+          "未说明自动化执行方式，需人工按工作流操作"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "文档",
+          "运维部署",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Repairs code and documentation after a folder, service, or package is moved or renamed."
+          },
+          {
+            "field": "does",
+            "quote": "1. Confirm the old path and new path explicitly.\n2. Search for both paths across the repo."
+          },
+          {
+            "field": "does",
+            "quote": "Update code references first:\n   - relative imports\n   - `tsconfig.json`\n   - `package.json` scripts"
+          },
+          {
+            "field": "does",
+            "quote": "Update documentation references next:\n   - root `README.md`\n   - service `README.md`\n   - `AGENTS.md`"
+          },
+          {
+            "field": "does",
+            "quote": "5. Re-run verification from the moved service/package.\n6. Do a final search for the old path and explain any remaining generated matches."
+          },
+          {
+            "field": "does",
+            "quote": "re-check relative imports to sibling services such as `service/registry`"
+          },
+          {
+            "field": "inputs",
+            "quote": "Confirm the old path and new path explicitly."
+          },
+          {
+            "field": "outputs",
+            "quote": "- [ ] old path removed from source/docs\n- [ ] imports compile\n- [ ] docs point to the new path"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- a directory moved, such as `connect/mcp` -> `service/mcp`\n- a package or service was renamed\n- docs still reference an old path"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "For `service/mcp`, the default validation is:\n\n```bash\nnpm run lint\nnpm run typecheck\nnpm test\n```"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "run\n  `helm lint charts/signet -f charts/signet/values-local.yaml` and\n  `actionlint .github/workflows/*.yml`"
+          },
+          {
+            "field": "limits",
+            "quote": "## Files to check in this repo"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm run lint\nnpm run typecheck\nnpm test"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "update `service/mcp/tsconfig.json`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".cursor/skills/signet-registry/SKILL.md",
+      "blob_sha": "c5bc87a2d357d0d24aa1d73ad2a0fc592e9b7efb",
+      "source_url": "https://github.com/therandomsecurityguy/signet/blob/edfad64090e449749e5576c021a28dd3c3573900/.cursor/skills/signet-registry/SKILL.md",
+      "fetched_at": "2026-11-19T00:19:11.330Z",
+      "generated_at": "2026-11-19T00:19:11.330Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "signet-registry",
+        "description": "Discover, inspect, load, trust, and use skills and agents from the Signet registry via the MCP gateway. Use when you need to find a capability that already exists, load its real implementation, verify its certification/provenance before relying on it, or onboard onto the Signet registry as a new agent."
+      },
+      "excerpt": "---\nname: signet-registry\ndescription: Discover, inspect, load, trust, and use skills and agents from the Signet registry via the MCP gateway. Use when you need to find a capability that already exists, load its real implementation, verify its certification/provenance before relying on it, or onboard onto the Signet registry as a new agent.\n---\n# Signet Registry\n\n## Goal\nUse the Signet registry as the single source of truth for agents and skills.\nFollow the canonical happy path — **discover → inspect → load → trust → use** —\nso you never duplicate a capability that already exists, and you only rely on\nartifacts whose certification and provenance you have checked.\n\n## Use this skill when\n- You need a capability (skill, runbook, process knowledge) and want to check whether it already exists before writing it yourself.\n- You want to load the real implementation of a skill or agent.\n- You need to verify that a skill/agent is current, certified, and trustworthy before using it.\n- You are onboarding onto the Signet registry as a new agent.\n\n## Connect\nAll reads go through the MCP gateway (`service/mcp`) at `http://localhost:3000/mcp`\n(Streamable HTTP transport) with `Authorization: Bearer <token>`.\nSee `docs/mcp-onboarding.md` for per-harness config (Claude Code, Cursor, opencode, generic MCP clients).\n\n## Canonical flow\n\n### 1. Discover\nFind what already exists. Do not write a new skill until you have searched.\n- `registry.search` — search skills and agents by name, key, or description. Start here.\n- `registry.list_skills` / `registry.list_agents` — browse the full catalog.\n\nExample: `registry.search` with `{ \"query\": \"infra bootstrap\", \"type\": \"all\" }`.\n\n### 2. Inspect\nUnderstand a candidate before loading it.\n- `registry.get_skill` — get a skill and its linked artifacts (and active version).\n- `registry.get_agent` — get an agent and its linked skills/artifacts/harnesses.\n\nCheck the metadata: does it do what you need? Is there an active version?\n\n### 3. Load and verify bytes\nFetch the real implementation bytes and make them prove themselves.\n- `registry.get_artifact` — fetch an artifact (content-addressed file) by sha256/URN. The response re-hashes the bytes; treat `digest_verified: false` as untrusted.\n\n### 4. Trust\nVerify the publication before relying on the artifact.\n- `registry.verify_publication` — envelope digests, frozen-envelope artifact, detached signatures, and transparency proofs for a version. Treat anything other than `verification_status: verified` as untrusted.\n- `registry.get_attestations` — build provenance and SBOM attestations attached to the version.\n- `registry.get_provenance` — PROV-O provenance chain and audit replay.\n- Validation evidence: `registry.get_skill` / `registry.get_agent` list the\n  version's `governance_artifacts`; the `validation_report` entries linked via\n  `sg:validatedBy` are machine-readable reports of the W3C SHACL execution\n  that gated publication — `validator: shacl-v1`, the engine identity,\n  `conforms`, and per-layer violations (graph shape + policy, with\n  `shapes_format`/`shapes_sha256` fingerprints). Fetch one by its `sha256`\n  with `registry.get_artifact` if you need the per-layer detail.\n\nCheck: is the version `certified` (not just `draft`/`published`) — and\n`validation_status: passed`? Validation executes W3C SHACL over the\npublication graph; `Violation`-severity results (graph-shape or policy\nlayer) block publication, so a certified version passed those checks. Are\nthe verification verdicts clean (frozen-envelope digest match, signatures\nvalid)?\nIf trust signals are missing, or the version is deprecated/revoked (some\nenvironments deny revoked reads outright), do not use it — surface that to\nthe human instead.\n\n### 5. Use\nOnly after discover → inspect → load → trust:\n- Apply the loaded skill/agent content to your task.\n- Cite the `skill_key`/`agent_key` and version you used so the human can trace it.\n\n## Recertify\nCertification is not permanent. If you rely on a skill long-term, note that it\nmay need recertification (versions can be deprecated, revoked, or superseded).\nRe-run the trust step when a skill changes.\n\n## Tools reference (read-only)\n- `registry.search`\n- `registry.list_agents` / `registry.get_agent`\n- `registry.list_skills` / `registry.get_skill`\n- `registry.get_artifact`\n- `registry.verify_publication`\n- `registry.get_attestations`\n- `registry.get_provenance`\n\nThe MCP gateway is a read-only trust surface. It does not publish, certify,\nrevoke, or supersede registry state — those go through the management-plane API\n(`service/api`) with operator credentials, not from agent workflows.\n\n## Output checklist\n- [ ] Searched the registry before writing anything new\n- [ ] Inspected the candidate's metadata and active version\n- [ ] Loaded the real artifact bytes\n- [ ] Verified certification status and provenance chain\n- [ ] Cited the skill/agent key and version used\n",
+      "card": {
+        "title_zh": "Signet注册表技能",
+        "purpose_zh": "通过MCP网关从Signet注册表发现、检查、加载、验证并复用已有的技能与代理，避免重复造轮子，并只依赖已核验认证与来源的制品。",
+        "does": [
+          "按名称、键或描述搜索技能与代理，或浏览完整目录",
+          "查看技能或代理的元数据、关联制品与活跃版本",
+          "按sha256/URN获取制品真实字节并校验摘要",
+          "核验发布签名、透明性证明、认证状态与来源链",
+          "在完成发现、检查、加载、信任后应用技能内容并引用键与版本",
+          "提示长期依赖的技能可能需要重新认证"
+        ],
+        "inputs": [
+          "搜索查询词与类型（技能/代理/全部）",
+          "技能键或代理键",
+          "制品sha256或URN",
+          "MCP网关地址与Bearer令牌"
+        ],
+        "outputs": [
+          "技能与代理的搜索结果及目录列表",
+          "技能/代理元数据、关联制品与活跃版本",
+          "制品内容字节及digest_verified校验结果",
+          "verification_status、认证状态、验证报告与来源链",
+          "所使用技能/代理的键与版本引用"
+        ],
+        "scenarios": [
+          "编写新技能前先检索是否已有现成能力",
+          "需要加载某技能或代理的真实实现",
+          "依赖前核验技能/代理是否已认证且可信",
+          "以新代理身份接入Signet注册表",
+          "长期依赖某技能时检查其是否被弃用或撤销"
+        ],
+        "prerequisites": [
+          "MCP网关运行于http://localhost:3000/mcp（Streamable HTTP传输）",
+          "请求需携带Authorization: Bearer令牌",
+          "按docs/mcp-onboarding.md完成对应宿主配置"
+        ],
+        "limits": [
+          "网关为只读信任面，不发布、认证、撤销或取代注册表状态",
+          "发布等管理操作需通过service/api管理面与操作员凭据，不在代理工作流内",
+          "digest_verified为false或verification_status非verified时应视为不可信",
+          "版本非certified或validation_status未通过时不应使用",
+          "已弃用或撤销的版本不可使用，部分环境直接拒绝读取"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "network",
+          "needs_secret"
+        ],
+        "tags": [
+          "调研",
+          "文档",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Discover, inspect, load, trust, and use skills and agents from the Signet registry via the MCP gateway."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "so you never duplicate a capability that already exists, and you only rely on artifacts whose certification and provenance you have checked."
+          },
+          {
+            "field": "does",
+            "quote": "`registry.search` — search skills and agents by name, key, or description. Start here."
+          },
+          {
+            "field": "does",
+            "quote": "`registry.get_artifact` — fetch an artifact (content-addressed file) by sha256/URN. The response re-hashes the bytes; treat `digest_verified: false` as untrusted."
+          },
+          {
+            "field": "does",
+            "quote": "`registry.verify_publication` — envelope digests, frozen-envelope artifact, detached signatures, and transparency proofs for a version."
+          },
+          {
+            "field": "does",
+            "quote": "Cite the `skill_key`/`agent_key` and version you used so the human can trace it."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "All reads go through the MCP gateway (`service/mcp`) at `http://localhost:3000/mcp` (Streamable HTTP transport) with `Authorization: Bearer <token>`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "See `docs/mcp-onboarding.md` for per-harness config (Claude Code, Cursor, opencode, generic MCP clients)."
+          },
+          {
+            "field": "limits",
+            "quote": "The MCP gateway is a read-only trust surface. It does not publish, certify, revoke, or supersede registry state"
+          },
+          {
+            "field": "limits",
+            "quote": "If trust signals are missing, or the version is deprecated/revoked (some environments deny revoked reads outright), do not use it"
+          },
+          {
+            "field": "hosts",
+            "quote": "See `docs/mcp-onboarding.md` for per-harness config (Claude Code, Cursor, opencode, generic MCP clients)."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".cursor/skills/tool-addition-end-to-end/SKILL.md",
+      "blob_sha": "fd8eab13d46881542d4197a82d0ac93dbada34cd",
+      "source_url": "https://github.com/therandomsecurityguy/signet/blob/edfad64090e449749e5576c021a28dd3c3573900/.cursor/skills/tool-addition-end-to-end/SKILL.md",
+      "fetched_at": "2026-11-19T00:19:11.330Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "tool-addition-end-to-end",
+        "description": "Adds a canonical tool end-to-end in the MCP gateway. Use when creating or extending `data.*` or `registry.*` tools in `service/mcp`, including contracts, tool names, tool registry, execute dispatch, routes, MCP exposure, tests, docs, and audit-safe behavior."
+      },
+      "excerpt": "---\nname: tool-addition-end-to-end\ndescription: Adds a canonical tool end-to-end in the MCP gateway. Use when creating or extending `data.*` or `registry.*` tools in `service/mcp`, including contracts, tool names, tool registry, execute dispatch, routes, MCP exposure, tests, docs, and audit-safe behavior.\n---\n# Tool Addition End To End\n\n## Goal\nAdd a tool once, with the canonical Tool API as the source of truth, then expose it through HTTP and MCP without duplicating business logic.\n\n## Use this skill when\n- adding a new `data.*` tool\n- adding a new `registry.*` tool\n- extending MCP tool exposure\n- updating tool contracts and tests together\n\n## Repository rule\nThe canonical order is:\n1. contract\n2. tool name\n3. tool registry\n4. application dispatch / connector port\n5. HTTP route behavior\n6. MCP exposure\n7. tests\n8. docs\n\nDo not start from the MCP adapter. The MCP layer stays thin.\n\n## Files to inspect\n- `service/mcp/src/contracts/tools/*`\n- `service/mcp/src/domain/tools/tool-names.ts`\n- `service/mcp/src/domain/tools/tool-registry.ts`\n- `service/mcp/src/application/usecases/execute-tool.ts`\n- `service/mcp/src/application/ports/*`\n- `service/mcp/src/app/routes/tools.ts`\n- `service/mcp/src/app/routes/mcp.ts`\n- `service/mcp/tests/unit/*`\n- `service/mcp/tests/contract/*`\n\n## Workflow\n1. Define input/output contracts under `src/contracts/tools/`.\n2. Add or extend the tool name enum/constants.\n3. Register the tool in `ToolRegistry.buildDefault()`.\n4. Wire the use case dispatch in `execute-tool.ts`.\n5. Extend connector ports/adapters if the tool needs a new backend method.\n6. Ensure HTTP Tool API picks it up through the shared use case.\n7. Ensure MCP picks it up from the same registry.\n8. Add tests for:\n   - registry presence\n   - execute path\n   - route behavior\n   - MCP contract parity if the tool is exposed there\n9. Update README/docs if the tool is user-facing.\n\n## Repository-specific notes\n\n### Read-plane rule\n`service/mcp` is a read-only trust surface by governance rule: do not add\npublish, certify, revoke, supersede, or other write tools to `registry.*`.\nManagement operations belong to `service/api` with operator credentials\n(see the root `AGENTS.md` canonical boundaries).\n\n### ToolRegistry\n`ToolRegistry` is the source of truth for:\n- name\n- description\n- version\n- risk tier\n- input schema\n- output schema\n\n### ExecuteToolUseCase\nKeep dispatch explicit. In this repo, a switch statement is acceptable because tool count is small and stable.\n\n### MCP route\n`service/mcp/src/app/routes/mcp.ts` should register tools by iterating the registry and pass through the canonical Zod schemas.\n\n### Auditing and shaping\nWhen the tool returns large payloads:\n- redact or hash sensitive inputs\n- add truncation/shaping only in the use case layer\n- do not bypass audit publication\n\n## Validation\nFor `service/mcp`:\n\n```bash\nnpm run lint\nnpm run typecheck\nnpm test\n```\n\nPay special attention to:\n- tool registry tests\n- execute-tool tests\n- tool route tests\n- MCP tool-list contract tests\n\nCI also runs an OpenAPI spec/SDK type-sync check for `service/api`; MCP-only\ntool additions do not affect it, but changes under `service/registry` surface\nin both planes' suites.\n\n## Output checklist\n- [ ] contracts added\n- [ ] tool name added\n- [ ] tool registered\n- [ ] use case dispatch updated\n- [ ] connector port/adapter updated if needed\n- [ ] HTTP route path works\n- [ ] MCP exposes the same tool\n- [ ] tests updated\n- [ ] docs updated\n",
+      "card": null
+    }
+  ]
+}
