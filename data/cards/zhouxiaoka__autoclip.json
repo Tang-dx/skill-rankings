@@ -1,0 +1,177 @@
+{
+  "schema": 1,
+  "repo": "zhouxiaoka/autoclip",
+  "tree_sha": "a729db33c5a25a7c05a4082224926893cbbc692a",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/autoclip/SKILL.md",
+      "blob_sha": "a76233a3923113f10861ac5561d729c42183f205",
+      "source_url": "https://github.com/zhouxiaoka/autoclip/blob/cd8e6bed18d87a81273d48bcd165751708ac715c/skills/autoclip/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": "2026-11-21T00:18:14.635Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "autoclip",
+        "description": "用 AutoClip 把一条 YouTube / B 站链接，或本地长视频（讲座、访谈、播客、课程），做成各平台成片、封面、发布文案和 ZIP 发布包。 当用户要「出片」「做封面」「写发布文案」「打包发布」「从这个链接做短视频」时使用。 只要原始高光切片、合集，或把旧切片发到 Upload-Post 时不要用这份说明，改读 references/legacy.md。"
+      },
+      "excerpt": "---\nname: autoclip\ndescription: >-\n  用 AutoClip 把一条 YouTube / B 站链接，或本地长视频（讲座、访谈、播客、课程），做成各平台成片、封面、发布文案和 ZIP 发布包。\n  当用户要「出片」「做封面」「写发布文案」「打包发布」「从这个链接做短视频」时使用。\n  只要原始高光切片、合集，或把旧切片发到 Upload-Post 时不要用这份说明，改读 references/legacy.md。\n---\n\n# AutoClip：从链接或长视频到发布包\n\nAutoClip 在本机把一条素材做成可发布的成片。产物和桌面应用共用数据目录，桌面首页能看到同一个项目。\n\n先调用 `get_version`（或 `autoclip --version`）读取当前安装的版本。版本号来自安装包，不要和文档里的数字核对。\n\n## 什么时候用\n\n用户给出下面任一输入，并且要的是成片而不是素材列表：\n\n- HTTPS 的 YouTube 或 B 站链接\n- 本地长视频的绝对路径（讲座、访谈、播客录像、课程）\n\n交付物是四样，缺一要说明哪一样没有：\n\n1. 按平台剪好的成片\n2. 封面\n3. 发布文案\n4. ZIP 发布包\n\n## 什么时候不用\n\n- 只要带评分的原始切片和合集：读 [references/legacy.md](references/legacy.md)。\n- 把已经切好的旧片段发到 TikTok / YouTube 等（Upload-Post）：同样读那份参考，不要走下面的出片流程。\n- 用户只是在问 AutoClip 怎么安装、或还没有视频：先说明装法，不要空跑任务。\n\n## 先选调用方式\n\n1. **有 AutoClip MCP 工具** → 用工具，不要自己拼命令。\n2. **没有 MCP，但能跑 shell** → `autoclip produce <source> --json`。\n3. **两者都没有** → 一行安装：`uvx autoclip-mcp`，skill 用 `npx skills add zhouxiaoka/autoclip`。备选是在仓库根目录执行 `python -m pip install -r requirements.txt`，再执行 `python -m pip install --no-deps .`。详见 `docs/CLI_AND_MCP.md`。\n\n模型密钥放在桌面应用的设置里，或环境变量 `AUTOCLIP_API_KEY`。不要把 key 写进工具参数或对话。\n\n## 示例 1：链接出发布包\n\n1. `get_version`（或 `autoclip --version`），记下返回的版本。不要对照文档里写死的版本号。\n2. `start_quick_output`，`source` 用用户给的 HTTPS 链接（YouTube 或 B 站）。本地文件则先解析成绝对路径。`platforms` 用用户点名的平台；没点名时用 `douyin`。已有字幕就传 `srt_path`。\n3. 立刻拿到 `project_id`。按返回里的 `poll_after_sec` 调用 `get_quick_output_status`；没有这个字段时每 10 秒查一次。\n4. 每次把 `progress`、`stage`、`eta` 用一句话告诉用户。终态是 `completed`、`partial`、`failed`、`interrupted`、`cancelled`。`unknown` 表示没有这条任务，不要把它说成已完成。\n5. 终态后再查一次，并带 `export_kits=true`。把每条成片的视频、封面、文案和 ZIP 路径交给用户。\n6. `partial`：交付已经完成的版本，说明失败的平台，不要把整单再提交一遍。`interrupted`：进程已经不在，已完成的成片仍可取，未完成的要用户决定是否重做。\n\n没有 MCP 时：\n\n```bash\nautoclip produce \"https://www.youtube.com/watch?v=VIDEO\" --platform douyin --platform youtube_shorts --json\nautoclip outputs PROJECT_ID --export-kits\n```\n\n`youtube_long` 只生成至少 180 秒的完整片段。短素材改用 Shorts 或 B 站。\n\n## 示例 2：选剪辑风格\n\n风格 id 有五个：`editorial`（杂志风）、`street`（街头快剪）、`news`（新闻）、`cinema`（电影）、`classic`（经典）。竖版版式 `portrait_style`（`auto` / `interview` / `podcast`）只改竖版布局，不代替剪辑风格。`template` / `--template` 只在 `mcp_v2_tools` 打开时接受。不支持的值返回 `invalid_input`。\n\n1. 如果工具列表里有 `list_styles`，先调用它，把 id 和名称给用户选。没有 list_styles 就不要传 template。\n2. 用户选定后，MCP 在 `start_quick_output` 上传 `template`。命令行用 `--template`。开关关闭时不要传；不传则按经典制作。注意：桌面导入页默认是杂志风，但 CLI / MCP 不传时默认经典；用户想要和桌面一样的效果，就显式传 `editorial`。\n3. 以返回结果里的风格为准。`template` 是实际用的风格，`requested_template` 是请求值。`pkg_templates_v1` 关闭时，即使请求了杂志风或街头快剪，实际风格也是 `classic`。\n4. 其余步骤与示例 1 相同：轮询到终态，再 `export_kits=true`。\n\n```bash\nautoclip produce talk.mp4 --template street --platform douyin --json\n```\n\n```json\n{\"source\":\"/absolute/path/talk.mp4\",\"platforms\":[\"douyin\"],\"template\":\"editorial\"}\n```\n\n不要发明 `magazine` 或其他 id，也不要额外加风格参数。那些留到后续版本。\n\n## 示例 3：批量\n\n多个链接或多个本地文件时，一次只提交一条。不要并行开多条任务。\n\n1. 和用户确认平台和风格（风格可省略，省略则不传 `template`）。\n2. 对第一条调用 `start_quick_output`，记下 `project_id`。\n3. 按 `poll_after_sec`（没有则 10 秒）轮询到终态，导出发布包。\n4. 再提交下一条。全部结束后做一张表：来源、`project_id`、状态、发布包路径。失败的单独列出，不要为了补齐而重跑已经成功的条目。\n\n没有「一次传入多条 source」的参数。不要自造 `sources` 数组。\n\n## 平台\n\n`douyin`、`xiaohongshu`、`bilibili`、`tiktok`、`instagram_reels`、`youtube_shorts`、`youtube_long`。`reels` 和 `shorts` 是别名。\n\n中文平台用中文，英文平台用英文。横版保持 16:9。\n\n## 出了问题先看这里\n\n| 问题 | 去哪 |\n|---|---|\n| 链接或本地视频 → 成片、封面、文案、发布包 | 本文示例 1 |\n| 选杂志风 / 街头快剪 / 经典 | 本文示例 2 |\n| 多个链接排队 | 本文示例 3 |\n| 原始切片、合集、评分、Upload-Post | [references/legacy.md](references/legacy.md) |\n| 安装、命令、数据目录 | `docs/CLI_AND_MCP.md` |\n\n给用户结果时列出：平台、状态、视频路径、封面路径、文案标题、ZIP 路径。路径给全，但不要把密钥或环境变量值打出来。\n",
+      "card": {
+        "title_zh": "AutoClip 出片发布包",
+        "purpose_zh": "把一条 YouTube 或 B 站链接，或本地长视频（讲座、访谈、播客、课程），在本机做成各平台成片、封面、发布文案和 ZIP 发布包。",
+        "does": [
+          "读取当前安装版本，不核对文档写死的版本号",
+          "用链接或本地绝对路径提交出片任务，指定平台与剪辑风格",
+          "轮询任务状态并汇报进度、阶段和预计时间",
+          "终态后导出每条成片的视频、封面、文案和 ZIP 路径",
+          "多条素材时逐条排队提交，最后汇总成表",
+          "区分 partial、interrupted 等终态并说明缺失项"
+        ],
+        "inputs": [
+          "HTTPS 的 YouTube 或 B 站链接",
+          "本地长视频的绝对路径",
+          "目标平台（未点名时用 douyin）",
+          "剪辑风格 id（可省略）",
+          "已有字幕的 srt_path（可选）"
+        ],
+        "outputs": [
+          "按平台剪好的成片",
+          "封面",
+          "发布文案",
+          "ZIP 发布包",
+          "project_id 与任务状态、进度信息"
+        ],
+        "scenarios": [
+          "从 YouTube 或 B 站链接做短视频成片",
+          "把本地讲座、访谈、播客录像或课程剪成发布包",
+          "为成片选杂志风、街头快剪、新闻、电影或经典风格",
+          "批量处理多个链接或本地文件并汇总结果"
+        ],
+        "prerequisites": [
+          "有 AutoClip MCP 工具，或能跑 shell 执行 autoclip 命令",
+          "两者都没有时先安装：uvx autoclip-mcp，或 pip 安装依赖",
+          "模型密钥放在桌面应用设置或环境变量 AUTOCLIP_API_KEY"
+        ],
+        "limits": [
+          "只要原始高光切片、合集或 Upload-Post 发布时不用本文，改读 references/legacy.md",
+          "没有一次传入多条 source 的参数，不能并行开多条任务",
+          "template 只在 mcp_v2_tools 打开时接受，不支持的值返回 invalid_input",
+          "pkg_templates_v1 关闭时实际风格为 classic",
+          "youtube_long 只生成至少 180 秒的完整片段",
+          "unknown 状态表示没有这条任务，不能说成已完成",
+          "不要把密钥写进工具参数或对话"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "视频",
+          "内容运营",
+          "自动化",
+          "写作"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "用 AutoClip 把一条 YouTube / B 站链接，或本地长视频（讲座、访谈、播客、课程），做成各平台成片、封面、发布文案和 ZIP 发布包。"
+          },
+          {
+            "field": "does",
+            "quote": "先调用 `get_version`（或 `autoclip --version`）读取当前安装的版本。版本号来自安装包，不要和文档里的数字核对。"
+          },
+          {
+            "field": "does",
+            "quote": "`start_quick_output`，`source` 用用户给的 HTTPS 链接（YouTube 或 B 站）。本地文件则先解析成绝对路径。"
+          },
+          {
+            "field": "does",
+            "quote": "按返回里的 `poll_after_sec` 调用 `get_quick_output_status`；没有这个字段时每 10 秒查一次。"
+          },
+          {
+            "field": "does",
+            "quote": "终态后再查一次，并带 `export_kits=true`。把每条成片的视频、封面、文案和 ZIP 路径交给用户。"
+          },
+          {
+            "field": "does",
+            "quote": "多个链接或多个本地文件时，一次只提交一条。不要并行开多条任务。"
+          },
+          {
+            "field": "does",
+            "quote": "`partial`：交付已经完成的版本，说明失败的平台，不要把整单再提交一遍。"
+          },
+          {
+            "field": "inputs",
+            "quote": "- HTTPS 的 YouTube 或 B 站链接\n- 本地长视频的绝对路径（讲座、访谈、播客录像、课程）"
+          },
+          {
+            "field": "outputs",
+            "quote": "1. 按平台剪好的成片\n2. 封面\n3. 发布文案\n4. ZIP 发布包"
+          },
+          {
+            "field": "scenarios",
+            "quote": "用户给出下面任一输入，并且要的是成片而不是素材列表："
+          },
+          {
+            "field": "scenarios",
+            "quote": "风格 id 有五个：`editorial`（杂志风）、`street`（街头快剪）、`news`（新闻）、`cinema`（电影）、`classic`（经典）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "1. **有 AutoClip MCP 工具** → 用工具，不要自己拼命令。\n2. **没有 MCP，但能跑 shell** → `autoclip produce <source> --json`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "模型密钥放在桌面应用的设置里，或环境变量 `AUTOCLIP_API_KEY`。不要把 key 写进工具参数或对话。"
+          },
+          {
+            "field": "limits",
+            "quote": "只要原始高光切片、合集，或把旧切片发到 Upload-Post 时不要用这份说明，改读 references/legacy.md。"
+          },
+          {
+            "field": "limits",
+            "quote": "没有「一次传入多条 source」的参数。不要自造 `sources` 数组。"
+          },
+          {
+            "field": "limits",
+            "quote": "`template` / `--template` 只在 `mcp_v2_tools` 打开时接受。不支持的值返回 `invalid_input`。"
+          },
+          {
+            "field": "limits",
+            "quote": "`youtube_long` 只生成至少 180 秒的完整片段。短素材改用 Shorts 或 B 站。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "备选是在仓库根目录执行 `python -m pip install -r requirements.txt`，再执行 `python -m pip install --no-deps .`。"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/product-board/SKILL.md",
+      "blob_sha": "f52bb8c8cf2e0a71fd1fabd8615c9e69f3e947da",
+      "source_url": "https://github.com/zhouxiaoka/autoclip/blob/cd8e6bed18d87a81273d48bcd165751708ac715c/skills/product-board/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "product-board",
+        "description": "维护 AutoClip 的公开社区看板。当用户要看社区反馈、整理功能呼声、把一条讨论放进路线图、 或问 GitHub Discussions、Projects、Quackback、Featurebase 该怎么接时使用。 想法留在 Discussions，只有人确认后才开 Issue。"
+      },
+      "excerpt": "---\nname: product-board\ndescription: >-\n  维护 AutoClip 的公开社区看板。当用户要看社区反馈、整理功能呼声、把一条讨论放进路线图、\n  或问 GitHub Discussions、Projects、Quackback、Featurebase 该怎么接时使用。\n  想法留在 Discussions，只有人确认后才开 Issue。\n---\n\n# AutoClip 产品看板\n\n规则的正文在 `docs/COMMUNITY_BOARD.md`。商业化阶段仍以 `ROADMAP.md` 为准，当前工程状态以 `HANDOFF.md` 为准。\n\n## 先读再动\n\n1. 跑 `python3 scripts/feature_signals.py --days 30 --json`。\n2. 用语义把讨论收成几条需求。脚本里的用词重叠只是提示。\n3. 对照已有 `status:*` Issue，标出重复。\n4. 给出排序和「建议停在哪一列」。不要在这一步创建 Issue。\n\n## 什么时候可以写 GitHub\n\n只有人明确说「放进某一列」或「开成 Issue」才写。\n\n- 可以建议 Exploring 或 Researching。\n- Planned、Building、Testing、Shipped 必须使用人说出的那一列，不能自己升级。\n- 合并 PR 不算 Shipped。发版说明里写了才把卡移到 Shipped。\n\n晋升时按 `docs/community/issue-body.md` 写正文，打 `feature` 和对应 `status:*`，加入名为 **AutoClip Roadmap** 的 Project，并回原讨论帖。\n\n## 不要做的事\n\n- 不要把 Q&A 和能复现的 bug 混进路线图。bug 用现有 bug 模板。\n- 不要为了看板去部署 Quackback、Featurebase 或 Linear。触发条件写在 `docs/COMMUNITY_BOARD.md`。\n- 不要编造票数。没有反应数时就说没有。\n- 应用内反馈会由 `scripts/ingest_app_feedback.py` 写进 Issue（故障）或 Discussions（想法 / 其他）。这些帖子是收件箱，带反馈编号；不要把 `from-app` 推进到 Planned。不要把用户指回飞书表格。\n",
+      "card": null
+    }
+  ]
+}

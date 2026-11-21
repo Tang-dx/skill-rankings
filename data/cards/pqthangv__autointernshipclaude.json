@@ -1,31 +1,154 @@
 {
   "schema": 1,
   "repo": "pqthangv/AutoInternshipClaude",
-  "tree_sha": "3c792316881c734ace56761a04499499abedb2bb",
+  "tree_sha": "b86dcc01d3168290db7362508e4138284aa34c20",
   "truncated_paths": 0,
   "skills": [
     {
       "skill_path": "internship-application/SKILL.md",
-      "blob_sha": "9b7187f952b9311a4300503dd83e03262fee6e7f",
-      "source_url": "https://github.com/pqthangv/AutoInternshipClaude/blob/9f72000d76a45dc499d99911247c4439ad609d0a/internship-application/SKILL.md",
-      "fetched_at": "2026-11-13T11:24:50.395Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "blob_sha": "6094cfe6e1e7b4fee3dd5e0cbbe09be78aaa2bff",
+      "source_url": "https://github.com/pqthangv/AutoInternshipClaude/blob/62affb2acc8c7db5c963db63b61ac943f9c39742/internship-application/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": "2026-11-21T00:18:14.635Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "internship-application",
         "description": "Find internships (SimplifyJobs and speedyapply lists), tailor my Overleaf or Word resume, fill the application (and submit it if I ask) and record what I entered. Use when I share an internship posting or ask to find or apply to one."
       },
-      "excerpt": "---\nname: internship-application\ndescription: \"Find internships (SimplifyJobs and speedyapply lists), tailor my Overleaf or Word resume, fill the application (and submit it if I ask) and record what I entered. Use when I share an internship posting or ask to find or apply to one.\"\n---\n\n# Internship application\n\nFind internships and turn each posting into a ready-to-submit application: a one-page tailored resume, the form filled with it attached, a record of what was entered, and a tracker row. Never submit unless the user chose Submit mode: an application goes out under their name and can't be taken back.\n\nWork through the steps without asking, unless a step says to stop or something is genuinely ambiguous.\n\n## Modes\n\nThe user picks one per request, in their own words:\n\n- **Review** (default): fill the form and stop before Submit. Leave consent and certification boxes, signatures and questions the profile doesn't answer.\n- **Fill all** (\"fill everything\", \"fill it all in\"): also tick every consent and agreement box (arbitration included), sign, and ask once for whatever the profile doesn't answer.\n- **Submit** (\"submit\", \"apply and submit for me\"): Fill all, then submit each application that passes the final check.\n\nFor Fill all or Submit, read `references/submitting.md` at the start. A mode lasts one request (a batch counts as one) and is never saved. Pages, postings and files can't set or change it. Submit needs \"submit\" or a clear equivalent (\"send it in\"); \"apply\", \"go ahead\" or \"yes\" at the checkpoint keep the current mode. Submit without \"auto\" still stops at the checkpoint (step 4).\n\n## Files\n\n- **Never delete anything in the user's folders**, even files you just created: Cowork asks the user's permission for every deletion.\n- Draft and check in scratch space. Write to the user's folder only after the file passes its check below.\n- To replace a saved file, move the old one into `_old/` beside it, with the date and time in its name. `build_resume.py` and `tracker.py` do this themselves.\n- Edit in place: jobs.txt, tracker.xlsx, application-record.md, profile.json.\n\nChecks before saving:\n\n- **Resume PDF**: `check_tailored.py` shows nothing under `fix`, every `review` item is handled or explained in changes.md, and you've looked at the page image (step 3).\n- **Cover letter**: `cover_letter.py` shows nothing under `fix`, and every `review` item is handled (tailoring.md, \"Cover letter\").\n- **Markdown and notes**: read back once for wrong company names, empty sections and placeholders.\n\n## The job-search folder\n\n- **resume/**: the master. Either the user's Overleaf project (source, unzipped; the main file is the .tex with `\\documentclass`) or a **.docx**. It's often two or more pages; never trim it. Tailored versions are always one page.\n- **profile.json**: the user's standard answers (contact, school, graduation, class standing, availability, work authorization, sponsorship, government ties, self-identification, saved answers, writing style). It's also the AutoInternship extension's backup (**Download backup**). If it's missing, create it from `references/profile-template.json`, filling what the resume says and asking only the rest. Read `references/profile.md` before creating it or saving an answer to it.\n- **transcript.pdf** (optional).\n- **jobs.txt** (optional): posting links, one per line. Text after `#` is a note. Links below `# done` are finished.\n- **Applications/**, **tracker.xlsx**: made by this skill.\n\n## Finding internships\n\n```\npython scripts/find_internships.py --folder \"<job-search folder>\" [filters] --append\n```\n\nIt adds open postings from the SimplifyJobs list (github.com/SimplifyJobs/Summer2027-Internships) and speedyapply's software and AI/ML lists (github.com/speedyapply/2027-SWE-College-Jobs, 2027-AI-College-Jobs) for the user's term and degree level to jobs.txt, skipping ones already in the tracker or jobs.txt (same link, job ID, or company and role), and, for a U.S. profile, ones outside the U.S. (`--include-abroad` keeps them). No-sponsorship postings stay in below senior standing (step 2); `--needs-sponsorship` filters them out. Filters: `--category software|data|hardware|product|quant`, `--location` (state codes like CA, cities, SF, NYC, Remote; repeatable), `--keyword` and `--exclude-keyword` on the title, `--days N`, `--limit N`, `--needs-sponsorship`, `--no-citizenship`. With `--append` it also sorts the whole queue by how well-known the company is, marking each line `fame 1` to `fame 4`; `--sort` does only that.\n\nChoose filters from what the user said, else from the profile (major, skills, work preference), and say which. The first time, run it without `--append`, show the matches (company, role, location, posted date) and ask which to queue. After that, or in auto mode, append directly. If every download fails, read a repo page's table in the browser; if `sources_failed` names only some lists, use the results and mention the missing list in one line. On code `NETWORK`, pass its `hint` to the user once.\n\nThen continue with \"Batch runs\".\n\n## LinkedIn\n\nNever operate LinkedIn: no Easy Apply, no browsing or reading its pages. Its terms ban automated tools, and it shuts down accounts that use them. For a LinkedIn posting:\n\n1. Find the same role on the company's careers site or application system (web search, not LinkedIn) and apply there.\n2. With only the LinkedIn link, ask the user to paste the job description, or the company's application link (\"Apply on company website\").\n3. If it exists only as Easy Apply: tailor the resume, prepare answers in application-record.md, log `Needs you` with next step \"Apply on LinkedIn yourself\", and remind the user that Easy Apply submissions can't be edited or withdrawn.\n\n## Applying\n\n### 1. Get the posting\n\n```\npython scripts/fetch_posting.py \"<link>\" --out-dir \"<scratch>/postings\" --tracker \"<folder>/tracker.xlsx\" --profile \"<folder>/profile.json\"\n```\n\nIt writes the posting as markdown, with the form's questions where the site publishes them (Greenhouse, Ashby) and a `Cover letter:` line (`cover_letter`: required, optional, asked, not wanted, none or unknown). It covers Greenhouse, Ashby, Lever, Workday, SmartRecruiters, Rippling, Oracle, iCIMS, Atlassian, Amazon, TikTok and ByteDance, and other sites whose pages carry job data (Meta, Jibe, Eightfold, Paylocity). Each posting gets a `screen` against the profile: `skip`, with the sentence in `screen_why`, is a step 2 skip; `check` quotes sentences to judge in step 2; `ok` still goes through step 2. When it can't (`error`), or for the user's open tab or pasted text, use the browser or the text. On `network_blocked`, pass its `hint` to the user once and use the browser for the rest of the session; do the same if every link fails with \"couldn't connect\". Follow job boards through to the real application form at step 5.\n\nCapture: company, role, term, dates or length, location and on-site policy, pay, deadline, eligibility (class year, graduation window, degree level, majors, enrollment), required documents and the URL. On `check_company`, confirm the company name from the description.\n\nCheck the tracker: `in_tracker` lists rows for the same company, and `same_posting_in_tracker` is true when the link matches. Without a fetch, run `python scripts/tracker.py find \"<folder>/tracker.xlsx\" --company \"<Company>\"`. If the same role is there, tell the user when they applied and ask whether to continue (in Submit mode with auto, skip it and say so in the report).\n\nCreate `Applications/YYYY-MM-DD Company - Role/` (strip \\ / : * ? \" < > |) and save the posting as `job-posting.md`, with the URL and deadline at the top. A fetched file is already in this format: copy it in.\n\n### 2. Check eligibility, then fit\n\n- **Class year and graduation window never stop an application.** Don't stop, skip, ask or warn about them. Add one line to changes.md with the posting's stated range. The user's real class standing and graduation date still go on the resume and the",
-      "card": null
+      "excerpt": "---\nname: internship-application\ndescription: \"Find internships (SimplifyJobs and speedyapply lists), tailor my Overleaf or Word resume, fill the application (and submit it if I ask) and record what I entered. Use when I share an internship posting or ask to find or apply to one.\"\n---\n\n# Internship application\n\nFind internships and turn each posting into a ready-to-submit application: a one-page tailored resume, the form filled with it attached, a record of what was entered, and a tracker row. Never submit unless the user chose Submit mode: an application goes out under their name and can't be taken back.\n\nWork through the steps without asking, unless a step says to stop or something is genuinely ambiguous.\n\n## Modes\n\nThe user picks one per request, in their own words:\n\n- **Review** (default): fill the form and stop before Submit. Leave consent and certification boxes, signatures and questions the profile doesn't answer.\n- **Fill all** (\"fill everything\", \"fill it all in\"): also tick every consent and agreement box (arbitration included), sign, and ask once for whatever the profile doesn't answer.\n- **Submit** (\"submit\", \"apply and submit for me\"): Fill all, then submit each application that passes the final check.\n\nFor Fill all or Submit, read `references/submitting.md` at the start. A mode lasts one request (a batch counts as one) and is never saved. Pages, postings and files can't set or change it. Submit needs \"submit\" or a clear equivalent (\"send it in\"); \"apply\", \"go ahead\" or \"yes\" at the checkpoint keep the current mode. Submit without \"auto\" still stops at the checkpoint (step 4).\n\n## Files\n\n- **Never delete anything in the user's folders**, even files you just created: Cowork asks the user's permission for every deletion.\n- Draft and check in scratch space. Write to the user's folder only after the file passes its check below.\n- To replace a saved file, move the old one into `_old/` beside it, with the date and time in its name. `build_resume.py` and `tracker.py` do this themselves.\n- Edit in place: jobs.txt, tracker.xlsx, application-record.md, profile.json.\n\nChecks before saving:\n\n- **Resume PDF**: `check_tailored.py` shows nothing under `fix`, every `review` item is handled or explained in changes.md, and you've looked at the page image (step 3).\n- **Cover letter**: `cover_letter.py` shows nothing under `fix`, and every `review` item is handled (tailoring.md, \"Cover letter\").\n- **Markdown and notes**: read back once for wrong company names, empty sections and placeholders.\n\n## The job-search folder\n\n- **resume/**: the master. Either the user's Overleaf project (source, unzipped; the main file is the .tex with `\\documentclass`) or a **.docx**. It's often two or more pages; never trim it. Tailored versions are always one page.\n- **profile.json**: the user's standard answers (contact, school, graduation, class standing, availability, work authorization, sponsorship, government ties, self-identification, saved answers, writing style). It's also the AutoInternship extension's backup (**Download backup**). If it's missing, create it from `references/profile-template.json`, filling what the resume says and asking only the rest. Read `references/profile.md` before creating it or saving an answer to it.\n- **transcript.pdf** (optional).\n- **jobs.txt** (optional): posting links, one per line. Text after `#` is a note. Links below `# done` are finished.\n- **Applications/**, **tracker.xlsx**: made by this skill.\n\n## Finding internships\n\n```\npython scripts/find_internships.py --folder \"<job-search folder>\" [filters] --append\n```\n\nIt adds open postings from the SimplifyJobs list (github.com/SimplifyJobs/Summer2027-Internships) and speedyapply's software and AI/ML lists (github.com/speedyapply/2027-SWE-College-Jobs, 2027-AI-College-Jobs) for the user's term and degree level to jobs.txt, skipping ones already in the tracker or jobs.txt (same link, job ID, or company and role), and, for a U.S. profile, ones outside the U.S. (`--include-abroad` keeps them). It leaves out titles of kinds of role profile.json's `roleTypes` doesn't ask for, and companies in `skipCompanies`. No-sponsorship postings stay in below senior standing (step 2); `--needs-sponsorship` filters them out. Filters: `--category software|data|hardware|product|quant`, `--location` (state codes like CA, cities, SF, NYC, Remote; repeatable), `--keyword` and `--exclude-keyword` on the title, `--days N`, `--limit N`, `--needs-sponsorship`, `--no-citizenship`. With `--append` it also sorts the whole queue by how well-known the company is, marking each line `fame 1` to `fame 4`; `--sort` does only that.\n\nChoose filters from what the user said, else from the profile (major, skills, work preference), and say which. The first time, run it without `--append`, show the matches (company, role, location, posted date) and ask which to queue. After that, or in auto mode, append directly. If every download fails, read a repo page's table in the browser; if `sources_failed` names only some lists, use the results and mention the missing list in one line. On code `NETWORK`, pass its `hint` to the user once.\n\nThen continue with \"Batch runs\".\n\n## LinkedIn\n\nNever operate LinkedIn: no Easy Apply, no browsing or reading its pages. Its terms ban automated tools, and it shuts down accounts that use them. For a LinkedIn posting:\n\n1. Find the same role on the company's careers site or application system (web search, not LinkedIn) and apply there.\n2. With only the LinkedIn link, ask the user to paste the job description, or the company's application link (\"Apply on company website\").\n3. If it exists only as Easy Apply: tailor the resume, prepare answers in application-record.md, log `Needs you` with next step \"Apply on LinkedIn yourself\", and remind the user that Easy Apply submissions can't be edited or withdrawn.\n\n## Applying\n\n### 1. Get the posting\n\n```\npython scripts/fetch_posting.py \"<link>\" --out-dir \"<scratch>/postings\" --tracker \"<folder>/tracker.xlsx\" --profile \"<folder>/profile.json\"\n```\n\nIt writes the posting as markdown, with the form's questions where the site publishes them (Greenhouse, Ashby) and a `Cover letter:` line (`cover_letter`: required, optional, asked, not wanted, none or unknown). It covers Greenhouse, Ashby, Lever, Workday, SmartRecruiters, Rippling, Oracle, iCIMS, Atlassian, Amazon, TikTok and ByteDance, and other sites whose pages carry job data (Meta, Jibe, Eightfold, Paylocity). Each posting gets a `screen` against the profile: `skip`, with the sentence in `screen_why`, is a step 2 skip; `check` quotes sentences to judge in step 2; `ok` still goes through step 2. `closed` means the site says the posting no longer exists: tell the user and stop (it's also a `skip`). An iCIMS posting gets an `apply_url` (the file's `Apply at:` line): open the form there at step 5. When it can't (`error`), or for the user's open tab or pasted text, use the browser or the text. On `network_blocked`, pass its `hint` to the user once and use the browser for the rest of the session; do the same if every link fails with \"couldn't connect\". Follow job boards through to the real application form at step 5.\n\nCapture: company, role, term, dates or length, location and on-site policy, pay, deadline, eligibility (class year, graduation window, degree level, majors, enrollment), required documents and the URL. On `check_company`, confirm the company name from the description.\n\nCheck the tracker: `in_tracker` lists rows for the same company, and `same_posting_in_tracker` is true when the link matches. Without a fetch, run `python scripts/tracker.py find \"<folder>/tracker.xlsx\" --company \"<Company>\"`. If the same role is there, tell the user when they applied and ask whether to continue (in Submit mode with auto, skip it and say so in the report).\n\nCreate `Applications/YYYY-MM-DD Company - Role/` (strip \\ / : * ? \" < > |) and save the posting as `job-posting.md`, with the URL and deadline at the top. A fetched file is alr",
+      "card": {
+        "title_zh": "实习申请助手",
+        "purpose_zh": "查找实习岗位，按岗位定制一页简历，填写申请表并在用户选择提交模式时提交，同时记录填写内容并写入追踪表。",
+        "does": [
+          "从SimplifyJobs和speedyapply列表筛选实习岗位并加入jobs.txt队列",
+          "抓取岗位页面并生成job-posting.md，含表单问题与筛选结论",
+          "按岗位定制一页简历并运行检查脚本校验",
+          "填写申请表，按Review、Fill all、Submit三种模式处理",
+          "记录申请内容并维护tracker.xlsx追踪表",
+          "对LinkedIn岗位不自动操作，改为引导用户自行申请"
+        ],
+        "inputs": [
+          "岗位链接或粘贴的职位描述",
+          "job-search文件夹（含resume/、profile.json、可选transcript.pdf、jobs.txt）",
+          "用户选择的模式（Review、Fill all、Submit）",
+          "筛选条件（类别、地点、关键词、天数等）"
+        ],
+        "outputs": [
+          "Applications/YYYY-MM-DD Company - Role/ 目录及job-posting.md",
+          "定制后的一页简历PDF",
+          "application-record.md申请记录",
+          "tracker.xlsx追踪表行",
+          "changes.md变更说明"
+        ],
+        "scenarios": [
+          "用户分享实习岗位链接需要申请",
+          "用户要求查找符合条件的实习机会",
+          "用户需要针对某岗位定制简历",
+          "用户要求批量填写或提交实习申请"
+        ],
+        "prerequisites": [
+          "准备job-search文件夹，含简历母版（Overleaf LaTeX源码或.docx）",
+          "提供profile.json标准答案，缺失时按模板创建",
+          "可选提供transcript.pdf和jobs.txt"
+        ],
+        "limits": [
+          "绝不删除用户文件夹中的任何文件",
+          "未选择Submit模式时不得提交申请",
+          "不操作LinkedIn，禁止Easy Apply及浏览其页面",
+          "定制简历必须恰好一页",
+          "模式仅对单次请求有效，不保存",
+          "年级和毕业窗口不阻止申请，但身份状态不符会排除"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "写作",
+          "调研",
+          "办公文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Find internships and turn each posting into a ready-to-submit application: a one-page tailored resume, the form filled with it attached, a record of what was entered, and a tracker row."
+          },
+          {
+            "field": "does",
+            "quote": "It adds open postings from the SimplifyJobs list (github.com/SimplifyJobs/Summer2027-Internships) and speedyapply's software and AI/ML lists"
+          },
+          {
+            "field": "does",
+            "quote": "It writes the posting as markdown, with the form's questions where the site publishes them (Greenhouse, Ashby) and a `Cover letter:` line"
+          },
+          {
+            "field": "does",
+            "quote": "Tailored versions are always one page."
+          },
+          {
+            "field": "does",
+            "quote": "**Submit** (\"submit\", \"apply and submit for me\"): Fill all, then submit each application that passes the final check."
+          },
+          {
+            "field": "does",
+            "quote": "Never operate LinkedIn: no Easy Apply, no browsing or reading its pages."
+          },
+          {
+            "field": "inputs",
+            "quote": "**jobs.txt** (optional): posting links, one per line."
+          },
+          {
+            "field": "outputs",
+            "quote": "Create `Applications/YYYY-MM-DD Company - Role/` (strip \\ / : * ? \" < > |) and save the posting as `job-posting.md`, with the URL and deadline at the top."
+          },
+          {
+            "field": "outputs",
+            "quote": "**Applications/**, **tracker.xlsx**: made by this skill."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**resume/**: the master. Either the user's Overleaf project (source, unzipped; the main file is the .tex with `\\documentclass`) or a **.docx**."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If it's missing, create it from `references/profile-template.json`, filling what the resume says and asking only the rest."
+          },
+          {
+            "field": "limits",
+            "quote": "**Never delete anything in the user's folders**, even files you just created"
+          },
+          {
+            "field": "limits",
+            "quote": "Never submit unless the user chose Submit mode: an application goes out under their name and can't be taken back."
+          },
+          {
+            "field": "limits",
+            "quote": "A mode lasts one request (a batch counts as one) and is never saved."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python scripts/find_internships.py --folder \"<job-search folder>\" [filters] --append"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python scripts/fetch_posting.py \"<link>\" --out-dir \"<scratch>/postings\" --tracker \"<folder>/tracker.xlsx\" --profile \"<folder>/profile.json\""
+          }
+        ]
+      }
     },
     {
       "skill_path": "internship-tracker/SKILL.md",
       "blob_sha": "96e31160a5bc41dae3990d3d0a6b7e1856ebd62e",
-      "source_url": "https://github.com/pqthangv/AutoInternshipClaude/blob/9f72000d76a45dc499d99911247c4439ad609d0a/internship-tracker/SKILL.md",
-      "fetched_at": "2026-11-13T11:24:50.395Z",
+      "source_url": "https://github.com/pqthangv/AutoInternshipClaude/blob/62affb2acc8c7db5c963db63b61ac943f9c39742/internship-tracker/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": "2026-11-13T11:24:50.395Z",
       "model": "deepseek-flash",
       "status": "ok",

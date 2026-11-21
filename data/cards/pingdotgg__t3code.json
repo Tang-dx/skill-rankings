@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "repo": "pingdotgg/t3code",
-  "tree_sha": "f2b21a543649e6f1c0af20b6bc53cf6ae6453c2f",
-  "truncated_paths": 21,
+  "tree_sha": "b9db061c1420563e7755a7db2a7ea2c678f69328",
+  "truncated_paths": 22,
   "skills": [
     {
       "skill_path": ".agents/skills/contribution-triage/SKILL.md",
       "blob_sha": "39d8e91394ac2fea4ea99d134f163da72406ed8b",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.agents/skills/contribution-triage/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.agents/skills/contribution-triage/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": "2026-11-20T00:18:19.296Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -131,10 +131,136 @@
       }
     },
     {
+      "skill_path": ".agents/skills/launch-video/SKILL.md",
+      "blob_sha": "82ef0bdd576d76645fae5cb93ee36b02704a59a2",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.agents/skills/launch-video/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": "2026-11-21T00:18:14.635Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "launch-video",
+        "description": "Make a short launch video (1920x1080 MP4 plus an outro PNG) that demos a T3 Code feature, built from the real app with added motion, for an X/Twitter announcement or release thread. Use when asked for a launch video, demo video, feature teaser or announcement clip, or to add a video to a release tweet."
+      },
+      "excerpt": "---\nname: launch-video\ndescription: Make a short launch video (1920x1080 MP4 plus an outro PNG) that demos a T3 Code feature, built from the real app with added motion, for an X/Twitter announcement or release thread. Use when asked for a launch video, demo video, feature teaser or announcement clip, or to add a video to a release tweet.\n---\n\n# Launch videos\n\nA launch video is 20–30 seconds: the app goes through one story in two or three beats,\nthe camera punches in on each, a caption names it, and an outro card closes. Frames are\nrendered one by one in headless Chromium, so the result is deterministic.\n\nThere are two ways to build one:\n\n- **Real app (default).** A staging script runs the real server and web client with fictional\n  data and the free replay agent, drives the flow in a browser, and freezes the page at each\n  beat into `beats/<name>.html`. The story stacks those frozen pages and adds the motion: the\n  camera, cursor, pops, glows, typing and captions. The UI is whatever the app draws today, so\n  re-staging on main updates the video. `stagings/linked-environments/` is a finished example.\n- **Mock.** `template/story.html` is a hand-built HTML copy of the app (the 0.1.11 tunnels\n  video). Use it only for what a staging can't produce, such as another app on the desktop or\n  a desktop-only screen. It drifts as the app changes.\n\n## Workflow (real app)\n\n1. **Learn the feature.** Read the PRs and the components it touches. Write down the one\n   thing a user can now do that they couldn't before, in the user's words.\n2. **Write the story** before any code: who the user is, what they want, and two or three\n   beats that get them there. Show it to the maintainer if the angle is a guess.\n3. **Stage it.** Copy `stagings/linked-environments/` to `stagings/<slug>/`.\n   - `serve.mjs` builds fresh homes under `.t3/launch/<slug>/` with `scripts/stage-env.mjs`.\n     Each home gets a fictional machine label, the replay agent, and no paid provider.\n     It starts the servers, creates projects, writes `<out>/stage.json` and keeps running.\n     Run it in the background.\n   - `drive.mjs` opens the web client with `openBrowser()` (1440×720, dark, release\n     branding) and walks the flow. It calls `beat(name)` at each moment the video needs.\n     Re-run it as often as you like against the same servers.\n   - Agent turns: pass `claude: [turns]` to `prepareHome` and the real Claude provider runs\n     `scripts/fake-claude.mjs` as its CLI, so the video shows Claude's logo, models, thinking\n     and tool rows. Each turn is `{ match, steps }`: `think`, `text`, `bash` (+ `output`, `ms`),\n     `wait`, and `tool` (+ `input`), which calls that T3 MCP tool for real, e.g.\n     `delegate_task`. Match generated titles with a `{ match: \"title\", repeat: true }` turn.\n     `<var:name>` is filled from the JSON file at `T3_DEV_REPLAY_VARS`, for ids that change\n     every run. `fake-claude.log` in the home records the protocol, for debugging.\n   - The free replay agent (`apps/server/scripts/dev-replay-agent.ts`) still works without\n     `claude`, but it shows as an ACP provider.\n4. **Create the story:** `scripts/new.sh ~/launch-videos/<slug>`, then copy the beats in, or\n   pass that directory as the staging's `<out>`. Add one `<iframe data-beat>` per beat and\n   write `setup()` and `placeCursor()` (see Anatomy).\n5. **Find targets** in a beat: `scripts/find.mjs <dir>/beats/<name>.html \"<text>\"` prints\n   selectors and boxes for the elements containing that text and their ancestors.\n6. **Probe** with contact sheets at every beat, fix, repeat:\n   `scripts/sheet.sh ~/launch-videos/<slug> 1,4.5,8,12,16,21,26` then Read `sheet.png`.\n   The times are video seconds (after `Kit.timeline`), not animation seconds. Read the\n   full-size frames in `probe/` to check small text. A probe takes about 2 s a frame.\n7. **Render:** `scripts/render.sh ~/launch-videos/<slug> t3code-<slug>` gives\n   `t3code-<slug>.mp4` and `outro.png`. A 30 s video takes 3–6 minutes.\n8. **Hand back** with the video and outro embedded (`![...](/abs/path.mp4)`), the caption\n   copy, any `Kit.text` edits, and anything you assumed rather than verified.\n\nThe scripts need this repo's `node_modules` (`vp i`) for `playwright-core`, any Chromium in\nthe Playwright cache (or `CHROME=/path`), and `ffmpeg` on PATH. Stop `serve.mjs` with your\nharness's task stop; it ends its servers' process groups.\n\n### Staging traps\n\n- **Machine names and icons.** `T3CODE_ENVIRONMENT_LABEL` and `T3CODE_ENVIRONMENT_MACHINE_KIND`\n  (laptop, desktop, cloud, linux, mac-mini, mac-studio) override what the server detects.\n  `prepareHome({ label, machine })` records them and `startEnvironment` and `cli()` pass them\n  on; the CLI needs them too, because a link introduces the machine by its label.\n- **Linked environments** refuse loopback addresses (\"this machine\"), and plain http works\n  only on tailnet names. `serve.mjs` links to this machine's tailnet DNS name.\n- **Leaks.** Grep the beats for the real hostname, username and tailnet name before\n  rendering. `snapshot.mjs` drops hidden inputs' values (they hold local paths).\n- **Timing.** A replayed turn streams in real time (each frame delay caps at 2 s). Make a\n  recording long enough for the drive to catch the state you need, and freeze beats on a\n  timer when the UI summarises (a running command shows only \"Running pnpm\").\n- **Agent wake-ups.** When a delegated child finishes, the parent agent gets a new turn. Give\n  its recording a second turn, or the first replays and delegates again.\n\n## What the maintainers asked for\n\nThese came from review of the 0.1.11 videos. Each one was a real correction.\n\n- **It must look like the real app.** \"Quite far off how it actually looks\" was the first\n  round's verdict on a mock. Stage the real app; mock only what can't be staged, rebuilt from\n  the real component (strings live in `apps/web/src/i18n/translations/en.json` under hashed\n  keys, so grep by the text).\n- **Punchier than the app.** Extra motion is welcome (pops, glows, punch-ins, typing), as\n  long as every pixel it moves is the real UI.\n- **Readable on a phone.** Captions are 40px; zoom the camera 1.5–1.9× onto whatever the\n  beat is about. If text is under ~14px after zoom, zoom further or cut it.\n- **Slow enough to follow.** Slow the key interactions to 0.6–0.8× and hold 0.8–1.5 s after\n  each payoff. A viewer must see the result before the next beat starts.\n- **A realistic example.** The demo has to be something a user would really do. A local\n  terminal querying a forwarded port was rejected (\"why not use the in-app terminal?\");\n  a desktop database client was the right example.\n- **Distinct features read as distinct.** Two features get two numbered captions and two\n  clearly separate payoffs, never one blended beat.\n- **Brand.** Production logo only (`logo-prod.png`, from `assets/prod/`), never the blue\n  dev icon. The app's dark palette (below); orange only where the app uses it.\n- **Only announced things.** Before showing a screen, check it ships enabled. Feature-flagged\n  or separately announced work (for 0.1.11: GitHub sign-in and PR tooling, the mobile app)\n  stays out, even as background UI. A video whose subject is an opt-in Labs feature is\n  fine when the maintainer asked for it; say where to turn it on in the caption or tweet,\n  and ask whether the outro should call it a beta. Ask when unsure.\n- **Fictional demo data.** Project `acme/mugshot`, machine `devbox`, made-up people with\n  `@example.com`. No real people, teams, emails, repos or the user's own threads.\n- **Timing is checked, not assumed.** Typing must finish before the cursor clicks, a\n  tooltip must appear before it is read, and card text must not overflow. The contact\n  sheet catches these; full-size probe frames catch the rest.\n\n## Look\n\nFrom `apps/web/src/index.css`, dark theme:\n\n- Background `#000` with a faint primary glow at the top (`rgba(52,107,241,.13)`).\n- Text `#f1f3f7`, secondary `#a3a3a3`, UI muted `#8e8e93`, dim `#636368",
+      "card": {
+        "title_zh": "发布视频制作",
+        "purpose_zh": "用真实应用界面制作20–30秒的1920x1080发布演示视频和片尾图，供X/Twitter发布或版本公告使用。",
+        "does": [
+          "用真实应用搭建演示环境，在浏览器中驱动流程并冻结每个节拍页面",
+          "在冻结页面上叠加镜头推近、光标、弹出、发光、打字和字幕等动效",
+          "用无头Chromium逐帧渲染，生成MP4和片尾PNG",
+          "用联系表和全尺寸帧检查时序、可读性和文字溢出",
+          "提供模拟版故事模板，用于无法搭建的真实应用场景"
+        ],
+        "inputs": [
+          "功能说明（PR与相关组件）",
+          "故事脚本：用户、目标与两三个节拍",
+          "搭建目录与节拍HTML文件",
+          "视频时间轴与字幕文案",
+          "片尾标题与版本号"
+        ],
+        "outputs": [
+          "1920x1080、30fps、20–30秒的MP4视频",
+          "片尾卡片outro.png",
+          "联系表sheet.png与全尺寸检查帧"
+        ],
+        "scenarios": [
+          "为X/Twitter发布或版本公告制作功能演示短片",
+          "制作功能预告或公告片段",
+          "为发布推文补充视频"
+        ],
+        "prerequisites": [
+          "仓库的node_modules（含playwright-core）",
+          "Playwright缓存中的Chromium，或通过CHROME指定路径",
+          "PATH中有ffmpeg"
+        ],
+        "limits": [
+          "视频时长限定20–30秒",
+          "只展示已正式发布的功能，不展示特性开关或另行公布的内容",
+          "演示数据必须虚构，不得出现真实人名、机器名或仓库",
+          "模拟版会随应用变化而过时，仅用于无法搭建的场景",
+          "同一元素的同一属性不能叠加两个动画"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "视频",
+          "自动化",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Make a short launch video (1920x1080 MP4 plus an outro PNG) that demos a T3 Code feature"
+          },
+          {
+            "field": "does",
+            "quote": "A staging script runs the real server and web client with fictional data and the free replay agent, drives the flow in a browser, and freezes the page at each beat into `beats/<name>.html`."
+          },
+          {
+            "field": "does",
+            "quote": "The story stacks those frozen pages and adds the motion: the camera, cursor, pops, glows, typing and captions."
+          },
+          {
+            "field": "does",
+            "quote": "Frames are rendered one by one in headless Chromium, so the result is deterministic."
+          },
+          {
+            "field": "does",
+            "quote": "`scripts/render.sh ~/launch-videos/<slug> t3code-<slug>` gives `t3code-<slug>.mp4` and `outro.png`."
+          },
+          {
+            "field": "does",
+            "quote": "`template/story.html` is a hand-built HTML copy of the app (the 0.1.11 tunnels video). Use it only for what a staging can't produce"
+          },
+          {
+            "field": "outputs",
+            "quote": "`t3code-<slug>.mp4` and `outro.png`"
+          },
+          {
+            "field": "outputs",
+            "quote": "then Read `sheet.png`"
+          },
+          {
+            "field": "scenarios",
+            "quote": "for an X/Twitter announcement or release thread"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when asked for a launch video, demo video, feature teaser or announcement clip, or to add a video to a release tweet."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The scripts need this repo's `node_modules` (`vp i`) for `playwright-core`, any Chromium in the Playwright cache (or `CHROME=/path`), and `ffmpeg` on PATH."
+          },
+          {
+            "field": "limits",
+            "quote": "A launch video is 20–30 seconds"
+          },
+          {
+            "field": "limits",
+            "quote": "Only announced things."
+          },
+          {
+            "field": "limits",
+            "quote": "Fictional demo data."
+          }
+        ]
+      }
+    },
+    {
       "skill_path": ".agents/skills/test-t3-app/SKILL.md",
       "blob_sha": "7ac0eb1106b3268356ebcf7d7249bc0b8dde5c52",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.agents/skills/test-t3-app/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.agents/skills/test-t3-app/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": "2026-11-20T00:18:19.296Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -262,8 +388,8 @@
     {
       "skill_path": ".agents/skills/test-t3-mobile/SKILL.md",
       "blob_sha": "a11eee4e3f4ebbf4aa8d4e5ed39c2dd332181e45",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.agents/skills/test-t3-mobile/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.agents/skills/test-t3-mobile/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": "2026-11-20T00:18:19.296Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -412,8 +538,8 @@
     {
       "skill_path": ".repos/alchemy-effect/.agents/skills/alchemy-domain/SKILL.md",
       "blob_sha": "6c12f5cf901f8d1d00d58641d05559d5fcb5e0cd",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.repos/alchemy-effect/.agents/skills/alchemy-domain/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.repos/alchemy-effect/.agents/skills/alchemy-domain/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -429,8 +555,8 @@
     {
       "skill_path": ".repos/alchemy-effect/.agents/skills/alchemy-provider/SKILL.md",
       "blob_sha": "c91686958c307ed6e1eb2bbba13b70c05a8a13e7",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.repos/alchemy-effect/.agents/skills/alchemy-provider/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.repos/alchemy-effect/.agents/skills/alchemy-provider/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -446,8 +572,8 @@
     {
       "skill_path": ".repos/alchemy-effect/.agents/skills/audit/SKILL.md",
       "blob_sha": "3ad17bb97fa101a6fbcae6d21678f474a094413f",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.repos/alchemy-effect/.agents/skills/audit/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.repos/alchemy-effect/.agents/skills/audit/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -463,8 +589,8 @@
     {
       "skill_path": ".repos/alchemy-effect/.agents/skills/harden/SKILL.md",
       "blob_sha": "ec71b0b957f946082f67da94d759c63fbff94122",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.repos/alchemy-effect/.agents/skills/harden/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.repos/alchemy-effect/.agents/skills/harden/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": "2026-11-20T00:18:19.296Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -579,8 +705,8 @@
     {
       "skill_path": ".repos/alchemy-effect/.agents/skills/pr-queue/SKILL.md",
       "blob_sha": "098873ca1f218260a656ddfdbf9cf8194851b5eb",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.repos/alchemy-effect/.agents/skills/pr-queue/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.repos/alchemy-effect/.agents/skills/pr-queue/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": "2026-11-20T00:18:19.296Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -722,8 +848,8 @@
     {
       "skill_path": ".repos/alchemy-effect/.agents/skills/prepare-release/SKILL.md",
       "blob_sha": "900df7f998e90f2622c38b1876d4246a9e85d1a2",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.repos/alchemy-effect/.agents/skills/prepare-release/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.repos/alchemy-effect/.agents/skills/prepare-release/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": "2026-11-20T00:18:19.296Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -860,25 +986,134 @@
     {
       "skill_path": ".repos/alchemy-effect/.agents/skills/release-blog/SKILL.md",
       "blob_sha": "096519c44c3f2cd344995e5d5ac77d467009cdb6",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.repos/alchemy-effect/.agents/skills/release-blog/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.repos/alchemy-effect/.agents/skills/release-blog/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": "2026-11-21T00:18:14.635Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "release-blog",
         "description": "Write the next alchemy release blog post — find the last `chore(release)` commit on origin/main, read the description of every PR merged since, plan the headline sections (Effect upgrades, new providers, new features, major bug fixes, breaking changes) with DX-first code snippets, fold the rest into \"Also in this release\", credit contributors, check every link and diff block, and (when asked) draft one tweet per category with a screenshot of its section. Use for \"write the release blog\", \"prepar"
       },
       "excerpt": "---\nname: release-blog\ndescription: Write the next alchemy release blog post — find the last `chore(release)` commit on origin/main, read the description of every PR merged since, plan the headline sections (Effect upgrades, new providers, new features, major bug fixes, breaking changes) with DX-first code snippets, fold the rest into \"Also in this release\", credit contributors, check every link and diff block, and (when asked) draft one tweet per category with a screenshot of its section. Use for \"write the release blog\", \"prepare the next release post\", \"/release-blog\", \"blog for beta.N\", \"write tweets for the release\".\nmetadata:\n  internal: true\n---\n\n# Write the release blog\n\nThe post covers every PR merged to `origin/main` since the most recent\n`chore(release)` commit, and announces the next version. The house rules for\nrelease posts live in AGENTS.md (\"Blog / Release Notes Conventions\"); this\nskill is the procedure. Read the last two posts in\n`website/src/content/docs/blog/` (`*-beta-*.md`) before writing. They set the\nvoice, length and structure to match.\n\n## 1. Collect every PR\n\n```sh\n.agents/skills/release-blog/scripts/collect-prs.sh /tmp/release-blog-<next>\n```\n\nIt prints the release commit (`chore(release): 2.0.0-beta.N`, so the post is\nfor `beta.N+1`) and writes one JSON per PR, a `digest.txt` with every PR's\ntitle, author and full body (oldest first), and `authors.txt` with every\nnon-maintainer author's display name.\n\n## 2. Read every description in full\n\nRead all of `digest.txt`, in chunks, start to finish. It holds whole bodies,\non purpose: a PR's later sections (\"### Changes\", a second snippet, a\n\"Removed\" list) are where secondary features and renames hide, and a post\nplanned from excerpts folds them into a clause or drops them. Don't sample,\nand don't skim by title: a `chore` or `test` title can carry a user-facing\nfix, and a `feat` body often holds the best snippet for the post.\n\nTag each PR as you go:\n\n- **breaking**: `!` in the title, or `Breaking`/`[!CAUTION]` in the body. Note\n  the migration diff the PR gives. Unmarked PRs break things too: look for\n  \"renamed\", \"removed\", \"replaces\", \"is gone\", \"now requires\", \"`X` is now\n  `Y`\" and \"was `X`\" in every body. Confirm each one shipped in the last\n  release (`git grep <old name> <release-sha> -- packages/`) before listing\n  it; a rename of something added in this same release isn't breaking.\n- **headline**: a dependency upgrade users must make (Effect, a framework\n  major), a new provider or package, a new capability with a user-facing API,\n  or a major bug fix (data loss, wrong resource deleted or taken over,\n  deploys that hang or fail, large perf or bundle wins).\n- **also**: smaller features and fixes users would notice.\n- **skip**: internal only. CI, skills, lint and repo tooling, test-only PRs\n  that fix no shipped behavior, distilled bumps without a user-visible change,\n  docs restyles, and fix-ups of earlier PRs in the same release.\n\nGroup related PRs into one item: a stack of PRs for one feature is one\nsection, and a family of fixes (drift, ownership, local dev) is one bullet.\n\n## 3. Plan before writing\n\nWrite the plan out first: the title, the breaking-change list, the ordered\nheadline sections with the PRs each one cites, and the also-list groups.\n\n- **Title**: `2.0.0-beta.N - <three short items>`. It renders in the blog\n  sidebar, so it must fit on one line.\n- **Order the headlines** by how much they change a user's day: required\n  upgrades (Effect) first, then new providers and packages, then the biggest\n  new capabilities, then major fixes. There is no cap on the number of\n  sections; a large release gets 25–30. Its size is set by what shipped.\n- **A new user-facing API gets a snippet**, in its own section or in a\n  section about its area (a \"New AWS resources and options\" section collects\n  smaller ones). Never shrink one into a clause of an unrelated section: a\n  reader skimming headings must find it. A PR that adds several APIs (a store\n  that gains `accountId`, `workerName` and `domain` plus a new bootstrap\n  command) is usually its own section.\n- **Everything else** goes into `## Also in this release`, grouped by area\n  (Cloudflare features, Cloudflare fixes, Local dev fixes, AWS features, AWS\n  fixes, GCP, Domain, Auth, …), each group one bullet with its PR links.\n\n## 4. Write it\n\nFile: `website/src/content/docs/blog/YYYY-MM-DD-beta-NN.md`, dated the\nrelease day (ask if it isn't today). Frontmatter `title`, `date`,\n`category: release` and a one-sentence `excerpt`.\n\n- Open with two short paragraphs naming the headline features in bold.\n- `:::caution` with **Breaking changes** at the top. Each item says what to\n  do, with a `diff` snippet when code changes, and links its section below.\n- One `##` per headline. One or two sentences, then a snippet of the\n  user-facing API. Show DX, not implementation: what you write, what you get,\n  the before/after error or output. Take snippets from the PR bodies, trim\n  them, and check the names against the source (`grep` the export) since PRs\n  get renamed in review.\n- End a section with `Docs: [Page](/path)` links when a page covers it.\n- Cite PRs inline as `([#NNN](https://github.com/alchemy-run/alchemy/pull/NNN))`.\n- Credit external contributors by display name from `authors.txt`, linked to\n  their GitHub profile: `Thanks [Name](https://github.com/login)!`. Use the\n  login when there's no display name. PRs a maintainer opened on someone's\n  behalf say so in the body (\"carries #N by\", \"ported from\", \"supersedes\");\n  credit that person.\n- End with `## Where to go next`: doc links, then\n  `[CHANGELOG](https://github.com/alchemy-run/alchemy/blob/main/CHANGELOG.md#v200-betaNN)`\n  and `[Compare v2.0.0-beta.N → v2.0.0-beta.N+1](https://github.com/alchemy-run/alchemy/compare/v2.0.0-beta.N...v2.0.0-beta.N+1)`.\n\nFormat every snippet the way oxfmt would at an 80-column print width (the\nblog's code column), and move trailing comments that overflow onto their own\nline. oxfmt reads a top-level `yield*` as multiplication, so format such\nsnippets by hand or inside a temporary `function* () {}` wrapper.\n\nStyle: plain, direct sentences; no marketing adjectives; no \"X just\nhappened\" lists explaining a snippet. Every ```diff block needs a context line\nat column 0 (a comment, an import, the outer call), and `+`/`-` lines are the\nmarker followed by the line's real indentation. Inline code that contains a\nbacktick uses double-backtick delimiters.\n\n## 5. Check it\n\n```sh\npython3 -I .agents/skills/release-blog/scripts/check-post.py website/src/content/docs/blog/<post>.md /tmp/release-blog-<next>\n```\n\nIt checks that every docs link and anchor resolves and that every diff block\npasses the website build's odd-indent check. Fix every problem it reports.\nIt also lists every `feat`, `fix`, `perf` or `!` PR the post doesn't cite.\nEach one must be a deliberate skip (a fix-up of another PR in this release,\ntest or CI only); cite the rest.\n\nThen hand the post to the user with the headline plan (sections and the PRs\nbehind each), the breaking-change list, and anything you weren't sure about:\na PR whose user impact was unclear, a section you cut, or the date. Don't\ncommit, push or open a PR unless asked.\n\n## 6. Tweets (when asked)\n\nOne tweet per major category, in the post's order: Effect, each headline\nDomain feature, each headline provider feature, state, CLI, and one for the\nbug fixes. Each tweet is one sentence plus a screenshot of its section.\n\n**The sentence** states the user-facing change and, when the post has one,\nits number: \"a million accounts in 8 minutes\", \"plans are 270× faster\".\nPlain words, no hype, no hashtags, no emoji. Take every claim from the post,\nnot from memory.\n\n**The screenshot** is the section's heading plus its code, diagram or table,\nwith the prose between them hidden. Run the docs dev server\n(`cd website && bunx astro dev --ignore-lock`), list each heading's blocks,\nthen write a `shots.json` that picks them:\n\n```sh\nPW=$(ls -d node",
-      "card": null
+      "card": {
+        "title_zh": "发布博客撰写",
+        "purpose_zh": "按仓库既有规范撰写下一次 alchemy 版本的发布博客：收集自上次 chore(release) 以来合并的全部 PR，通读描述，规划标题章节与破坏性变更，撰写并校验文章，被要求时再起草推文与截图。",
+        "does": [
+          "运行脚本收集自上次 chore(release) 提交以来合并的所有 PR，生成 digest 与作者列表",
+          "通读每个 PR 完整描述，按 breaking、headline、also、skip 分类并合并相关 PR",
+          "先写计划：标题、破坏性变更清单、有序标题章节及各自引用的 PR",
+          "按模板撰写博客文件，含 frontmatter、caution 破坏性变更、代码片段、PR 链接与贡献者致谢",
+          "运行检查脚本验证文档链接、锚点与 diff 块，并列出未被引用的 feat/fix/perf PR",
+          "被要求时按类别起草推文，并用脚本截取对应章节截图"
+        ],
+        "inputs": [
+          "上次 chore(release) 提交之后的 origin/main 合并 PR",
+          "AGENTS.md 中的发布博客约定",
+          "website/src/content/docs/blog/ 下最近两篇 beta 文章",
+          "用户指定的发布日期（非当天时需询问）",
+          "被要求写推文时的博客文章与章节选择配置"
+        ],
+        "outputs": [
+          "website/src/content/docs/blog/YYYY-MM-DD-beta-NN.md 发布博客文章",
+          "标题计划、破坏性变更清单与不确定事项说明",
+          "被要求时：每类一条推文文本与章节截图，保存到临时目录"
+        ],
+        "scenarios": [
+          "撰写下一次 alchemy 版本的发布博客",
+          "为 beta.N 版本准备发布文章",
+          "为发布文章起草分类推文与配图"
+        ],
+        "prerequisites": [
+          "仓库中存在 .agents/skills/release-blog/scripts/ 下的收集与检查脚本",
+          "可访问 origin/main 的 git 历史与 PR 信息",
+          "已阅读 AGENTS.md 的发布博客约定与最近两篇 beta 文章",
+          "写推文截图时需启动 docs 开发服务器并具备 playwright-core"
+        ],
+        "limits": [
+          "未获要求时不提交、推送或创建 PR",
+          "从不实际发布推文",
+          "截图需逐张检查是否截断代码或带入相邻文本",
+          "推文目前不含链接",
+          "代码片段需按 oxfmt 80 列格式手工处理，顶层 yield* 需特殊处理"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "文档",
+          "内容运营",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "The post covers every PR merged to `origin/main` since the most recent `chore(release)` commit, and announces the next version."
+          },
+          {
+            "field": "does",
+            "quote": "Read all of `digest.txt`, in chunks, start to finish."
+          },
+          {
+            "field": "does",
+            "quote": "Write the plan out first: the title, the breaking-change list, the ordered headline sections with the PRs each one cites, and the also-list groups."
+          },
+          {
+            "field": "does",
+            "quote": "File: `website/src/content/docs/blog/YYYY-MM-DD-beta-NN.md`, dated the release day (ask if it isn't today)."
+          },
+          {
+            "field": "does",
+            "quote": "It checks that every docs link and anchor resolves and that every diff block passes the website build's odd-indent check."
+          },
+          {
+            "field": "does",
+            "quote": "One tweet per major category, in the post's order: Effect, each headline Domain feature, each headline provider feature, state, CLI, and one for the bug fixes."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The house rules for release posts live in AGENTS.md (\"Blog / Release Notes Conventions\"); this skill is the procedure."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the last two posts in `website/src/content/docs/blog/` (`*-beta-*.md`) before writing."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run the docs dev server (`cd website && bunx astro dev --ignore-lock`), list each heading's blocks, then write a `shots.json` that picks them:"
+          },
+          {
+            "field": "limits",
+            "quote": "Don't commit, push or open a PR unless asked."
+          },
+          {
+            "field": "risk_flags",
+            "quote": ".agents/skills/release-blog/scripts/collect-prs.sh /tmp/release-blog-<next>"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "python3 -I .agents/skills/release-blog/scripts/check-post.py website/src/content/docs/blog/<post>.md /tmp/release-blog-<next>"
+          },
+          {
+            "field": "hosts",
+            "quote": "description: Write the next alchemy release blog post"
+          }
+        ]
+      }
     },
     {
       "skill_path": ".repos/alchemy-effect/.agents/skills/release-overnight/SKILL.md",
       "blob_sha": "433ae9ee18990a67a468beaa1a0bf76164749643",
-      "source_url": "https://github.com/pingdotgg/t3code/blob/490a0d687bde4f29a869fdb62ea7c8241e35e082/.repos/alchemy-effect/.agents/skills/release-overnight/SKILL.md",
-      "fetched_at": "2026-11-20T00:18:19.296Z",
+      "source_url": "https://github.com/pingdotgg/t3code/blob/e19193db45054e06df5e799bf4d6b4fd9ec53e90/.repos/alchemy-effect/.agents/skills/release-overnight/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
       "generated_at": "2026-11-20T00:18:19.296Z",
       "model": "deepseek-flash",
       "status": "ok",

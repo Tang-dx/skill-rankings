@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "repo": "solidjs/solid",
+  "tree_sha": "817795397e75cc33584eda338e79a51c473cde86",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "packages/diagnostics/skills/agent-loops/SKILL.md",
+      "blob_sha": "1ef22aa77f697628341fd933a2a8d708115975b4",
+      "source_url": "https://github.com/solidjs/solid/blob/5a43d6f85af6d647bbef49b3f9c63fdbac7397ff/packages/diagnostics/skills/agent-loops/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "agent-loops",
+        "description": "Verify Solid 2.0 reactive code with evidence from @solidjs/diagnostics captureArtifact instead of reading it; generation, acceptance, attribution, responsiveness and server-render loops. Use when checking that generated or ported Solid code is quiet, within budget and re-runs only for the right reasons."
+      },
+      "excerpt": "---\nname: agent-loops\ndescription: Verify Solid 2.0 reactive code with evidence from @solidjs/diagnostics captureArtifact instead of reading it; generation, acceptance, attribution, responsiveness and server-render loops. Use when checking that generated or ported Solid code is quiet, within budget and re-runs only for the right reasons.\n---\n\n# Agent loops with @solidjs/diagnostics\n\nSolid's dev builds expose two evidence channels — rule diagnostics (stable\ncodes for known anti-patterns) and attribution (per-re-run causality with\ntiming and waste accounting). This package captures both into one\nserializable artifact. Use it to verify claims about reactive code instead\nof inferring them from reading it.\n\nThere are five loops. Each takes the same fixture:\n\n```ts\nimport { captureArtifact } from \"@solidjs/diagnostics\";\n\nconst { artifact } = await captureArtifact(\n  () => {\n    // mount a tree or exercise a store, then perform the interaction\n    // under test; flush() happens automatically at the end\n  },\n  { scenario: \"todo-toggle\" }\n);\n```\n\n## Loop 1 — Generation (write code until the channel is quiet)\n\nAfter generating or porting a component, run its scenario and read\n`artifact.diagnostics`. Every event has a stable `code`; the\n`reactivity-diagnostics` skill shipped in `solid-js` maps each code to its\nrepair. Fix, re-capture, repeat until zero events. Do not allowlist a code\nyou have not understood — each one is a real defect or a real cost.\n\n```ts\nimport { expectNoDiagnostics } from \"@solidjs/diagnostics\";\nexpectNoDiagnostics(artifact); // throws with the offending events as evidence\n```\n\n## Loop 2 — Acceptance (scenario + budget = definition of done)\n\nA component is done when a named scenario stays within an explicit budget.\nBudgets are machine-checkable, so \"the port is granular\" stops being a\njudgment call:\n\n```ts\nimport { assertBudget } from \"@solidjs/diagnostics\";\n\nassertBudget(artifact, {\n  allow: [], // tolerated diagnostic codes\n  maxReruns: 2, // total re-run cardinality for the scenario\n  maxWastedRuns: 0, // unchanged recomputes (plain, non-held)\n  scopes: { TodoRow: 1 }, // per-scope caps; \"/regex/\" keys also work\n  maxSilentHoldMs: 0 // every hold the interaction caused was acknowledged on screen\n});\n```\n\nBudgets belong in a checked-in JSON file (see `parseBudgetFile`) so CI owns\nthem and a regression is a test failure, not a review comment. In Vitest,\nimport the matchers for inline use:\n\n```ts\nimport \"@solidjs/diagnostics/vitest\";\n\nexpect(artifact).toHaveNoDiagnostics();\nexpect(artifact).toStayWithinRerunBudget(2, { scope: /TodoRow/ });\nexpect(artifact).toHaveNoWaste();\n```\n\n## Loop 3 — Attribution (why did this run → targeted refactor)\n\nWhen a budget fails or something feels slow, do not guess — read the\ncausality:\n\n- `artifact.attribution.reruns[]` — each re-run: `nodeName`, `causes`\n  (change chain back to the root write), `selfMs`, `changed`, `phase`.\n  A run with `changed: false` and `phase: \"plain\"` was pure waste.\n- `artifact.attribution.costs.scopes` — scopes ranked by self-time with\n  `wastedMs`; `costs.writes` — root writes ranked by downstream cost.\n\nStart from the top of the cost tables. The usual repairs: a missing memo\nboundary (waste), an unstable memo output (fan-out amplifier), a wide read\nthat should be split, or a hot value that should be inverted into a store\nused as a map keyed by id. Re-capture after each change and diff the rerun counts — the\nartifact is the before/after evidence.\n\n## Loop 4 — Responsiveness (the click did something, visibly)\n\nSolid holds a write that lands on async work until the data settles, so the\nscreen never tears. That is correct — and from the user's side the click did\nnothing until the data came back unless something on screen acknowledged the\nwait. Agents systematically skip the affordances that do this (`isPending`,\n`latest`, `createOptimistic`); this loop makes the omission a test failure.\n\nSet `maxSilentHoldMs: 0` on every scenario that is a user interaction, or\nassert directly:\n\n```ts\nimport { expectNoSilentHolds } from \"@solidjs/diagnostics\";\nexpectNoSilentHolds(artifact); // fails with the hold: interaction, held write, blocker, duration\n```\n\nWhen it fails, read `artifact.attribution.feedback.sources` first — the\nranked table of what users waited on: per async source, how many holds, how\nmany silent, `acknowledgedBy` (which affordance answered, in how many holds),\nand which interactions were held. A source acknowledged in some holds and\nsilent in others means the affordance exists on one screen and is missing on\nanother; add it where the silent holds happen. Then repair by shape, in this\norder:\n\n1. **Show the wait** — read `isPending(() => blocker())` (the blocker is\n   named in the failure) in the affected UI and render a busy state.\n2. **Reveal the input** — `latest(heldSource)` shows the new value of the\n   held write (page number, filter, query) immediately while data catches up.\n3. **Predict the outcome** — `createOptimistic`/`createOptimisticStore`\n   written alongside the real write (or inside the action) shows the expected\n   result now and reverts on failure. For actions this is the primary repair.\n\nAnti-repair: never make the assertion pass by moving the write off the async\npath, wrapping it in `untrack`, or splitting the read so the write \"commits\nfaster\". That trades a hold for a torn screen and is the bug the hold exists\nto prevent. `expectHoldBudget(artifact, ms)` is the separate latency gate —\nacknowledged or not, no hold may outlast it — for mocked sources that should\nsettle within a known time.\n\n`artifact.attribution.feedback.interactions` is the INP-shaped view: per user\nevent, the synchronous re-run work one dispatch caused (`worstDispatchMs` —\nfix through Loop 3) beside the time its writes spent held (`worstHoldMs`,\n`silentMs` — fix here). In browser captures the interaction is stamped by the\nweb runtime; in-process, wrap the write in\n`OBSERVE.attribution.withInteraction({ type, target }, () => …)` so holds are\nmeasured from the event and keyed by it. A router that wraps its location\nwrite in `OBSERVE.attribution.withOrigin({ kind: \"navigation\", name, to, from, params }, () => …)`\nnames holds by route as well — `SILENT_HOLD` then reads \"click on a.nav\n(navigation to /users/:id) wrote …\", and `feedback.navigations` /\n`attribution.history(\"navigation\")` give the per-route view. A redirect declared\nwith `redirect: n` folds onto the pending navigation (one record, timed from\nthe click, the abandoned destination in `redirects`) rather than superseding it.\n\nThe remaining fact tables in `feedback` have no verdict of their own; read\nthem when a scenario is slow without being silent:\n\n- `flights` — per async source, `flights`/`landed`/`abandoned`. A source that\n  abandons most of its flights re-asks on every input change (search as you\n  type); put a debounced or equality-gated derivation between the input and\n  the fetch. `long`/`longMs` on a `sources` row is the sibling fact: the\n  hold's tail (last input → commit) ran past the long-hold threshold,\n  acknowledged or not — the `LONG_HOLD` shape. A spinner over stale content\n  is not the answer at that length: key a `Loading` boundary with `on` so the\n  fallback shows, or preload/cache so the wait never gets there.\n- `fallbacks` — per loading boundary, `shows`/`shownMs`/`flashes`. A flash\n  (under 150ms) is a spinner that appeared and vanished; preload, cache, or\n  lift the fetch above the boundary. Do not add artificial delay.\n\nLoop 4's structural siblings live in Loop 2's diagnostics list:\n`EFFECT_RELAY_TEAR` (derived state via effect — a reader ran twice for one\nwrite, the first frame inconsistent; make it a memo), `IMMUTABLE_UPDATE_IN_STORE`\n(spread-copy store writes — mutate the draft or `reconcile`), and\n`UNSTABLE_LIST_IDENTITY` (a list rebuilt for equivalent records — key by a\nstable field or `reconcile`). Each names its repair in the message.\n\n## Loop 5 — Server renders (waits and calls)\n\nThe same fixture over `",
+      "card": null
+    },
+    {
+      "skill_path": "packages/solid/skills/reactivity-diagnostics/SKILL.md",
+      "blob_sha": "7dff9b27a79800a8c81d985e6e5f3f9d0aa3e88b",
+      "source_url": "https://github.com/solidjs/solid/blob/5a43d6f85af6d647bbef49b3f9c63fdbac7397ff/packages/solid/skills/reactivity-diagnostics/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": null,
+      "model": null,
+      "status": "too_large",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "",
+        "description": ""
+      },
+      "excerpt": "",
+      "card": null
+    },
+    {
+      "skill_path": "packages/solid/skills/solid-2.0/SKILL.md",
+      "blob_sha": "ff74de893545e5c2d4b638d021ab7e55491ace51",
+      "source_url": "https://github.com/solidjs/solid/blob/5a43d6f85af6d647bbef49b3f9c63fdbac7397ff/packages/solid/skills/solid-2.0/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": "2026-11-21T00:18:14.635Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "solid-2.0",
+        "description": "Solid 2.0 primer for coding agents. Use when writing, reviewing or migrating Solid 2.0 code (solid-js 2.x, @solidjs/web). The API differs from Solid 1.x and from React; read this before generating, then check unfamiliar names against node_modules/solid-js/CHEATSHEET.md."
+      },
+      "excerpt": "---\nname: solid-2.0\ndescription: Solid 2.0 primer for coding agents. Use when writing, reviewing or migrating Solid 2.0 code (solid-js 2.x, @solidjs/web). The API differs from Solid 1.x and from React; read this before generating, then check unfamiliar names against node_modules/solid-js/CHEATSHEET.md.\n---\n\n# Solid 2.0 for agents\n\nSolid is not React, and 2.0 is not 1.x. Pattern-matching from either is the\ndominant bug source. Every name below is a `solid-js` export unless noted;\nDOM APIs (`render`, `hydrate`, `Portal`, `dynamic`) are in `@solidjs/web`.\n\n## Three rules\n\n1. **Props are read, not destructured; pass values, not accessors.**\n   - Wrong: `function C({ name }) {}` and `<C value={count} />`\n   - Right: `function C(props) { return <p>{props.name}</p>; }` and `<C value={count()} />`\n2. **`createEffect` takes two functions: compute (tracks), then apply (side effects).**\n   - Wrong: `createEffect(() => { el.title = count(); });`\n   - Right: `createEffect(() => count(), v => { el.title = v; });`\n3. **Stores are written through the draft.**\n   - Wrong: `setStore(\"user\", \"name\", \"B\")` or `setStore(produce(s => ...))`\n   - Right: `setStore(s => { s.user.name = \"B\"; });`\n\n## 1.x → 2.0 corrections\n\nNothing in the left column exists in 2.0.\n\n| Wrong (1.x)                                    | Right (2.0)                                                       |\n| ---------------------------------------------- | ----------------------------------------------------------------- |\n| `import { createStore } from \"solid-js/store\"` | `import { createStore } from \"solid-js\"`                          |\n| `import { render } from \"solid-js/web\"`        | `import { render } from \"@solidjs/web\"`                           |\n| `\"jsxImportSource\": \"solid-js\"`                | `\"jsxImportSource\": \"@solidjs/web\"`                               |\n| `createEffect(fn)` (one argument)              | `createEffect(compute, apply)`                                    |\n| `onMount(fn)`                                  | `onSettled(() => { setup(); return cleanup; })`                   |\n| `createEffect(on(dep, fn))`                    | `createEffect(() => dep(), v => fn(v))`                           |\n| `const [d] = createResource(id, fetchX)`       | `const d = createMemo(() => fetchX(id()))` under `<Loading>`      |\n| `d.loading` / `d.error`                        | `<Loading>` or `isPending(() => d())` / `<Errored>`               |\n| `refetch()`                                    | `refresh(d)` (`affects(d); refresh(d)` to read as pending)        |\n| `<Suspense>` / `<SuspenseList>`                | `<Loading>` / `<Reveal>`                                          |\n| `<ErrorBoundary>`                              | `<Errored fallback={(err, reset) => ...}>` (heals automatically)  |\n| `<Index each={xs}>`                            | `<For each={xs} keyed={false}>`                                   |\n| `batch(fn)`                                    | not needed: updates batch per microtask; `flush()` applies now    |\n| `startTransition` / `useTransition`            | built-in transitions: `action(...)`, `isPending`, optimistic APIs |\n| `createComputed`                               | `createMemo`, split `createEffect`, or `createSignal(fn)`         |\n| `mergeProps` / `splitProps` / `unwrap`         | `merge` / `omit` / `snapshot`                                     |\n| `produce`, `createMutable`, `modifyMutable`    | draft setters are the default in `createStore`                    |\n| `createSelector`                               | `createProjection` (or `createStore(fn)`)                         |\n| `<Ctx.Provider value={v}>`                     | `<Ctx value={v}>`                                                 |\n| `classList={{ a: x() }}`                       | `class={{ a: x() }}` or `class={[\"base\", { a: x() }]}`            |\n| `use:dir={x}` / `attr:` / `on:` / `tabIndex`   | `ref={dir(x)}` / plain attributes / `onClick` / `tabindex`        |\n| `onError` / `catchError`                       | `<Errored>` or `createEffect(c, { effect, error })`               |\n| `from(source)` / `observable`                  | `createMemo(() => from(source))`; push out with `createEffect`    |\n\nAlso:\n\n- Reads lag writes: `setX(1); x()` still returns the old value until the\n  microtask or `flush()`. In tests, `flush()` before asserting.\n- Effects never compare: when the compute re-runs, apply and the previous\n  cleanup run again even if compute returned an equal value. To skip work on\n  an unchanged value, read a memo in the compute:\n  `const active = createMemo(() => status() === \"active\"); createEffect(() => active(), v => ...)`.\n  The memo's `equals` (default `===`) stops the re-run.\n- No writes inside a memo, effect compute, or component body (dev throws).\n  Write from event handlers, `onSettled`, or actions.\n- Writes in one synchronous frame land together: if one starts async work\n  (a navigation, a refetch), the rest are held with it. To land a write on\n  its own (close a menu before calling `props.onSelect`), wrap it in\n  `onFlush(() => setOpen(false))`. Not `queueMicrotask` or `setTimeout`.\n- Hydration adopts server answers without re-asking, but runs each adopted\n  compute once to track reads with fake `Promise`/`fetch` that never settle.\n  Never store a promise or `import()` created inside a compute in a cache\n  that outlives it; cache resolved values, or start the load outside.\n- No reactive reads at the top of a component body; read in JSX, a memo, an\n  effect's compute, or hand a hook an accessor (`useThing(() => props.id)`;\n  JSX props still take values). Flow\n  callbacks (`<For>`, `<Show>`, `<Match>`) are owners, not tracking scopes:\n  read their accessor arguments in JSX, not at the top.\n- Never use `untrack` to silence `STRICT_READ_UNTRACKED`: the value still\n  goes stale, and the warning was the only sign. Move the read instead (see\n  that code's section in the diagnostics skill). Hooks and adapters take\n  accessors and read them inside their own memos and effects.\n- `<For>`: default gives a raw item and an index accessor; `keyed={false}`\n  gives an item accessor and a plain number. `<Repeat>`: `i` is a number.\n- `onClick={cond() ? a : b}` binds once; decide inside a stable handler.\n- `on:`, `oncapture:`, `attr:`, `bool:`, `use:` and `classList` on a native\n  element are compile errors; the message names the replacement above.\n- Inputs aren't strictly controlled: `value={x()}` writes only when the\n  binding re-runs — and a change to any other dynamic attribute in the same\n  template re-runs it (dev warns `UNCOMMITTED_INPUT_OVERWRITTEN` when that\n  erases typed text). Keep typing in a draft signal (`onInput`), commit on\n  `onChange`/submit; when a handler rejects input, also set\n  `e.currentTarget.value = next` (an unchanged signal won't revert the DOM).\n\n## Primitives to reach for\n\n| Primitive                                                          | Use                                                                                     |\n| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |\n| `createSignal(0)` / `createSignal(() => fetchUser(id()))`          | plain signal / writable derived value, sync or async; read by calling it                |\n| `createMemo(() => fetchX(id()))`                                   | read-only derived value; a Promise result is pending until it lands                     |\n| `createProjection(async () => api.list(), [], { key: \"id\" })`      | read-only derived store with keyed reconciliation                                       |\n| `createOptimisticStore(() => api.list(), [])`                      | store whose optimistic writes revert when the transition settles                        |\n| `action(function* (x) { write(); yield api.put(x); refresh(d); })` | mutation with transition coordination; optimistic writes go inside     ",
+      "card": {
+        "title_zh": "Solid 2.0 编码指南",
+        "purpose_zh": "为编码代理提供 Solid 2.0 的写法要点与 1.x 到 2.0 的迁移对照，避免按 React 或 Solid 1.x 模式匹配而产生错误。",
+        "does": [
+          "说明 Solid 2.0 的三条核心规则：props 读取不解构、createEffect 双函数、store 通过草稿写入",
+          "给出 1.x 到 2.0 的 API 与导入路径对照表",
+          "列出应优先使用的响应式原语及其用途",
+          "提示读写时序、effect 比较、水合、输入框控制等易错点",
+          "指向速查表、诊断技能、lint 配置与官方文档等参考资料"
+        ],
+        "inputs": [
+          "待编写、审查或迁移的 Solid 2.0 代码",
+          "node_modules/solid-js/CHEATSHEET.md 等本地参考资料"
+        ],
+        "outputs": [
+          "Solid 2.0 正确写法与迁移建议",
+          "错误模式与对应正确写法的对照说明"
+        ],
+        "scenarios": [
+          "编写 Solid 2.0 组件代码",
+          "审查 Solid 2.0 代码",
+          "将 Solid 1.x 代码迁移到 2.0"
+        ],
+        "prerequisites": [
+          "使用 solid-js 2.x 与 @solidjs/web",
+          "可查阅 node_modules/solid-js/CHEATSHEET.md"
+        ],
+        "limits": [
+          "仅覆盖 Solid 2.0，不适用于 Solid 1.x 或 React",
+          "部分诊断与证据循环依赖本地 node_modules 中的技能文件",
+          "未说明具体宿主平台或安装方式"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "前端",
+          "文档",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Solid 2.0 primer for coding agents. Use when writing, reviewing or migrating Solid 2.0 code (solid-js 2.x, @solidjs/web)."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Solid is not React, and 2.0 is not 1.x. Pattern-matching from either is the dominant bug source."
+          },
+          {
+            "field": "does",
+            "quote": "**Props are read, not destructured; pass values, not accessors.**"
+          },
+          {
+            "field": "does",
+            "quote": "**`createEffect` takes two functions: compute (tracks), then apply (side effects).**"
+          },
+          {
+            "field": "does",
+            "quote": "**Stores are written through the draft.**"
+          },
+          {
+            "field": "does",
+            "quote": "## 1.x → 2.0 corrections"
+          },
+          {
+            "field": "does",
+            "quote": "## Primitives to reach for"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "check unfamiliar names against node_modules/solid-js/CHEATSHEET.md"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "packages/web/skills/server-components/SKILL.md",
+      "blob_sha": "28123803135f1977dbd1095548759ba17843e523",
+      "source_url": "https://github.com/solidjs/solid/blob/5a43d6f85af6d647bbef49b3f9c63fdbac7397ff/packages/web/skills/server-components/SKILL.md",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "server-components",
+        "description": "Rules for writing Solid 2.0 server components (\"use server\" functions that return a template) and their slots with @solidjs/web. Use when writing or reviewing a server component, deciding what lives on the server versus the client, or wiring a slot."
+      },
+      "excerpt": "---\nname: server-components\ndescription: Rules for writing Solid 2.0 server components (\"use server\" functions that return a template) and their slots with @solidjs/web. Use when writing or reviewing a server component, deciding what lives on the server versus the client, or wiring a slot.\n---\n\n# Writing Solid server components with slots\n\nA Solid server component is a `\"use server\"` function that returns a\ntemplate; the browser receives its markup and never its code. Anything the\nclient contributes goes through a **slot** on the component's props: a\nclient component the client places at a position in the server's markup.\nThis guide is the set of rules an author — a person or an agent — needs to\nwrite one correctly the first time. The design record is\n`documentation/server-components/server-components-principles.md`; this\nfile is the operative subset.\n\n## Where things go\n\n> **An element lives where the data that creates it lives.**\n\n- Exists because of **server data** (a todo row, a nav link, a search\n  form the server renders)? It is **server markup**. A mutation on it is a\n  form `action` — it works without JavaScript, and the router marks a\n  submission in flight (`aria-busy`) so CSS can show the intent.\n- Needs **client behavior or client state** (a handler, an optimistic add,\n  a modal, a drag ghost, an editor open over a field)? It is a **client\n  component** placed through a **slot**.\n\nWhen the client confirms an optimistic entity and the server renders it, the\nrow _becomes_ server markup; `$key` on the element reconciles the two.\n\n## Slots\n\n```tsx\nimport type { Slot } from \"@solidjs/web/frames\";\n\ninterface TodosProps {\n  pending: Slot; // no props\n  editor: Slot<{ id: string; title: string }>; // props from the server\n}\n```\n\nA slot is placed as an element: `<props.pending />`,\n`<props.editor id={t.id} title={t.title} />`. The client owns the nodes\nbetween the slot's markers; the server's markup around them stays the\nserver's.\n\n```tsx\nexport async function todoList() {\n  \"use server\";\n  const todos = await db.list();\n  return (props: TodosProps) => (\n    <ul>\n      {todos.map(t => (\n        <li $key={t.id}>\n          {t.title}\n          <props.editor $key={t.id} id={t.id} title={t.title} />\n        </li>\n      ))}\n      <props.pending />\n    </ul>\n  );\n}\n```\n\nThe client passes the fill — a component of the slot's props:\n\n```tsx\n<Todos editor={p => <Editor id={p.id} title={p.title} />} pending={() => <For each={adds}>{…}</For>} />\n```\n\n- **The fill runs once per occurrence, as a component body does.** It runs\n  untracked, under the occurrence's owner, with live props. State it\n  creates (a signal, a memo, an `onCleanup`) lives as long as the\n  occurrence. A top-level read is read once, and `STRICT_READ_UNTRACKED`\n  names it (\"the \\`editor\\` template-slot fill\").\n- **Place slots as JSX, not calls.** The compiler wraps each prop in a\n  getter so the read defers to the slot border; a call form\n  (`props.status({ … })`) evaluates its args eagerly in the server\n  component's body.\n- **`$key` is optional.** Add it when the fill holds its own state (an edit\n  draft, a signal created inside) that must follow the entity across\n  refetches and reorders.\n- **An async value crosses with `asyncArg`.**\n  `<props.status progress={asyncArg(gen.progress)} />` ships the promise or\n  async iterable; the fill's read settles (suspends until the first value).\n\n## Behavior on server markup\n\nA handler on a server-rendered element cannot come from the server: a\nserver function never runs in the browser. Pick one:\n\n- **A form.** A mutation is `<form action={…}>`; it works before\n  JavaScript and needs no client code.\n- **A client component that owns the element.** Move the control into a\n  slot's fill (`<props.toggle id={t.id} done={t.completed} />`, rendering\n  the checkbox on the client).\n- **One delegated listener.** For many identical controls inside server\n  markup (a copy button on every code block), place one slot occurrence\n  whose component registers a single document listener in `onSettled` and\n  finds its target from the event (`closest(\"button.copy-code\")`). Inside a\n  live hole this is the shape that keeps the hole streaming: a slot placed\n  inside a live hole latches it (`SSR_LIVE_HOLE_LATCHED`, `data.cause`\n  `\"records\"`). `examples/chat`'s Copy button is this shape.\n\n## Shared components\n\nOne component can render on both sides. Put `$key={props.id}` on the\nelement it renders (morph identity) — the slot's own `$key` is a different\nkey for a different job. Do not read `document`/`window` during render;\nthat is the ordinary isomorphic rule.\n\n## Compiling\n\nWith `@solidjs/vite-plugin`, `solid({ ssr: true, serverFunctions:\n{ components: true } })` is the turnkey setup (the examples under\n`examples/todos-server`, `examples/notes`, `examples/chat`).\n",
+      "card": null
+    }
+  ]
+}

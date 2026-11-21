@@ -623,35 +623,241 @@
       "skill_path": "skills/rank-tracking/SKILL.md",
       "blob_sha": "0cfc58195ac39c011b3652e74b088b5ca10d19cb",
       "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/rank-tracking/SKILL.md",
-      "fetched_at": "2026-11-13T11:30:56.796Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": "2026-11-21T00:18:14.635Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "rank-tracking",
         "description": "Rank tracking without a tracker subscription — position movers between any two periods from real Search Console data. Use when asked \"how are my rankings\", \"what moved this week/month\", \"track my keywords\", or \"did the update hit me\"."
       },
       "excerpt": "---\nname: rank-tracking\ndescription: Rank tracking without a tracker subscription — position movers between any two periods from real Search Console data. Use when asked \"how are my rankings\", \"what moved this week/month\", \"track my keywords\", or \"did the update hit me\".\n---\n\n# Rank Tracking\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nRank trackers estimate your position by scraping SERPs daily. Search Console records the position Google actually served you at. Use the real number.\n\n## Workflow\n\n1. **Property.** `google_search_console__listSites` → pick the user's domain.\n2. **Two windows.** Default: last 28 days vs previous 28. If the user names an event (\"since the March update\"), split around that date. GSC data lags ~2 days — never include today.\n3. **Pull both periods.** `google_search_console__runRawSearchAnalytics`, dimensions `[\"query\"]`, rowLimit high enough to cover the site (start 5000). Repeat with `[\"page\"]` for page-level movement.\n4. **Join and diff.** Match queries across periods, compute position delta, clicks delta, impressions delta.\n5. **Classify:**\n   - **Winners** — position improved ≥ 2 spots on queries with real impressions\n   - **Losers** — dropped ≥ 2 spots (sort by clicks lost, not by delta — a 4→7 drop on a money query beats a 40→80 crash on a nothing query)\n   - **New** — queries appearing only in the recent period\n   - **Lost** — queries that vanished\n6. **Spot-verify (optional).** For the 3–5 most important losers, if DataForSEO SERP tools are exposed in the workspace, pull the live SERP to see who took the spot. Skip if unavailable.\n\n## Output\n\nVerdict first (net up/down and the single biggest move), then four tables: Winners, Losers, New, Lost — query, positions before→after, clicks delta. If the user asked about a specific algorithm update, answer that question explicitly with the before/after evidence.\n\n## Recurring\n\nIf the user wants this weekly, suggest scheduling it (Claude Code scheduled tasks / a routine) rather than re-running by hand.\n",
-      "card": null
+      "card": {
+        "title_zh": "排名追踪",
+        "purpose_zh": "用真实 Search Console 数据对比任意两个时间段的搜索排名变化，找出上升、下降、新增和丢失的查询，无需订阅第三方排名追踪工具。",
+        "does": [
+          "列出用户 Search Console 站点并选择域名",
+          "拉取两个时间段的 query 和 page 维度搜索分析数据",
+          "按查询匹配两期数据，计算排名、点击、展示变化",
+          "将查询分类为 Winners、Losers、New、Lost",
+          "可选：对重要下降查询拉取实时 SERP 查看谁抢了位置",
+          "先给结论再输出四张表，并针对算法更新问题给出前后证据"
+        ],
+        "inputs": [
+          "用户域名或 Search Console 属性",
+          "两个对比时间段（默认最近28天对比前28天，或围绕指定事件日期划分）",
+          "用户关于排名、关键词或算法更新的具体问题"
+        ],
+        "outputs": [
+          "净上升或下降及最大变动的结论",
+          "Winners、Losers、New、Lost 四张表，含查询、前后排名、点击变化",
+          "针对特定算法更新的前后对比证据"
+        ],
+        "scenarios": [
+          "询问我的排名怎么样",
+          "想知道本周或本月排名有什么变动",
+          "追踪关键词排名",
+          "判断某次算法更新是否影响了自己",
+          "定期每周生成排名变动报告"
+        ],
+        "prerequisites": [
+          "需要免费的 Ryze MCP 连接器 https://connector.get-ryze.ai/mcp",
+          "在 Claude Code 中用 claude mcp add ryze --transport http 添加，或在 claude.ai、Desktop、Cursor 中作为自定义连接器添加",
+          "拥有可访问的 Google Search Console 数据",
+          "注意 GSC 数据约滞后2天，不应包含当天"
+        ],
+        "limits": [
+          "依赖 Ryze MCP 连接器，未连接则无法使用",
+          "数据来自 Search Console，约滞后2天",
+          "实时 SERP 核查仅在 DataForSEO SERP 工具可用时进行，否则跳过",
+          "排名变动阈值默认为2位，且仅统计有真实展示的查询"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "未说明"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "调研",
+          "数据分析",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Rank tracking without a tracker subscription — position movers between any two periods from real Search Console data."
+          },
+          {
+            "field": "does",
+            "quote": "**Two windows.** Default: last 28 days vs previous 28. If the user names an event (\"since the March update\"), split around that date."
+          },
+          {
+            "field": "does",
+            "quote": "**Join and diff.** Match queries across periods, compute position delta, clicks delta, impressions delta."
+          },
+          {
+            "field": "does",
+            "quote": "**Winners** — position improved ≥ 2 spots on queries with real impressions"
+          },
+          {
+            "field": "does",
+            "quote": "**Spot-verify (optional).** For the 3–5 most important losers, if DataForSEO SERP tools are exposed in the workspace, pull the live SERP to see who took the spot. Skip if unavailable."
+          },
+          {
+            "field": "does",
+            "quote": "Verdict first (net up/down and the single biggest move), then four tables: Winners, Losers, New, Lost — query, positions before→after, clicks delta."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "GSC data lags ~2 days — never include today."
+          },
+          {
+            "field": "hosts",
+            "quote": "Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "The free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`)."
+          }
+        ]
+      }
     },
     {
       "skill_path": "skills/seo-audit/SKILL.md",
       "blob_sha": "7e272556da392769b4bcde39232beaad3f4baf99",
       "source_url": "https://github.com/Ryze-AI-Adgent/open-seo-mcp-skills/blob/f587b0a69dc1ed92b65cdb241e4f14985b1031fd/skills/seo-audit/SKILL.md",
-      "fetched_at": "2026-11-13T11:30:56.796Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "generated_at": "2026-11-21T00:18:14.635Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "seo-audit",
         "description": "Full SEO audit of a site from its real Search Console + GA4 data — indexation health, CTR anomalies, decaying pages, striking-distance keywords, quick wins. Use when asked to \"audit my site\", \"SEO audit\", \"why is my organic traffic down\", or \"SEO health check\"."
       },
       "excerpt": "---\nname: seo-audit\ndescription: Full SEO audit of a site from its real Search Console + GA4 data — indexation health, CTR anomalies, decaying pages, striking-distance keywords, quick wins. Use when asked to \"audit my site\", \"SEO audit\", \"why is my organic traffic down\", or \"SEO health check\".\n---\n\n# SEO Audit\n\n## Requires\n\nThe free Ryze MCP connector (`https://connector.get-ryze.ai/mcp`). Claude Code: `claude mcp add ryze --transport http https://connector.get-ryze.ai/mcp`. claude.ai / Desktop / Cursor: add it as a custom connector with the same URL. Setup: https://www.get-ryze.ai/how-to-connect-claude-to-google-meta-ads-mcp?utm_source=github&utm_content=open-seo-mcp-skills\n\nAudit the user's site using their own data via the Ryze MCP. No estimates — everything below comes from their actual GSC/GA4.\n\n## Workflow\n\n1. **Pick the property.** `google_search_console__listSites`. If several, use the one matching the user's domain; confirm only when ambiguous.\n2. **Indexation.** `google_search_console__getIndexationSummary` — indexed vs not-indexed counts and reasons. Flag anything unusual (large \"Crawled — currently not indexed\", spikes in excluded pages).\n3. **Performance baseline.** `google_search_console__runRawSearchAnalytics`: last 90 days vs previous 90, dimensions `query` and `page` (two calls each period). Compute clicks/impressions/CTR/position deltas.\n4. **Find the problems:**\n   - **Decaying pages** — pages whose clicks dropped >30% period-over-period\n   - **CTR anomalies** — queries with position ≤ 5 but CTR < 2% (title/meta problem)\n   - **Striking distance** — queries at position 8–20 with high impressions (one push from page 1)\n   - **Cannibalization** — same query, multiple ranking pages splitting clicks\n5. **Spot-check pages.** For the 3–5 worst pages, `google_search_console__inspectUrl` — canonical, indexing state, last crawl.\n6. **Cross-check traffic.** `google_analytics__runRawReport` — organic sessions + conversions by landing page, same periods. A page can hold rankings but lose revenue; call that out.\n7. **AI traffic.** `google_analytics__getAIReferrals` for the same window — note whether AI engines are becoming a meaningful channel for this site.\n\n## Output\n\nA report with: verdict up top (one paragraph, is the site healthy or not and the #1 issue), then sections — Indexation, Losers, Quick wins (striking distance + CTR fixes, ranked by impressions), Cannibalization — each with a table and the specific fix. End with a prioritized 5-item action list.\n\n## Fallbacks\n\nIf GSC isn't connected, say so and point to Ryze connector setup (https://help.get-ryze.ai/claude/connect) — do not substitute third-party estimates for the site's own data.\n",
-      "card": null
+      "card": {
+        "title_zh": "SEO 站点审计",
+        "purpose_zh": "基于用户自己的 Search Console 与 GA4 真实数据，对站点做完整 SEO 审计，覆盖索引健康、CTR 异常、流量下滑页、临界关键词与快速优化机会。",
+        "does": [
+          "列出并确认要审计的 GSC 站点属性",
+          "统计已索引与未索引页面数量及原因",
+          "对比近 90 天与前 90 天的点击、曝光、CTR、排名变化",
+          "识别点击下滑超 30% 的衰退页、排名前 5 但 CTR 低于 2% 的查询、排名 8–20 的高曝光临界词、同词多页分流",
+          "抽查最差页面的规范链接、索引状态与最近抓取",
+          "用 GA4 交叉核对自然流量与转化，并查看 AI 引荐流量"
+        ],
+        "inputs": [
+          "用户的 Google Search Console 站点属性",
+          "用户的 GA4 数据（通过 Ryze MCP 连接器访问）",
+          "审计时间窗口（默认近 90 天对比前 90 天）"
+        ],
+        "outputs": [
+          "含总体结论与首要问题的审计报告",
+          "索引、流失页、快速优化、关键词分流的表格与具体修复建议",
+          "按优先级排序的 5 项行动清单"
+        ],
+        "scenarios": [
+          "用户要求审计自己的网站",
+          "用户询问自然流量为何下降",
+          "用户要做 SEO 健康检查"
+        ],
+        "prerequisites": [
+          "需安装免费的 Ryze MCP 连接器（https://connector.get-ryze.ai/mcp）",
+          "Claude Code 用 claude mcp add ryze --transport http 添加；claude.ai、Desktop、Cursor 作为自定义连接器添加同一 URL",
+          "GSC 需已连接，否则应说明并指向 Ryze 连接器设置，不得用第三方估算替代"
+        ],
+        "limits": [
+          "所有结论均来自用户实际 GSC/GA4 数据，不做估算",
+          "GSC 未连接时无法完成审计，也不以第三方估算替代",
+          "仅覆盖原文列出的索引、表现、CTR、临界词、分流、AI 引荐等维度"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "未说明"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "调研",
+          "数据分析",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Full SEO audit of a site from its real Search Console + GA4 data — indexation health, CTR anomalies, decaying pages, striking-distance keywords, quick wins."
+          },
+          {
+            "field": "does",
+            "quote": "**Indexation.** `google_search_console__getIndexationSummary` — indexed vs not-indexed counts and reasons."
+          },
+          {
+            "field": "does",
+            "quote": "**Decaying pages** — pages whose clicks dropped >30% period-over-period"
+          },
+          {
+            "field": "does",
+            "quote": "**CTR anomalies** — queries with position ≤ 5 but CTR < 2% (title/meta problem)"
+          },
+          {
+            "field": "does",
+            "quote": "**Striking distance** — queries at position 8–20 with high impressions (one push from page 1)"
+          },
+          {
+            "field": "does",
+            "quote": "**Cannibalization** — same query, multiple ranking pages splitting clicks"
+          },
+          {
+            "field": "does",
+            "quote": "**Spot-check pages.** For the 3–5 worst pages, `google_search_console__inspectUrl` — canonical, indexing state, last crawl."
+          },
+          {
+            "field": "does",
+            "quote": "**Cross-check traffic.** `google_analytics__runRawReport` — organic sessions + conversions by landing page, same periods."
+          },
+          {
+            "field": "does",
+            "quote": "**AI traffic.** `google_analytics__getAIReferrals` for the same window"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when asked to \"audit my site\", \"SEO audit\", \"why is my organic traffic down\", or \"SEO health check\"."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If GSC isn't connected, say so and point to Ryze connector setup (https://help.get-ryze.ai/claude/connect) — do not substitute third-party estimates for the site's own data."
+          },
+          {
+            "field": "limits",
+            "quote": "No estimates — everything below comes from their actual GSC/GA4."
+          },
+          {
+            "field": "hosts",
+            "quote": "claude.ai / Desktop / Cursor: add it as a custom connector with the same URL."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`https://connector.get-ryze.ai/mcp`"
+          }
+        ]
+      }
     },
     {
       "skill_path": "skills/seo-vs-ads/SKILL.md",
