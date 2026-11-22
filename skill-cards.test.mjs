@@ -151,8 +151,8 @@ test('fetch and generation failures preserve the previous version without saving
   assert.equal((await readRepo(root, name)).skills[0].status, 'ok');
 });
 
-test('60 new cards per run, then resume until pending is zero', async t => {
-  const repositories = Object.fromEntries(Array.from({ length: 61 }, (_, index) => [
+test('20 new cards per run by default, then resume until pending is zero', async t => {
+  const repositories = Object.fromEntries(Array.from({ length: 21 }, (_, index) => [
     'owner/repo-' + String(index).padStart(2, '0'), [entry('SKILL.md', SOURCE + '\nExample ' + index)],
   ]));
   const root = await setup(t, repositories);
@@ -160,13 +160,13 @@ test('60 new cards per run, then resume until pending is zero', async t => {
   const generate = async () => { calls++; return card(); };
   const request = fakeGithub(repositories);
   const first = await buildSkillCards(root, { now: NOW, request, generate });
-  assert.equal(calls, 60);
+  assert.equal(calls, 20);
   assert.equal(first.pending, 1);
-  assert.equal(first.resume_from, 'owner/repo-60');
+  assert.equal(first.resume_from, 'owner/repo-20');
   const second = await buildSkillCards(root, { now: LATER, request, generate });
-  assert.equal(calls, 61);
+  assert.equal(calls, 21);
   assert.equal(second.pending, 0);
-  assert.equal(second.repos.length, 61);
+  assert.equal(second.repos.length, 21);
 });
 
 test('repository path cannot escape output or duplicate it by changing case', () => {
@@ -295,4 +295,77 @@ test('cards-only backfill resumes pending repositories without scanning complete
   assert(!requests.some(path => path.startsWith('/repos/owner/a')));
   assert(requests.some(path => path.startsWith('/repos/owner/b')));
   await verifyCardPublication(root);
+});
+
+test('validation failures reuse cached failure across runs while transient failures retry', async t => {
+  const repositories = {
+    'owner/invalid': [entry('SKILL.md')],
+    'owner/flaky': [entry('SKILL.md', SOURCE + '\nTransient target.')],
+  };
+  const root = await setup(t, repositories);
+  const request = fakeGithub(repositories);
+  const pathsRequested = [];
+  let invalidCalls = 0;
+  let flakyCalls = 0;
+  let succeedNow = false;
+  const generate = async (_system, input) => {
+    if (input.excerpt.includes('Transient target')) {
+      flakyCalls++;
+      if (!succeedNow) throw new Error('temporary network hiccup');
+      return card([{ field: 'purpose_zh', quote: 'Transient target.' }]);
+    }
+    invalidCalls++;
+    return succeedNow ? card() : card([]);
+  };
+
+  const first = await buildSkillCards(root, {
+    now: NOW, request: path => { pathsRequested.push(path); return request(path); }, generate,
+  });
+  assert.equal(invalidCalls, 1);
+  assert.equal(flakyCalls, 2);
+  assert.equal(first.failures.filter(f => f.repo === 'owner/invalid')[0].stage, 'validate');
+  assert.equal(first.failures.filter(f => f.repo === 'owner/flaky')[0].stage, 'generate');
+
+  pathsRequested.length = 0;
+  succeedNow = true;
+  const second = await buildSkillCards(root, {
+    now: LATER, request: path => { pathsRequested.push(path); return request(path); }, generate,
+  });
+  assert.equal(invalidCalls, 1);
+  assert(!pathsRequested.some(p => p.startsWith('/repos/owner/invalid/git/blobs/')));
+  assert.equal(second.failures.length, 1);
+  assert.equal(second.failures[0].repo, 'owner/invalid');
+  assert.equal(flakyCalls, 3);
+  assert.equal((await readRepo(root, 'owner/flaky')).skills[0].status, 'ok');
+  await verifyCardPublication(root);
+
+  repositories['owner/invalid'][0] = entry('SKILL.md', SOURCE + '\nUpdated SKILL text.');
+  const third = await buildSkillCards(root, { now: '2026-11-15T00:00:00Z', request, generate });
+  assert.equal(invalidCalls, 2);
+  assert.equal(third.failures.length, 0);
+  assert.equal((await readRepo(root, 'owner/invalid')).skills[0].status, 'ok');
+});
+
+test('long sources send only the bounded excerpt without additional_source and retries respect budget', async t => {
+  const longText = SOURCE + '\n' + 'a'.repeat(10000);
+  const repositories = {
+    'owner/a': [entry('SKILL.md', longText)],
+    'owner/b': [entry('SKILL.md', SOURCE + '\nSecond repo.')],
+  };
+  const root = await setup(t, repositories);
+  const seenInputs = [];
+  let calls = 0;
+  const first = await buildSkillCards(root, {
+    now: NOW, maxGenerations: 2, request: fakeGithub(repositories),
+    generate: async (_system, input) => {
+      seenInputs.push(input);
+      calls++;
+      throw new Error('upstream failure');
+    },
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(Object.keys(seenInputs[0]), ['excerpt']);
+  assert.equal(Array.from(seenInputs[0].excerpt).length, 8000);
+  assert.equal(first.pending, 1);
+  assert.equal(first.resume_from, 'owner/b');
 });

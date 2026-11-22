@@ -7,11 +7,12 @@ import { configuredJsonGenerator } from './summary-model.mjs';
 
 export const CARD_PROMPT_VERSION = 'skill_card_v1';
 export const TAGS = ['写作', '内容运营', '视频', '图像', '设计/UI', '前端', '后端', '数据分析', '测试', '代码审查', '安全', '运维部署', '文档', '调研', '产品规划', '办公文档', '自动化', '学习辅导', '游戏', '其他'];
-const HOSTS = ['claude-code', 'codex', 'cursor', 'gemini-cli', '通用', '未说明'];
+const HOSTS = ['claude-code', 'codex', 'cursor', 'gemini-cli', 'antigravity', '通用', '未说明'];
 const RISKS = ['shell', 'network', 'writes_files', 'needs_secret', 'installs_packages'];
 const MAX_PATHS = 12;
 const MAX_BLOB_BYTES = 60 * 1024;
-const MAX_GENERATIONS = 60;
+const DEFAULT_MAX_GENERATIONS = 20;
+const MAX_GENERATIONS_CAP = 60;
 const MAX_EXCERPT = 8000;
 const shaPattern = /^[a-f0-9]{40}$/;
 const chinese = /\p{Script=Han}/u;
@@ -25,7 +26,7 @@ const cardInstructions = [
   '只返回 JSON 对象，字段为 title_zh（中文名≤20字）、purpose_zh（用途≤120字）、does、inputs、outputs、scenarios、prerequisites、limits、hosts、risk_flags、tags、evidence。',
   'does 最多6项，scenarios 最多5项，其余中文数组最多8项，每项不超过200字。风险仅根据原文明确出现的命令、网络请求、写文件、密钥、安装包判断。',
   'hosts 只能选：' + HOSTS.join('、') + '。risk_flags 只能选：' + RISKS.join('、') + '。tags 从以下词表选1–5项：' + TAGS.join('、') + '。',
-  'evidence 是最多18个 {field,quote}。purpose_zh 必须有至少一条证据，does 与 prerequisites 有实际内容时必须分别给证据。quote 从可引证原文逐字复制，1–200字；补充原文只供理解。中文字段禁止换行及尖括号。',
+  'evidence 是最多18个 {field,quote}。purpose_zh 必须有至少一条证据，does 与 prerequisites 有实际内容时必须分别给证据。quote 必须从给出的原文逐字复制，1–200字。中文字段禁止换行及尖括号（参数占位请用方括号或反引号，不要写 < >）。',
 ].join('\n');
 
 const take = (value, count) => Array.from(value).slice(0, count).join('');
@@ -80,7 +81,7 @@ export function validateCard(card, excerpt) {
   const evidence = card.evidence.flatMap(item => {
     if (!isObject(item) || !cardFields.includes(item.field) || item.field === 'evidence' || typeof item.quote !== 'string') return [];
     const quote = item.quote.trim();
-    if (!quote || count(quote) > 200 || !normalized.includes(normalizeWhitespace(quote))) return [];
+    if (!quote || count(item.quote) > 200 || !normalized.includes(normalizeWhitespace(quote))) return [];
     return [{ field: item.field, quote }];
   });
   for (const field of requiredEvidence) {
@@ -169,7 +170,7 @@ export function verifyCardIndex(index) {
   return index;
 }
 
-function verifyRepoDocument(doc, row) {
+export function verifyRepoDocument(doc, row) {
   if (!isObject(doc) || doc.schema !== 1 || doc.repo !== row.repo || doc.tree_sha !== row.tree_sha || !integer(doc.truncated_paths)
       || !Array.isArray(doc.skills) || doc.skills.length !== row.card_count) {
     throw new Error('Invalid Skill card repository document');
@@ -279,13 +280,25 @@ const messages = {
   generate: 'Skill card model request failed',
   validate: 'Skill card failed schema or evidence validation',
 };
+function resolveMaxGenerations(value = process.env.SKILL_CARDS_MAX_GENERATIONS) {
+  if (value === undefined || value === '') return DEFAULT_MAX_GENERATIONS;
+  const parsed = typeof value === 'number' ? value
+    : typeof value === 'string' && /^\d+$/.test(value.trim()) ? Number(value.trim()) : NaN;
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > MAX_GENERATIONS_CAP) {
+    throw new Error('Invalid maxGenerations budget');
+  }
+  return parsed;
+}
+
 class BackfillDeferred extends Error {}
 
 export async function buildSkillCards(output, options = {}) {
   const {
     token = process.env.GITHUB_TOKEN, model = process.env.SUMMARY_MODEL || 'deepseek-flash',
     now = new Date().toISOString(), request = github, generate, budgetMs = 360000, pendingOnly = false,
+    maxGenerations: maxGenerationsOption,
   } = options;
+  const maxGenerations = resolveMaxGenerations(maxGenerationsOption);
   const signal = AbortSignal.timeout(budgetMs);
   let rateLimited = false;
   const checkBudget = () => {
@@ -314,6 +327,7 @@ export async function buildSkillCards(output, options = {}) {
   const previousRows = new Map(previous.repos.map(row => [row.file, row]));
   const oldDocs = new Map();
   const cache = new Map();
+  const failedValidationCache = new Map();
   const priorFailures = new Map();
   for (const item of previous.failures) {
     const key = repoFile(item.repo);
@@ -326,7 +340,12 @@ export async function buildSkillCards(output, options = {}) {
     verifyRepoDocument(doc, row);
     oldDocs.set(row.file, doc);
     for (const skill of doc.skills) {
-      if (skill.status === 'ok' && skill.card_prompt_version === CARD_PROMPT_VERSION) cache.set(skill.blob_sha, skill);
+      if (skill.status === 'ok' && skill.card_prompt_version === CARD_PROMPT_VERSION) {
+        cache.set(skill.blob_sha, skill);
+      } else if (skill.status === 'failed' && skill.card_prompt_version === CARD_PROMPT_VERSION
+          && skill.last_error === messages.validate) {
+        failedValidationCache.set(skill.blob_sha, skill);
+      }
     }
   }
   const repos = await readRepositories(output);
@@ -357,7 +376,7 @@ export async function buildSkillCards(output, options = {}) {
   for (const [file, { repo, estimate }] of work) {
     const previousRow = previousRows.get(file);
     const oldDoc = oldDocs.get(file);
-    if (signal.aborted || rateLimited || generations >= MAX_GENERATIONS) {
+    if (signal.aborted || rateLimited || generations >= maxGenerations) {
       index.resume_from ??= repo;
       defer(repo, pendingBefore.get(file) ?? (!oldDoc || previous.card_prompt_version !== CARD_PROMPT_VERSION ? estimate : 0));
       if (previousRow) index.repos.push(previousRow);
@@ -407,16 +426,27 @@ export async function buildSkillCards(output, options = {}) {
           ? old : { ...base, status: 'too_large' });
         continue;
       }
+      // Reuse deterministic validation failures for the same prompt version and blob SHA instead of paying daily retries.
+      const cachedFailure = failedValidationCache.get(entry.sha);
+      if (cachedFailure) {
+        const last_error = failure(repo, entry.path, 'validate');
+        if (old?.status === 'ok') {
+          doc.skills.push({ ...old, last_error });
+        } else {
+          const fetched_at = old?.blob_sha === entry.sha && old.source_url === base.source_url ? old.fetched_at : now;
+          doc.skills.push({
+            ...base, fetched_at, frontmatter: cachedFailure.frontmatter, excerpt: cachedFailure.excerpt, last_error,
+          });
+        }
+        continue;
+      }
       let stage = 'fetch';
       let fetched = base;
       try {
-        if (generations >= MAX_GENERATIONS) throw new BackfillDeferred();
+        if (generations >= maxGenerations) throw new BackfillDeferred();
         const original = await fetchBlob(repo, entry, get);
         fetched = { ...base, excerpt: take(original, MAX_EXCERPT), frontmatter: readFrontmatter(original) };
-        const input = {
-          excerpt: fetched.excerpt,
-          additional_source: Array.from(take(original, 12000)).slice(MAX_EXCERPT).join(''),
-        };
+        const input = { excerpt: fetched.excerpt };
         stage = 'generate';
         checkBudget();
         generations++;
@@ -424,6 +454,8 @@ export async function buildSkillCards(output, options = {}) {
         try { value = await modelRequest(cardInstructions, input, signal); }
         catch {
           checkBudget();
+          if (generations >= maxGenerations) throw new BackfillDeferred();
+          generations++;
           value = await modelRequest(cardInstructions, input, signal);
         }
         checkBudget();
@@ -440,6 +472,7 @@ export async function buildSkillCards(output, options = {}) {
           if (old) doc.skills.push(old);
         } else {
           const last_error = failure(repo, entry.path, stage);
+          if (stage === 'validate' && fetched !== base) failedValidationCache.set(entry.sha, fetched);
           doc.skills.push({ ...(old?.status === 'ok' ? old : fetched), last_error });
         }
       }
