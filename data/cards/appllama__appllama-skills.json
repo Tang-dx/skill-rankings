@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "repo": "Appllama/appllama-skills",
+  "tree_sha": "543ce652f62330c857eef011ecf3899924cec335",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/appllama-app-design-skill/SKILL.md",
+      "blob_sha": "eccc4e8708709a9dba0563e5a5fcadb1ffa88e58",
+      "source_url": "https://github.com/Appllama/appllama-skills/blob/7682d2c38224e35366029dfac57e22d64d17f9f8/skills/appllama-app-design-skill/SKILL.md",
+      "fetched_at": "2026-11-22T00:18:10.525Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "appllama-app-design-skill",
+        "description": "Build native-feeling, benchmark-quality mobile app screens (Expo / React Native). Use when designing or implementing any mobile UI — screens, flows, onboarding, paywalls, tab bars, sheets, settings, empty states — or when polishing motion, navigation, typography, dark mode, or perceived performance. Enforces Apple HIG fidelity, semantic colors, native controls, anti-slop discipline, navigation semantics (push vs replace, modal vs sheet vs overlay, the one-way doors where back must not exist), pu"
+      },
+      "excerpt": "---\nname: appllama-app-design-skill\ndescription: Build native-feeling, benchmark-quality mobile app screens (Expo / React Native). Use when designing or implementing any mobile UI — screens, flows, onboarding, paywalls, tab bars, sheets, settings, empty states — or when polishing motion, navigation, typography, dark mode, or perceived performance. Enforces Apple HIG fidelity, semantic colors, native controls, anti-slop discipline, navigation semantics (push vs replace, modal vs sheet vs overlay, the one-way doors where back must not exist), purposeful Reanimated motion, a full-motion simulator-verified iteration loop, and a study-real-apps-first workflow (pairs with the Appllama MCP). Trigger on \"build a screen\", \"make this screen better\", \"design the onboarding\", \"wire up this flow\", \"polish the UI\", \"make it feel native\", or any mobile design/implementation task.\nlicense: MIT\nmetadata:\n  author: Appllama (appllama.io)\n  version: 1.3.0\n---\n\n# Appllama App Design Skill\n\nYou are building screens that will sit on a phone next to the best-designed apps\nin the world. The user will compare your output to those apps within seconds of\nlaunching it. This skill defines the bar and the method for clearing it.\n\n## The Prime Directive: study before you draw\n\nNever design a screen from imagination when you can study how top apps solved\nthe same screen. Real, shipping, revenue-ranked apps encode thousands of hours\nof design iteration and A/B testing. Your first move on any screen is research:\n\n1. If the **Appllama MCP** is connected, pull real screens for the category and\n   screen type you are building (see the `appllama-usage` skill for the exact\n   research playbooks). Study 20–30 screens before writing a line of UI code.\n2. Extract the **pattern, not the pixels**: layout skeleton, information\n   hierarchy, control choices, spacing rhythm, where the primary CTA sits, what\n   gets an illustration vs. plain text, how progress is communicated.\n   Note: every Appllama image and video carries a small Appllama watermark in\n   the top-left corner. It is provenance, not design — ignore it when reading\n   a screen (it may sit over the status bar or a back button) and never\n   reproduce it in anything you build.\n3. Then design **your** screen: same proven skeleton, your product's voice.\n   Copying a competitor's screen 1:1 is both lazy and legally risky; shipping a\n   screen that ignores every convention users already know is worse.\n\n## Platform baseline\n\nDefault stack assumptions (override only if the project already differs):\n\n- **Expo + Expo Router**, React Native, TypeScript.\n- `react-native-reanimated` for motion, `react-native-gesture-handler` for\n  gestures, `@shopify/flash-list` (or FlashList v2) for any list that can grow.\n- `expo-image` for images (and SF Symbols via `source=\"sf:name\"` on iOS),\n  `expo-video` / `expo-audio` (never the deprecated `expo-av`).\n- `react-native-safe-area-context` for insets. Never hard-code notch numbers.\n- `process.env.EXPO_OS` over `Platform.OS` for compile-time platform checks.\n\n## Native fidelity laws\n\nThese are the details that separate \"web page in a wrapper\" from \"native app\".\nViolating any of them is a finding, not a style preference.\n\n1. **Semantic colors, both themes, day one.** Use system/semantic color tokens\n   (e.g. `Color` from `expo-router` on iOS: `Color.ios.label`,\n   `Color.ios.secondarySystemBackground`; Material dynamic colors on Android).\n   Every screen must render correctly in light AND dark before it is \"done\".\n   Never pass semantic color objects into Reanimated animated styles — resolve\n   to strings first.\n2. **Native controls over rebuilt ones.** Switch, Slider, SegmentedControl,\n   context menus, date pickers: use the native control or a faithful wrapper.\n   A rebuilt toggle that animates 50 ms differently than iOS's reads as fake\n   instantly.\n3. **SF Symbols / Material Symbols for iconography.** On iOS prefer SF Symbols\n   (`expo-image` with `sf:` sources, or `expo-symbols`); they inherit weight,\n   optical size, and Dynamic Type behavior. Do not mix three icon families on\n   one screen.\n4. **Typography is hierarchy.** Use the platform type ramp (Large Title / Title\n   / Headline / Body / Footnote on iOS). One display size per screen. Tabular\n   numerals (`fontVariant: ['tabular-nums']`) for anything that counts, times,\n   or prices. `Text selectable` on data users may want to copy.\n5. **Continuous corners.** `borderCurve: 'continuous'` on every rounded\n   rectangle. Squircles are the single cheapest \"feels iOS\" win that exists.\n6. **Shadows via CSS `boxShadow`**, not legacy `shadow*`/`elevation` props.\n   Shadows are for elevation logic, not decoration — one elevation system per\n   app.\n7. **Spacing rhythm.** Pick a base unit (4 or 8) and never leave it. Prefer\n   flexbox `gap` over margin stacking. ScrollView padding goes in\n   `contentContainerStyle`, never on the ScrollView itself.\n8. **Safe areas and the Dynamic Island are part of the design.** Screens must\n   be verified with content scrolled under the island / status bar (does the\n   blur/fade treatment hold?), with the home indicator (does the bottom CTA\n   clear it?), and in landscape if supported.\n9. **Navigation titles belong to the navigator.** Use the stack's native title\n   (and large-title collapse behavior on iOS) rather than a hand-rolled header\n   whenever possible.\n10. **Haptics are punctuation.** Selection tick when a value passes a step,\n    light impact when something snaps home, notification success/error for\n    outcomes — on the same frame as the visual, one per user action, never\n    the only feedback. Never on scroll, never in loops.\n11. **Format numbers like a product, not a database**: 1.4M, 38k, $4.99. Trim\n    trailing zeros. Localize dates.\n12. **Root scroll behavior**: screens that can ever overflow wrap content in a\n    ScrollView (first component in the route) with\n    `contentInsetAdjustmentBehavior=\"automatic\"`. Use `useWindowDimensions`,\n    never `Dimensions.get()`.\n\n## Navigation laws\n\nNavigation is the part of a screen a screenshot can't show, and users feel\nit in ten seconds. Every transition answers three questions: what is the\ndestination to here, must the user be able to come back, and what does back\n(chevron, iOS edge swipe, Android hardware back) do afterwards.\n\n1. **Push goes deeper, replace moves on.** `router.push` when the user will\n   want to return here; `router.replace` / `<Redirect>` when coming back\n   would land in a state the world has moved past; `router.dismissTo(href)`\n   for \"finish this flow and land on X\". Back undoes *navigation*, never\n   *events*.\n2. **Presentation is meaning.** A self-contained task with steps →\n   `presentation: 'modal'` with its own stack and its own Cancel/Done; a\n   short interruption (picker, filters, item options) → `formSheet` with\n   detents, drag-to-dismiss; immersive content → `fullScreenModal` with an\n   explicit Close; something floating over a still-visible screen (confirm\n   card, lightbox, coach mark) → `transparentModal` overlay; destructive\n   confirms → action sheet; item actions → native context menu; share /\n   web / photo picking → the system controller, never a rebuilt route. A\n   sheet that grows a second step was a modal all along; if a link could\n   open it, it is a route, not a `useState` sheet.\n3. **One-way doors leave the stack.** Sign-in on a wall app, finished\n   onboarding (Skip included), a purchase, a completed session: guard with\n   `Stack.Protected` and land with `replace`, so back can never re-enter\n   the old state — Android back from home exits the app, never shows\n   Login; a paid paywall never re-opens. But keep the user's *place*:\n   sign-in demanded by one action (save, follow, buy) is a modal over the\n   screen that completes the action where it was tapped, and a paywall\n   opened from a feature dismisses back onto the feature, unlocked — never\n   `replace('/(tabs)')` from there.\n4. **Back is blocked in exactly two cases** ",
+      "card": null
+    },
+    {
+      "skill_path": "skills/appllama-usage/SKILL.md",
+      "blob_sha": "b7240be93e90e62ab9ce0aa7dabb281f7ab56b60",
+      "source_url": "https://github.com/Appllama/appllama-skills/blob/7682d2c38224e35366029dfac57e22d64d17f9f8/skills/appllama-usage/SKILL.md",
+      "fetched_at": "2026-11-22T00:18:10.525Z",
+      "generated_at": "2026-11-22T00:18:10.525Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "appllama-usage",
+        "description": "Use the Appllama MCP (mcp.appllama.io) well — research real top-grossing mobile apps, their screens, flows, and UI elements, then build from what you learn. Load when the Appllama MCP is connected and the task involves building a mobile app or screen, researching app design patterns, studying onboarding/paywall/feature flows, improving an existing screen, or whenever an appllama_* / search_apps / list_app_screens tool is available. Covers the tool map, pagination, expiring media, and the full bu"
+      },
+      "excerpt": "---\nname: appllama-usage\ndescription: Use the Appllama MCP (mcp.appllama.io) well — research real top-grossing mobile apps, their screens, flows, and UI elements, then build from what you learn. Load when the Appllama MCP is connected and the task involves building a mobile app or screen, researching app design patterns, studying onboarding/paywall/feature flows, improving an existing screen, or whenever an appllama_* / search_apps / list_app_screens tool is available. Covers the tool map, pagination, expiring media, and the full build-from-research playbooks.\nlicense: MIT\nmetadata:\n  author: Appllama (appllama.io)\n  version: 1.1.0\n---\n\n# Appllama Usage Skill\n\nAppllama is the design library of top-grossing mobile apps — their real\nscreens, flows, and UI patterns, with revenue and download context. The MCP\nputs that library in an agent's hands: **not just a research tool, a builder's\ntool.** You study what already wins, then you build something better.\n\nPair this skill with **appllama-app-design-skill** for every design/implementation\nstep — this skill tells you what to study; that one tells you how to build.\n\n## Ground rules (read first)\n\n1. **Start with `get_credits` — it's free.** It tells you the balance,\n   limits, and reset date. Pro includes 1,500 credits a month (they reset in\n   full once a month, when the plan renews); every other call spends 1 credit.\n2. **Go deep.** Design language lives in the whole journey, not a sample —\n   walk every screen of the apps that matter for the task, images included.\n   That is exactly what the library is for. The one thing that's against the\n   terms is harvesting: sweeping the catalog to extract the dataset itself\n   rather than to answer a real task. That isn't research, and it's detected\n   server-side.\n3. **Media URLs expire in ~1 hour.** Download/view what you study promptly.\n   If links died mid-task, re-request that page for fresh ones — screen ids\n   are durable, links are not.\n4. **Ignore the watermark.** Every Appllama image and video carries a small\n   Appllama watermark in the top-left corner. It is provenance, not part of\n   the screen — don't let it skew your read of that corner (status bar,\n   back button, title), and never reproduce it in anything you build.\n5. **Pagination is sequential.** Every list response carries `next_cursor`;\n   pass it back to continue. You cannot jump to page N — and a cursor only\n   works for the same query that minted it. If a cursor errors, drop it and\n   restart from page one.\n6. **If you hit a rate limit, wait it out.** The per-minute and per-day\n   limits sit far above real research; on the rare hit, wait the stated\n   time — don't retry-hammer.\n7. **Errors are instructions.** Tool errors are written to be acted on\n   (expired cursor → restart; out of credits → tell the user when their\n   credits reset, which the error says, and that they can request more in\n   Settings → Usage).\n\n## Tool map\n\n| Tool | What it gives you | Typical use |\n|---|---|---|\n| `get_credits` | Balance, limits, reset date. **Free.** | Session start |\n| `search_apps` | 10 apps/page: name, revenue, downloads, rating, launch date, screens count, **flow list with screen counts**. Natural-language `query` + filters (revenue/downloads/rating/launch date/price/onboarding steps) + `sort` + `board_id` | Find the top apps for a category or need |\n| `get_app` | One app in full: ratings breakdown, category rank, IAP pricing, top countries, flows | Decide if an app deserves a deep study |\n| `list_app_screens` | 10 screens/page **in journey order** (welcome → onboarding → paywall → product), each with media URL, flow, UI elements, colors. Filter by `flow` or `section` | Walk an app screen by screen |\n| `search_screens` | Screens across the whole library. `mode=\"keyword\"` matches screen names + filters (flow, screen_type, element, app_id); `mode=\"semantic\"` searches by meaning/visual language | Gather design references for one screen type |\n| `get_screen` | One screen in full + up to 5 visually similar screens from other apps. Accepts `screen_ref` = `app_id/screen_id` (what appllama.io's \"Copy Screen ID\" produces) | The user pasted a screen ref; or drill into one reference |\n| `list_flows` | The flow taxonomy with screen/app counts | Discover what flows exist for a category |\n| `get_flow_apps` | Apps containing a flow, top revenue first | Find the best examples of one flow |\n| `list_ui_elements` | ~38 UI-element families with counts (one call) | Vocabulary for element-level research |\n| `get_element_screens` | Screens featuring an element family | Study how winners build one component |\n| `list_my_boards` | The member's own appllama.io boards (screens / apps / flows) | Find their curation first |\n| `get_board` | A board's full contents: screens with media, app profiles, or (app, flow) pairs | When the member curated a board for the task, START from it |\n\n**The screen_ref handshake:** members can click \"Copy Screen ID\" on any\nscreen at appllama.io and paste it to you. It looks like\n`1393061654/spl_9i075` — feed it straight to\n`get_screen(screen_ref=...)` and you're looking at exactly the screen they\nmean, plus its closest siblings across the library.\n\n## The playbooks\n\n| Scenario | Reference |\n|---|---|\n| Build an app from scratch (e.g. \"build me a habit tracker\") | [references/build-from-scratch.md](references/build-from-scratch.md) |\n| Make an existing screen better | [references/improve-a-screen.md](references/improve-a-screen.md) |\n| Flow & element research; general research method | [references/research-methods.md](references/research-methods.md) |\n\nBoth build playbooks end the same way: **the simulator loop from\nappllama-app-design-skill, repeated until you cannot find a flaw.** Research\nwithout that loop is decoration.\n\n## Local reference boards\n\nWhen you pull screens for study, save them into a local working structure —\nlinks expire in about an hour, but your notes and downloads don't:\n\n```\nresearch/\n  <category>/\n    apps.md            # the shortlist: metrics, flows, verdicts\n    <app-name>/\n      screens.md       # per-screen notes: id, name, flow, elements, colors\n      img/             # downloaded screens, in journey order\n    patterns.md        # cross-app synthesis: the category's design language\n```\n\nDownload the screens as you study them — synthesis happens with the images\nside by side, not from metadata. Notes and screen IDs are durable; re-fetch\na fresh link from the ID if you ever need the pixels again.\n",
+      "card": {
+        "title_zh": "Appllama应用研究",
+        "purpose_zh": "指导代理使用Appllama MCP研究畅销移动应用的真实屏幕、流程与UI元素，并据此构建或改进移动应用界面。",
+        "does": [
+          "说明Appllama MCP各工具用途与典型调用场景",
+          "指导按旅程顺序逐屏研究应用设计语言",
+          "提供从零构建应用、改进现有屏幕、流程与元素研究三类操作手册",
+          "说明分页游标、媒体链接约1小时过期、水印、限流与错误处理规则",
+          "建议将研究屏幕下载并整理为本地研究目录与笔记",
+          "引导结合appllama-app-design-skill的模拟器循环反复打磨"
+        ],
+        "inputs": [
+          "自然语言研究查询与筛选条件（收入、下载量、评分、上线日期、价格、引导步骤等）",
+          "screen_ref（如app_id/screen_id）",
+          "分页游标next_cursor",
+          "成员在appllama.io上的看板"
+        ],
+        "outputs": [
+          "应用列表与详情（收入、下载量、评分、流程等）",
+          "按旅程顺序的屏幕列表及媒体链接、UI元素、颜色",
+          "相似屏幕推荐与元素级屏幕结果",
+          "本地研究目录中的笔记与下载图片"
+        ],
+        "scenarios": [
+          "从零构建一个移动应用",
+          "改进现有屏幕设计",
+          "研究引导、付费墙、功能流程等设计模式",
+          "按UI元素族研究组件实现",
+          "查找某类流程的头部应用案例"
+        ],
+        "prerequisites": [
+          "已连接Appllama MCP（mcp.appllama.io）",
+          "可用appllama_*、search_apps、list_app_screens等工具",
+          "建议配合appllama-app-design-skill使用"
+        ],
+        "limits": [
+          "媒体URL约1小时过期，需及时下载或重新请求",
+          "分页只能顺序进行，游标仅对签发它的查询有效",
+          "禁止批量抓取目录数据集，服务端会检测",
+          "图片和视频带Appllama水印，不得复制到构建产物",
+          "有每分钟和每日速率限制，触发后需等待",
+          "Pro每月1500积分，除get_credits外每次调用消耗1积分"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "设计/UI",
+          "调研",
+          "产品规划",
+          "前端"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Appllama is the design library of top-grossing mobile apps — their real\nscreens, flows, and UI patterns, with revenue and download context."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "You study what already wins, then you build something better."
+          },
+          {
+            "field": "does",
+            "quote": "| `search_apps` | 10 apps/page: name, revenue, downloads, rating, launch date, screens count, **flow list with screen counts**."
+          },
+          {
+            "field": "does",
+            "quote": "| `list_app_screens` | 10 screens/page **in journey order** (welcome → onboarding → paywall → product), each with media URL, flow, UI elements, colors."
+          },
+          {
+            "field": "does",
+            "quote": "| Build an app from scratch (e.g. \"build me a habit tracker\") | [references/build-from-scratch.md](references/build-from-scratch.md) |"
+          },
+          {
+            "field": "does",
+            "quote": "**Media URLs expire in ~1 hour.** Download/view what you study promptly."
+          },
+          {
+            "field": "does",
+            "quote": "Download the screens as you study them — synthesis happens with the images side by side, not from metadata."
+          },
+          {
+            "field": "does",
+            "quote": "Both build playbooks end the same way: **the simulator loop from\nappllama-app-design-skill, repeated until you cannot find a flaw.**"
+          },
+          {
+            "field": "inputs",
+            "quote": "Natural-language `query` + filters (revenue/downloads/rating/launch date/price/onboarding steps) + `sort` + `board_id`"
+          },
+          {
+            "field": "inputs",
+            "quote": "Accepts `screen_ref` = `app_id/screen_id` (what appllama.io's \"Copy Screen ID\" produces)"
+          },
+          {
+            "field": "inputs",
+            "quote": "Every list response carries `next_cursor`;\n   pass it back to continue."
+          },
+          {
+            "field": "outputs",
+            "quote": "| `get_screen` | One screen in full + up to 5 visually similar screens from other apps."
+          },
+          {
+            "field": "outputs",
+            "quote": "research/\n  <category>/\n    apps.md            # the shortlist: metrics, flows, verdicts"
+          },
+          {
+            "field": "scenarios",
+            "quote": "| Make an existing screen better | [references/improve-a-screen.md](references/improve-a-screen.md) |"
+          },
+          {
+            "field": "scenarios",
+            "quote": "| Flow & element research; general research method | [references/research-methods.md](references/research-methods.md) |"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Load when the Appllama MCP is connected and the task involves building a mobile app or screen"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Pair this skill with **appllama-app-design-skill** for every design/implementation\nstep"
+          },
+          {
+            "field": "limits",
+            "quote": "The one thing that's against the\n   terms is harvesting: sweeping the catalog to extract the dataset itself\n   rather than to answer a real task."
+          }
+        ]
+      }
+    }
+  ]
+}

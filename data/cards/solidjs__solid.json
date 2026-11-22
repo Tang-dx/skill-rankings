@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "repo": "solidjs/solid",
-  "tree_sha": "817795397e75cc33584eda338e79a51c473cde86",
+  "tree_sha": "277688f08d0edd060e9ab9adda7b2ee56b786b29",
   "truncated_paths": 0,
   "skills": [
     {
       "skill_path": "packages/diagnostics/skills/agent-loops/SKILL.md",
       "blob_sha": "1ef22aa77f697628341fd933a2a8d708115975b4",
-      "source_url": "https://github.com/solidjs/solid/blob/5a43d6f85af6d647bbef49b3f9c63fdbac7397ff/packages/diagnostics/skills/agent-loops/SKILL.md",
-      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "source_url": "https://github.com/solidjs/solid/blob/da28cd5b0653d402defff26c3f4513f6503caedf/packages/diagnostics/skills/agent-loops/SKILL.md",
+      "fetched_at": "2026-11-22T00:18:10.525Z",
       "generated_at": null,
       "model": null,
       "status": "failed",
@@ -24,8 +24,8 @@
     {
       "skill_path": "packages/solid/skills/reactivity-diagnostics/SKILL.md",
       "blob_sha": "7dff9b27a79800a8c81d985e6e5f3f9d0aa3e88b",
-      "source_url": "https://github.com/solidjs/solid/blob/5a43d6f85af6d647bbef49b3f9c63fdbac7397ff/packages/solid/skills/reactivity-diagnostics/SKILL.md",
-      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "source_url": "https://github.com/solidjs/solid/blob/da28cd5b0653d402defff26c3f4513f6503caedf/packages/solid/skills/reactivity-diagnostics/SKILL.md",
+      "fetched_at": "2026-11-22T00:18:10.525Z",
       "generated_at": null,
       "model": null,
       "status": "too_large",
@@ -41,8 +41,8 @@
     {
       "skill_path": "packages/solid/skills/solid-2.0/SKILL.md",
       "blob_sha": "ff74de893545e5c2d4b638d021ab7e55491ace51",
-      "source_url": "https://github.com/solidjs/solid/blob/5a43d6f85af6d647bbef49b3f9c63fdbac7397ff/packages/solid/skills/solid-2.0/SKILL.md",
-      "fetched_at": "2026-11-21T00:18:14.635Z",
+      "source_url": "https://github.com/solidjs/solid/blob/da28cd5b0653d402defff26c3f4513f6503caedf/packages/solid/skills/solid-2.0/SKILL.md",
+      "fetched_at": "2026-11-22T00:18:10.525Z",
       "generated_at": "2026-11-21T00:18:14.635Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -133,19 +133,117 @@
     {
       "skill_path": "packages/web/skills/server-components/SKILL.md",
       "blob_sha": "28123803135f1977dbd1095548759ba17843e523",
-      "source_url": "https://github.com/solidjs/solid/blob/5a43d6f85af6d647bbef49b3f9c63fdbac7397ff/packages/web/skills/server-components/SKILL.md",
-      "fetched_at": "2026-11-21T00:18:14.635Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "source_url": "https://github.com/solidjs/solid/blob/da28cd5b0653d402defff26c3f4513f6503caedf/packages/web/skills/server-components/SKILL.md",
+      "fetched_at": "2026-11-22T00:18:10.525Z",
+      "generated_at": "2026-11-22T00:18:10.525Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "server-components",
         "description": "Rules for writing Solid 2.0 server components (\"use server\" functions that return a template) and their slots with @solidjs/web. Use when writing or reviewing a server component, deciding what lives on the server versus the client, or wiring a slot."
       },
       "excerpt": "---\nname: server-components\ndescription: Rules for writing Solid 2.0 server components (\"use server\" functions that return a template) and their slots with @solidjs/web. Use when writing or reviewing a server component, deciding what lives on the server versus the client, or wiring a slot.\n---\n\n# Writing Solid server components with slots\n\nA Solid server component is a `\"use server\"` function that returns a\ntemplate; the browser receives its markup and never its code. Anything the\nclient contributes goes through a **slot** on the component's props: a\nclient component the client places at a position in the server's markup.\nThis guide is the set of rules an author — a person or an agent — needs to\nwrite one correctly the first time. The design record is\n`documentation/server-components/server-components-principles.md`; this\nfile is the operative subset.\n\n## Where things go\n\n> **An element lives where the data that creates it lives.**\n\n- Exists because of **server data** (a todo row, a nav link, a search\n  form the server renders)? It is **server markup**. A mutation on it is a\n  form `action` — it works without JavaScript, and the router marks a\n  submission in flight (`aria-busy`) so CSS can show the intent.\n- Needs **client behavior or client state** (a handler, an optimistic add,\n  a modal, a drag ghost, an editor open over a field)? It is a **client\n  component** placed through a **slot**.\n\nWhen the client confirms an optimistic entity and the server renders it, the\nrow _becomes_ server markup; `$key` on the element reconciles the two.\n\n## Slots\n\n```tsx\nimport type { Slot } from \"@solidjs/web/frames\";\n\ninterface TodosProps {\n  pending: Slot; // no props\n  editor: Slot<{ id: string; title: string }>; // props from the server\n}\n```\n\nA slot is placed as an element: `<props.pending />`,\n`<props.editor id={t.id} title={t.title} />`. The client owns the nodes\nbetween the slot's markers; the server's markup around them stays the\nserver's.\n\n```tsx\nexport async function todoList() {\n  \"use server\";\n  const todos = await db.list();\n  return (props: TodosProps) => (\n    <ul>\n      {todos.map(t => (\n        <li $key={t.id}>\n          {t.title}\n          <props.editor $key={t.id} id={t.id} title={t.title} />\n        </li>\n      ))}\n      <props.pending />\n    </ul>\n  );\n}\n```\n\nThe client passes the fill — a component of the slot's props:\n\n```tsx\n<Todos editor={p => <Editor id={p.id} title={p.title} />} pending={() => <For each={adds}>{…}</For>} />\n```\n\n- **The fill runs once per occurrence, as a component body does.** It runs\n  untracked, under the occurrence's owner, with live props. State it\n  creates (a signal, a memo, an `onCleanup`) lives as long as the\n  occurrence. A top-level read is read once, and `STRICT_READ_UNTRACKED`\n  names it (\"the \\`editor\\` template-slot fill\").\n- **Place slots as JSX, not calls.** The compiler wraps each prop in a\n  getter so the read defers to the slot border; a call form\n  (`props.status({ … })`) evaluates its args eagerly in the server\n  component's body.\n- **`$key` is optional.** Add it when the fill holds its own state (an edit\n  draft, a signal created inside) that must follow the entity across\n  refetches and reorders.\n- **An async value crosses with `asyncArg`.**\n  `<props.status progress={asyncArg(gen.progress)} />` ships the promise or\n  async iterable; the fill's read settles (suspends until the first value).\n\n## Behavior on server markup\n\nA handler on a server-rendered element cannot come from the server: a\nserver function never runs in the browser. Pick one:\n\n- **A form.** A mutation is `<form action={…}>`; it works before\n  JavaScript and needs no client code.\n- **A client component that owns the element.** Move the control into a\n  slot's fill (`<props.toggle id={t.id} done={t.completed} />`, rendering\n  the checkbox on the client).\n- **One delegated listener.** For many identical controls inside server\n  markup (a copy button on every code block), place one slot occurrence\n  whose component registers a single document listener in `onSettled` and\n  finds its target from the event (`closest(\"button.copy-code\")`). Inside a\n  live hole this is the shape that keeps the hole streaming: a slot placed\n  inside a live hole latches it (`SSR_LIVE_HOLE_LATCHED`, `data.cause`\n  `\"records\"`). `examples/chat`'s Copy button is this shape.\n\n## Shared components\n\nOne component can render on both sides. Put `$key={props.id}` on the\nelement it renders (morph identity) — the slot's own `$key` is a different\nkey for a different job. Do not read `document`/`window` during render;\nthat is the ordinary isomorphic rule.\n\n## Compiling\n\nWith `@solidjs/vite-plugin`, `solid({ ssr: true, serverFunctions:\n{ components: true } })` is the turnkey setup (the examples under\n`examples/todos-server`, `examples/notes`, `examples/chat`).\n",
-      "card": null
+      "card": {
+        "title_zh": "Solid 服务端组件规范",
+        "purpose_zh": "指导编写与审查 Solid 2.0 服务端组件（返回模板的 use server 函数）及其 slot，判断哪些内容放在服务端、哪些放在客户端，并正确接线 slot。",
+        "does": [
+          "给出元素归属规则：由服务端数据产生的元素为服务端标记，需要客户端行为或状态的元素通过 slot 放置",
+          "说明 slot 的类型声明与 JSX 放置方式，以及客户端填充的运行语义",
+          "说明 $key 用于状态跟随实体、asyncArg 用于传递异步值",
+          "列出服务端标记上处理行为的三种做法：表单 action、客户端组件接管元素、单个委托监听器",
+          "说明同一组件双端渲染时的 $key 与同构规则",
+          "给出 @solidjs/vite-plugin 的编译配置方式"
+        ],
+        "inputs": [
+          "服务端组件源码（use server 函数与返回模板）",
+          "slot 的 props 类型定义与客户端填充组件",
+          "@solidjs/vite-plugin 配置"
+        ],
+        "outputs": [
+          "符合规范的服务端组件与 slot 接线代码",
+          "服务端渲染标记与客户端 slot 填充的划分方案"
+        ],
+        "scenarios": [
+          "编写新的 Solid 服务端组件",
+          "审查已有服务端组件与 slot 用法",
+          "决定某段 UI 放在服务端还是客户端",
+          "为服务端标记上的交互选择表单、客户端组件或委托监听器"
+        ],
+        "prerequisites": [
+          "使用 Solid 2.0 与 @solidjs/web",
+          "使用 @solidjs/vite-plugin 并开启 ssr 与 serverFunctions.components"
+        ],
+        "limits": [
+          "仅为规则子集，完整设计记录在 documentation/server-components/server-components-principles.md",
+          "slot 填充中顶层读取只读一次，会触发 STRICT_READ_UNTRACKED",
+          "slot 放在 live hole 内会锁存该 hole（SSR_LIVE_HOLE_LATCHED）",
+          "渲染期间不得读取 document/window"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "前端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Rules for writing Solid 2.0 server components (\"use server\" functions that return a template) and their slots with @solidjs/web."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Use when writing or reviewing a server component, deciding what lives on the server versus the client, or wiring a slot."
+          },
+          {
+            "field": "does",
+            "quote": "An element lives where the data that creates it lives."
+          },
+          {
+            "field": "does",
+            "quote": "A slot is placed as an element: `<props.pending />`,"
+          },
+          {
+            "field": "does",
+            "quote": "**`$key` is optional.** Add it when the fill holds its own state (an edit draft, a signal created inside) that must follow the entity across refetches and reorders."
+          },
+          {
+            "field": "does",
+            "quote": "**An async value crosses with `asyncArg`.**"
+          },
+          {
+            "field": "does",
+            "quote": "**A form.** A mutation is `<form action={…}>`; it works before JavaScript and needs no client code."
+          },
+          {
+            "field": "does",
+            "quote": "Do not read `document`/`window` during render; that is the ordinary isomorphic rule."
+          },
+          {
+            "field": "does",
+            "quote": "With `@solidjs/vite-plugin`, `solid({ ssr: true, serverFunctions: { components: true } })` is the turnkey setup"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "With `@solidjs/vite-plugin`, `solid({ ssr: true, serverFunctions: { components: true } })` is the turnkey setup"
+          },
+          {
+            "field": "limits",
+            "quote": "The design record is `documentation/server-components/server-components-principles.md`; this file is the operative subset."
+          },
+          {
+            "field": "limits",
+            "quote": "A top-level read is read once, and `STRICT_READ_UNTRACKED` names it"
+          },
+          {
+            "field": "limits",
+            "quote": "a slot placed inside a live hole latches it (`SSR_LIVE_HOLE_LATCHED`, `data.cause` `\"records\"`)"
+          }
+        ]
+      }
     }
   ]
 }
