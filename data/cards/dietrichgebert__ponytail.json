@@ -1,0 +1,915 @@
+{
+  "schema": 1,
+  "repo": "DietrichGebert/ponytail",
+  "tree_sha": "15542ab21601f457d973bd6510fd74812ec795ba",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/ponytail-audit/SKILL.md",
+      "blob_sha": "ff9a95480700600fe2664d2d0906a4d750b2da0b",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/skills/ponytail-audit/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": "2026-11-23T00:18:18.442Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-audit",
+        "description": "Quality audit of a whole repo: bugs, security holes, what breaks under real load, risky code without tests, slow paths, and what to delete, merge or split. Ranked, each finding explained in plain English. One-shot report, changes nothing. Use for \"audit this codebase\", \"review the whole repo\", \"find bloat\", \"what can I delete\", /ponytail-audit."
+      },
+      "excerpt": "---\nname: ponytail-audit\ndescription: >\n  Quality audit of a whole repo: bugs, security holes, what breaks under real\n  load, risky code without tests, slow paths, and what to delete, merge or\n  split. Ranked, each finding explained in plain English. One-shot report,\n  changes nothing. Use for \"audit this codebase\", \"review the whole repo\",\n  \"find bloat\", \"what can I delete\", /ponytail-audit.\n---\n\nAudit the whole repo like the senior developer who just inherited it and\nwill be paged when it breaks. Order of importance: correct, safe, holds under\nload, tested, fast, lean. Lean still matters: every extra line must be read,\ntested and fixed later. This is a report the user asked for, so give it in full.\n\n## 1. Map first\n\n- Audit what the user names: a folder, a package, or the whole repo.\n  Nothing named: the whole repo.\n- Read the README, the deploy and build config, the dependency list, the\n  entry points (main, routes, handlers, jobs, CLI commands) and the tests.\n- Find the expected load: one person running a script, or many users and\n  processes at once. Judge scale against that, and say which load you assumed.\n- Trace the main flows end to end: where data comes in, what is stored,\n  what goes out. Read those paths fully: input from users, money, auth,\n  data writes, background jobs, anything shared between processes.\n- Big repo: go deep where a mistake costs the most, not file by file. Say\n  which parts you did not read.\n\n## 2. Look for\n\n1. **Bug:** wrong result, crash, missed edge case (empty, zero, last item,\n   rounding, time zones), callers that disagree with what a function returns,\n   the same rule applied differently in two places.\n2. **Risk:** security holes (injection, weak randomness, secrets in code,\n   missing checks on input from users), data loss (errors swallowed, writes\n   in the wrong order, no transaction).\n3. **Scale:** fine for one user, wrong for many: check-then-write races, the\n   same work done by every process, memory or lists that only grow, a query\n   per item, O(n^2) on big input, per-process state that must be shared.\n4. **Missing test:** risky logic (a branch, a parser, money, security, data\n   writes) with no test that fails when it breaks. One good test, not coverage.\n5. **Speed:** big slowdowns are problems. Small wins (work repeated in a hot\n   loop) are suggestions; some software counts every millisecond.\n6. **Lean:** code that should not exist or should be smaller.\n   - delete: dead code, unused options, flags and config, speculative features\n   - reuse: two helpers doing the same thing (keep one, name the path)\n   - stdlib / native: the standard library or platform already does it;\n     a dependency doing what a few lines or the platform can do\n   - yagni: interface with one implementation, factory with one product,\n     wrapper that only passes calls through\n   - merge: near-copies that must change together\n   - split: one function or class doing several unrelated jobs, so it is\n     hard to read or test. Split by job, never by line count, and never into\n     helpers that exist only to make a function shorter.\n\n## 3. Check before you report\n\n- Every finding needs a concrete case: \"this input or situation leads to this\n  wrong result\". No case, no finding.\n- Before calling code unused, grep the whole tree for it, including tests,\n  fixtures, config, and string or dynamic references.\n- A shortcut marked with a `shortcut:` (or older `ponytail:`) comment that names its limit is a\n  decision, not a finding, unless the expected load already crosses it.\n- Propose the smallest fix that works. Prefer fixes that delete code. Never\n  add layers, frameworks or config the problem does not need.\n- No style taste, no \"consider\", no vague worries.\n\n## 4. Output\n\nVery simple English: short sentences, everyday words. Explain a technical\nterm the first time you use it. The reader may never have seen this code.\n\nStart with `What this repo does:` in two or three sentences, and the load\nyou assumed.\n\nThen the findings in three groups, most important first, skip empty groups:\n- **Must fix:** bug, security, data loss, breaks at the expected load.\n- **Should fix:** risky code without a test, real slowness, duplication, a\n  function that mixes jobs, code that should not exist.\n- **Nice to have:** small speed-ups, shorter forms.\n\nNumber findings across all groups, so the user can say \"fix 2 and 5\". At\nmost 20 findings; if you left smaller ones out, say how many.\nEvery finding has all four parts, each one or two short sentences:\n\n2. **Orders land on the wrong day** (`billing/close_day.py:L40-52`)\n   - **What this is:** At midnight this job closes the day and bills all orders of that day.\n   - **Problem:** It takes \"today\" from the server clock, which runs in UTC. An order placed\n     at 00:30 in Berlin is billed on the day before.\n   - **Fix:** Compute the day once in the shop's time zone:\n     `datetime.now(ZoneInfo(\"Europe/Berlin\")).date()`. One line, nothing else changes.\n   - **If we skip it:** Late orders show the wrong date, and accounting fixes them by hand.\n\nEnd with:\n- `Verdict:` one line: healthy, or what to fix first.\n- `Lean: -<N> lines, -<M> dependencies possible.` when lean findings exist.\n- `Not checked:` the parts you did not read or could not run.\n\nNothing found: `What this repo does:`, then `Healthy. Nothing to fix.` and\none line on what you checked.\n\nOne-shot report, changes no code.\n",
+      "card": {
+        "title_zh": "仓库质量审计报告",
+        "purpose_zh": "对整个仓库做一次性质量审计：找出缺陷、安全漏洞、真实负载下的问题、缺少测试的风险代码、慢路径，以及可删除、合并或拆分的代码，按重要性排序并用简单英文解释，只出报告不改代码。",
+        "does": [
+          "先读 README、部署与构建配置、依赖、入口和测试，梳理主要数据流",
+          "按正确、安全、负载、测试、速度、精简的优先级查找问题",
+          "每条发现必须给出具体触发场景，并先 grep 确认代码确实未被使用",
+          "给出最小可行修复，优先选择能删代码的方案",
+          "按 Must fix、Should fix、Nice to have 三组编号输出，最多 20 条",
+          "结尾给出 Verdict、Lean 行数/依赖估算和 Not checked 说明"
+        ],
+        "inputs": [
+          "用户指定的文件夹、包或整个仓库（未指定则审计整个仓库）",
+          "仓库中的 README、部署与构建配置、依赖列表、入口点与测试代码"
+        ],
+        "outputs": [
+          "以 What this repo does 开头并说明假设负载的审计报告",
+          "按三组排序、编号的发现列表，每条含 What this is、Problem、Fix、If we skip it",
+          "Verdict 一行结论",
+          "Lean 行数与依赖可减少量",
+          "Not checked 未读或未能运行的部分"
+        ],
+        "scenarios": [
+          "审计整个代码库",
+          "审查整个仓库",
+          "找出冗余膨胀代码",
+          "判断哪些代码可以删除",
+          "接手陌生仓库时做全面体检"
+        ],
+        "prerequisites": [
+          "用户提供可访问的仓库或指定目录",
+          "能读取 README、配置、依赖、入口与测试文件",
+          "能对代码树执行 grep 以确认代码是否被引用"
+        ],
+        "limits": [
+          "只出报告，不修改任何代码",
+          "最多 20 条发现，超出需说明省略数量",
+          "每条发现必须有具体触发案例，否则不报",
+          "不评论代码风格，不使用 consider 式模糊建议",
+          "大仓库只深入风险最高处，并需说明未读部分",
+          "带 shortcut: 或 ponytail: 注释且标明限制的取舍不算发现，除非负载已超出"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "安全",
+          "测试",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Quality audit of a whole repo: bugs, security holes, what breaks under real load, risky code without tests, slow paths, and what to delete, merge or split."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "One-shot report, changes nothing."
+          },
+          {
+            "field": "does",
+            "quote": "Read the README, the deploy and build config, the dependency list, the entry points (main, routes, handlers, jobs, CLI commands) and the tests."
+          },
+          {
+            "field": "does",
+            "quote": "Every finding needs a concrete case: \"this input or situation leads to this wrong result\". No case, no finding."
+          },
+          {
+            "field": "does",
+            "quote": "Before calling code unused, grep the whole tree for it, including tests, fixtures, config, and string or dynamic references."
+          },
+          {
+            "field": "does",
+            "quote": "Propose the smallest fix that works. Prefer fixes that delete code."
+          },
+          {
+            "field": "does",
+            "quote": "Then the findings in three groups, most important first, skip empty groups:"
+          },
+          {
+            "field": "does",
+            "quote": "At most 20 findings; if you left smaller ones out, say how many."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Audit what the user names: a folder, a package, or the whole repo. Nothing named: the whole repo."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Before calling code unused, grep the whole tree for it, including tests, fixtures, config, and string or dynamic references."
+          },
+          {
+            "field": "limits",
+            "quote": "One-shot report, changes no code."
+          },
+          {
+            "field": "limits",
+            "quote": "No style taste, no \"consider\", no vague worries."
+          },
+          {
+            "field": "limits",
+            "quote": "Big repo: go deep where a mistake costs the most, not file by file. Say which parts you did not read."
+          },
+          {
+            "field": "limits",
+            "quote": "A shortcut marked with a `shortcut:` (or older `ponytail:`) comment that names its limit is a decision, not a finding, unless the expected load already crosses it."
+          },
+          {
+            "field": "outputs",
+            "quote": "Start with `What this repo does:` in two or three sentences, and the load you assumed."
+          },
+          {
+            "field": "outputs",
+            "quote": "End with: - `Verdict:` one line: healthy, or what to fix first."
+          },
+          {
+            "field": "outputs",
+            "quote": "`Not checked:` the parts you did not read or could not run."
+          },
+          {
+            "field": "hosts",
+            "quote": "Use for \"audit this codebase\", \"review the whole repo\", \"find bloat\", \"what can I delete\", /ponytail-audit."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ponytail-debt/SKILL.md",
+      "blob_sha": "3124f520a65d2a4fa75a2f5db6225c38ebdb8620",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/skills/ponytail-debt/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": "2026-11-23T00:18:18.442Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-debt",
+        "description": "List every `shortcut:` comment (and older `ponytail:` ones) as a debt ledger. One-shot report, changes nothing. Use for \"ponytail debt\", \"what did ponytail defer\", \"list the shortcuts\", /ponytail-debt."
+      },
+      "excerpt": "---\nname: ponytail-debt\ndescription: >\n  List every `shortcut:` comment (and older `ponytail:` ones) as a debt ledger. One-shot report,\n  changes nothing. Use for \"ponytail debt\", \"what did ponytail defer\", \"list the\n  shortcuts\", /ponytail-debt.\n---\n\nEvery deliberate ponytail shortcut is marked with a `shortcut:` comment naming\nits ceiling and upgrade path (older code may say `ponytail:`). This collects them into one ledger so a deferral\ncan't quietly become permanent.\n\n## Scan\n\nGrep the repo for comment markers, skipping `.git` and everything the\n`.gitignore` files ignore (dependencies, build output, caches, in any stack):\n\n`git grep --no-index --exclude-standard -nE '(#|//|/[*]) ?(shortcut|ponytail):'`  (add other comment prefixes if your stack uses them)\n\nIf the user names their own marker word (`/ponytail-debt TODO`), grep for that word instead.\n\nEach hit is one ledger row. The comment prefix keeps prose that merely mentions\nthe convention out of the ledger. Skip hits that are not a deferral, like a note\nabout a keyboard shortcut.\n\n## Output\n\nOne row per marker, grouped by file:\n\n`<file>:<line>, <what was simplified>. ceiling: <the limit named>. upgrade: <the trigger to revisit>.`\n\nThe convention is `shortcut: <ceiling>, <upgrade path>`, so pull the ceiling\nand the trigger straight from the comment. Want an owner per row too? add\n`git blame -L<line>,<line>`.\n\nFlag the rot risk: any marker comment that names no upgrade path or\ntrigger gets a `no-trigger` tag, those are the ones that silently rot.\n\nEnd with `<N> markers, <M> with no trigger.` Nothing found: `No shortcut debt. Clean ledger.`\n\n## Boundaries\n\nReads and reports only, changes nothing. To persist it, ask and it writes the\nledger to a file (e.g. `PONYTAIL-DEBT.md`). One-shot.\n",
+      "card": {
+        "title_zh": "技术债标记清单",
+        "purpose_zh": "扫描仓库中标记为 shortcut: 或 ponytail: 的注释，把每处有意简化整理成债务清单，一次性只读报告，不修改代码。",
+        "does": [
+          "用 git grep 扫描仓库中的 shortcut: 与 ponytail: 注释标记",
+          "跳过 .git 目录以及 .gitignore 忽略的文件",
+          "支持用户指定自定义标记词进行扫描",
+          "按文件分组，逐条列出简化内容、上限与升级触发条件",
+          "对没有升级路径或触发条件的标记打上 no-trigger 标签",
+          "结尾统计标记总数与无触发条件数量"
+        ],
+        "inputs": [
+          "仓库路径（隐含当前仓库）",
+          "可选：用户指定的自定义标记词"
+        ],
+        "outputs": [
+          "按文件分组的债务清单行",
+          "no-trigger 风险标签",
+          "标记总数与无触发条件数量的汇总句",
+          "可选：经用户同意后写入的清单文件"
+        ],
+        "scenarios": [
+          "盘点代码中所有被推迟的简化",
+          "回答 ponytail 推迟了哪些工作",
+          "列出仓库中的 shortcut 注释",
+          "识别可能悄悄长期化的技术债"
+        ],
+        "prerequisites": [
+          "仓库使用 git 管理",
+          "代码注释中使用 shortcut: 或 ponytail: 标记约定"
+        ],
+        "limits": [
+          "只读报告，不修改代码",
+          "一次性执行，不持续跟踪",
+          "非推迟性质的命中需人工跳过",
+          "需用户同意才写文件"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "代码审查",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "List every `shortcut:` comment (and older `ponytail:` ones) as a debt ledger. One-shot report, changes nothing."
+          },
+          {
+            "field": "does",
+            "quote": "`git grep --no-index --exclude-standard -nE '(#|//|/[*]) ?(shortcut|ponytail):'`"
+          },
+          {
+            "field": "does",
+            "quote": "Grep the repo for comment markers, skipping `.git` and everything the `.gitignore` files ignore"
+          },
+          {
+            "field": "does",
+            "quote": "If the user names their own marker word (`/ponytail-debt TODO`), grep for that word instead."
+          },
+          {
+            "field": "does",
+            "quote": "One row per marker, grouped by file:"
+          },
+          {
+            "field": "does",
+            "quote": "any marker comment that names no upgrade path or trigger gets a `no-trigger` tag"
+          },
+          {
+            "field": "does",
+            "quote": "End with `<N> markers, <M> with no trigger.`"
+          },
+          {
+            "field": "inputs",
+            "quote": "If the user names their own marker word (`/ponytail-debt TODO`), grep for that word instead."
+          },
+          {
+            "field": "outputs",
+            "quote": "`<file>:<line>, <what was simplified>. ceiling: <the limit named>. upgrade: <the trigger to revisit>.`"
+          },
+          {
+            "field": "outputs",
+            "quote": "Flag the rot risk: any marker comment that names no upgrade path or trigger gets a `no-trigger` tag"
+          },
+          {
+            "field": "outputs",
+            "quote": "To persist it, ask and it writes the ledger to a file (e.g. `PONYTAIL-DEBT.md`)."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use for \"ponytail debt\", \"what did ponytail defer\", \"list the shortcuts\", /ponytail-debt."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Every deliberate ponytail shortcut is marked with a `shortcut:` comment naming its ceiling and upgrade path (older code may say `ponytail:`)."
+          },
+          {
+            "field": "limits",
+            "quote": "Reads and reports only, changes nothing."
+          },
+          {
+            "field": "limits",
+            "quote": "One-shot."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`git grep --no-index --exclude-standard -nE '(#|//|/[*]) ?(shortcut|ponytail):'`"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ponytail-gain/SKILL.md",
+      "blob_sha": "1edff0e461fad6b671733ea6796aea9e417e266b",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/skills/ponytail-gain/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": "2026-11-23T00:18:18.442Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-gain",
+        "description": "Show ponytail's measured savings (code, cost, speed) from the benchmark. One-shot display. Use for /ponytail-gain, \"what does ponytail save\", \"ponytail impact\"."
+      },
+      "excerpt": "---\nname: ponytail-gain\ndescription: >\n  Show ponytail's measured savings (code, cost, speed) from the benchmark.\n  One-shot display. Use for /ponytail-gain, \"what does ponytail save\",\n  \"ponytail impact\".\n---\n\n# Ponytail Gain\n\nDisplay this scoreboard when invoked. One-shot: do NOT change mode, write flag\nfiles, or persist anything.\n\nThe figures are the published agentic benchmark of Ponytail 5: headless Claude\nCode (Opus 5.5, default effort) on 39 tasks (feature tickets in a real FastAPI +\nReact repo, bug fixes, security and privacy cases, small apps), 5 runs each,\nagainst the same agent without the skill. 18 of the tasks have hidden checks\nfor correctness and safety. Each figure is the geometric mean of the per-task\nmedians. They are measured, not computed from the current repo.\nSource: `benchmarks/results/2026-10-07-agentic.md` and the README.\n\n## Scoreboard\n\nRender plain ASCII bars. The bar length shows ponytail as a share of the\nno-skill baseline; the label carries the exact figure:\n\n```\n  ponytail gain           benchmark · 39 tasks × 5 runs · Opus 5.5\n\n  no-skill        ████████████████████  100%\n  Lines of code   █████████···········   47%   ▼ 53%\n  Output tokens   ███████████·········   55%   ▼ 45%\n  Cost            ███████████████·····   74%   ▼ 26%\n  Time            ████████████········   59%   ▼ 41%\n  Hidden checks passed   97%  (no-skill 96%)\n  Tests where the logic needs one   98%  (no-skill 68%)\n\n  This repo:  /ponytail-debt  (shortcuts you deferred)\n              /ponytail-audit (what's still cuttable)\n```\n\n## Honesty boundary\n\nThese are benchmark averages, not this repo. NEVER print a per-repo savings\nnumber (\"you saved X lines/tokens here\"): the unbuilt version was never\nwritten, so there is no real baseline to subtract from in a live repo. The\nonly real per-repo figures come from `/ponytail-debt` (a counted ledger), and\nthis card points there instead of inventing one.\n\n## Boundaries\n\nOne-shot display. Edits nothing, changes no mode.\n",
+      "card": {
+        "title_zh": "Ponytail 收益看板",
+        "purpose_zh": "一次性展示 Ponytail 5 在已发布 agentic 基准中的实测节省数据（代码行数、成本、速度等），并指向仓库级账本命令。",
+        "does": [
+          "以纯 ASCII 条形图渲染基准记分板",
+          "展示代码行数、输出 token、成本、时间相对无技能基线的占比与降幅",
+          "展示隐藏检查通过率与逻辑精简测试数据",
+          "提示可改用 /ponytail-debt 与 /ponytail-audit 查看仓库级数据",
+          "声明数据为基准平均值而非当前仓库实测"
+        ],
+        "inputs": [
+          "调用指令 /ponytail-gain 或相关提问"
+        ],
+        "outputs": [
+          "ASCII 条形图记分板",
+          "基准来源与口径说明",
+          "指向 /ponytail-debt 和 /ponytail-audit 的提示"
+        ],
+        "scenarios": [
+          "用户询问 ponytail 能节省多少",
+          "用户想了解 ponytail 的影响",
+          "用户调用 /ponytail-gain"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "仅一次性展示，不改变模式、不写标记文件、不持久化任何内容",
+          "不编辑任何文件",
+          "绝不输出针对当前仓库的节省数字，因为不存在真实基线",
+          "数据来自已发布基准，非当前仓库实测"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Show ponytail's measured savings (code, cost, speed) from the benchmark."
+          },
+          {
+            "field": "does",
+            "quote": "Render plain ASCII bars. The bar length shows ponytail as a share of the no-skill baseline; the label carries the exact figure:"
+          },
+          {
+            "field": "does",
+            "quote": "Lines of code   █████████···········   47%   ▼ 53%"
+          },
+          {
+            "field": "does",
+            "quote": "This repo:  /ponytail-debt  (shortcuts you deferred)"
+          },
+          {
+            "field": "does",
+            "quote": "These are benchmark averages, not this repo."
+          },
+          {
+            "field": "limits",
+            "quote": "One-shot: do NOT change mode, write flag files, or persist anything."
+          },
+          {
+            "field": "limits",
+            "quote": "NEVER print a per-repo savings number"
+          },
+          {
+            "field": "limits",
+            "quote": "One-shot display. Edits nothing, changes no mode."
+          },
+          {
+            "field": "outputs",
+            "quote": "Source: `benchmarks/results/2026-10-07-agentic.md` and the README."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ponytail-help/SKILL.md",
+      "blob_sha": "34fccb3ff542b3b8d4d131e6120a1812c9c4617a",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/skills/ponytail-help/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": "2026-11-23T00:18:18.442Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-help",
+        "description": "Quick reference for ponytail levels, skills and commands. One-shot display. Use for /ponytail-help, \"ponytail help\", \"how do I use ponytail\"."
+      },
+      "excerpt": "---\nname: ponytail-help\ndescription: >\n  Quick reference for ponytail levels, skills and commands. One-shot display.\n  Use for /ponytail-help, \"ponytail help\", \"how do I use ponytail\".\n---\n\n# Ponytail Help\n\nDisplay this reference card when invoked. One-shot, do NOT change mode,\nwrite flag files, or persist anything.\n\n## Levels\n\n| Level | Trigger | What change |\n|-------|---------|-------------|\n| **Lite** | `/ponytail lite` | Build what was asked, name the smaller option in one line. |\n| **Full** | `/ponytail` | The smallest complete change, a check where the logic needs one, and a reply that names what was skipped and any risk. Default. |\n| **Ultra** | `/ponytail ultra` | Also questions the request and pushes back before building. |\n\nLevel sticks until changed or session end.\n\n## Skills\n\n| Skill | Trigger | What it does |\n|-------|---------|--------------|\n| **ponytail** | `/ponytail` | Lazy mode itself: least new code, clear replies that name skipped work and risks. |\n| **ponytail-review** | `/ponytail-review` | Quality review of a diff: bugs, security, load, missing tests, speed, what to cut. Each finding says what goes wrong and how to fix it. |\n| **ponytail-audit** | `/ponytail-audit` | The same quality review for the whole repo, ranked. |\n| **ponytail-debt** | `/ponytail-debt` | Harvest `shortcut:` comments into a tracked ledger. |\n| **ponytail-gain** | `/ponytail-gain` | Measured-impact scoreboard: less code, less cost, more speed. |\n| **ponytail-help** | `/ponytail-help` | This card. |\n\nIn Codex CLI and the IDE extension, invoke skills with `$ponytail:ponytail`,\n`$ponytail:ponytail-review`, or `$ponytail:ponytail-help`. Claude Code and OpenCode use the\nslash-command forms above (OpenCode ships all six as slash commands).\n\n## Deactivate\n\nSay \"stop ponytail\" or \"normal mode\". Resume anytime with `/ponytail`.\n`/ponytail off` also works.\n\n## Band (Claude Code)\n\n`/ponytail band` hides the band above the prompt, the same command brings it back.\n`/ponytail band on` and `/ponytail band off` set it directly. The level stays.\n`/ponytail band import` adds your past Claude Code sessions (cost, agent time, tokens) to the board.\n\n## Configure Default Mode\n\nDefault mode = `full`, auto-active every session. Change it:\n\n**Environment variable** (highest priority):\n```bash\nexport PONYTAIL_DEFAULT_MODE=ultra\n```\n\n**Config file** (`~/.config/ponytail/config.json`, Windows: `%APPDATA%\\ponytail\\config.json`):\n```json\n{ \"defaultMode\": \"lite\" }\n```\n\nSet `\"off\"` to disable auto-activation on session start, activate manually\nwith `/ponytail` when wanted.\n\nResolution: env var > config file > `full`.\n\n## Update\n\nEnable auto-update once: open `/plugin`, go to Marketplaces, pick ponytail, Enable auto-update. Claude Code then pulls new versions at startup (run `/reload-plugins` when it prompts). Manual refresh: `/plugin marketplace update ponytail` then `/reload-plugins`.\n\nIf `/plugin` is not recognized, your Claude Code is out of date. Update it (`npm install -g @anthropic-ai/claude-code@latest`, or `brew upgrade claude-code`) and restart. Other hosts use their own update flow.\n\n## More\n\nFull docs + examples: https://github.com/DietrichGebert/ponytail\n",
+      "card": {
+        "title_zh": "Ponytail 帮助卡",
+        "purpose_zh": "一次性显示 ponytail 的等级、技能与命令速查卡，用于 /ponytail-help 或询问如何使用 ponytail。",
+        "does": [
+          "显示 ponytail 三个等级（Lite、Full、Ultra）的触发方式与改动范围",
+          "列出 ponytail 系列技能及其触发命令与用途",
+          "说明在 Codex CLI、IDE 扩展、Claude Code、OpenCode 中的调用形式",
+          "说明停用与恢复方式（stop ponytail、normal mode、/ponytail off）",
+          "说明 Claude Code 中 band 显示与导入历史会话的命令",
+          "说明默认模式的配置方式（环境变量与配置文件）及更新流程"
+        ],
+        "inputs": [
+          "/ponytail-help 命令或“ponytail help”等自然语言请求"
+        ],
+        "outputs": [
+          "一张参考速查卡（等级、技能、停用、band、配置、更新说明）"
+        ],
+        "scenarios": [
+          "用户想知道 ponytail 有哪些等级和技能",
+          "用户询问如何使用 ponytail",
+          "用户需要查看停用、恢复或配置默认模式的方法"
+        ],
+        "prerequisites": [
+          "已安装 ponytail 插件或技能包",
+          "在支持的主机（如 Claude Code、Codex CLI、OpenCode）中调用"
+        ],
+        "limits": [
+          "一次性显示，不改变模式、不写标志文件、不持久化任何内容",
+          "band 相关功能仅限 Claude Code",
+          "若 /plugin 不被识别，说明 Claude Code 版本过旧需更新"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Quick reference for ponytail levels, skills and commands. One-shot display."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Display this reference card when invoked. One-shot, do NOT change mode,"
+          },
+          {
+            "field": "does",
+            "quote": "| **Lite** | `/ponytail lite` | Build what was asked, name the smaller option in one line. |"
+          },
+          {
+            "field": "does",
+            "quote": "| **ponytail-review** | `/ponytail-review` | Quality review of a diff: bugs, security, load, missing tests, speed, what to cut."
+          },
+          {
+            "field": "does",
+            "quote": "In Codex CLI and the IDE extension, invoke skills with `$ponytail:ponytail`,"
+          },
+          {
+            "field": "does",
+            "quote": "Say \"stop ponytail\" or \"normal mode\". Resume anytime with `/ponytail`."
+          },
+          {
+            "field": "does",
+            "quote": "`/ponytail band import` adds your past Claude Code sessions (cost, agent time, tokens) to the board."
+          },
+          {
+            "field": "does",
+            "quote": "Resolution: env var > config file > `full`."
+          },
+          {
+            "field": "inputs",
+            "quote": "Use for /ponytail-help, \"ponytail help\", \"how do I use ponytail\"."
+          },
+          {
+            "field": "outputs",
+            "quote": "Display this reference card when invoked."
+          },
+          {
+            "field": "scenarios",
+            "quote": "\"how do I use ponytail\""
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Enable auto-update once: open `/plugin`, go to Marketplaces, pick ponytail, Enable auto-update."
+          },
+          {
+            "field": "limits",
+            "quote": "One-shot, do NOT change mode,\nwrite flag files, or persist anything."
+          },
+          {
+            "field": "limits",
+            "quote": "## Band (Claude Code)"
+          },
+          {
+            "field": "limits",
+            "quote": "If `/plugin` is not recognized, your Claude Code is out of date."
+          },
+          {
+            "field": "hosts",
+            "quote": "Claude Code and OpenCode use the\nslash-command forms above (OpenCode ships all six as slash commands)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "export PONYTAIL_DEFAULT_MODE=ultra"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm install -g @anthropic-ai/claude-code@latest"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": "skills/ponytail-review/SKILL.md",
+      "blob_sha": "a50e3ac6ded6fccc9edae34ce37877bbce11e3fa",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/skills/ponytail-review/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-review",
+        "description": "Quality review of a change: is the logic right, is it safe, does it hold under real load, is risky code tested, is it fast enough, and is every line needed. Reads the connected code, not only the diff. Each finding is explained in plain English. Use for \"review this\", \"code review\", \"review the last commit\", \"review my PR\", \"is this over-engineered\", /ponytail-review."
+      },
+      "excerpt": "---\nname: ponytail-review\ndescription: >\n  Quality review of a change: is the logic right, is it safe, does it hold\n  under real load, is risky code tested, is it fast enough, and is every line\n  needed. Reads the connected code, not only the diff. Each finding is\n  explained in plain English. Use for \"review this\", \"code review\", \"review\n  the last commit\", \"review my PR\", \"is this over-engineered\", /ponytail-review.\n---\n\nReview a change like the senior developer who will be paged when it breaks.\nOrder of importance: correct, safe, holds under load, tested, fast, lean.\nLean still matters: every extra line must be read, tested and fixed later.\nThis is a report the user asked for, so give it in full.\n\n## 1. Understand first\n\n- Review what the user names: uncommitted or staged changes, a branch, a PR\n  link, or files. Nothing named: the uncommitted changes, or the last commit\n  if there are none.\n- Read the diff, then the code it touches: callers of every changed function,\n  the functions it calls, the tests, the README.\n- Trace the real flow: where data comes in, what is stored, what goes out.\n- A change can break code it does not touch. When a signature, return value\n  or behavior changes, grep every caller.\n- Find the expected load in the repo (README, deploy config): one person\n  running a script, or many users and processes at once. Judge scale against\n  that, and say which load you assumed.\n\n## 2. Look for\n\n1. **Bug:** wrong result, crash, missed edge case (empty, zero, last item,\n   rounding, time zones), a caller broken by the change, a fix applied in one\n   caller while the shared function stays broken.\n2. **Risk:** security holes (injection, weak randomness, secrets, missing\n   checks on input from users), data loss (errors swallowed, writes in the\n   wrong order, no transaction).\n3. **Scale:** fine for one user, wrong for many: check-then-write races, the\n   same work done by every process, memory or lists that only grow, a query\n   per item, O(n^2) on big input, per-process state that must be shared.\n4. **Missing test:** risky new logic (a branch, a parser, money, security,\n   data writes, a bug fix) with no test that fails when it breaks. One good\n   test, not coverage.\n5. **Speed:** big slowdowns are problems. Small wins (work repeated in a hot\n   loop) are suggestions; some software counts every millisecond.\n6. **Lean:** code that should not exist or should be smaller.\n   - delete: dead code, unused options, speculative features\n   - reuse: the repo already has this helper (name the path)\n   - stdlib / native: the standard library or platform already does it; a\n     new dependency for a few lines\n   - yagni: abstraction with one implementation, config nobody sets\n   - merge: near-copies that must change together\n   - split: one function doing several unrelated jobs, so it is hard to read\n     or test. Split by job, never by line count, and never into helpers that\n     exist only to make a function shorter.\n\n## 3. Check before you report\n\n- Every finding needs a concrete case: \"this input or situation leads to this\n  wrong result\". No case, no finding.\n- Re-read the lines and confirm: the caller exists, the value can really be\n  empty, the code really is unused.\n- A shortcut marked with a `shortcut:` (or older `ponytail:`) comment that names its limit is a\n  decision, not a finding, unless the expected load already crosses it.\n- Propose the smallest fix that works. Prefer fixes that delete code. Never\n  add layers, frameworks or config the problem does not need.\n- No style taste, no \"consider\", no vague worries.\n\n## 4. Output\n\nVery simple English: short sentences, everyday words. Explain a technical\nterm the first time you use it. The reader may never have seen this code.\n\nStart with `What this change does:` in two or three sentences.\n\nThen the findings in three groups, skip empty groups:\n- **Must fix:** bug, security, data loss, breaks at the expected load.\n- **Should fix:** risky code without a test, real slowness, duplication, a\n  function that mixes jobs, code that should not exist.\n- **Nice to have:** small speed-ups, shorter forms.\n\nNumber findings across all groups, so the user can say \"fix 2 and 5\".\nEvery finding has all four parts, each one or two short sentences:\n\n2. **Orders land on the wrong day** (`billing/close_day.py:L40-52`)\n   - **What this is:** At midnight this job closes the day and bills all orders of that day.\n   - **Problem:** It takes \"today\" from the server clock, which runs in UTC. An order placed\n     at 00:30 in Berlin is billed on the day before.\n   - **Fix:** Compute the day once in the shop's time zone:\n     `datetime.now(ZoneInfo(\"Europe/Berlin\")).date()`. One line, nothing else changes.\n   - **If we skip it:** Late orders show the wrong date, and accounting fixes them by hand.\n\nEnd with:\n- `Verdict: Ship.` or `Verdict: fix 1 and 3 first.`\n- `Lean: -<N> lines possible.` when lean findings exist.\n- `Not checked:` one line, if something mattered and you could not check it.\n\nNothing found: `What this change does:`, then `Looks good. Ship.` and one line\non what you checked.\n\nLists findings, changes no code.\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/ponytail/SKILL.md",
+      "blob_sha": "d64edd32265ba21cbf5270158f04e97d96925f27",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/skills/ponytail/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": "2026-11-23T00:18:18.442Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail",
+        "description": "Lazy senior dev mode: the smallest change that fully solves the task, and a reply a busy human understands in one read. Use on any coding task (writing, fixing, refactoring, reviewing, choosing dependencies) and when the user says \"ponytail\", \"be lazy\", \"simplest solution\", \"yagni\", or complains about over-engineering or bloat. Levels: lite, full (default), ultra."
+      },
+      "excerpt": "---\nname: ponytail\ndescription: >\n  Lazy senior dev mode: the smallest change that fully solves the task, and a\n  reply a busy human understands in one read. Use on any coding task (writing,\n  fixing, refactoring, reviewing, choosing dependencies) and when the user says\n  \"ponytail\", \"be lazy\", \"simplest solution\", \"yagni\", or complains about\n  over-engineering or bloat. Levels: lite, full (default), ultra.\nargument-hint: \"[lite|full|ultra|off]\"\nlicense: MIT\n---\n\n# Ponytail\n\nYou are a lazy senior developer. The best code is the code never written. You solve the whole problem with the least new code. End your reply with one or two lines: what you skipped or did not check, and any risk the user must know.\n\nActive for the whole session until the user says \"stop ponytail\" or \"normal mode\". Switch level: `/ponytail lite|full|ultra`.\n\n## Before you write\n\nRead the task and the code it touches. List every place your change must reach: callers, tests, fixtures, config, exports. Check what your change could break for users: data it would destroy or expose, callers that stop working. That is scope. Extra features are not.\n\n## The smallest complete change\n\nTake the first option that fully works:\n\n1. Does it need to exist? Skip features, options and flexibility nobody asked for, and name them in one line. A vague request (\"build me X\") gets the smallest version that does the core job.\n2. Already in this codebase (a helper, component, service, pattern)? Use it the way the surrounding code does.\n3. Standard library or a platform feature? Use it, unless the project has its own. A house component beats a native widget.\n4. An installed dependency? Use it. Never add a dependency for a few lines.\n5. Can it be one line a reader gets at a glance? One line.\n6. Otherwise: the minimum code that works.\n\n- Be lazy about the solution, never about the change itself: finish every part the task needs, including the callers, tests and fixtures your change breaks.\n- No abstraction, wrapper, type conversion, option, config, boilerplate or \"for later\" code nobody asked for. Keep values in the form the platform already gives you. Deletion beats addition. Keep the structure the codebase already has: its layers, interfaces and conventions.\n- The shortest working diff wins, once you know everything it must touch. A one-liner that needs decoding is not short.\n- Comment only the why the code cannot show, in one line.\n- Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code.\n- Code you move or merge keeps its error handling and validation.\n- Between options of equal size, take the one that is correct on edge cases.\n- Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none.\n- A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`.\n\nNever cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for.\n\n## Levels\n\n| Level | Behavior |\n|-------|----------|\n| **lite** | Build what was asked. Name the smaller option in one line and let the user pick. |\n| **full** | The rules above. Default. |\n| **ultra** | Also question the request: before building, push back on any part the need does not justify. |\n",
+      "card": {
+        "title_zh": "极简资深开发者模式",
+        "purpose_zh": "以懒惰资深开发者姿态，用最少新代码完整解决编码任务，并给出忙碌的人一读就懂的回复，末尾说明跳过或未检查的内容及风险。",
+        "does": [
+          "先读任务与相关代码，列出改动需触及的调用方、测试、夹具、配置、导出，并评估可能破坏的用户数据或调用方",
+          "按优先级选最小可行方案：是否需要存在、复用现有代码、标准库或平台特性、已装依赖、一行代码、否则最少代码",
+          "不添加未被要求的抽象、包装、选项、配置、样板或以后用的代码，删除优于新增，保持代码库既有结构",
+          "修 bug 前先 grep 所有调用方，在共享代码中一次性修复根因；移动或合并代码保留错误处理与校验",
+          "非平凡新逻辑需留一个小测试或基于断言的自我检查；已知限制的捷径用 `shortcut: [限制], [何时升级]` 注释",
+          "回复末尾用一两行说明跳过了什么、没检查什么，以及用户必须知道的风险"
+        ],
+        "inputs": [
+          "编码任务描述（编写、修复、重构、审查、选择依赖等）",
+          "任务涉及的代码与调用方、测试、夹具、配置、导出",
+          "可选级别参数：lite、full、ultra、off"
+        ],
+        "outputs": [
+          "最小完整改动的代码",
+          "针对非平凡逻辑的小测试或断言式自检",
+          "末尾一两行说明跳过内容与风险",
+          "（lite 级别）一行指出更小方案供用户选择"
+        ],
+        "scenarios": [
+          "编写新功能时只做核心最小版本",
+          "修复 bug 时定位并一次性修复根因",
+          "重构或合并代码时保持既有结构与错误处理",
+          "代码审查或选择依赖时避免过度工程",
+          "用户抱怨过度设计或臃肿时切换到极简模式"
+        ],
+        "prerequisites": [
+          "用户说出 ponytail、be lazy、simplest solution、yagni 或抱怨过度工程",
+          "会话中通过 `/ponytail lite|full|ultra` 切换级别，说 stop ponytail 或 normal mode 退出"
+        ],
+        "limits": [
+          "不削减信任边界校验、防止数据丢失的错误处理、安全、无障碍、真实硬件校准及用户明确要求的内容",
+          "lite 级别只构建被要求的内容并一行提示更小选项",
+          "ultra 级别还会在构建前质疑需求中不合理的部分",
+          "默认级别为 full"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "后端",
+          "前端",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "You are a lazy senior developer. The best code is the code never written. You solve the whole problem with the least new code."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "End your reply with one or two lines: what you skipped or did not check, and any risk the user must know."
+          },
+          {
+            "field": "does",
+            "quote": "Read the task and the code it touches. List every place your change must reach: callers, tests, fixtures, config, exports."
+          },
+          {
+            "field": "does",
+            "quote": "Take the first option that fully works:"
+          },
+          {
+            "field": "does",
+            "quote": "No abstraction, wrapper, type conversion, option, config, boilerplate or \"for later\" code nobody asked for."
+          },
+          {
+            "field": "does",
+            "quote": "Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code."
+          },
+          {
+            "field": "does",
+            "quote": "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check."
+          },
+          {
+            "field": "does",
+            "quote": "A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`."
+          },
+          {
+            "field": "inputs",
+            "quote": "Use on any coding task (writing, fixing, refactoring, reviewing, choosing dependencies)"
+          },
+          {
+            "field": "inputs",
+            "quote": "argument-hint: \"[lite|full|ultra|off]\""
+          },
+          {
+            "field": "outputs",
+            "quote": "The shortest working diff wins, once you know everything it must touch."
+          },
+          {
+            "field": "scenarios",
+            "quote": "when the user says \"ponytail\", \"be lazy\", \"simplest solution\", \"yagni\", or complains about over-engineering or bloat"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Active for the whole session until the user says \"stop ponytail\" or \"normal mode\". Switch level: `/ponytail lite|full|ultra`."
+          },
+          {
+            "field": "limits",
+            "quote": "Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for."
+          },
+          {
+            "field": "limits",
+            "quote": "| **lite** | Build what was asked. Name the smaller option in one line and let the user pick. |"
+          },
+          {
+            "field": "limits",
+            "quote": "| **ultra** | Also question the request: before building, push back on any part the need does not justify. |"
+          },
+          {
+            "field": "limits",
+            "quote": "| **full** | The rules above. Default. |"
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".openclaw/skills/ponytail-audit/SKILL.md",
+      "blob_sha": "7df228535a39685bb120f9ebdff62a7fafba9fa5",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/.openclaw/skills/ponytail-audit/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-audit",
+        "description": "Quality audit of the whole repo: bugs, security, real load, missing tests, speed, and what to delete. Most important first."
+      },
+      "excerpt": "---\nname: ponytail-audit\ndescription: \"Quality audit of the whole repo: bugs, security, real load, missing tests, speed, and what to delete. Most important first.\"\nhomepage: https://github.com/DietrichGebert/ponytail\nlicense: MIT\n---\n\nAudit the whole repo like the senior developer who just inherited it and\nwill be paged when it breaks. Order of importance: correct, safe, holds under\nload, tested, fast, lean. Lean still matters: every extra line must be read,\ntested and fixed later. This is a report the user asked for, so give it in full.\n\n## 1. Map first\n\n- Audit what the user names: a folder, a package, or the whole repo.\n  Nothing named: the whole repo.\n- Read the README, the deploy and build config, the dependency list, the\n  entry points (main, routes, handlers, jobs, CLI commands) and the tests.\n- Find the expected load: one person running a script, or many users and\n  processes at once. Judge scale against that, and say which load you assumed.\n- Trace the main flows end to end: where data comes in, what is stored,\n  what goes out. Read those paths fully: input from users, money, auth,\n  data writes, background jobs, anything shared between processes.\n- Big repo: go deep where a mistake costs the most, not file by file. Say\n  which parts you did not read.\n\n## 2. Look for\n\n1. **Bug:** wrong result, crash, missed edge case (empty, zero, last item,\n   rounding, time zones), callers that disagree with what a function returns,\n   the same rule applied differently in two places.\n2. **Risk:** security holes (injection, weak randomness, secrets in code,\n   missing checks on input from users), data loss (errors swallowed, writes\n   in the wrong order, no transaction).\n3. **Scale:** fine for one user, wrong for many: check-then-write races, the\n   same work done by every process, memory or lists that only grow, a query\n   per item, O(n^2) on big input, per-process state that must be shared.\n4. **Missing test:** risky logic (a branch, a parser, money, security, data\n   writes) with no test that fails when it breaks. One good test, not coverage.\n5. **Speed:** big slowdowns are problems. Small wins (work repeated in a hot\n   loop) are suggestions; some software counts every millisecond.\n6. **Lean:** code that should not exist or should be smaller.\n   - delete: dead code, unused options, flags and config, speculative features\n   - reuse: two helpers doing the same thing (keep one, name the path)\n   - stdlib / native: the standard library or platform already does it;\n     a dependency doing what a few lines or the platform can do\n   - yagni: interface with one implementation, factory with one product,\n     wrapper that only passes calls through\n   - merge: near-copies that must change together\n   - split: one function or class doing several unrelated jobs, so it is\n     hard to read or test. Split by job, never by line count, and never into\n     helpers that exist only to make a function shorter.\n\n## 3. Check before you report\n\n- Every finding needs a concrete case: \"this input or situation leads to this\n  wrong result\". No case, no finding.\n- Before calling code unused, grep the whole tree for it, including tests,\n  fixtures, config, and string or dynamic references.\n- A shortcut marked with a `shortcut:` (or older `ponytail:`) comment that names its limit is a\n  decision, not a finding, unless the expected load already crosses it.\n- Propose the smallest fix that works. Prefer fixes that delete code. Never\n  add layers, frameworks or config the problem does not need.\n- No style taste, no \"consider\", no vague worries.\n\n## 4. Output\n\nVery simple English: short sentences, everyday words. Explain a technical\nterm the first time you use it. The reader may never have seen this code.\n\nStart with `What this repo does:` in two or three sentences, and the load\nyou assumed.\n\nThen the findings in three groups, most important first, skip empty groups:\n- **Must fix:** bug, security, data loss, breaks at the expected load.\n- **Should fix:** risky code without a test, real slowness, duplication, a\n  function that mixes jobs, code that should not exist.\n- **Nice to have:** small speed-ups, shorter forms.\n\nNumber findings across all groups, so the user can say \"fix 2 and 5\". At\nmost 20 findings; if you left smaller ones out, say how many.\nEvery finding has all four parts, each one or two short sentences:\n\n2. **Orders land on the wrong day** (`billing/close_day.py:L40-52`)\n   - **What this is:** At midnight this job closes the day and bills all orders of that day.\n   - **Problem:** It takes \"today\" from the server clock, which runs in UTC. An order placed\n     at 00:30 in Berlin is billed on the day before.\n   - **Fix:** Compute the day once in the shop's time zone:\n     `datetime.now(ZoneInfo(\"Europe/Berlin\")).date()`. One line, nothing else changes.\n   - **If we skip it:** Late orders show the wrong date, and accounting fixes them by hand.\n\nEnd with:\n- `Verdict:` one line: healthy, or what to fix first.\n- `Lean: -<N> lines, -<M> dependencies possible.` when lean findings exist.\n- `Not checked:` the parts you did not read or could not run.\n\nNothing found: `What this repo does:`, then `Healthy. Nothing to fix.` and\none line on what you checked.\n\nOne-shot report, changes no code.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".openclaw/skills/ponytail-debt/SKILL.md",
+      "blob_sha": "e32ea4af46da125d6c86be2e100f822e7f128c53",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/.openclaw/skills/ponytail-debt/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-debt",
+        "description": "Harvest every shortcut: comment into one debt ledger, so deferrals get tracked instead of forgotten. One-shot report."
+      },
+      "excerpt": "---\nname: ponytail-debt\ndescription: \"Harvest every shortcut: comment into one debt ledger, so deferrals get tracked instead of forgotten. One-shot report.\"\nhomepage: https://github.com/DietrichGebert/ponytail\nlicense: MIT\n---\n\nEvery deliberate ponytail shortcut is marked with a `shortcut:` comment naming\nits ceiling and upgrade path (older code may say `ponytail:`). This collects them into one ledger so a deferral\ncan't quietly become permanent.\n\n## Scan\n\nGrep the repo for comment markers, skipping `.git` and everything the\n`.gitignore` files ignore (dependencies, build output, caches, in any stack):\n\n`git grep --no-index --exclude-standard -nE '(#|//|/[*]) ?(shortcut|ponytail):'`  (add other comment prefixes if your stack uses them)\n\nIf the user names their own marker word (`/ponytail-debt TODO`), grep for that word instead.\n\nEach hit is one ledger row. The comment prefix keeps prose that merely mentions\nthe convention out of the ledger. Skip hits that are not a deferral, like a note\nabout a keyboard shortcut.\n\n## Output\n\nOne row per marker, grouped by file:\n\n`<file>:<line>, <what was simplified>. ceiling: <the limit named>. upgrade: <the trigger to revisit>.`\n\nThe convention is `shortcut: <ceiling>, <upgrade path>`, so pull the ceiling\nand the trigger straight from the comment. Want an owner per row too? add\n`git blame -L<line>,<line>`.\n\nFlag the rot risk: any marker comment that names no upgrade path or\ntrigger gets a `no-trigger` tag, those are the ones that silently rot.\n\nEnd with `<N> markers, <M> with no trigger.` Nothing found: `No shortcut debt. Clean ledger.`\n\n## Boundaries\n\nReads and reports only, changes nothing. To persist it, ask and it writes the\nledger to a file (e.g. `PONYTAIL-DEBT.md`). One-shot.\n",
+      "card": null
+    },
+    {
+      "skill_path": ".openclaw/skills/ponytail-gain/SKILL.md",
+      "blob_sha": "a0c6e3d4cdc4b1558d4766a0856783fd0193b6f9",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/.openclaw/skills/ponytail-gain/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": "2026-11-23T00:18:18.442Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-gain",
+        "description": "Show ponytail measured impact as a scoreboard: less code, less cost, more speed, from the agentic benchmark averages. One-shot display."
+      },
+      "excerpt": "---\nname: ponytail-gain\ndescription: \"Show ponytail measured impact as a scoreboard: less code, less cost, more speed, from the agentic benchmark averages. One-shot display.\"\nhomepage: https://github.com/DietrichGebert/ponytail\nlicense: MIT\n---\n\n# Ponytail Gain\n\nDisplay this scoreboard when invoked. One-shot: do NOT change mode, write flag\nfiles, or persist anything.\n\nThe figures are the published agentic benchmark of Ponytail 5: headless Claude\nCode (Opus 5.5, default effort) on 39 tasks (feature tickets in a real FastAPI +\nReact repo, bug fixes, security and privacy cases, small apps), 5 runs each,\nagainst the same agent without the skill. 18 of the tasks have hidden checks\nfor correctness and safety. Each figure is the geometric mean of the per-task\nmedians. They are measured, not computed from the current repo.\nSource: `benchmarks/results/2026-10-07-agentic.md` and the README.\n\n## Scoreboard\n\nRender plain ASCII bars. The bar length shows ponytail as a share of the\nno-skill baseline; the label carries the exact figure:\n\n```\n  ponytail gain           benchmark · 39 tasks × 5 runs · Opus 5.5\n\n  no-skill        ████████████████████  100%\n  Lines of code   █████████···········   47%   ▼ 53%\n  Output tokens   ███████████·········   55%   ▼ 45%\n  Cost            ███████████████·····   74%   ▼ 26%\n  Time            ████████████········   59%   ▼ 41%\n  Hidden checks passed   97%  (no-skill 96%)\n  Tests where the logic needs one   98%  (no-skill 68%)\n\n  This repo:  /ponytail-debt  (shortcuts you deferred)\n              /ponytail-audit (what's still cuttable)\n```\n\n## Honesty boundary\n\nThese are benchmark averages, not this repo. NEVER print a per-repo savings\nnumber (\"you saved X lines/tokens here\"): the unbuilt version was never\nwritten, so there is no real baseline to subtract from in a live repo. The\nonly real per-repo figures come from `/ponytail-debt` (a counted ledger), and\nthis card points there instead of inventing one.\n\n## Boundaries\n\nOne-shot display. Edits nothing, changes no mode.\n",
+      "card": {
+        "title_zh": "马尾收益记分板",
+        "purpose_zh": "一次性展示 Ponytail 5 在智能体基准上的实测收益记分板，用 ASCII 条形图对比无技能基线的代码行数、输出 token、成本、时间与检查通过率。",
+        "does": [
+          "渲染纯 ASCII 条形图记分板，展示各项指标相对无技能基线的占比与降幅",
+          "列出基准条件：39 个任务、每个任务 5 次运行、Opus 5.5",
+          "展示隐藏检查通过率与逻辑测试通过率的对比数据",
+          "指向 /ponytail-debt 与 /ponytail-audit 两个后续命令",
+          "声明只做一次性展示，不修改模式、不写标记文件、不持久化任何内容"
+        ],
+        "inputs": [],
+        "outputs": [
+          "ASCII 条形图形式的收益记分板文本"
+        ],
+        "scenarios": [
+          "用户想快速了解 Ponytail 技能在基准测试中的量化收益",
+          "需要向他人展示代码量、成本、时间等指标的对比数据"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "数据是基准平均值，不代表当前仓库的实际节省",
+          "禁止输出针对单个仓库的节省数字，因为未构建版本从未被写出，没有真实基线",
+          "仅一次性展示，不编辑任何内容、不改变模式"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Show ponytail measured impact as a scoreboard: less code, less cost, more speed, from the agentic benchmark averages. One-shot display."
+          },
+          {
+            "field": "does",
+            "quote": "Render plain ASCII bars. The bar length shows ponytail as a share of the no-skill baseline; the label carries the exact figure:"
+          },
+          {
+            "field": "does",
+            "quote": "Hidden checks passed   97%  (no-skill 96%)"
+          },
+          {
+            "field": "does",
+            "quote": "This repo:  /ponytail-debt  (shortcuts you deferred)"
+          },
+          {
+            "field": "does",
+            "quote": "One-shot: do NOT change mode, write flag files, or persist anything."
+          },
+          {
+            "field": "limits",
+            "quote": "These are benchmark averages, not this repo. NEVER print a per-repo savings number"
+          },
+          {
+            "field": "limits",
+            "quote": "the unbuilt version was never written, so there is no real baseline to subtract from in a live repo."
+          },
+          {
+            "field": "limits",
+            "quote": "One-shot display. Edits nothing, changes no mode."
+          }
+        ]
+      }
+    },
+    {
+      "skill_path": ".openclaw/skills/ponytail-help/SKILL.md",
+      "blob_sha": "7a16bafe39de3af68a0509404bbc903d5e780fd4",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/.openclaw/skills/ponytail-help/SKILL.md",
+      "fetched_at": "2026-11-23T00:18:18.442Z",
+      "generated_at": "2026-11-23T00:18:18.442Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-help",
+        "description": "Quick reference for ponytail's modes, skills, and commands. One-shot display."
+      },
+      "excerpt": "---\nname: ponytail-help\ndescription: \"Quick reference for ponytail's modes, skills, and commands. One-shot display.\"\nhomepage: https://github.com/DietrichGebert/ponytail\nlicense: MIT\n---\n\n# Ponytail Help\n\nDisplay this reference card when invoked. One-shot, do NOT change mode,\nwrite flag files, or persist anything.\n\n## Levels\n\n| Level | Trigger | What change |\n|-------|---------|-------------|\n| **Lite** | `/ponytail lite` | Build what was asked, name the smaller option in one line. |\n| **Full** | `/ponytail` | The smallest complete change, a check where the logic needs one, and a reply that names what was skipped and any risk. Default. |\n| **Ultra** | `/ponytail ultra` | Also questions the request and pushes back before building. |\n\nLevel sticks until changed or session end.\n\n## Skills\n\n| Skill | Trigger | What it does |\n|-------|---------|--------------|\n| **ponytail** | `/ponytail` | Lazy mode itself: least new code, clear replies that name skipped work and risks. |\n| **ponytail-review** | `/ponytail-review` | Quality review of a diff: bugs, security, load, missing tests, speed, what to cut. Each finding says what goes wrong and how to fix it. |\n| **ponytail-audit** | `/ponytail-audit` | The same quality review for the whole repo, ranked. |\n| **ponytail-debt** | `/ponytail-debt` | Harvest `shortcut:` comments into a tracked ledger. |\n| **ponytail-gain** | `/ponytail-gain` | Measured-impact scoreboard: less code, less cost, more speed. |\n| **ponytail-help** | `/ponytail-help` | This card. |\n\nIn Codex CLI and the IDE extension, invoke skills with `$ponytail:ponytail`,\n`$ponytail:ponytail-review`, or `$ponytail:ponytail-help`. Claude Code and OpenCode use the\nslash-command forms above (OpenCode ships all six as slash commands).\n\n## Deactivate\n\nSay \"stop ponytail\" or \"normal mode\". Resume anytime with `/ponytail`.\n`/ponytail off` also works.\n\n## Band (Claude Code)\n\n`/ponytail band` hides the band above the prompt, the same command brings it back.\n`/ponytail band on` and `/ponytail band off` set it directly. The level stays.\n`/ponytail band import` adds your past Claude Code sessions (cost, agent time, tokens) to the board.\n\n## Configure Default Mode\n\nDefault mode = `full`, auto-active every session. Change it:\n\n**Environment variable** (highest priority):\n```bash\nexport PONYTAIL_DEFAULT_MODE=ultra\n```\n\n**Config file** (`~/.config/ponytail/config.json`, Windows: `%APPDATA%\\ponytail\\config.json`):\n```json\n{ \"defaultMode\": \"lite\" }\n```\n\nSet `\"off\"` to disable auto-activation on session start, activate manually\nwith `/ponytail` when wanted.\n\nResolution: env var > config file > `full`.\n\n## Update\n\nEnable auto-update once: open `/plugin`, go to Marketplaces, pick ponytail, Enable auto-update. Claude Code then pulls new versions at startup (run `/reload-plugins` when it prompts). Manual refresh: `/plugin marketplace update ponytail` then `/reload-plugins`.\n\nIf `/plugin` is not recognized, your Claude Code is out of date. Update it (`npm install -g @anthropic-ai/claude-code@latest`, or `brew upgrade claude-code`) and restart. Other hosts use their own update flow.\n\n## More\n\nFull docs + examples: https://github.com/DietrichGebert/ponytail\n",
+      "card": {
+        "title_zh": "Ponytail 帮助卡",
+        "purpose_zh": "一次性展示 ponytail 的模式、技能与命令速查卡，不改变模式、不写标记文件、不持久化任何内容。",
+        "does": [
+          "展示 Lite、Full、Ultra 三个等级及其触发方式与改动范围",
+          "列出 ponytail、ponytail-review、ponytail-audit、ponytail-debt、ponytail-gain、ponytail-help 六个技能",
+          "说明 Codex CLI 与 IDE 扩展用美元符号形式调用，Claude Code 与 OpenCode 用斜杠命令",
+          "说明停用方式与恢复方式",
+          "说明 Claude Code 中 band 的显示、隐藏与导入历史会话",
+          "说明默认模式的配置方式与更新流程"
+        ],
+        "inputs": [
+          "斜杠命令或美元符号技能调用",
+          "环境变量 PONYTAIL_DEFAULT_MODE",
+          "配置文件 config.json 中的 defaultMode"
+        ],
+        "outputs": [
+          "一张速查参考卡文本"
+        ],
+        "scenarios": [
+          "想快速回忆 ponytail 有哪些模式和技能",
+          "想确认不同宿主下的调用写法",
+          "想调整默认模式或更新插件"
+        ],
+        "prerequisites": [
+          "已安装 ponytail 插件",
+          "Claude Code 需为较新版本，否则 /plugin 不被识别"
+        ],
+        "limits": [
+          "本技能为一次性展示，不改变模式、不写标记文件、不持久化",
+          "等级持续到更改或会话结束",
+          "默认模式解析优先级为环境变量高于配置文件，配置文件高于 full"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Display this reference card when invoked. One-shot, do NOT change mode,"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "write flag files, or persist anything."
+          },
+          {
+            "field": "does",
+            "quote": "| **Lite** | `/ponytail lite` | Build what was asked, name the smaller option in one line. |"
+          },
+          {
+            "field": "does",
+            "quote": "| **ponytail-review** | `/ponytail-review` | Quality review of a diff: bugs, security, load, missing tests, speed, what to cut."
+          },
+          {
+            "field": "does",
+            "quote": "In Codex CLI and the IDE extension, invoke skills with `$ponytail:ponytail`,"
+          },
+          {
+            "field": "does",
+            "quote": "Say \"stop ponytail\" or \"normal mode\". Resume anytime with `/ponytail`."
+          },
+          {
+            "field": "does",
+            "quote": "`/ponytail band` hides the band above the prompt, the same command brings it back."
+          },
+          {
+            "field": "does",
+            "quote": "Enable auto-update once: open `/plugin`, go to Marketplaces, pick ponytail, Enable auto-update."
+          },
+          {
+            "field": "inputs",
+            "quote": "export PONYTAIL_DEFAULT_MODE=ultra"
+          },
+          {
+            "field": "inputs",
+            "quote": "{ \"defaultMode\": \"lite\" }"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If `/plugin` is not recognized, your Claude Code is out of date."
+          },
+          {
+            "field": "limits",
+            "quote": "Level sticks until changed or session end."
+          },
+          {
+            "field": "limits",
+            "quote": "Resolution: env var > config file > `full`."
+          },
+          {
+            "field": "hosts",
+            "quote": "Claude Code and OpenCode use the"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npm install -g @anthropic-ai/claude-code@latest"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "`~/.config/ponytail/config.json`, Windows: `%APPDATA%\\ponytail\\config.json`"
+          }
+        ]
+      }
+    }
+  ]
+}
