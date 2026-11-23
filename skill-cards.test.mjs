@@ -96,6 +96,37 @@ test('changed blob regenerates and a shared blob is generated once', async t => 
   assert.equal((await readRepo(root, name)).skills[0].blob_sha, changed.sha);
 });
 
+test('new blobs reuse only proven equivalent card inputs and publish fresh source identities', async t => {
+  const name = 'owner/long';
+  const first = SOURCE.padEnd(8000, 'x');
+  const repositories = { [name]: [entry('SKILL.md', first + 'one')] };
+  const root = await setup(t, repositories);
+  let calls = 0;
+  const generate = async () => { calls++; return card(); };
+  const run = (now, model = 'test') => buildSkillCards(root, { now, model, generate, request: fakeGithub(repositories) });
+  await run(NOW);
+  const original = (await readRepo(root, name)).skills[0];
+  repositories[name][0] = entry('SKILL.md', first + 'two');
+  await run(LATER);
+  const reused = (await readRepo(root, name)).skills[0];
+  assert.equal(calls, 1);
+  assert.deepEqual(reused.card, original.card);
+  assert.equal(reused.generated_at, NOW);
+  assert.equal(reused.fetched_at, LATER);
+  assert.equal(reused.blob_sha, repositories[name][0].sha);
+  await verifyCardPublication(root);
+
+  const doc = await readRepo(root, name);
+  delete doc.skills[0].input_format;
+  await writeFile(join(root, repoFile(name)), JSON.stringify(doc));
+  repositories[name][0] = entry('SKILL.md', first + 'three');
+  await run(LATER);
+  assert.equal(calls, 2);
+  repositories[name][0] = entry('SKILL.md', first + 'four');
+  await run(LATER, 'another-model');
+  assert.equal(calls, 3);
+});
+
 test('a tree entry over 60 KiB does not fetch the blob or invoke the model', async t => {
   const repositories = { 'owner/a': [entry('SKILL.md', 'x'.repeat(60 * 1024 + 1))] };
   const root = await setup(t, repositories);

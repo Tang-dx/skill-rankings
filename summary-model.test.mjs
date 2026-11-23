@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summarizeRanked, sourceText, responsesSummaryGenerator, chatSummaryGenerator, summaryPromptVersion } from './summary-model.mjs';
+import { summarizeRanked, sourceText, responsesSummaryGenerator, chatSummaryGenerator, configuredJsonGenerator, summaryPromptVersion } from './summary-model.mjs';
 
 test('natural multi-sentence descriptions need no forced use case; legacy prompt caches regenerate',async()=>{
  const feed={daily:[{name:'a/tool',description:'Inspect code and export a report.'}],rising:[],failures:[]};
@@ -61,8 +61,44 @@ test('ranked duplicates share one summary; cache invalidates when README changes
  assert.equal(feed.daily[0].summary_zh,feed.rising[0].summary_zh);
  assert.equal(feed.daily[0].summary_evidence.sources[1].sha,'abc');
  await summarizeRanked({feed,cache,readme,generate});assert.equal(calls,1);
- await summarizeRanked({feed,cache,readme:async()=>({...await readme(),sha:'def'}),generate});assert.equal(calls,2);
- await summarizeRanked({feed,cache,readme:async()=>({...await readme(),text:'A drawing editor.'}),generate});assert.equal(calls,3);
+ const before=structuredClone(feed.daily[0]);
+ const rebound=async()=>({...await readme(),sha:'def',url:'https://github.com/a/tool/blob/main/Readme.md'});
+ await summarizeRanked({feed,cache,readme:rebound,generate,now:'2026-11-24T00:00:00Z'});assert.equal(calls,1);
+ const after=feed.daily[0];
+ assert.equal(after.summary_zh,before.summary_zh);
+ assert.equal(after.summary_evidence.generated_at,before.summary_evidence.generated_at);
+ assert.equal(after.summary_evidence.sources[1].sha,'def');
+ assert.equal(after.summary_evidence.sources[1].url,(await rebound()).url);
+ assert.notEqual(after.summary_evidence.input_hash,before.summary_evidence.input_hash);
+ assert.deepEqual(after.summary_evidence,feed.rising[0].summary_evidence);
+ await summarizeRanked({feed,cache,readme:async()=>({...await rebound(),text:'A drawing editor.'}),generate});assert.equal(calls,2);
+ await summarizeRanked({feed,cache,readme,generate,model:'other-model'});assert.equal(calls,3);
+});
+
+test('configured usage distinguishes retries and unknown usage without logging request content', async t=>{
+ const keys={SUMMARY_API_KEY:'test-only',SUMMARY_BASE_URL:'https://example.test',SUMMARY_API_STYLE:'chat'};
+ for(const [key,value] of Object.entries(keys)){
+  const prior=process.env[key];process.env[key]=value;
+  t.after(()=>{if(prior===undefined)delete process.env[key];else process.env[key]=prior;});
+ }
+ const response={ok:true,json:async()=>({choices:[{finish_reason:'stop',message:{content:'{}'}}],
+  usage:{prompt_tokens:120,completion_tokens:40,prompt_cache_hit_tokens:0}})};
+ const logs=[];
+ let current=response;
+ const generate=configuredJsonGenerator({operation:'skill_card',request:async()=>current,log:line=>logs.push(JSON.parse(line))});
+ await generate('private source',{});
+ current={ok:false,status:503,text:async()=>''};
+ await assert.rejects(generate('private source',{},{retry:true}),/503/);
+ process.env.SUMMARY_API_STYLE='responses';
+ const failedEvent={type:'response.incomplete',response:{usage:{input_tokens:45,output_tokens:12,input_tokens_details:{cached_tokens:5}}}};
+ const stream=configuredJsonGenerator({request:async()=>new Response('data: '+JSON.stringify(failedEvent)+'\n\n',
+  {headers:{'content-type':'text/event-stream'}}),log:line=>logs.push(JSON.parse(line))});
+ await assert.rejects(stream('private source',{}),/did not complete/);
+ assert.deepEqual(logs,[
+  {event:'model_usage',operation:'skill_card',retry:false,input_tokens:120,output_tokens:40,cached_input_tokens:0},
+  {event:'model_usage',operation:'skill_card',retry:true,input_tokens:null,output_tokens:null,cached_input_tokens:null},
+  {event:'model_usage',operation:'ranking_summary',retry:false,input_tokens:45,output_tokens:12,cached_input_tokens:5},
+ ]);
 });
 
 test('HTTP diagnostics redact echoed credentials and bound error detail',async()=>{

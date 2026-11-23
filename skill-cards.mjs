@@ -14,6 +14,8 @@ const MAX_BLOB_BYTES = 60 * 1024;
 const DEFAULT_MAX_GENERATIONS = 20;
 const MAX_GENERATIONS_CAP = 60;
 const MAX_EXCERPT = 8000;
+// Older cards with the same prompt version could also have used additional_source.
+const CARD_INPUT_FORMAT = 'excerpt_only_v1';
 const shaPattern = /^[a-f0-9]{40}$/;
 const chinese = /\p{Script=Han}/u;
 const unsafeText = /[<>\p{Cc}\u2028\u2029]/u;
@@ -313,9 +315,9 @@ export async function buildSkillCards(output, options = {}) {
       throw error;
     }
   };
-  const requestJson = generate ? null : configuredJsonGenerator({ required: true, defaultModel: model });
-  const modelRequest = generate ?? ((system, input, runSignal) => requestJson(system, input, {
-    temperature: 0.2, maxTokens: 1500, timeoutMs: 30000, signal: runSignal, includeErrorDetail: false,
+  const requestJson = generate ? null : configuredJsonGenerator({ required: true, defaultModel: model, operation: 'skill_card' });
+  const modelRequest = generate ?? ((system, input, runSignal, retry = false) => requestJson(system, input, {
+    temperature: 0.2, maxTokens: 1500, timeoutMs: 30000, signal: runSignal, includeErrorDetail: false, retry,
   }));
   const cardsRoot = join(output, 'cards');
   await mkdir(cardsRoot, { recursive: true });
@@ -327,6 +329,7 @@ export async function buildSkillCards(output, options = {}) {
   const previousRows = new Map(previous.repos.map(row => [row.file, row]));
   const oldDocs = new Map();
   const cache = new Map();
+  const byExcerpt = new Map();
   const failedValidationCache = new Map();
   const priorFailures = new Map();
   for (const item of previous.failures) {
@@ -342,6 +345,7 @@ export async function buildSkillCards(output, options = {}) {
     for (const skill of doc.skills) {
       if (skill.status === 'ok' && skill.card_prompt_version === CARD_PROMPT_VERSION) {
         cache.set(skill.blob_sha, skill);
+        if (skill.input_format === CARD_INPUT_FORMAT && skill.model === model) byExcerpt.set(skill.excerpt, skill);
       } else if (skill.status === 'failed' && skill.card_prompt_version === CARD_PROMPT_VERSION
           && skill.last_error === messages.validate) {
         failedValidationCache.set(skill.blob_sha, skill);
@@ -418,7 +422,8 @@ export async function buildSkillCards(output, options = {}) {
       if (cached) {
         const { generated_at, model, frontmatter, excerpt, card } = cached;
         const fetched_at = old?.blob_sha === entry.sha && old.source_url === base.source_url ? old.fetched_at : now;
-        doc.skills.push({ ...base, fetched_at, generated_at, model, frontmatter, excerpt, card, status: 'ok' });
+        doc.skills.push({ ...base, fetched_at, generated_at, model, frontmatter, excerpt, card, status: 'ok',
+          ...(cached.input_format === CARD_INPUT_FORMAT ? { input_format: CARD_INPUT_FORMAT } : {}) });
         continue;
       }
       if (entry.size > MAX_BLOB_BYTES) {
@@ -446,6 +451,14 @@ export async function buildSkillCards(output, options = {}) {
         if (generations >= maxGenerations) throw new BackfillDeferred();
         const original = await fetchBlob(repo, entry, get);
         fetched = { ...base, excerpt: take(original, MAX_EXCERPT), frontmatter: readFrontmatter(original) };
+        const equivalent = byExcerpt.get(fetched.excerpt);
+        if (equivalent) {
+          const reused = { ...fetched, generated_at: equivalent.generated_at, model, status: 'ok',
+            input_format: CARD_INPUT_FORMAT, card: validateCard(equivalent.card, fetched.excerpt) };
+          cache.set(entry.sha, reused);
+          doc.skills.push(reused);
+          continue;
+        }
         const input = { excerpt: fetched.excerpt };
         stage = 'generate';
         checkBudget();
@@ -456,14 +469,16 @@ export async function buildSkillCards(output, options = {}) {
           checkBudget();
           if (generations >= maxGenerations) throw new BackfillDeferred();
           generations++;
-          value = await modelRequest(cardInstructions, input, signal);
+          value = await modelRequest(cardInstructions, input, signal, true);
         }
         checkBudget();
         stage = 'validate';
         const result = {
-          ...fetched, generated_at: now, model, status: 'ok', card: validateCard(value, fetched.excerpt),
+          ...fetched, generated_at: now, model, status: 'ok', input_format: CARD_INPUT_FORMAT,
+          card: validateCard(value, fetched.excerpt),
         };
         cache.set(entry.sha, result);
+        byExcerpt.set(result.excerpt, result);
         doc.skills.push(result);
       } catch (error) {
         if (error instanceof BackfillDeferred || signal.aborted) {

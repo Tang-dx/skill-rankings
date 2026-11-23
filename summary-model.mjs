@@ -43,7 +43,13 @@ export async function summarizeRanked({feed,cache,readme,generate,model='openai/
   if(doc)sources.push({kind:'readme',url:doc.url,sha:doc.sha});
   const source={name:row.name,description,readme:excerpt,sources,version:summaryVersion,prompt_version:summaryPromptVersion};
   const input_hash=hash(source),old=cache.entries[row.name.toLowerCase()];
-  if(old?.input_hash===input_hash&&old.version===summaryVersion&&old.prompt_version===summaryPromptVersion&&old.model===model) {
+  // Rebuild the previous hash with today's model-visible text and the saved
+  // source references. This also proves equivalence for pre-existing caches.
+  if(old?.version===summaryVersion&&old.prompt_version===summaryPromptVersion&&old.model===model
+      &&Array.isArray(old.evidence?.sources)&&old.evidence.input_hash===old.input_hash
+      &&(old.input_hash===input_hash||old.input_hash===hash({...source,sources:old.evidence.sources}))) {
+   old.input_hash=input_hash;
+   old.evidence={...old.evidence,input_hash,sources};
    old.used_at=now;
    Object.assign(row,{summary_zh:old.summary_zh,summary_source:summaryVersion,summary_evidence:old.evidence});continue;
   }
@@ -93,7 +99,7 @@ export function githubSummaryGenerator({token,model='openai/gpt-4.1-mini',reques
 
 // Require a terminal success event before accepting streamed text. Some compatible
 // gateways omit output in the completed envelope but send valid output_text deltas.
-async function readSummaryResponse(response) {
+async function readSummaryResponse(response,onUsage) {
  if (!response.headers?.get('content-type')?.includes('text/event-stream')) return response.json();
  const reader=response.body.getReader(),decoder=new TextDecoder();
  let buffer='',text='',bytes=0;
@@ -114,9 +120,13 @@ async function readSummaryResponse(response) {
      text+=event.delta??'';
      if(text.length>20000)throw new Error('Model returned no bounded summary');
     }
-    if(['error','response.failed','response.incomplete'].includes(event.type))throw new Error('Summary model did not complete');
+    if(['error','response.failed','response.incomplete'].includes(event.type)) {
+     onUsage?.(event.response?.usage);
+     throw new Error('Summary model did not complete');
+    }
     if(event.type==='response.completed') {
      const result=event.response;
+     onUsage?.(result?.usage);
      if(!result||result.status!=='completed'||result.error||result.incomplete_details)throw new Error('Summary model did not complete');
      return {...result,output_text:result.output_text||text};
     }
@@ -127,7 +137,7 @@ async function readSummaryResponse(response) {
 }
 
 function responsesJsonGenerator({baseUrl,token,model,request=fetch}={}) {
- return async (system,input,{temperature=0.2,maxTokens=5000,timeoutMs=60000,signal,includeErrorDetail=true}={})=>{
+ return async (system,input,{temperature=0.2,maxTokens=5000,timeoutMs=60000,signal,includeErrorDetail=true,onUsage}={})=>{
   if(!token||!model||!baseUrl)throw new Error('Chinese summary model is not configured');
   const url=new URL(baseUrl.replace(/\/$/,'')+'/responses');
   if(url.protocol!=='https:')throw new Error('Summary model requires HTTPS');
@@ -143,7 +153,8 @@ function responsesJsonGenerator({baseUrl,token,model,request=fetch}={}) {
    } catch {}
    throw new Error(`Summary model HTTP ${response.status}${detail}`);
   }
-  const data=await readSummaryResponse(response);
+  const data=await readSummaryResponse(response,onUsage);
+  onUsage?.(data.usage);
   if(data.status&&data.status!=='completed')throw new Error(`Summary model response is ${data.status}`);
   if(data.incomplete_details||data.error)throw new Error('Summary model did not complete');
   const blocks=Array.isArray(data.output)?data.output.flatMap(item=>Array.isArray(item.content)?item.content:[]):[];
@@ -157,7 +168,7 @@ function responsesJsonGenerator({baseUrl,token,model,request=fetch}={}) {
 }
 
 function chatJsonGenerator({baseUrl,token,model,request=fetch}={}) {
- return async (system,input,{temperature=0.2,maxTokens=5000,timeoutMs=60000,signal,includeErrorDetail=true}={})=>{
+ return async (system,input,{temperature=0.2,maxTokens=5000,timeoutMs=60000,signal,includeErrorDetail=true,onUsage}={})=>{
   if(!token||!model||!baseUrl)throw new Error('Chinese summary model is not configured');
   const url=new URL(baseUrl.replace(/\/$/,'')+'/chat/completions');
   if(url.protocol!=='https:')throw new Error('Summary model requires HTTPS');
@@ -173,6 +184,7 @@ function chatJsonGenerator({baseUrl,token,model,request=fetch}={}) {
    throw new Error(`Summary model HTTP ${response.status}${detail?': '+detail:''}`);
   }
   const data=await response.json();
+  onUsage?.(data.usage);
   const choice=data.choices?.[0];
   if(choice?.finish_reason!=='stop') {
    const reason=['length','content_filter','tool_calls','function_call'].includes(choice?.finish_reason)?choice.finish_reason:'unknown';
@@ -203,12 +215,25 @@ export function chatSummaryGenerator(options) {
  return summarizeWith(chatJsonGenerator(options));
 }
 
-export function configuredJsonGenerator({required=false,defaultModel='openai/gpt-4.1-mini'}={}) {
+const tokenCount=value=>Number.isSafeInteger(value)&&value>=0?value:null;
+
+export function configuredJsonGenerator({required=false,defaultModel='openai/gpt-4.1-mini',operation='ranking_summary',request=fetch,log=console.info}={}) {
  if(process.env.SUMMARY_API_KEY) {
-  const options={baseUrl:process.env.SUMMARY_BASE_URL??'https://models.github.ai/inference',token:process.env.SUMMARY_API_KEY,model:process.env.SUMMARY_MODEL||defaultModel};
+  const options={baseUrl:process.env.SUMMARY_BASE_URL??'https://models.github.ai/inference',token:process.env.SUMMARY_API_KEY,model:process.env.SUMMARY_MODEL||defaultModel,request};
   const style=process.env.SUMMARY_API_STYLE || (new URL(options.baseUrl).hostname==='models.github.ai'?'chat':'responses');
   if(!['responses','chat'].includes(style))throw new Error('Unsupported summary API style');
-  return style==='responses'?responsesJsonGenerator(options):chatJsonGenerator(options);
+  const generate=style==='responses'?responsesJsonGenerator(options):chatJsonGenerator(options);
+  return async (system,input,settings={})=>{
+   let usage;
+   try {
+    return await generate(system,input,{...settings,onUsage:value=>{usage=value;}});
+   } finally {
+    log(JSON.stringify({event:'model_usage',operation,retry:settings.retry===true,
+     input_tokens:tokenCount(usage?.prompt_tokens??usage?.input_tokens),
+     output_tokens:tokenCount(usage?.completion_tokens??usage?.output_tokens),
+     cached_input_tokens:tokenCount(usage?.prompt_cache_hit_tokens??usage?.prompt_tokens_details?.cached_tokens??usage?.input_tokens_details?.cached_tokens)}));
+   }
+  };
  }
  if(required)throw new Error('Skill card model is not configured');
  return async()=>{throw new Error('Chinese summary model is not configured; existing summaries remain cached');};
