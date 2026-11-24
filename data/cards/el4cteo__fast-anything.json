@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "repo": "EL4CTEO/fast-anything",
+  "tree_sha": "4c6bfa1ecf797060ee4752802d63949602407072",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/fast-anything/SKILL.md",
+      "blob_sha": "7162f523bac56af45630d72aaf1ad97c381f2222",
+      "source_url": "https://github.com/EL4CTEO/fast-anything/blob/ccf46b49daa03799db76bcbb46cacbe873572c1b/skills/fast-anything/SKILL.md",
+      "fetched_at": "2026-11-24T00:18:43.836Z",
+      "generated_at": "2026-11-24T00:18:43.836Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "fast-anything",
+        "description": "Speed up a slow Python, Node.js/TypeScript, Ruby, Java, Go, PHP, C, C++ or C# app by porting its hottest pure functions to Rust and proving each port gives the same results on real recorded calls. Use when the user wants their Python code faster, asks about hot paths or profiling, or says \"rewrite the slow part in Rust\"."
+      },
+      "excerpt": "---\nname: fast-anything\ndescription: Speed up a slow Python, Node.js/TypeScript, Ruby, Java, Go, PHP, C, C++ or C# app by porting its hottest pure functions to Rust and proving each port gives the same results on real recorded calls. Use when the user wants their Python code faster, asks about hot paths or profiling, or says \"rewrite the slow part in Rust\".\n---\n\n# fast-anything\n\nThe `fast-anything` CLI measures, records, builds, checks and swaps. You write the Rust.\n(The same steps are MCP tools: `fast_scan`, `fast_port`, `fast_verify`, `fast_enable`, `fast_bench`, `fast_report`.)\n\n## Loop\n\n1. **Scan**: `fast-anything scan -- python app.py`, using the command the user runs their app with\n   (a representative workload, not the test suite). Pick the top function marked \"port it\".\n   Skip anything under 2% of the run: porting it can't make a visible difference.\n2. **Port**: `fast-anything port <id>`. It re-runs the app, records up to 500 real calls, and creates\n   `.fast/ports/<id>/` with a stub `src/lib.rs` and a `TASK.md`. Read TASK.md fully.\n3. **Write the Rust** in `src/lib.rs` (Ruby, Java, Go, PHP, C, C++, C#: `src/port.rs`; `src/lib.rs` there is generated glue):\n   - Same semantics: Unicode code points (`.chars()`; JavaScript compares UTF-16 units), integer ranges, float operation order, error cases.\n   - Fast: borrow, no needless allocation, ASCII fast paths, `with_capacity`.\n   - Keep the function and module names. Run `cargo check` in the crate.\n4. **Verify**: `fast-anything verify <id>` builds in release mode and replays every recorded call.\n   On mismatch, read the failing call, fix, verify again. Never edit the recordings.\n5. **Enable**: `fast-anything enable <id>`, then `fast-anything bench` and `fast-anything report`.\n6. Tell the user the end-to-end speedup, the per-call speedup, and how to undo\n   (`fast-anything disable <id>`, or `FAST_ANYTHING_DISABLE=1` for a single run).\n\n## Don't\n\n- Don't edit the original Python function: the block appended to its module does the swap.\n- Don't enable a port that hasn't passed verify.\n- If a function shows ✗ (I/O, randomness, globals, lives in the entry script), say why it can't be ported yet.\n  Suggest moving pure logic into its own module when that's the blocker.\n",
+      "card": {
+        "title_zh": "Rust热路径移植加速",
+        "purpose_zh": "把慢速应用中最热的纯函数移植为Rust，并用真实录制的调用回放验证移植结果一致，再启用、基准测试并报告端到端与单次调用加速比。",
+        "does": [
+          "扫描应用运行过程，找出占比不低于2%的热点函数并标记可移植项",
+          "重新运行应用并录制最多500次真实调用，生成Rust桩代码与任务说明",
+          "由用户按任务说明编写Rust实现，保持函数与模块名并运行cargo check",
+          "以release模式构建并回放全部录制调用，校验移植结果与原实现一致",
+          "启用通过验证的移植，执行基准测试并生成报告",
+          "告知端到端与单次调用加速比，以及禁用与单次运行禁用的回退方式"
+        ],
+        "inputs": [
+          "用户运行应用的命令（代表性工作负载）",
+          "热点函数标识",
+          "用户编写的Rust实现代码"
+        ],
+        "outputs": [
+          "热点扫描结果与可移植标记",
+          "录制调用数据与移植目录（含桩代码和任务说明）",
+          "验证结果",
+          "基准测试与加速报告"
+        ],
+        "scenarios": [
+          "Python代码运行慢，希望加速",
+          "用户询问热点路径或性能剖析",
+          "用户要求把慢的部分用Rust重写",
+          "Node.js/TypeScript、Ruby、Java、Go、PHP、C、C++或C#应用的热点纯函数加速"
+        ],
+        "prerequisites": [
+          "已安装fast-anything CLI",
+          "有可运行的代表性工作负载命令",
+          "具备Rust工具链以运行cargo check与release构建"
+        ],
+        "limits": [
+          "仅适用于纯函数，I/O、随机性、全局变量或位于入口脚本的函数暂不可移植",
+          "占比低于2%的函数不建议移植",
+          "不得编辑原始函数，也不得修改录制数据",
+          "未通过验证的移植不得启用"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "后端",
+          "自动化",
+          "测试",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Speed up a slow Python, Node.js/TypeScript, Ruby, Java, Go, PHP, C, C++ or C# app by porting its hottest pure functions to Rust and proving each port gives the same results on real recorded calls."
+          },
+          {
+            "field": "does",
+            "quote": "**Scan**: `fast-anything scan -- python app.py`, using the command the user runs their app with"
+          },
+          {
+            "field": "does",
+            "quote": "**Port**: `fast-anything port <id>`. It re-runs the app, records up to 500 real calls, and creates `.fast/ports/<id>/` with a stub `src/lib.rs` and a `TASK.md`."
+          },
+          {
+            "field": "does",
+            "quote": "**Verify**: `fast-anything verify <id>` builds in release mode and replays every recorded call."
+          },
+          {
+            "field": "does",
+            "quote": "**Enable**: `fast-anything enable <id>`, then `fast-anything bench` and `fast-anything report`."
+          },
+          {
+            "field": "does",
+            "quote": "Tell the user the end-to-end speedup, the per-call speedup, and how to undo"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Run `cargo check` in the crate."
+          },
+          {
+            "field": "limits",
+            "quote": "Skip anything under 2% of the run: porting it can't make a visible difference."
+          },
+          {
+            "field": "limits",
+            "quote": "If a function shows ✗ (I/O, randomness, globals, lives in the entry script), say why it can't be ported yet."
+          },
+          {
+            "field": "limits",
+            "quote": "Don't edit the original Python function: the block appended to its module does the swap."
+          },
+          {
+            "field": "limits",
+            "quote": "Never edit the recordings."
+          },
+          {
+            "field": "limits",
+            "quote": "Don't enable a port that hasn't passed verify."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    }
+  ]
+}

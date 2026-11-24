@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "repo": "imuratalpay/ui-diff",
+  "tree_sha": "a2e5ac7cc267f01a206dfc8a91e235d54c3920f7",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/ui-diff/SKILL.md",
+      "blob_sha": "a34545401d059f96a6bdea1d17d531789502f1a6",
+      "source_url": "https://github.com/imuratalpay/ui-diff/blob/66454fbd858291ea678ac5230464210dce7c8f5f/skills/ui-diff/SKILL.md",
+      "fetched_at": "2026-11-24T00:18:43.836Z",
+      "generated_at": "2026-11-24T00:18:43.836Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ui-diff",
+        "description": "Before/after screenshots, highlighted pixel diffs and a short UX summary for pull requests that change UI, posted as one sticky PR comment whose images stay private in the same repository. Use when someone wants reviewers to see a frontend change (\"add before/after screenshots to the PR\", \"what does this PR look like\", \"visual diff\", \"UI review\", \"did this CSS change break anything\"), wants to check a hover, focus or open state (\"check the mobile menu open state\", \"diff the checkout flow\") or on"
+      },
+      "excerpt": "---\nname: ui-diff\ndescription: Before/after screenshots, highlighted pixel diffs and a short UX summary for pull requests that change UI, posted as one sticky PR comment whose images stay private in the same repository. Use when someone wants reviewers to see a frontend change (\"add before/after screenshots to the PR\", \"what does this PR look like\", \"visual diff\", \"UI review\", \"did this CSS change break anything\"), wants to check a hover, focus or open state (\"check the mobile menu open state\", \"diff the checkout flow\") or one component on its own (\"diff the primary button\"), or wants to compare design variants (?hero=1..4), record hover/transition clips, audit design-token usage, check accessibility regressions on changed screens, or capture auth-protected preview deployments.\nmetadata:\n  version: \"2.1.0\"\n---\n\n# ui-diff\n\nRenders the affected routes of a web app at the PR's **base** and **head**, diffs the\nscreenshots, and posts one PR comment that starts with the verdict, then the measured element\nchanges, still `base | head` pairs of each changed area and your UX summary.\nThe mechanics are scripted; your job is the judgment: which routes matter, what the changes\nmean for users, and whether it is OK to post.\n\n`$SKILL` is the directory containing this file. Run the CLI as:\n\n```bash\nnode \"$SKILL/bin/ui-diff.mjs\" <command> [options]\n```\n\nThe first run installs dependencies and builds (about a minute); the first capture downloads\nPlaywright's Chromium. Every command prints JSON on stdout and progress on stderr. Output goes\nto `.ui-diff/` at the repo root, which is added to `.git/info/exclude` automatically.\n\n## Privacy rules (always)\n\n- Screenshots never go to public or third-party hosts (no imgur, gists, Slack, CDNs, pastebins).\n  The only upload target is the repository's own `ui-diff-assets` branch.\n- `publish` refuses public repositories unless the user explicitly passes `--allow-public-repo`.\n  If it says the repo is public or its visibility is unknown, stop and ask the user.\n- Never create Vercel share links, bypass URLs or URLs with tokens. Protected previews are\n  reached with headers/cookies whose values come from environment variables (see `references/privacy.md`).\n- Never print secret values or paste them into comments or summaries.\n\n## 1. Context\n\n```bash\ngh pr view <n> --json number,url,baseRefName,headRefName,headRefOid   # or: gh pr view (current branch)\ngit status --short\n```\n\n- Look for `ui-diff.config.json` (repo root or the app's directory). If there is none, run\n  `node \"$SKILL/bin/ui-diff.mjs\" init`, check the suggested `startCommand` and `routes`, and offer\n  to commit the file. `doctor` checks git, gh, the browser, the config and repo visibility: FAIL\n  blocks a run; WARN (no gh login, no remote) only matters for publishing or `--pr`.\n- **Posting to a PR:** pass `--pr <n>` so head is the pushed commit. Mention uncommitted or unpushed\n  work, because it will not appear.\n- **Checking work in progress:** `node \"$SKILL/bin/ui-diff.mjs\" check` diffs the working tree\n  (uncommitted changes included) against the merge base with the default branch (`--base <ref>`\n  to change it), prints a short summary with the measured changes, writes `.ui-diff/out/` and\n  posts nothing; exit 0 no visual changes, 1 changes, 2 errors (`--json` for JSON). `run` without\n  `--head` does the same into `.ui-diff/` for a later `publish`.\n- **Deployed previews:** pass `--base-url` / `--head-url` (or `preview` in the config). For\n  protected previews configure `auth` once; see `references/privacy.md`.\n\n## 2. Detect changed UI and choose routes\n\n```bash\nnode \"$SKILL/bin/ui-diff.mjs\" detect --pr <n>\n```\n\nIts JSON starts with `status`: `capture` (routes to capture), `nothing-mapped` (UI files that match\nno route) or `no-ui-changes`. It maps changed files to routes through `routes[].files` and `globalFiles` in the config, then\nframework conventions (Next.js, SvelteKit, Nuxt, Astro, Remix, TanStack Router, plain HTML) and an import graph\n(relative imports, tsconfig aliases, package.json `#` imports, workspace packages, CSS `@import`/`url()`, HTML `href`/`src`).\nThe JSON lists each route with `reasons` and `confidence`, plus:\n\n- `unmatched`: UI files it could not place. Find their pages yourself (grep for imports) and pass\n  them with `--routes`.\n- If the user only cares about part of a page, or a part is noise (ads, live feeds), set `focus` or\n  `ignore` selectors in the config; a selector that matches nothing is reported as a warning.\n- `needsExample`: dynamic routes (`/blog/[slug]`). Find a real id and pass `--routes /blog/hello`.\n- `notes`: e.g. routes beyond `detect.maxRoutes`.\n- `dependencies`: changed packages from `package.json` and lockfiles. A `ui: true` one (React,\n  Tailwind, a component library; `detect.uiPackages`) makes every route affected; mention the\n  others as not checked visually.\n\nIf no UI file changed, say so and stop; do not produce an empty report. If UI files changed but\nnone maps to a route (`run` prints `\"status\": \"nothing-mapped\"` and a `notChecked` reason), nothing\nwas checked: resolve the routes yourself or tell the user; never report that as \"no visual changes\". Tell the user in one or\ntwo lines which routes you will capture and why. Remember routes that are affected but not\ncaptured (login walls, modals, limits): they go in the summary so \"no change\" is not read as\nan all-clear.\n\n## 3. Capture and diff\n\n```bash\nnode \"$SKILL/bin/ui-diff.mjs\" run --pr <n> [--routes \"/,/pricing\"] [--viewports desktop,mobile] [--themes light,dark] \\\n  [--variants hero=1..4] [--motion | --motion-all] [--tokens path/to/tokens.json | auto] [--a11y]\n```\n\nIn one go it creates git worktrees for base (the merge base) and head, links or installs\ndependencies, starts each app on a free port in its own process group, captures every\nroute × viewport × theme, diffs with pixelmatch, writes per changed area a still `base | head`\npair with the changed boxes outlined, a blink GIF and a `before | after | diff` crop (plus the full\npage), runs the enabled extras, and cleans up. Captures are\ndeterministic (`freeze`, on by default): `Date` frozen at run start, `Math.random` and `crypto`\nseeded, animations, transitions and the caret stopped, web fonts and images awaited; plus hidden\nscrollbars, scroll reset and masked selectors (`capture.mask`, for carousels and live counters), and\neach screenshot is retaken until consecutive shots match (if something keeps moving, the page's\nJavaScript timers are paused for the final shots).\n\nThe JSON result has `stats`, `changed` (with image paths), `flows`, `components`, `variants`, `motion`, `a11y`, `tokens`,\n`timing` (one measured line: detect, prepare per side, capture, diff, extras; `timings` in\n`report.json` has the numbers), `warnings`, `notCaptured` and `unmatchedFiles`. Add `--themes light,dark` when colors or tokens\nchanged. If it fails, the error names the step and the log in `.ui-diff/logs/` (common causes and\nfixes: `references/troubleshooting.md`); fix the cause\n(missing env var, wrong `startCommand`, auth) and rerun. Never post a one-sided result. A capture\nwhose page returns HTTP 4xx/5xx is reported as failed, not as \"unchanged\".\nA failed run keeps the previous report in `.ui-diff/` (`render` and `publish` warn that it is from\nan earlier run): do not publish until a rerun succeeds.\n\n### Flows: changes that need someone to use the page\n\nStill captures show pages as they load. When the change sits behind an interaction (a menu, a\ndialog, a filled form, a tab), add a flow to `flows` in `ui-diff.config.json`: it is replayed on\nbase and head with the same frozen inputs, and at each checkpoint the first viewport is captured,\nmapped and diffed like a still capture. To write one from a sentence such as \"check the mobile\nmenu open state\":\n\n1. **Route and viewport**: the page the sentence names (`/` when none), plus `viewports` when it\n   names one (\"mobile\" → `[\"mobile\"]`, a name from the config's `viewports`).\n2. **Steps**: read the ",
+      "card": {
+        "title_zh": "UI 视觉差异审查",
+        "purpose_zh": "在 PR 的 base 与 head 上渲染受影响路由，截图并做像素级差异对比，生成前后对照图与简短 UX 总结，作为一条私有 PR 评论发布。",
+        "does": [
+          "检测改动文件并映射到受影响路由",
+          "在 base 与 head 分别启动应用并截图对比",
+          "生成前后对照图、闪烁 GIF 与差异裁剪图",
+          "回放交互流程（菜单、弹窗、表单等）并逐检查点截图",
+          "可选检查主题、设计变体、动效与无障碍回归",
+          "发布一条含结论与 UX 总结的 PR 评论"
+        ],
+        "inputs": [
+          "PR 编号或当前分支",
+          "ui-diff.config.json 配置（路由、启动命令、视口等）",
+          "可选命令行参数：路由、视口、主题、变体、动效、tokens、a11y",
+          "受保护预览所需的环境变量凭据"
+        ],
+        "outputs": [
+          "stdout 上的 JSON 结果（stats、changed、flows 等）",
+          "`.ui-diff/` 下的截图、差异图、GIF 与 report.json",
+          "一条 PR 评论（结论、元素变化、前后对照、UX 总结）",
+          "退出码：0 无视觉变化，1 有变化，2 错误"
+        ],
+        "scenarios": [
+          "为改动 UI 的 PR 添加前后截图",
+          "检查悬停、聚焦或菜单展开等交互状态",
+          "对比设计变体（如 hero=1..4）",
+          "审计设计 token 使用与无障碍回归",
+          "截取需登录的预览部署页面"
+        ],
+        "prerequisites": [
+          "Node 环境，首次运行会安装依赖并构建",
+          "首次截图会下载 Playwright 的 Chromium",
+          "仓库根或应用目录存在 ui-diff.config.json，否则先运行 init",
+          "发布到 PR 需要 gh 登录与远程仓库",
+          "受保护预览需配置 auth 环境变量"
+        ],
+        "limits": [
+          "截图不得上传到公开或第三方托管，仅可传到仓库自身 ui-diff-assets 分支",
+          "publish 默认拒绝公开仓库，除非显式传 --allow-public-repo",
+          "未提交或未推送的改动不会出现在 --pr 的对比中",
+          "动态路由需手动提供真实示例路径",
+          "无法映射到路由的 UI 文件不会被检查，不能当作无视觉变化",
+          "失败的运行会保留旧报告，重跑成功前不得发布",
+          "页面返回 4xx/5xx 的截图记为失败而非未变化"
+        ],
+        "hosts": [
+          "claude-code"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret",
+          "installs_packages"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "测试",
+          "代码审查",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Renders the affected routes of a web app at the PR's **base** and **head**, diffs the screenshots, and posts one PR comment"
+          },
+          {
+            "field": "does",
+            "quote": "It maps changed files to routes through `routes[].files` and `globalFiles` in the config"
+          },
+          {
+            "field": "does",
+            "quote": "In one go it creates git worktrees for base (the merge base) and head"
+          },
+          {
+            "field": "does",
+            "quote": "diffs with pixelmatch, writes per changed area a still `base | head` pair with the changed boxes outlined, a blink GIF and a `before | after | diff` crop"
+          },
+          {
+            "field": "does",
+            "quote": "it is replayed on base and head with the same frozen inputs, and at each checkpoint the first viewport is captured, mapped and diffed like a still capture"
+          },
+          {
+            "field": "does",
+            "quote": "posts one PR comment that starts with the verdict, then the measured element changes"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The first run installs dependencies and builds (about a minute); the first capture downloads Playwright's Chromium."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Look for `ui-diff.config.json` (repo root or the app's directory). If there is none, run `node \"$SKILL/bin/ui-diff.mjs\" init`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "WARN (no gh login, no remote) only matters for publishing or `--pr`."
+          },
+          {
+            "field": "limits",
+            "quote": "Screenshots never go to public or third-party hosts (no imgur, gists, Slack, CDNs, pastebins)."
+          },
+          {
+            "field": "limits",
+            "quote": "`publish` refuses public repositories unless the user explicitly passes `--allow-public-repo`."
+          },
+          {
+            "field": "limits",
+            "quote": "Mention uncommitted or unpushed work, because it will not appear."
+          },
+          {
+            "field": "limits",
+            "quote": "If UI files changed but none maps to a route (`run` prints `\"status\": \"nothing-mapped\"` and a `notChecked` reason), nothing was checked"
+          },
+          {
+            "field": "limits",
+            "quote": "A failed run keeps the previous report in `.ui-diff/`"
+          },
+          {
+            "field": "limits",
+            "quote": "A capture whose page returns HTTP 4xx/5xx is reported as failed, not as \"unchanged\"."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "node \"$SKILL/bin/ui-diff.mjs\" <command> [options]"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Protected previews are reached with headers/cookies whose values come from environment variables"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Output goes to `.ui-diff/` at the repo root, which is added to `.git/info/exclude` automatically."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    }
+  ]
+}

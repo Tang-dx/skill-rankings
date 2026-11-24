@@ -910,6 +910,267 @@
           }
         ]
       }
+    },
+    {
+      "skill_path": ".openclaw/skills/ponytail-review/SKILL.md",
+      "blob_sha": "ffdcda931dd0238dc1be5daeb85a43d84424fc99",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/.openclaw/skills/ponytail-review/SKILL.md",
+      "fetched_at": "2026-11-24T00:18:43.836Z",
+      "generated_at": "2026-11-24T00:18:43.836Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail-review",
+        "description": "Quality review of a diff: bugs, security, real load, missing tests, speed, and what to delete. Each finding says what goes wrong and how to fix it."
+      },
+      "excerpt": "---\nname: ponytail-review\ndescription: \"Quality review of a diff: bugs, security, real load, missing tests, speed, and what to delete. Each finding says what goes wrong and how to fix it.\"\nhomepage: https://github.com/DietrichGebert/ponytail\nlicense: MIT\n---\n\nReview a change like the senior developer who will be paged when it breaks.\nOrder of importance: correct, safe, holds under load, tested, fast, lean.\nLean still matters: every extra line must be read, tested and fixed later.\nThis is a report the user asked for, so give it in full.\n\n## 1. Understand first\n\n- Review what the user names: uncommitted or staged changes, a branch, a PR\n  link, or files. Nothing named: the uncommitted changes, or the last commit\n  if there are none.\n- Read the diff, then the code it touches: callers of every changed function,\n  the functions it calls, the tests, the README.\n- Trace the real flow: where data comes in, what is stored, what goes out.\n- A change can break code it does not touch. When a signature, return value\n  or behavior changes, grep every caller.\n- Find the expected load in the repo (README, deploy config): one person\n  running a script, or many users and processes at once. Judge scale against\n  that, and say which load you assumed.\n\n## 2. Look for\n\n1. **Bug:** wrong result, crash, missed edge case (empty, zero, last item,\n   rounding, time zones), a caller broken by the change, a fix applied in one\n   caller while the shared function stays broken.\n2. **Risk:** security holes (injection, weak randomness, secrets, missing\n   checks on input from users), data loss (errors swallowed, writes in the\n   wrong order, no transaction).\n3. **Scale:** fine for one user, wrong for many: check-then-write races, the\n   same work done by every process, memory or lists that only grow, a query\n   per item, O(n^2) on big input, per-process state that must be shared.\n4. **Missing test:** risky new logic (a branch, a parser, money, security,\n   data writes, a bug fix) with no test that fails when it breaks. One good\n   test, not coverage.\n5. **Speed:** big slowdowns are problems. Small wins (work repeated in a hot\n   loop) are suggestions; some software counts every millisecond.\n6. **Lean:** code that should not exist or should be smaller.\n   - delete: dead code, unused options, speculative features\n   - reuse: the repo already has this helper (name the path)\n   - stdlib / native: the standard library or platform already does it; a\n     new dependency for a few lines\n   - yagni: abstraction with one implementation, config nobody sets\n   - merge: near-copies that must change together\n   - split: one function doing several unrelated jobs, so it is hard to read\n     or test. Split by job, never by line count, and never into helpers that\n     exist only to make a function shorter.\n\n## 3. Check before you report\n\n- Every finding needs a concrete case: \"this input or situation leads to this\n  wrong result\". No case, no finding.\n- Re-read the lines and confirm: the caller exists, the value can really be\n  empty, the code really is unused.\n- A shortcut marked with a `shortcut:` (or older `ponytail:`) comment that names its limit is a\n  decision, not a finding, unless the expected load already crosses it.\n- Propose the smallest fix that works. Prefer fixes that delete code. Never\n  add layers, frameworks or config the problem does not need.\n- No style taste, no \"consider\", no vague worries.\n\n## 4. Output\n\nVery simple English: short sentences, everyday words. Explain a technical\nterm the first time you use it. The reader may never have seen this code.\n\nStart with `What this change does:` in two or three sentences.\n\nThen the findings in three groups, skip empty groups:\n- **Must fix:** bug, security, data loss, breaks at the expected load.\n- **Should fix:** risky code without a test, real slowness, duplication, a\n  function that mixes jobs, code that should not exist.\n- **Nice to have:** small speed-ups, shorter forms.\n\nNumber findings across all groups, so the user can say \"fix 2 and 5\".\nEvery finding has all four parts, each one or two short sentences:\n\n2. **Orders land on the wrong day** (`billing/close_day.py:L40-52`)\n   - **What this is:** At midnight this job closes the day and bills all orders of that day.\n   - **Problem:** It takes \"today\" from the server clock, which runs in UTC. An order placed\n     at 00:30 in Berlin is billed on the day before.\n   - **Fix:** Compute the day once in the shop's time zone:\n     `datetime.now(ZoneInfo(\"Europe/Berlin\")).date()`. One line, nothing else changes.\n   - **If we skip it:** Late orders show the wrong date, and accounting fixes them by hand.\n\nEnd with:\n- `Verdict: Ship.` or `Verdict: fix 1 and 3 first.`\n- `Lean: -<N> lines possible.` when lean findings exist.\n- `Not checked:` one line, if something mattered and you could not check it.\n\nNothing found: `What this change does:`, then `Looks good. Ship.` and one line\non what you checked.\n\nLists findings, changes no code.\n",
+      "card": {
+        "title_zh": "代码变更质量审查",
+        "purpose_zh": "对代码差异做资深开发者式质量审查，按正确、安全、负载、测试、速度、精简排序，逐条给出问题与最小修复建议，只出报告不改代码。",
+        "does": [
+          "先读懂变更：读 diff 及其触及的调用方、被调函数、测试与 README，追踪数据真实流向",
+          "按六类查找问题：缺陷、安全与数据丢失风险、规模负载、缺失测试、速度、精简",
+          "报告前逐条核实：每个发现须有具体触发场景，确认调用方存在、值可为空、代码确实未用",
+          "把发现分为必须修、应该修、可选三组并连续编号，每条含是什么、问题、修复、不修的后果",
+          "以 Verdict 结论、可减少行数与未检查项收尾；无问题则直接给出 Looks good. Ship.",
+          "只列发现，不修改任何代码"
+        ],
+        "inputs": [
+          "用户指定的审查对象：未提交或已暂存改动、分支、PR 链接或文件",
+          "未指定时默认审查未提交改动，无改动则审查最后一次提交",
+          "仓库中的 README、部署配置等用于判断预期负载的资料"
+        ],
+        "outputs": [
+          "以 What this change does: 开头的两三句变更说明",
+          "分组编号的审查发现，每条含 What this is、Problem、Fix、If we skip it 四部分",
+          "Verdict 结论行",
+          "存在精简发现时的 Lean: -[N] lines possible 行",
+          "必要时的一行 Not checked 说明"
+        ],
+        "scenarios": [
+          "提交前自查未提交或已暂存的代码改动",
+          "审查某个分支或 PR 链接的变更质量",
+          "检查签名、返回值或行为变更是否破坏未直接改动的调用方",
+          "评估新逻辑是否缺少会在出错时失败的测试",
+          "找出可删除、可复用标准库或应合并拆分的冗余代码"
+        ],
+        "prerequisites": [
+          "能访问待审查的 diff 及被触及的代码、测试与 README",
+          "能确定仓库的预期负载（来自 README 或部署配置）"
+        ],
+        "limits": [
+          "只输出报告，不修改代码",
+          "每个发现必须有具体触发场景，无场景不报",
+          "不评论代码风格，不使用 consider 式模糊担忧",
+          "带 shortcut: 或 ponytail: 注释并写明限制的取舍不算问题，除非预期负载已越过该限制",
+          "修复建议须为最小可行方案，不新增问题不需要的层、框架或配置",
+          "输出使用简单英文短句，首次出现的技术术语需解释"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "测试",
+          "安全",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Quality review of a diff: bugs, security, real load, missing tests, speed, and what to delete."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Each finding says what goes wrong and how to fix it."
+          },
+          {
+            "field": "does",
+            "quote": "Read the diff, then the code it touches: callers of every changed function, the functions it calls, the tests, the README."
+          },
+          {
+            "field": "does",
+            "quote": "Trace the real flow: where data comes in, what is stored, what goes out."
+          },
+          {
+            "field": "does",
+            "quote": "Every finding needs a concrete case: \"this input or situation leads to this wrong result\". No case, no finding."
+          },
+          {
+            "field": "does",
+            "quote": "Then the findings in three groups, skip empty groups:"
+          },
+          {
+            "field": "does",
+            "quote": "Number findings across all groups, so the user can say \"fix 2 and 5\"."
+          },
+          {
+            "field": "does",
+            "quote": "Lists findings, changes no code."
+          },
+          {
+            "field": "inputs",
+            "quote": "Review what the user names: uncommitted or staged changes, a branch, a PR link, or files. Nothing named: the uncommitted changes, or the last commit if there are none."
+          },
+          {
+            "field": "inputs",
+            "quote": "Find the expected load in the repo (README, deploy config): one person running a script, or many users and processes at once."
+          },
+          {
+            "field": "outputs",
+            "quote": "Start with `What this change does:` in two or three sentences."
+          },
+          {
+            "field": "outputs",
+            "quote": "Every finding has all four parts, each one or two short sentences:"
+          },
+          {
+            "field": "outputs",
+            "quote": "`Verdict: Ship.` or `Verdict: fix 1 and 3 first.`"
+          },
+          {
+            "field": "outputs",
+            "quote": "`Lean: -<N> lines possible.` when lean findings exist."
+          },
+          {
+            "field": "outputs",
+            "quote": "`Not checked:` one line, if something mattered and you could not check it."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Find the expected load in the repo (README, deploy config)"
+          },
+          {
+            "field": "limits",
+            "quote": "A shortcut marked with a `shortcut:` (or older `ponytail:`) comment that names its limit is a decision, not a finding, unless the expected load already crosses it."
+          },
+          {
+            "field": "limits",
+            "quote": "No style taste, no \"consider\", no vague worries."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": ".openclaw/skills/ponytail/SKILL.md",
+      "blob_sha": "df5996b4953af9f8c67bb7a13bfe77659003ce4c",
+      "source_url": "https://github.com/DietrichGebert/ponytail/blob/ebd8654c2c627f721eb8f9c0d1bd4090a29f9e10/.openclaw/skills/ponytail/SKILL.md",
+      "fetched_at": "2026-11-24T00:18:43.836Z",
+      "generated_at": "2026-11-24T00:18:43.836Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ponytail",
+        "description": "Lazy senior dev mode for any coding task: the smallest change that fully solves it, and a reply a busy human understands in one read."
+      },
+      "excerpt": "---\nname: ponytail\ndescription: \"Lazy senior dev mode for any coding task: the smallest change that fully solves it, and a reply a busy human understands in one read.\"\nhomepage: https://github.com/DietrichGebert/ponytail\nlicense: MIT\n---\n\n# Ponytail\n\nYou are a lazy senior developer. The best code is the code never written. You solve the whole problem with the least new code. End your reply with one or two lines: what you skipped or did not check, and any risk the user must know.\n\nActive for the whole session until the user says \"stop ponytail\" or \"normal mode\". Switch level: `/ponytail lite|full|ultra`.\n\n## Before you write\n\nRead the task and the code it touches. List every place your change must reach: callers, tests, fixtures, config, exports. Check what your change could break for users: data it would destroy or expose, callers that stop working. That is scope. Extra features are not.\n\n## The smallest complete change\n\nTake the first option that fully works:\n\n1. Does it need to exist? Skip features, options and flexibility nobody asked for, and name them in one line. A vague request (\"build me X\") gets the smallest version that does the core job.\n2. Already in this codebase (a helper, component, service, pattern)? Use it the way the surrounding code does.\n3. Standard library or a platform feature? Use it, unless the project has its own. A house component beats a native widget.\n4. An installed dependency? Use it. Never add a dependency for a few lines.\n5. Can it be one line a reader gets at a glance? One line.\n6. Otherwise: the minimum code that works.\n\n- Be lazy about the solution, never about the change itself: finish every part the task needs, including the callers, tests and fixtures your change breaks.\n- No abstraction, wrapper, type conversion, option, config, boilerplate or \"for later\" code nobody asked for. Keep values in the form the platform already gives you. Deletion beats addition. Keep the structure the codebase already has: its layers, interfaces and conventions.\n- The shortest working diff wins, once you know everything it must touch. A one-liner that needs decoding is not short.\n- Comment only the why the code cannot show, in one line.\n- Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code.\n- Code you move or merge keeps its error handling and validation.\n- Between options of equal size, take the one that is correct on edge cases.\n- Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check. Trivial changes need none.\n- A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`.\n\nNever cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for.\n\n## Levels\n\n| Level | Behavior |\n|-------|----------|\n| **lite** | Build what was asked. Name the smaller option in one line and let the user pick. |\n| **full** | The rules above. Default. |\n| **ultra** | Also question the request: before building, push back on any part the need does not justify. |\n",
+      "card": {
+        "title_zh": "极简资深开发者模式",
+        "purpose_zh": "以“懒惰资深开发者”风格处理编码任务：用最少的新代码完整解决问题，并让忙碌的人一次读懂回复。",
+        "does": [
+          "先读任务与相关代码，列出改动必须触及的调用方、测试、fixture、配置、导出，并评估可能破坏的用户数据或调用方",
+          "按顺序选择最小可行方案：是否需要存在、复用现有代码、标准库或平台特性、已装依赖、一行代码、否则写最小代码",
+          "不添加未被要求的抽象、包装、选项、配置或“以后用”的代码，删除优于新增，保持代码库既有结构与约定",
+          "修 bug 前先 grep 所有调用方，在共享代码中一次性修复根因；移动或合并代码时保留错误处理与校验",
+          "新增非平凡逻辑时留下一个小测试或基于 assert 的自检；已知限制用 `shortcut: [限制], [何时升级]` 注释标注",
+          "回复末尾用一两行说明跳过了什么、没检查什么，以及用户必须知道的风险"
+        ],
+        "inputs": [
+          "编码任务描述",
+          "任务涉及的代码库与相关代码",
+          "用户指定的级别指令，如 `/ponytail lite|full|ultra`"
+        ],
+        "outputs": [
+          "最小完整改动的代码",
+          "针对非平凡逻辑的小测试或 assert 自检",
+          "末尾一两行说明：跳过的内容、未检查的内容、需知风险"
+        ],
+        "scenarios": [
+          "需要以最小改动完成编码任务时",
+          "修复 bug 并定位共享代码根因时",
+          "用户提出模糊需求（如“帮我做个 X”）需要最小可用版本时",
+          "希望回复简洁、一次读懂并附带风险说明时"
+        ],
+        "prerequisites": [
+          "会话中启用该 skill，直到用户说 stop ponytail 或 normal mode",
+          "可读取任务涉及的代码库"
+        ],
+        "limits": [
+          "不添加未被要求的抽象、包装、选项、配置或样板代码",
+          "绝不削减：信任边界校验、防止数据丢失的错误处理、安全、无障碍、真实硬件所需校准、用户明确要求的内容",
+          "非平凡逻辑必须配小测试或自检，平凡改动不需要",
+          "已知捷径须以 `shortcut: [限制], [何时升级]` 注释标注",
+          "级别分 lite、full、ultra，full 为默认"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "后端",
+          "前端",
+          "测试",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Lazy senior dev mode for any coding task: the smallest change that fully solves it, and a reply a busy human understands in one read."
+          },
+          {
+            "field": "does",
+            "quote": "Read the task and the code it touches. List every place your change must reach: callers, tests, fixtures, config, exports."
+          },
+          {
+            "field": "does",
+            "quote": "Take the first option that fully works:"
+          },
+          {
+            "field": "does",
+            "quote": "No abstraction, wrapper, type conversion, option, config, boilerplate or \"for later\" code nobody asked for."
+          },
+          {
+            "field": "does",
+            "quote": "Bug fix: before you edit, grep every caller of the function you touch, then fix the root cause once in the shared code."
+          },
+          {
+            "field": "does",
+            "quote": "Lazy code without its check is unfinished: new non-trivial logic (a branch, a loop, a parser, money or security, or a whole new script or app) leaves one small test or an assert-based self-check."
+          },
+          {
+            "field": "does",
+            "quote": "End your reply with one or two lines: what you skipped or did not check, and any risk the user must know."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Active for the whole session until the user says \"stop ponytail\" or \"normal mode\"."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Switch level: `/ponytail lite|full|ultra`."
+          },
+          {
+            "field": "limits",
+            "quote": "Never cut: validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs, anything the user asked for."
+          },
+          {
+            "field": "limits",
+            "quote": "A shortcut with a known limit gets a code comment in this form: `shortcut: <the limit>, <when to upgrade>`."
+          },
+          {
+            "field": "limits",
+            "quote": "| **full** | The rules above. Default. |"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
     }
   ]
 }
