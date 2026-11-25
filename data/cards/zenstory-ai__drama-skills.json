@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "repo": "zenstory-ai/drama-skills",
-  "tree_sha": "900d96b531aa732d13551c3092ab22ba4b1d5c97",
+  "tree_sha": "16504b5dd45964c6e80e4a213892ec5f344d9a07",
   "truncated_paths": 1,
   "skills": [
     {
       "skill_path": "skills/short-drama-assets/SKILL.md",
       "blob_sha": "51324e5aad948328ed1e369fddb7efc01ac7a170",
-      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/7fed9dfcd33c5a3134ff1b51709dd826488b5aab/skills/short-drama-assets/SKILL.md",
-      "fetched_at": "2026-11-24T00:18:43.836Z",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-assets/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
       "generated_at": "2026-11-24T00:18:43.836Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -137,6 +137,1348 @@
           {
             "field": "limits",
             "quote": "图片提示词、分镜、审查和生产不自动启动。"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama-breakdown/SKILL.md",
+      "blob_sha": "3e5ed84f1fcbe6558251f599c530b50dd166aa97",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-breakdown/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-breakdown",
+        "description": "拆解对标短剧或漫剧成片，测量集长、镜长、对白密度与留钩节奏，提炼可借鉴手法并与本项目同尺比对；也支持将成片反推为标准剧本与制作文档。用户提供视频/字幕说“拆解/对标这部剧”“把视频反推成剧本”时使用；不直接修改原创项目文档。"
+      },
+      "excerpt": "---\nname: short-drama-breakdown\ndescription: 拆解对标短剧或漫剧成片，测量集长、镜长、对白密度与留钩节奏，提炼可借鉴手法并与本项目同尺比对；也支持将成片反推为标准剧本与制作文档。用户提供视频/字幕说“拆解/对标这部剧”“把视频反推成剧本”时使用；不直接修改原创项目文档。\nlicense: MIT\n---\n\n# 短剧拆解学习\n\n## 快速开始\n\n> 下文命令中 `<SKILL_DIR>` 指本 `SKILL.md` 所在目录，`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）。\n\n测量、字幕挂接与对标汇总使用 [breakdown_tool.py](scripts/breakdown_tool.py)，具体命令见[第 2 步](#2-测量)。\n\n## 模式选择（轻量单段速拆 vs 正式对标建档）\n\n- **轻量单段速拆**：用户仅发来单条短视频/单场片段想快速看节奏、镜头切法、开场钩子或叙事结构（不建长期对标库、不做多集同尺统计）时，直接对单段运行一次 `measure`（或在无终端时结合字幕/截图直接拉片），在当前对话中给出清晰的分镜节奏与看点拆解，**无需建立 `REF-ID` 登记目录或多集 `profile`**。\n- **正式对标建档 / 整集还原**：做多集对标统计、与本项目同尺比对差距，或反推标准《剧本.md》及全套五份文档时，按下方完整工作流建档执行。\n\n## 使用边界与职责分工\n\n- 只读取当前对话提供或明确授权的素材。原片、转写稿、缩略图拼图与还原结果一律放在 `输入/对标/<REF-ID>/` 下，不进入正式交付或公开文件；学习用途（`study`）对标剧的真实剧名、专有角色名、逐字台词与独有桥段严禁进入原创项目文档或公开材料（脱敏边界详见 [阶段规范](references/stage-contract.md)）。\n- 还原出来的全套文档只有在明确登记为自有（`owned`）或已获授权（`licensed`）并写明依据时，才能转出对标目录交给下游使用。\n- 本技能只负责测量、拆解、同尺比对与对标还原，不替创作者定节奏数值；本项目的正式创作文档由对应负责技能修改，实测节奏数值须经 `short-drama-develop` 技能拟定方案并由创作者拍板确认后，才写入项目节奏目标。本环节完整规则见 [阶段规范](references/stage-contract.md)。\n\n## 工作流\n\n### 1. 登记对标剧与本轮关注点\n\n给每部对标剧分配固定编号 `REF-ID`，在 `输入/对标/<REF-ID>/对标登记.md`（或外层已立项项目的 `项目开发/对标拆解.md`）记清素材位置、授权用途（`study` / `owned` / `licensed`，后两种须注明授权依据）、是否允许上传给外部模型服务、投放平台与横竖屏画幅、制作形态。创作者未指定具体关注点时，默认直接拆解开篇立题、单集节奏与集尾衔接，不在开场或集间停工反问。\n\n### 2. 测量\n\n按 [测量与观看](references/measure-and-read.md) 抽取样本集。默认先用 `measure` 生成代表帧缩略图拼版并挂接字幕转写拆解全局，仅对创作者指定的重点集或高光段落按需跑 `shots` 逐镜切片（运行环境 `PATH` 需有 `ffmpeg` 与 `ffprobe`）：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/breakdown_tool.py\" measure <视频...> --out 输入/对标/<REF-ID>/measure\n<PYTHON> \"<SKILL_DIR>/scripts/breakdown_tool.py\" transcript <某集.measure.json> <同集字幕.srt>\n<PYTHON> \"<SKILL_DIR>/scripts/breakdown_tool.py\" profile <REF-ID>=输入/对标/<REF-ID>/measure --opening 3\n```\n\n### 3. 看片细读\n\n对照代表帧拼图与带时间戳的转写稿，按 [拆解维度](references/breakdown-dimensions.md) 逐项梳理整剧集长编排、开场第一拍、信息交代方式、对白密度、镜头分切、集尾留钩与跨集衔接、画幅与制作形态；每一项都分开写明**实测与画面事实**、**作用分析**和**待确认盲区**。\n\n- **无原生音视频多模态输入时的降级路径**：若当前智能体环境不支持直接读取视频或音频文件，优先使用外挂字幕（SRT/WebVTT）或本地 ASR 转写稿，配合 `breakdown_tool.py` 生成的代表帧拼图（`*.sheet.jpg`）、字幕拼版（`*.subtitles.sheet*.jpg`）与音轨测量（`audio`）完成拆解与对照；无法从静帧与文字确认的语气、声线、配乐与非字幕人声须明确记为待确认盲区，不凭猜测补全。\n\n### 3a. 视频反推剧本与整集还原（按需）\n\n要把单集或连续多集视频反推成标准《剧本.md》或全套五份制作文档（含拿自家老片续写或重制）时，按 [整集与多集还原](references/reconstruct.md) 在 `输入/对标/<REF-ID>/还原/` 下建独立还原项目：\n\n- **只需反推剧本**：跑 `measure` 与 `subtitles` 并结合全片音画（无原生音视频输入时改用外挂字幕/ASR 转写稿配合拼图关键帧与 `audio` 测量）直接写出跨集统一的《剧本.md》，不切单镜视频。\n- **需还原全套五份文档**：对目标集加跑 `shots` 导出单镜切片与首中尾静帧，补齐视觉设定、分镜、图片与视频提示词；跨集人物表、原片穿帮与核对记录统一放入 `还原/审查/还原核对.md`。\n\n### 4. 提炼可借鉴手法\n\n在多部对标剧里反复出现、且能说清帮观众解决了什么观看痛点的做法，整理为可借鉴手法（写明适用场景、实际观看效果、什么情况下会失灵、哪些原片独有桥段不能照抄）；只在单部剧里见到的做法标为单部个例。提炼出的手法交 `short-drama-develop` 技能汇总，供后续写剧本参考。\n\n### 5. 同尺对照与分工移交\n\n用 `measure` 实测自家成片（尚无成片时，结合 `short-drama-write` 技能的单集估时与本项目 `分镜.md` 镜长做纸面估算），按 [差距对照与分工移交](references/gap-and-learning-loop.md) 与对标剧放在同一把尺子下并排拉出差距表。直接区分建议补强的差距与疑似有意取舍的设计，需要补强的项连同实测依据转交对应的负责技能（新项目刚起步时，把实测数据交 `short-drama-develop` 技能作为拟定节奏目标的参考依据）。\n\n### 6. 归档拆解记录\n\n将对标清单（隐私与脱敏边界见 [阶段规范](references/stage-contract.md)）、实测统计、可借鉴手法、同尺差距表及后续成片同尺复测结果整理写入 `项目开发/对标拆解.md`。\n",
+      "card": {
+        "title_zh": "短剧拆解学习",
+        "purpose_zh": "拆解对标短剧或漫剧成片，测量集长、镜长、对白密度与留钩节奏，提炼可借鉴手法并与本项目同尺比对；也支持将成片反推为标准剧本与制作文档。",
+        "does": [
+          "登记对标剧编号、素材位置、授权用途与画幅形态",
+          "用脚本测量视频集长、镜头与音轨并挂接字幕转写",
+          "对照代表帧拼图与带时间戳转写稿逐项拆解节奏与结构",
+          "按需将单集或多集视频反推为剧本及全套制作文档",
+          "提炼可借鉴手法并区分单部个例",
+          "与自家成片同尺比对生成差距表并归档拆解记录"
+        ],
+        "inputs": [
+          "对标短剧或漫剧视频文件",
+          "外挂字幕（SRT/WebVTT）或本地 ASR 转写稿",
+          "创作者指定的关注点与重点集",
+          "对标剧授权用途说明（study/owned/licensed）",
+          "本项目分镜与单集估时（无成片时用于纸面估算）"
+        ],
+        "outputs": [
+          "代表帧缩略图拼版与字幕拼版",
+          "带时间戳的转写稿与音轨测量结果",
+          "对标登记文件与拆解记录（项目开发/对标拆解.md）",
+          "可借鉴手法清单与同尺差距表",
+          "反推的《剧本.md》及全套五份制作文档（按需）",
+          "还原核对记录"
+        ],
+        "scenarios": [
+          "快速拆解单条短视频的节奏、镜头切法与开场钩子",
+          "多集对标统计并与本项目同尺比对差距",
+          "把成片反推成标准剧本或全套制作文档",
+          "提炼对标剧可借鉴手法供写剧本参考",
+          "对自家成片做同尺复测"
+        ],
+        "prerequisites": [
+          "Python 3.9+ 解释器",
+          "运行环境 PATH 中有 ffmpeg 与 ffprobe",
+          "素材为当前对话提供或明确授权",
+          "无原生音视频输入时需外挂字幕或 ASR 转写稿"
+        ],
+        "limits": [
+          "只读取当前对话提供或明确授权的素材",
+          "不直接修改原创项目文档，正式创作文档由对应技能修改",
+          "不替创作者定节奏数值，实测数值须经创作者拍板",
+          "study 用途对标剧的剧名、角色名、逐字台词与独有桥段不得进入原创文档或公开材料",
+          "还原文档仅在登记为 owned 或 licensed 并写明依据时才能转出对标目录",
+          "无法从静帧与文字确认的语气、声线、配乐须记为待确认盲区"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "视频",
+          "写作",
+          "调研",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "拆解对标短剧或漫剧成片，测量集长、镜长、对白密度与留钩节奏，提炼可借鉴手法并与本项目同尺比对；也支持将成片反推为标准剧本与制作文档。"
+          },
+          {
+            "field": "does",
+            "quote": "测量、字幕挂接与对标汇总使用 [breakdown_tool.py](scripts/breakdown_tool.py)"
+          },
+          {
+            "field": "does",
+            "quote": "对照代表帧拼图与带时间戳的转写稿，按 [拆解维度](references/breakdown-dimensions.md) 逐项梳理整剧集长编排、开场第一拍、信息交代方式、对白密度、镜头分切、集尾留钩与跨集衔接、画幅与制作形态"
+          },
+          {
+            "field": "does",
+            "quote": "要把单集或连续多集视频反推成标准《剧本.md》或全套五份制作文档（含拿自家老片续写或重制）时"
+          },
+          {
+            "field": "does",
+            "quote": "在多部对标剧里反复出现、且能说清帮观众解决了什么观看痛点的做法，整理为可借鉴手法"
+          },
+          {
+            "field": "does",
+            "quote": "与对标剧放在同一把尺子下并排拉出差距表"
+          },
+          {
+            "field": "does",
+            "quote": "将对标清单（隐私与脱敏边界见 [阶段规范](references/stage-contract.md)）、实测统计、可借鉴手法、同尺差距表及后续成片同尺复测结果整理写入 `项目开发/对标拆解.md`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<PYTHON>` 指 Python 3.9+ 解释器"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "运行环境 `PATH` 需有 `ffmpeg` 与 `ffprobe`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "只读取当前对话提供或明确授权的素材。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "优先使用外挂字幕（SRT/WebVTT）或本地 ASR 转写稿"
+          },
+          {
+            "field": "limits",
+            "quote": "本技能只负责测量、拆解、同尺比对与对标还原，不替创作者定节奏数值"
+          },
+          {
+            "field": "limits",
+            "quote": "不直接修改原创项目文档"
+          },
+          {
+            "field": "limits",
+            "quote": "学习用途（`study`）对标剧的真实剧名、专有角色名、逐字台词与独有桥段严禁进入原创项目文档或公开材料"
+          },
+          {
+            "field": "limits",
+            "quote": "还原出来的全套文档只有在明确登记为自有（`owned`）或已获授权（`licensed`）并写明依据时，才能转出对标目录交给下游使用。"
+          },
+          {
+            "field": "limits",
+            "quote": "无法从静帧与文字确认的语气、声线、配乐与非字幕人声须明确记为待确认盲区，不凭猜测补全。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "<PYTHON> \"<SKILL_DIR>/scripts/breakdown_tool.py\" measure <视频...> --out 输入/对标/<REF-ID>/measure"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "在 `输入/对标/<REF-ID>/还原/` 下建独立还原项目"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama-develop/SKILL.md",
+      "blob_sha": "ac44383cc762203103727186c05721a1eaea8932",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-develop/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-develop",
+        "description": "将短剧/漫剧点子、梗概、已拆解的原著材料或多集完整剧本整理为改编方案、立项简报、导演阐述、核心冲突设定与分集大纲。用户说“开发短剧”“做故事设定/分集规划”“写导演阐述”“从多集剧本补分集大纲”时使用；不含长篇拆书、项目配置或单集写作。"
+      },
+      "excerpt": "---\nname: short-drama-develop\ndescription: 将短剧/漫剧点子、梗概、已拆解的原著材料或多集完整剧本整理为改编方案、立项简报、导演阐述、核心冲突设定与分集大纲。用户说“开发短剧”“做故事设定/分集规划”“写导演阐述”“从多集剧本补分集大纲”时使用；不含长篇拆书、项目配置或单集写作。\nlicense: MIT\n---\n\n# 短剧开发\n\n把创作者的原始想法落成能推着人物做抉择、付代价、变局面的故事框架，守住创作者对题材、结局走向和尺度的拍板权。常见桥段套路仅作备选参考。\n\n## 快速开始\n\n> 下文命令中 `<SKILL_DIR>` 指本 `SKILL.md` 所在目录，`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）。\n\n为多集完整剧本建立精确分集字节索引，或校验已编写的 `episode-map.jsonl` 结构与原著章节映射：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/episode_intake.py\" index <多集完整剧本> --out <episode-intake-index.json>\n<PYTHON> \"<SKILL_DIR>/scripts/episode_intake.py\" check-map <episode-map.jsonl> [--novel-index <_index.json>]\n```\n\n> **无终端 / 无 Python 兜底**：若当前对话环境不支持执行本地脚本，故事开发、简报编写、单集/多集分集大纲规划均可直接在对话中完成；多集来稿由用户按集或分批粘贴正文即可逐批梳理分集大纲，无需强求脚本切片。\n\n## 开始前\n\n本技能可独立运行；若已安装 `short-drama` 技能且处于项目内，可交由其读取全局配置或写入已确认的节奏与制作配置。[开发阶段职责与规则](references/stage-contract.md) 说明本环节职责范围、画风/制作形态要求与 `STY-*` 规则表，无需读取其他技能的文件。\n\n## 按体量选入口，不设多余门禁\n\n1. **轻量单集或迷你短篇项目**：支持直接在 `creative-brief.md` 写一份**合一简纲**（意图 + 核心冲突 + 简明分场/分集脉络），不强制拆 `story-engine.md` 与 `episode-map.jsonl`，写完即可交 `short-drama-write` 技能开写剧本。\n2. **已有明确设定、详细梗概或原著材料**：**直接顺着既有方向深挖落地，不再强行停下来凑 2～3 个备选方向等拍板**；只在缺失信息会颠覆主角立场、核心矛盾或结局底线时才追问。\n3. **只有模糊点子、题材或情绪**：给出两三个打法真正不同的备选方向（换破局手段、压制方式或代价落点，不只改剧名职业）供创作者挑选。\n4. **已有单集剧本**：不硬补开发文档；写剧本或改稿交 `short-drama-write` 技能，拆视觉设定或后续制作直接从对应技能切入。\n5. **已有多集完整剧本/选集稿，要生成或更新分集大纲**：原稿不动，加载 [多集完整剧本导入与分段续拆](references/multi-episode-intake.md)（支持从非第 1 集起步、跳集选拆与批次覆盖更新）。\n\n## 核心开发步骤（按项目体量裁剪）\n\n### 1. 敲定创作底线与核心看点\n\n理清不能改的关键事实/主题/人物/结局走向、可发挥的留白、制作条件限制与核心看点兑现。新项目复制 [creative-brief.md](assets/creative-brief.md)；改动已确认设定时说明改动点及下游影响，不静默覆盖。\n\n- 核心看点、主线矛盾引擎与人物弧光推演（含系统/规则类的机制循环）：读 [故事核与人物开发](references/story-and-character-craft.md)。\n- 题材落位：从 [genre-cards.md](references/genre-cards.md) 按需查取 **1 张**主赛道题材卡找准阻力与细节（内部参考，不写入交付文档）。\n- 跨题材开场钩子对比，或带有重生预知、系统外挂等高概念奇招：读 [genre-and-hook-playbook.md](references/genre-and-hook-playbook.md)（首集 3 秒强冲突拍脸仅作常规爽剧默认做法，悬疑、温情生活流、年代情感等题材可采用环境异象、点睛独白或日常切口开场）。\n\n### 2. 搭好核心矛盾与人物关系网（中长篇适用）\n\n多集连载项目复制 [story-engine.md](assets/story-engine.md)，写清危机触发、主角破局路数与软肋、对手变招反扑、主要人物小传与双向拿捏关系、信息差与伏笔台账。人物前史切入、弧光成长与跨集连戏备忘同样见 [故事核与人物开发](references/story-and-character-craft.md)。\n\n### 3. 按需编制分集大纲 (`episode-map.jsonl`)\n\n`episode-map.jsonl` 定位为**多集连载长剧的按需轻量分集状态账**。需要排多集连载时，读 [分集架构与节奏设计](references/episode-architecture.md) 并复制 [episode-map.jsonl](assets/episode-map.jsonl)（12 个精简扁平核心键：`episode_id`、`title`、`goal`、`hook`、`conflict`、`turn`、`climax`、`ending_hook`、`handoff_state`、`setup_payoff`、`locations`、`characters`），只记本集核心推进与单向交接，不重复抄写上一集状态。\n\n- 常规连载集在抛出集尾悬念前宜先落定一个本集阶段结果；单元温情剧也可在情绪落点舒缓收束。\n- 按制作形态提出节奏参考起点，经创作者确认后由 `short-drama` 技能写入 `creator_authority.rhythm_profile`。写单集剧本时若发现原分集切分或节奏排布存在结构卡点，路由回 `short-drama-develop` 技能更新 `episode-map.jsonl` / `adaptation-map.jsonl`，不由下游技能直接改写。\n\n### 4. 自检并交接\n\n提交前核对：集号与伏笔埋收编号前后一致、未定项已标明；每次冲突升级带来实质处境变化；改编项目保住原著核心人物立场与主线脉络，重要新增项已单列说明。已编写 `episode-map.jsonl` 时，可运行 `<PYTHON> \"<SKILL_DIR>/scripts/episode_intake.py\" check-map <episode-map.jsonl> [--novel-index <_index.json>]` 做确定性语法、集号唯一递增、12 个核心键及可选原著章节区间核对（结构错误阻断，空字段或区间越界仅软提醒）。需要独立审稿结论时调用 `short-drama-review` 技能；需要起草全剧视听总纲或拆解对标材料时读 [director-brief-craft.md](references/director-brief-craft.md)。\n\n## 产物与边界\n\n规则分级与阻断级 `STY` 不变量见 [stage-contract.md](references/stage-contract.md)。本技能按需维护：\n\n- `项目开发/creative-brief.md`（轻量项目可直接含合一简纲）\n- `项目开发/story-engine.md`（中长篇或复杂人物关系按需使用）\n- `项目开发/episode-map.jsonl`（多集连载按需分集状态账）\n- `项目开发/director-brief.md`（按需）\n- `项目开发/adaptation-map.jsonl`（百万字级长篇或大跨度重排按需使用，例见 [adaptation-map.example.jsonl](assets/adaptation-map.example.jsonl)）\n- `项目开发/episode-intake-index.json`（多集剧本导入时可随时重建的字节索引）\n\n不写具体场次动作与台词（归 `short-drama-write` 技能），不拆视觉设定，不写生图/视频提示词，不生成媒体文件，也不出具终审结论。\n\n## 按需加载\n\n- **核心看点、矛盾引擎、机制循环、人物前史与弧光、信息差与伏笔回收**：[story-and-character-craft.md](references/story-and-character-craft.md)\n- **分集状态账、首集切入与钩子、揭秘反转兑现、前因后果节拍与节奏参考标准**：[episode-architecture.md](references/episode-architecture.md)\n- **已有多集完整剧本/选集稿，精确切片、分段续拆与批次覆盖合并**：[multi-episode-intake.md](references/multi-episode-intake.md)\n- **小说改编必保取舍、支线删并、文字外化与高光前移因果修补**：[adaptation-craft.md](references/adaptation-craft.md)\n- **跨题材推进对比、多元开场留钩语法与高概念奇招（重生/系统限制底表）**：[genre-and-hook-playbook.md](references/genre-and-hook-playbook.md)\n- **题材目录与 15 张赛道参考卡（每次按需读一张）**：[genre-cards.md](references/genre-cards.md)\n- **导演阐述写法、对标作品门道提炼与分集字数参考区间**：[director-brief-craft.md](references/director-brief-craft.md)\n- **本阶段职责边界、制作形态四要素与 `STY` 规则表**：[stage-contract.md](references/stage-contract.md)\n",
+      "card": {
+        "title_zh": "短剧开发",
+        "purpose_zh": "把短剧/漫剧点子、梗概、原著材料或多集剧本整理为改编方案、立项简报、导演阐述、核心冲突设定与分集大纲，守住创作者对题材、结局和尺度的拍板权。",
+        "does": [
+          "将模糊点子给出两三个打法不同的备选方向供创作者挑选",
+          "已有设定或原著材料时顺着既有方向深挖落地为开发文档",
+          "编写或更新creative-brief、story-engine、episode-map等开发产物",
+          "为多集完整剧本建立字节索引并校验分集大纲结构与章节映射",
+          "按需起草导演阐述、改编映射与分集节奏参考",
+          "提交前自检集号、伏笔编号与冲突升级的实质处境变化"
+        ],
+        "inputs": [
+          "短剧/漫剧点子、题材或情绪",
+          "梗概、详细设定或原著材料",
+          "多集完整剧本或选集稿",
+          "已编写的episode-map.jsonl",
+          "创作者对题材、结局走向与尺度的拍板意见"
+        ],
+        "outputs": [
+          "项目开发/creative-brief.md（可含合一简纲）",
+          "项目开发/story-engine.md",
+          "项目开发/episode-map.jsonl",
+          "项目开发/director-brief.md",
+          "项目开发/adaptation-map.jsonl",
+          "项目开发/episode-intake-index.json"
+        ],
+        "scenarios": [
+          "用户说开发短剧、做故事设定或分集规划",
+          "用户要写导演阐述",
+          "从多集剧本补分集大纲",
+          "已有原著材料需整理改编方案",
+          "只有模糊点子需要备选方向"
+        ],
+        "prerequisites": [
+          "脚本功能需Python 3.9+解释器，Unix/macOS用python3，Windows用py -3或python",
+          "无终端或无Python时可在对话中直接完成开发与分集梳理，由用户按集粘贴正文",
+          "若已安装short-drama技能且处于项目内，可交由其读取全局配置或写入已确认的节奏与制作配置"
+        ],
+        "limits": [
+          "不写具体场次动作与台词，归short-drama-write技能",
+          "不拆视觉设定，不写生图/视频提示词，不生成媒体文件",
+          "不出具终审结论，需独立审稿时调用short-drama-review技能",
+          "不含长篇拆书、项目配置或单集写作",
+          "题材卡为内部参考，不写入交付文档",
+          "改动已确认设定时须说明改动点及下游影响，不静默覆盖"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "视频",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "将短剧/漫剧点子、梗概、已拆解的原著材料或多集完整剧本整理为改编方案、立项简报、导演阐述、核心冲突设定与分集大纲。"
+          },
+          {
+            "field": "does",
+            "quote": "**只有模糊点子、题材或情绪**：给出两三个打法真正不同的备选方向（换破局手段、压制方式或代价落点，不只改剧名职业）供创作者挑选。"
+          },
+          {
+            "field": "does",
+            "quote": "**已有明确设定、详细梗概或原著材料**：**直接顺着既有方向深挖落地，不再强行停下来凑 2～3 个备选方向等拍板**"
+          },
+          {
+            "field": "does",
+            "quote": "为多集完整剧本建立精确分集字节索引，或校验已编写的 `episode-map.jsonl` 结构与原著章节映射"
+          },
+          {
+            "field": "does",
+            "quote": "需要起草全剧视听总纲或拆解对标材料时读 [director-brief-craft.md](references/director-brief-craft.md)。"
+          },
+          {
+            "field": "does",
+            "quote": "每次冲突升级带来实质处境变化；改编项目保住原著核心人物立场与主线脉络，重要新增项已单列说明。"
+          },
+          {
+            "field": "inputs",
+            "quote": "用户说“开发短剧”“做故事设定/分集规划”“写导演阐述”“从多集剧本补分集大纲”时使用"
+          },
+          {
+            "field": "outputs",
+            "quote": "- `项目开发/creative-brief.md`（轻量项目可直接含合一简纲）"
+          },
+          {
+            "field": "outputs",
+            "quote": "- `项目开发/episode-intake-index.json`（多集剧本导入时可随时重建的字节索引）"
+          },
+          {
+            "field": "scenarios",
+            "quote": "用户说“开发短剧”“做故事设定/分集规划”“写导演阐述”“从多集剧本补分集大纲”时使用"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "若当前对话环境不支持执行本地脚本，故事开发、简报编写、单集/多集分集大纲规划均可直接在对话中完成"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "若已安装 `short-drama` 技能且处于项目内，可交由其读取全局配置或写入已确认的节奏与制作配置。"
+          },
+          {
+            "field": "limits",
+            "quote": "不写具体场次动作与台词（归 `short-drama-write` 技能），不拆视觉设定，不写生图/视频提示词，不生成媒体文件，也不出具终审结论。"
+          },
+          {
+            "field": "limits",
+            "quote": "不含长篇拆书、项目配置或单集写作。"
+          },
+          {
+            "field": "limits",
+            "quote": "题材落位：从 [genre-cards.md](references/genre-cards.md) 按需查取 **1 张**主赛道题材卡找准阻力与细节（内部参考，不写入交付文档）。"
+          },
+          {
+            "field": "limits",
+            "quote": "改动已确认设定时说明改动点及下游影响，不静默覆盖。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "<PYTHON> \"<SKILL_DIR>/scripts/episode_intake.py\" index <多集完整剧本> --out <episode-intake-index.json>"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama-edit/SKILL.md",
+      "blob_sha": "0cad9e0214e2ac8d7a4eb44e5e9ce75b72f2d59e",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-edit/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-edit",
+        "description": "将已生成的短剧镜头与配音剪成成片，编写剪辑单并完成渲染验收。用于“剪成成片/套剪”“加字幕/画面文字”“统一响度”“调整成片剪辑节奏、配乐/字幕混音与渲染导出”或导出精修素材；需补素材或改故事时转回上游阶段。"
+      },
+      "excerpt": "---\nname: short-drama-edit\ndescription: 将已生成的短剧镜头与配音剪成成片，编写剪辑单并完成渲染验收。用于“剪成成片/套剪”“加字幕/画面文字”“统一响度”“调整成片剪辑节奏、配乐/字幕混音与渲染导出”或导出精修素材；需补素材或改故事时转回上游阶段。\nlicense: MIT\n---\n\n# 短剧剪辑与成片\n\n把 `剧集/<EP>/制作成果/` 里的逐镜素材剪辑合成一条成片，并将入出点、镜序、声音、字幕与取舍依据写进 `剧集/<EP>/剪辑单.md`。\n\n## 快速开始\n\n```text\n用 short-drama-edit 技能把 EP001 已生产的镜头剪成成片\n```\n\n## 入口与边界\n\n- **前置条件**：正式 `check` 与 `render` 需要 `剧集/<EP>/制作成果/` 中已有可读的视频文件（或关键帧图片与配音文件），且本机已安装 `ffmpeg` 与 `ffprobe`（工具会自动回退查找 `~/.local/bin`、`/opt/homebrew/bin`、`/usr/local/bin`，仍缺失时直接报错退出）。**投产前纸面预检**：素材尚未生成前，可先运行 `check --plan-only` 校验剪辑单算术、上游 ID、剧本逐字字幕、画面文字结构、未采用镜头与路径安全，仅将尚未生成的本地素材降级为提醒。**`libass` 说明**：默认 `ffmpeg` 硬字幕与无 Remotion 兜底 `字卡` 均依赖编译进 `libass`（`ass` 滤镜）的 `ffmpeg`（例如 macOS Homebrew 需安装 `ffmpeg-full`）；若当前 `ffmpeg` 不含 `libass`，请改用 `--subtitles remotion`、`--overlay-renderer <cmd>` 或 `--no-subtitles` / `--screen-text-mode off`。同宽高比但分辨率或帧率不同的素材，`check` 给出提醒并由 `render` 自动统一至交付规格；宽高比明显不同（如横屏混入竖屏）时报错拦截，需先用外部工具统一画幅。\n- **不反向篡改上游定稿文档**：镜序与镜头作用对照 `分镜.md` 与 `视频提示词.md`，对白、VO、OS、场头时空与 `[画面文字]` 对照 `剧本.md`。剪辑阶段可裁短、删减、调序或用 `--partial` 局部试剪，但不回写上游定稿文档，也不擅自加塞无剧本依据的台词。\n- **跨阶段分工**：补拍、重出或换参考图转 `short-drama-produce` 技能；改提示词转 `short-drama-video-prompts` 或 `short-drama-image-prompts` 技能；改台词或剧情转 `short-drama-write` 技能；成片审片交 `short-drama-review` 技能或创作者把关。\n\n## 工作流\n\n1. **标定可用区间**：完整播放每条素材，记下画面可用的起止秒数及区间外的毛病（开头呆立、结尾走样、画面发白、动作回弹、重复动作），见 [素材检视与入出点](references/editing-guide.md#素材检视与入出点)。\n2. **定位台词起止与入出点**：带台词的镜头先听准整句字音起止与句间停顿；在可用区间内按起手动作、表情反应或气口定入点，在信息交代完毕且穿帮露头前定出点，逐段写清取舍理由。\n3. **排定镜序与接镜调色**：核对相邻镜头的动作衔接、空间方位与揭晓顺序；`render` 默认在同场次内执行自动接镜，需手动微调或跳过校正的段落单写 `画面` 行，见 [镜序、镜头下落与打戏切法](references/editing-guide.md#镜序镜头下落与打戏切法) 与 [接镜调色与颗粒](references/editing-guide.md#接镜调色与颗粒)。\n4. **处理声音、字幕与可选图文叠加层**：按需配置 `音效`、`配音`、`环境声`、`字幕` 与可选的 `画面文字`（见 [声音字幕与响度](references/editing-guide.md#声音字幕与响度)）。\n5. **保存、渲染与看片验收**：写出或更新 `剧集/<EP>/剪辑单.md`（未改动段落保留原 `CUT-...` 编号）；素材尚未生成时可先运行 `check --plan-only` 做纸面预检，素材到位后依次运行 `check`、`render`、`verify`（试剪单场或前几镜时传 `--partial`），按 [成片看片与交付验收](references/editing-guide.md#成片看片与交付验收) 抽帧看画面、回听切点后再交付。\n\n## 剪辑单概览\n\n每份 `剧集/<EP>/剪辑单.md` 由**开头交付规格**（目标时长、画幅帧率、交付响度、字幕，可选 `接镜匹配`/`颗粒`/`未采用镜头`）与按序排列的**剪辑段**（`## CUT-<EP>-<序号> · <名称>`）组成：\n\n- **视频与静帧段**：每段绑定一个上游来源（视频段 `MOTION-...`/`GROUP-...`，静帧段 `SHOT-...`/`IMG-...`）与真实媒体路径，写清两位小数秒数的 `入点`/`出点`/`时长` 与具体画面 `取舍` 理由（同源视频重叠仅在写明 `- 重放：` 时放行）。\n- **声音与字幕**：支持挂载 `音效`、`配音`、`环境声` 与逐字照抄《剧本.md》的 `字幕`（支持整段单句 `- 字幕：<台词>`、单句定时 `- 字幕：<起>-<止> <台词>` 或搭配 `- 字幕时间：<起>-<止>`、以及多句编号 `- 字幕 1：<起>-<止> <台词>`，均支持 `重点` 词高亮）；静帧段支持 `运镜` 参数。\n- **可选画面文字叠加层**：`字卡`、`卡片`、`角标` 为通用叠字样式，`系统面板`/`任务面板`（含品阶标签与倒计时）为面向系统流题材预置的**可选模板**，非此类题材无需使用。\n\n完整字段语法、取值范围与标点约定见 [剪辑单格式规范](references/format-spec.md)，成稿示范见 [剪辑单样例](assets/剪辑单.md)。\n\n## 命令与无 Remotion 降级路径\n\n> 下文命令中 `<SKILL_DIR>` 指本 `SKILL.md` 所在目录，`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）。\n\n命令行工具由 [edit_tool.py](scripts/edit_tool.py) 提供：\n\n```text\n<PYTHON> \"<SKILL_DIR>/scripts/edit_tool.py\" check <剧集/EP001> --project-root <project> [--partial] [--plan-only]\n<PYTHON> \"<SKILL_DIR>/scripts/edit_tool.py\" render <剧集/EP001> --project-root <project> [--partial] [--no-subtitles] [--subtitles ffmpeg|remotion] [--screen-text-mode auto|remotion|ffmpeg|off] [--overlay-renderer <cmd>] [--remotion-workspace <outside-project-dir>] [--remotion-concurrency N]\n<PYTHON> \"<SKILL_DIR>/scripts/edit_tool.py\" verify <剧集/EP001> --project-root <project>\n```\n\n- `check`（硬检查与软门禁分离）：\n  - **硬阻断（`findings`，退出码 1）**：仅对百分百确定性的结构、安全与媒体缺陷拦截——缺失/不可读素材、越界或符号链接路径、入出点算术或边界错误、奇偶像素不合法、画幅宽高比冲突、同源视频未标 `重放` 的区间重叠、上游来源/剧本原文缺失或语法无效。\n  - **软门禁（`提醒`，不阻断渲染）**：需要 Agent 或创作者结合语境复核的经验项——同宽高比分辨率/帧率自动缩放、快闪静帧（`< 0.50s`）、短抢话或标注 `叠音` 的配音交叠、素材修改时间晚于剪辑单、同场运镜突变、目标时长大幅偏差、偏短字幕时间窗及 `--partial` 下的未入片镜头。\n  - **纸面预检（`--plan-only`，仅用于 `check`）**：用于音视频素材生成前先审纸面剪辑单。所有确定性文档与安全规则（入出点算术、来源 ID 对照、逐字字幕与画面文字出处、未采用镜头登记、路径越界与符号链接拦截）仍为硬阻断；**仅将尚未生成的本地素材缺失降级为 `提醒`**（无硬错误时退出码 `0`，并在 `未测` 中如实列出缺失素材的实测项）。标准 `check`（不传 `--plan-only`）与 `render` 不受影响，缺素材仍硬阻断。\n- `render`：裁切分段、统一同比例分辨率与帧率、生成静帧运镜、同场自动接镜、拼接画面、混音、烧录字幕与可选图文层并统一响度，输出至 `剧集/<EP>/制作成果/成片/` 并保留分段中间文件。默认字幕走 `ffmpeg`（`libass`，**无需 Node/Remotion**），横屏（`width > height`）与竖屏（`9:16`）自动适配字幕底边距与英文按词换行；`--screen-text-mode` 控制 `画面文字` 渲染方式（默认 `auto`）：\n  - `auto`（默认）：存在复杂样式（`卡片`/`系统面板`/`任务面板`/`角标`）或本机已安装/显式配置 Remotion 时，走可选的 [Remotion 图文叠加层](assets/remotion/README.md)（默认并发数为 2）；未装 Node/Remotion 且全片仅含普通 `字卡` 时，自动降级为 `ffmpeg` ASS 烧录并在报告中给出提醒。\n  - `ffmpeg`：强制用 `ffmpeg` ASS 烧录普通 `字卡`（遇复杂面板样式时报错拦截）。\n  - `remotion`：强制走 Remotion 渲染全部 `画面文字` 叠层。\n  - `off`：跳过全部 `画面文字` 叠层，其余裁切、混音与字幕烧录照常执行。\n  - `--overlay-renderer <cmd>`（外置叠层协议）：可选覆盖内置 Remotion；写出 `叠层.props.json`（含 `width`/`height`/`fps`/`durationInSeconds`/`cues`/`layers`）并调用 `<cmd> --props <props.json> --output <overlay.webm>` 生成透明叠层视频再由 `ffmpeg` 叠合（也支持命令中显式使用 `{props}` / `{output}` 占位符）。\n- `verify`（纯测量 + 软提醒，始终退出 0）：实测成片总时长、综合响度与真峰值，列出图文与音轨起止秒数，并在 `提醒`（及 `请逐帧查看` / `请回听`）中汇总响度/真峰偏离、切点亮度跳变、切点音量跳变与疑似坏帧位置，提醒 Agent 与创作者重点抽查，不做粗暴阻断。\n\n**无 Node / Remotion 环境时的降级方案**：\n\n1. **纯 `ffmpeg` 出片（含普通 `字卡`）**：使用默认 `--screen-text-mode auto`（或显式 `--screen-text-mode ffmpeg`）搭配默认 `--subtitles ffmpeg`，无需 Node/Remotion 即可完成裁切、接镜、混音、字幕及普通 `字卡` 烧录。\n2. **跳过画面文字直接出片**：剪辑单里带有复杂面板但当前环境未装 Node/Remotion 时，可传 `--screen-text-mode off` 跳过全部 `画面文字` 叠层并保留字幕烧录出片。\n3. **交外部剪辑软件精修**：需要复杂画面文字、花字特效或转场但未装 Node/Remotion 时，先用 `--screen-text-mode off`（可按需加 `--no-subtitles`）渲染干净成片并保留分段中间文件，连同 `剧集/<EP>/剪辑单.md`（及 SRT/ASS 字幕）导入剪映、Premiere 或 DaVinci Resolve 叠加图文与精修混音。\n\n## 按需参考\n\n- 完整字段语法与可选图文模板定义：[剪辑单格式规范](references/format-spec.md)\n- 入出点、打戏节奏、接镜调色、静帧运镜、声音字幕与看片验收：[短剧剪辑实务指南](references/editing-guide.md)\n- 阶段边界与 `EDT-*` 规则表：[阶段职责与规则](references/stage-contract.md)\n- 可选 Remotion 叠加层安装与跨平台运行说明：[Remotion 图文叠加层](assets/remotion/README.md)\n- 完整剪辑单参考样例：[剪辑单样例](assets/剪辑单.md)\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/short-drama-image-prompts/SKILL.md",
+      "blob_sha": "3c03e63ec42f3e29264b2abde03ca247521d7a8a",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-image-prompts/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-image-prompts",
+        "description": "为角色/场景/道具设定图、视觉定调测试图、状态变化图、局部改图及需单出的首尾帧静图编写可直接复制的静态图片提示词，写入《图片提示词.md》。不负责项目级制作形态选型或 Lookdev 统筹、不拆视觉设定，也不直接调用外部模型出图。"
+      },
+      "excerpt": "---\nname: short-drama-image-prompts\ndescription: 为角色/场景/道具设定图、视觉定调测试图、状态变化图、局部改图及需单出的首尾帧静图编写可直接复制的静态图片提示词，写入《图片提示词.md》。不负责项目级制作形态选型或 Lookdev 统筹、不拆视觉设定，也不直接调用外部模型出图。\nlicense: MIT\n---\n\n# 短剧美术设定图提示词\n\n将视觉设定写成可直接复制的角色设定图、场景空镜设定图、道具设定图、状态变化图、局部改图或视觉定调图（Lookdev）提示词。\n\n## 快速开始\n\n```text\n使用 short-drama-image-prompts 技能，为 EP001 已确定的人物、地点和道具写可直接复制的图片提示词\n```\n\n## 模式选择（正式项目 vs 轻量起草）\n\n- **轻量 / 草稿模式**：用户仅要求为单个角色、场景、道具或测试画面快速起草几条静态图片提示词（无完整短剧项目目录）时，直接输出简短用途说明与可直接复制的提示词正文，**不强制套用完整项目的 `IMG-...` / `REF-...` 槽位语法**。\n- **正式项目模式**：落盘 `剧集/<EP>/图片提示词.md` 或衔接跨文档自动校验、创作台展示与内置批量出图时，完整遵循 [图片提示词格式规范](references/format-spec.md)（含 `## IMG-... · <名称>`、`- 参考：` 语法与 `### 可复制提示词` 引用块）。\n\n## 语种与工作流要求\n\n- **双语分工**：说明文字跟随项目语言；可复制提示词正文跟随 `short-drama.json#/format/prompt_language`（无配置文件时按已有提示词或项目文档语种推断，未指定时使用用户当前语言）。\n- **核心工作流**：\n  1. **核对设定与板式**：对照 `视觉设定.md` 确认本项属于角色设定图、换装/状态图、场景空镜图、道具设定图、分栏对照设定板、视觉定调图还是局部改图（分镜需单出尾帧图时，可将定稿「尾帧提示词」落成独立 `IMG-...` 状态图条目）。\n  2. **核心特征优先落笔**：按「设定图类型与主体 → 固定核心外观 → 本张造型/视角/状态 → 构图版式与尺寸参照 → 材质色彩与布光 → 背景清场与字迹排除项」组织正文（见 [美术设定图与视觉定调指南](references/sheet-prompt-guide.md)）。单图默认画单一共存状态，同板展示开合或多分区对照须明确声明分栏；多视图并排时按当前提示词语言补充无视图标签/尺寸标注约束。\n  3. **落实连戏锁与字迹规则**：被 `视觉设定.md` 的 `连戏锁` 点名的 `IMG-...` 条目须把 `锁定词` 原字带入 `### 可复制提示词`；画面字迹严格遵循设定规则，要求生成可读文字时绝不同时挂全局禁字词（详见 [阶段规则](references/stage-contract.md)）。\n  4. **干净正文与直接改稿**：`### 可复制提示词` 内不夹条目编号、文件路径或流程备注；收到明确的改词或局部改图要求时，先读最新磁盘文件后直接更新对应 `IMG-...`（见 [换装状态图与局部改图指南](references/variants-and-edits.md)）。整集请求一次写完所有指定条目。\n\n## 按需查阅\n\n- 完整项目条目字段与 `- 参考：` 槽位语法：[图片提示词格式规范](references/format-spec.md)\n- 阶段边界与规则分级：[阶段规则](references/stage-contract.md)\n- 通用编写顺序、角色/场景/道具板式、字迹规则、视觉定调图与英文正例：[美术设定图与视觉定调指南](references/sheet-prompt-guide.md)\n- 换装与分视角状态图、局部改图精简写法与自然语言修订：[换装状态图与局部改图指南](references/variants-and-edits.md)\n\n## 完成与投产\n\n所有指定条目具备唯一 `IMG-...`、合规 `- 参考：` 与干净可复制的 `### 可复制提示词` 即完成（同轮连带修改分镜时同步更新对应 `- 图片提示词项：`）。完成后可移交 `short-drama` 技能做局部或整集格式校验；实际出图移交 `short-drama-produce` 技能预览确认后执行。\n",
+      "card": {
+        "title_zh": "短剧美术设定图提示词",
+        "purpose_zh": "为短剧角色、场景、道具设定图、视觉定调测试图、状态变化图、局部改图及单出首尾帧静图编写可直接复制的静态图片提示词，并写入《图片提示词.md》。",
+        "does": [
+          "按设定图类型组织角色、场景空镜、道具、状态变化、局部改图与视觉定调图提示词正文",
+          "区分轻量草稿模式与正式项目模式，正式模式套用 IMG-... / REF-... 槽位语法",
+          "落实连戏锁锁定词与画面字迹规则，避免禁字词冲突",
+          "将提示词落盘到 剧集/[EP]/图片提示词.md 并保持正文干净可直接复制",
+          "收到改词或局部改图要求时读取最新磁盘文件并直接更新对应条目",
+          "同轮修改分镜时同步更新对应图片提示词项引用"
+        ],
+        "inputs": [
+          "已确定的人物、地点、道具等视觉设定（视觉设定.md）",
+          "剧集编号与条目范围（如 EP001）",
+          "项目语言与 prompt_language 配置",
+          "明确的改词或局部改图要求"
+        ],
+        "outputs": [
+          "《图片提示词.md》中的 IMG-... 条目",
+          "带 - 参考：槽位与 ### 可复制提示词 引用块的提示词正文",
+          "轻量模式下的简短用途说明与可复制提示词"
+        ],
+        "scenarios": [
+          "为短剧单集角色、场景、道具编写设定图提示词",
+          "为视觉定调测试图或状态变化图起草提示词",
+          "为分镜单出首尾帧静图编写独立状态图条目",
+          "按改词或局部改图要求修订已有提示词条目"
+        ],
+        "prerequisites": [
+          "需对照 视觉设定.md 确认设定与板式",
+          "正式项目模式需遵循图片提示词格式规范",
+          "提示词语种需参考 short-drama.json#/format/prompt_language 或已有文档推断"
+        ],
+        "limits": [
+          "不负责项目级制作形态选型或 Lookdev 统筹",
+          "不拆视觉设定",
+          "不直接调用外部模型出图",
+          "实际出图需移交 short-drama-produce 技能",
+          "格式校验需移交 short-drama 技能"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "图像",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "为角色/场景/道具设定图、视觉定调测试图、状态变化图、局部改图及需单出的首尾帧静图编写可直接复制的静态图片提示词，写入《图片提示词.md》。"
+          },
+          {
+            "field": "does",
+            "quote": "按「设定图类型与主体 → 固定核心外观 → 本张造型/视角/状态 → 构图版式与尺寸参照 → 材质色彩与布光 → 背景清场与字迹排除项」组织正文"
+          },
+          {
+            "field": "does",
+            "quote": "**轻量 / 草稿模式**：用户仅要求为单个角色、场景、道具或测试画面快速起草几条静态图片提示词"
+          },
+          {
+            "field": "does",
+            "quote": "**正式项目模式**：落盘 `剧集/<EP>/图片提示词.md` 或衔接跨文档自动校验、创作台展示与内置批量出图时，完整遵循"
+          },
+          {
+            "field": "does",
+            "quote": "被 `视觉设定.md` 的 `连戏锁` 点名的 `IMG-...` 条目须把 `锁定词` 原字带入 `### 可复制提示词`"
+          },
+          {
+            "field": "does",
+            "quote": "收到明确的改词或局部改图要求时，先读最新磁盘文件后直接更新对应 `IMG-...`"
+          },
+          {
+            "field": "does",
+            "quote": "同轮连带修改分镜时同步更新对应 `- 图片提示词项：`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**核对设定与板式**：对照 `视觉设定.md` 确认本项属于角色设定图、换装/状态图、场景空镜图、道具设定图、分栏对照设定板、视觉定调图还是局部改图"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "可复制提示词正文跟随 `short-drama.json#/format/prompt_language`（无配置文件时按已有提示词或项目文档语种推断，未指定时使用用户当前语言）"
+          },
+          {
+            "field": "limits",
+            "quote": "不负责项目级制作形态选型或 Lookdev 统筹、不拆视觉设定，也不直接调用外部模型出图。"
+          },
+          {
+            "field": "limits",
+            "quote": "完成后可移交 `short-drama` 技能做局部或整集格式校验；实际出图移交 `short-drama-produce` 技能预览确认后执行。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "落盘 `剧集/<EP>/图片提示词.md`"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama-novel-analyze/SKILL.md",
+      "blob_sha": "8c5d4307576035f8a74f8f5e4997862b75328796",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-novel-analyze/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-novel-analyze",
+        "description": "拆解长篇小说、连载网文或多章原著，完成章节索引、改编价值评估、情节提取、爽点与人物演进梳理及分集候选，移交 short-drama-develop 定改编方案。用户说“导入/拆这本小说”“分析原著”“先拆前N章”或给小说文件时使用；不写立项简报或剧本。"
+      },
+      "excerpt": "---\nname: short-drama-novel-analyze\ndescription: 拆解长篇小说、连载网文或多章原著，完成章节索引、改编价值评估、情节提取、爽点与人物演进梳理及分集候选，移交 short-drama-develop 定改编方案。用户说“导入/拆这本小说”“分析原著”“先拆前N章”或给小说文件时使用；不写立项简报或剧本。\nlicense: MIT\n---\n\n# 原著拆解分析\n\n从小说原文梳理有据可查的剧情推进：看每段戏改变了谁的抉择、揭开了什么秘密、怎样扭转人物强弱关系，并结合目标制作形态评估如何改成短剧或漫剧。支持整本拆解，也支持按创作者指定的章节范围（如前 100 章、第一卷、第一季）分批完整拆解。\n\n## 快速开始\n\n> 下文命令中 `<SKILL_DIR>` 指本 `SKILL.md` 所在目录，`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）。\n\n为长篇原著建立章节索引：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/novel_index.py\" index <原著.txt> --out <chapter-index.json>\n```\n\n> **无终端 / 无 Python 兜底**：若当前对话环境不支持执行本地脚本，短篇或指定章数可直接由用户分批粘贴正文在对话中完成拆解与汇总；超长篇建议切分章节文件后分批上传读取。\n\n## 开始前与材料前提\n\n- 本技能可独立运行；完整职责范围与规则见 [阶段规范](references/stage-contract.md)。\n- 只拆解创作者合法持有、拥有使用权的作品。`输入/` 只读，拆解时不改原文、不整段照抄原句（只记章节位置、起止行号和剧情作用概括，必要佐证只摘最短词句），交付文件不夹带原始全文。\n- 通俗题材里的暴力、复仇、背叛、情感拉扯与暗黑冲突照常提取剧情作用；个别片段无法处理时跳过并记明行号范围，不中断整章或整批拆解。\n\n## 先判断入口（三条路径）\n\n1. **短篇直读（≤5 章）**：直接通读原文，在当前对话中给出精炼的改编可行性评估、核心看点与爽点、主要改编难点及简明分集/节拍思路，**无需建立 `输入/`、索引文件或 S0–S5 全套档案**。\n2. **长篇快速可行性评估（>5 章，先判断值不值得改）**：无需落盘完整拆解目录，直接用临时索引搭配 `sample --count 12` 抽样阅读，给出改编可行性快评与建议拆解区间（见 [改编价值快评](references/adaptation-triage.md)），待创作者拍板后再决定是否进入完整拆解。\n3. **完整拆解档案（S0–S5，整本或指定区间）**：只有书名无原文时请创作者提供文件或粘贴正文，不凭书名回忆情节；已有长篇原文时建立只读 `输入/` 与 `项目开发/source-analysis/_work/`，用 `novel_index.py` 建索引后按 S0–S5 推进（已有部分拆解结果时，读 `项目开发/source-analysis/_progress.md` 从上次进度续跑）。\n\n## 拆解流程\n\n全部产出落在 `项目开发/source-analysis/`（先写进 `_work/` 核对无误后再整份替换写入正式路径；若项目已安装 `short-drama` 技能并启用了项目台账，交由 `short-drama` 技能登记进度，独立运行时直接按目录约定落盘，不跨技能调用其他技能的脚本）。\n\n| 阶段 | 做什么 | 产出 | 停顿条件 |\n|---|---|---|---|\n| S0 | 建章节索引（脚本） | `_index.json`、`_progress.md` | 仅零章节或索引损坏时停 |\n| S1 | 改编价值快评（长篇未定范围时抽样） | `triage.md` | 短篇或已指定范围**不暂停** |\n| S2 | 目标区间逐章情节提取 | `chapters/ch-<N>-extract.md` | 目标区间缺章时补齐 |\n| S3 | 剧情单元汇总与爽点梳理 | `story-units.md`、`rhythm-and-emotion.md` | — |\n| S4 | 人物合并与设定跨卷演进整理 | `characters.md`、`world.md` | — |\n| S5 | 结合制作形态的改编取舍与分集候选 | `adaptation-value.md`、`episode-candidates.jsonl` | 移交 `short-drama-develop` 技能 |\n\n### S0 章节索引\n\n各阶段共用 [章节索引脚本](scripts/novel_index.py) 建立的章节边界，不各自重新切分：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/novel_index.py\" index 输入/<原文文件> --out 项目开发/source-analysis/_work/_index.next.json\n<PYTHON> \"<SKILL_DIR>/scripts/novel_index.py\" verify 项目开发/source-analysis/_work/_index.next.json 输入/<原文文件>\n```\n\n校验通过后将 `_work/_index.next.json` 写入正式 `_index.json`。脚本支持可选 Markdown 标题前缀（`#`–`######`）、阿拉伯与中文数字章号，按 `章 / 回 / 集 / 话 / 話 / 幕 / 节` 由粗到细自动选定主编号单位（其余记入 `ignored_heading_units`，也可传 `--unit` 指定），剔除开头目录块并分卷核对。\n\n- **软门禁提醒（退出码 `0`）**：网文源书常见的作者跳章号、重章号或简短卷首语仅归入输出 JSON 的 `warnings` 提醒，脚本正常放行，供 Agent 复核。若网文导出稿在第一章前带有书名元数据、内容简介或较长卷首说明导致前置非正文超限，保持 `输入/` 只读，直接加 `--ignore-preamble` 运行 `index` 跳过前置说明块（跳过行号范围会记入 `warnings`）。\n- **确定性硬拦截（非零退出码）**：仅在以下情况拦截——完全识别不到章节（无章标题散稿可与创作者约定切分后手写 `sequence` / `line_start` / `line_end` 再过 `verify`）、第一章前遗漏大段属于剧情正文的楔子且未传 `--ignore-preamble`（真正的楔子正文须在索引开头补一条 `source_number: null` 覆盖第 1 行起的正文，而非跳过），或索引自身断号、行区间断裂。原文一旦修改须重建索引。\n\n### S1 改编价值快评\n\n未定范围的超长篇按 [改编价值快评](references/adaptation-triage.md) 跑 `sample --count 12` 写出 `triage.md`，汇报建议拆解区间并请创作者确认；短篇作品、创作者已指定拆解范围或明确要求直接拆完时，**不在 S1 暂停等拍板**，直接进入 S2。\n\n### S2 逐章情节提取\n\n按 [逐章提取与人物设定整理](references/chapter-extraction.md) 将本批目标区间内的每章拆进 `chapters/ch-<N>-extract.md`（支持并行子任务时每批 5–8 章）。写完后核对覆盖情况：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/novel_index.py\" coverage 项目开发/source-analysis/_index.json 项目开发/source-analysis/chapters [--start <起> --end <止>]\n```\n\n全书拆解时直接跑 `coverage`，按创作者指定区间（如 `sequence` 1–100）分批拆解时传 `--start 1 --end 100`；确认返回 `complete: true`（目标章齐全且无 `unmatched_files` 错名文件）即可进入 S3。\n\n### S3 剧情单元与爽点梳理\n\n基于 S2 提取结果（细节不清时按行号回查原文），按 [改编价值与分集候选](references/adaptation-value.md#故事框架与剧情单元) 写出 `story-units.md` 与 `rhythm-and-emotion.md`（含 [爽点表](references/adaptation-value.md#爽点表) 相对先后排序及简明 [原著语感与高光包袱锚点](references/adaptation-value.md#原著语感与高光包袱锚点)，防下游开发与写稿把原著洗成中性梗概体），并在文件开头注明本批覆盖的起止章号范围。\n\n### S4 人物与世界观设定\n\n按 [逐章提取与人物设定整理](references/chapter-extraction.md#人物合并与设定质变记录) 合并有原文实据的同人异名，记录人物立场身份与世界观规则、战力体系的**跨卷质变节点**及首次出场章号（未明确处写「原文未明确」），产出候选名单 `characters.md` 与 `world.md`。\n\n### S5 改编取舍与分集候选\n\n按 [改编价值与分集候选](references/adaptation-value.md#三类判定) 结合目标制作形态评估各剧情单元（区分实拍与动态漫/漫剧对心理吐槽及密集对话的不同承载力），写出 `adaptation-value.md` 与轻量级 `episode-candidates.jsonl`，完成后汇报本批覆盖章数、预计可改集数与主要改编注意点，移交 `short-drama-develop` 技能（如需独立把关可交 `short-drama-review` 技能做 `source_analysis` 范围审查）。\n\n## 按需加载\n\n- **何时做抽样快评、短篇与指定范围免停规则**：[改编价值快评](references/adaptation-triage.md)\n- **单章提取格式、载体记录、同人合并与人物设定跨卷质变记录**：[逐章提取与人物设定整理](references/chapter-extraction.md)\n- **故事框架、剧情单元、爽点表、结合制作形态的三类判定与分集候选切法**：[改编价值与分集候选](references/adaptation-value.md)\n- **本阶段职责边界与 `NVA` 规则分级**：[阶段规范](references/stage-contract.md)\n",
+      "card": {
+        "title_zh": "原著拆解分析",
+        "purpose_zh": "拆解长篇小说、连载网文或多章原著，完成章节索引、改编价值评估、情节提取、爽点与人物演进梳理及分集候选，移交 short-drama-develop 定改编方案；不写立项简报或剧本。",
+        "does": [
+          "为长篇原著建立章节索引并校验章节边界与覆盖情况",
+          "对未定范围的长篇做抽样改编价值快评并建议拆解区间",
+          "按目标区间逐章提取情节，汇总剧情单元与爽点节奏",
+          "合并人物异名并整理人物设定与世界观跨卷演进",
+          "结合实拍或漫剧等制作形态评估改编取舍并产出分集候选",
+          "将拆解结果移交 short-drama-develop 技能"
+        ],
+        "inputs": [
+          "原著小说原文文件（txt 等）",
+          "创作者指定的拆解章节范围（如前 100 章、第一卷）",
+          "目标制作形态（实拍或动态漫/漫剧）",
+          "已有部分拆解结果时的进度文件 _progress.md"
+        ],
+        "outputs": [
+          "章节索引 _index.json 与进度 _progress.md",
+          "改编价值快评 triage.md",
+          "逐章提取文件 chapters/ch-[N]-extract.md",
+          "剧情单元 story-units.md 与节奏情绪 rhythm-and-emotion.md",
+          "人物 characters.md 与世界观 world.md",
+          "改编取舍 adaptation-value.md 与分集候选 episode-candidates.jsonl"
+        ],
+        "scenarios": [
+          "导入并拆解一本长篇小说或连载网文",
+          "先拆前 N 章或第一卷做分批拆解",
+          "判断某部长篇是否值得改编成短剧",
+          "梳理原著爽点、人物演进与分集候选",
+          "为下游改编方案开发准备结构化拆解档案"
+        ],
+        "prerequisites": [
+          "只拆解创作者合法持有、拥有使用权的作品",
+          "完整拆解需 Python 3.9+ 解释器运行 novel_index.py",
+          "无终端或无 Python 时可分批粘贴正文在对话中完成",
+          "只有书名无原文时需创作者提供文件或粘贴正文"
+        ],
+        "limits": [
+          "不写立项简报或剧本",
+          "不凭书名回忆情节，须有原文",
+          "不整段照抄原句，交付文件不夹带原始全文",
+          "输入目录只读，拆解时不改原文",
+          "无法处理的片段跳过并记明行号范围，不中断整批拆解",
+          "短篇（≤5 章）不建立索引文件或 S0–S5 全套档案"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "内容运营",
+          "视频",
+          "文档",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "拆解长篇小说、连载网文或多章原著，完成章节索引、改编价值评估、情节提取、爽点与人物演进梳理及分集候选，移交 short-drama-develop 定改编方案。"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "不写立项简报或剧本。"
+          },
+          {
+            "field": "does",
+            "quote": "为长篇原著建立章节索引："
+          },
+          {
+            "field": "does",
+            "quote": "合并有原文实据的同人异名，记录人物立场身份与世界观规则、战力体系的**跨卷质变节点**及首次出场章号"
+          },
+          {
+            "field": "does",
+            "quote": "结合目标制作形态评估各剧情单元（区分实拍与动态漫/漫剧对心理吐槽及密集对话的不同承载力），写出 `adaptation-value.md` 与轻量级 `episode-candidates.jsonl`"
+          },
+          {
+            "field": "does",
+            "quote": "移交 `short-drama-develop` 技能"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "只拆解创作者合法持有、拥有使用权的作品。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<PYTHON>` 指 Python 3.9+ 解释器"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "若当前对话环境不支持执行本地脚本，短篇或指定章数可直接由用户分批粘贴正文在对话中完成拆解与汇总"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "只有书名无原文时请创作者提供文件或粘贴正文，不凭书名回忆情节"
+          },
+          {
+            "field": "limits",
+            "quote": "`输入/` 只读，拆解时不改原文、不整段照抄原句"
+          },
+          {
+            "field": "limits",
+            "quote": "交付文件不夹带原始全文。"
+          },
+          {
+            "field": "limits",
+            "quote": "个别片段无法处理时跳过并记明行号范围，不中断整章或整批拆解。"
+          },
+          {
+            "field": "limits",
+            "quote": "**无需建立 `输入/`、索引文件或 S0–S5 全套档案**。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "<PYTHON> \"<SKILL_DIR>/scripts/novel_index.py\" index <原著.txt> --out <chapter-index.json>"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "全部产出落在 `项目开发/source-analysis/`"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama-produce/SKILL.md",
+      "blob_sha": "435927cb23e3df424de2d7f1c7b8a6bc351c7544",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-produce/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-produce",
+        "description": "在创作者明确确认后，单条或按批调用已配置接口执行图片、视频、配音或配乐生成并保存产物与运行记录。用于“生成图/视频/配音/音乐”“开始跑图/跑视频”“把定稿提示词送去生成”；不写提示词、不改台词，不把预览或定稿当扣费确认。"
+      },
+      "excerpt": "---\nname: short-drama-produce\ndescription: 在创作者明确确认后，单条或按批调用已配置接口执行图片、视频、配音或配乐生成并保存产物与运行记录。用于“生成图/视频/配音/音乐”“开始跑图/跑视频”“把定稿提示词送去生成”；不写提示词、不改台词，不把预览或定稿当扣费确认。\nlicense: MIT\n---\n\n# 确认后生产\n\n本技能负责在创作者明确确认后，把定稿提示词与生成参数发往运行环境配置好的生成接口（adapter），并将产物与运行记录落入 `剧集/<EP>/制作成果/`。图片提示词归 `short-drama-image-prompts` 技能，视频提示词归 `short-drama-video-prompts` 技能，台词归 `short-drama-write` 技能，角色音色设定归 `short-drama-assets` 技能。\n\n## 快速开始\n\n只有在用户明确要求调用接口生成后，才建立临时生成任务单（任务单本身不作为第六份创作文档留存）：\n\n- **来源提取与参考绑定**：指定 `source` 与 `source_entry`（`IMG-*`、`SHOT-*`、`MOTION-*`、`GROUP-*` 或可选 `MUSIC-*`）时，工具自动从该二级标题段落提取可复制提示词与已落盘 `REF-...` 绑定，并按条目段落计算摘要（修改后续镜头不会连坐作废前序确认码）；详细字段规则见 [生成接口协议规范](references/adapter-contract.md#任务单格式job-json)。\n\n> 下文命令中 `<SKILL_DIR>` 指本 `SKILL.md` 所在目录，`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）。\n\n多条资产优先走**批次确认工作流**，先汇总预览整批清单，未确认前绝不发起任何外部扣费调用：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" prepare-batch <project> --jobs <job-1.json> <job-2.json>\n```\n\n## 确认工作流（推荐批次确认，兼容单任务）\n\n1. **建立任务单并预览**：\n   - **批次模式（多镜/整集推荐）**：按小批或单集建立一组任务单，运行 `prepare-batch` 一次性汇总展示本批总条数、目标接口/模型、时长或尺寸参数与全部输出路径预览。\n   - **单任务模式**：单张补图或单条重跑时运行 `prepare` 展示该条完整预览。\n2. **创作者一次性确认本批（或单条）预览**：等创作者亲眼看到预览清单后明确回复确认，再运行 `confirm` 写入确认回执（笼统的“继续”“预算够用”、上游已定稿或旧确认码均不算本次确认，严禁代填）。对应条目段落、参考文件、参数或输出路径一旦改动，原确认码自动失效。\n3. **执行生成**：运行 `run-batch` 顺序执行已确认批次（指定 `--batch-id` 断点续跑时自动跳过当前指纹下已成功且本地产物完好的条目，可选 `--continue-on-error` 遇错继续执行剩余项；单条运行 `run`）。工具在核销确认码前先完成本地配置与参数预检；若因缺少环境变量等本地预检拦截而未发出任何远端请求，确认码保持有效可直接修复环境后重试。已实际发起远端请求的任务无论成败均核销当次确认码。\n\n## 命令\n\n详细字段与接口协议见 [生成接口协议规范](references/adapter-contract.md)，命令行由 [production_tool.py](scripts/production_tool.py) 提供：\n\n```text\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" prepare-batch <project> --jobs <job-1.json> <job-2.json> [--batch-id <batch_id>]\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" confirm <project> [--batch-id <batch_id>] --confirmation \"CONFIRM BATCH <batch_id> <code>\"\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" confirm-batch <project> [--batch-id <batch_id>] --confirmation \"CONFIRM BATCH <batch_id> <code>\"\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" run-batch <project> (--batch-id <batch_id> | --job-ids <id>...) --adapter-config <outside-project-config.json> [--continue-on-error]\n\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" prepare <project> --job <job.json>\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" confirm <project> --job-id <id> --confirmation \"CONFIRM <id> <code>\"\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" run <project> --job-id <id> --adapter-config <outside-project-config.json>\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" status <project> (--job-id <id> | --batch-id <batch_id>)\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" collect <project> --job-id <id> --adapter-config <outside-project-config.json>\n<PYTHON> \"<SKILL_DIR>/scripts/production_tool.py\" audit <project>\n```\n\n同一任务单存在未结清的 `running` 记录时，禁止重新执行 `prepare`、`confirm` 或 `run`。\n\n## 输入选择\n\n- **图片（`image`）**：读取 `图片提示词.md` 的 `IMG-*`（角色/场景/道具设定图及状态图，含尾帧）或 `分镜.md` 的 `SHOT-*`（读取 `### 首帧提示词` 生成单镜首帧；支持多候选图的接口可单任务产出 1–16 张候选图）。图片落入 `剧集/<EP>/制作成果/images/` 后，`short-drama-storyboard` 技能可将其绑定为 `用途：起始帧` 的 `REF-...`。\n- **视频（`video`）**：读取 `视频提示词.md` 的 `MOTION-*` 或多镜合生分组 `GROUP-*`（`GROUP-*` 组级 `输入参考图` 可选，写出时按同规则核验并拦截 `待补参考图`，同样支持可选 `参考音频`；多镜合生时直接指定 `GROUP-*`，勿拿单个成员 `MOTION-*` 代替整组）。内置文档解析器仅读取参考图片与角色参考音频，标着“待续接、不可提交”的 `MOTION-*` 按 `short-drama.json` 中 `continuation_route` 分流：\n  - 尚未设置：请创作者在 `independent_starts`（每段从各自定稿起始帧独立生成）与 `relay_external`（后续段在支持参考视频的外部工具提交，本技能只跑第一段）之间二选一，交 `short-drama` 技能写入配置。\n  - `independent_starts`：交 `short-drama-storyboard` 技能补齐切点起始帧 → 本技能生成该图（或截取上一段尾帧）并经创作者确认 → 交 `short-drama-video-prompts` 技能改写为可提交提示词 → 预览确认后生成。\n  - `relay_external`：不为后续段建单，直接列出每段需上传的上一段成片与尾帧路径。\n- **配音（`tts`）**：从 `剧本.md` 读取台词原句与情绪括注，不改台词正文。支持参考录音的语音接口可固定角色定稿参考音频；使用预设音色 ID 的接口按《视觉设定.md》登记的声线与情绪/语速参数合成。\n- **音乐（`music`）**：读取 `视频提示词.md`（或独立配乐文档）已确认的成片配乐条目。推荐指定 `source_entry: \"MUSIC-...\"` 从对应二级标题下的 `### 可复制提示词` 自动提取提示词并启用条目级摘要（修改其他视频镜头不会作废配乐确认码）；省略 `source_entry` 时保持整文件摘要向后兼容。人声歌曲传定稿 `lyrics`，纯配乐不传歌词；音轨铺入时间线、循环与人声闪避交 `short-drama-edit` 技能处理。\n\n批量生产建议按单集（或单集内的首帧、视频镜头）建立 `prepare-batch` 批次，避免把整季几十集塞进同一个确认包。额度有限时按集拆批，一集的镜头全部跑完再建下一集，避免按资产类别横铺多集导致额度中途用完时手里没有能剪的整集。\n\n## 生成接口与凭据安全\n\n- **配置与密钥隔离**：生成接口配置文件存放在项目目录之外，API 密钥只从环境变量或系统凭据库读取，项目文件夹与创作台界面绝不保存任何密钥。\n- **能力显式声明**：在接口配置中优先显式声明 `reference_roles` 或 `audio_capable`（例如 `\"audio_capable\": true`），不依赖适配器脚本文件名即可接入自定义或外置接口。\n- **外置适配器版本锁定（安全红线）**：使用外置适配器包（如规划中的 `drama-providers`）时，**必须锁定精确版本号**（如 `drama-providers==X.Y.Z`）或指向明确核验过的本地脚本路径；**严禁**在携带真实付费 API Key 的环境下直接运行未锁版本的浮动远端包（如裸 `uvx drama-providers` 或 `@latest`）。\n- **硬门禁与软门禁**：扣费确认码、路径/符号链接隔离、凭据拦截、能力核验等 100% 确定性检查保持硬门禁；`prepare` / `prepare-batch` 返回的 `warnings`（如覆盖已有产物、配乐未用 `MUSIC-*` 条目级摘要、未设 `prompt_language` 等）为软门禁提醒，请 Agent 在请创作者确认前重点核查。\n- **通用协议与内置接口**：任何符合标准输入输出协议的自定义脚本均可接入（见 [生成接口协议规范](references/adapter-contract.md)）；开箱即用的内置零依赖图片、视频、音乐与语音接口清单、环境变量及各供应商特有参数详见 [内置生成接口说明](references/builtin-providers.md)。\n\n## 中断恢复与下游衔接\n\n异步任务拿到供应商返回的任务 ID 后，会在开始轮询前先落盘写入 `handle_path`。中途断网或轮询中断时，先运行 `audit` 检查是否存在 `orphaned_provider_job`（`action: collect_before_retry`），再用 `collect` 直接取回原远端任务结果（不重复扣费，也不消耗新确认码）；仅当远端任务确已失败且无法取回时，才对 `retryable` 任务重新确认重跑。\n\n运行完成后如实汇报产出路径、媒体类型与运行状态；若问题出在提示词或参考素材本身，退回对应上游技能修订。后续套剪成片转 `short-drama-edit` 技能，成片审片转 `short-drama-review` 技能。\n",
+      "card": {
+        "title_zh": "短剧生成生产执行",
+        "purpose_zh": "在创作者明确确认后，单条或按批调用已配置的生成接口，执行图片、视频、配音或配乐生成，并把产物与运行记录保存到剧集制作成果目录。",
+        "does": [
+          "建立临时生成任务单，从指定来源条目提取可复制提示词与参考绑定并计算摘要",
+          "批次或单任务预览生成清单，等待创作者明确确认后写入确认回执",
+          "顺序执行已确认批次或单条任务，调用配置好的图片、视频、配音、音乐生成接口",
+          "将产物与运行记录落入剧集制作成果目录，并汇报产出路径与运行状态",
+          "通过 audit 与 collect 处理中断的异步任务，取回原远端结果避免重复扣费",
+          "对改动后的条目、参考文件、参数或输出路径使原确认码自动失效"
+        ],
+        "inputs": [
+          "任务单 JSON（含 source、source_entry 等字段）",
+          "项目目录路径",
+          "项目目录之外的生成接口配置文件",
+          "环境变量或系统凭据库中的 API 密钥",
+          "创作者对预览清单的明确确认回复"
+        ],
+        "outputs": [
+          "生成的图片、视频、配音或音乐产物文件",
+          "运行记录与确认回执",
+          "批次或单任务的预览清单与状态查询结果",
+          "audit 检查结果（如 orphaned_provider_job）"
+        ],
+        "scenarios": [
+          "创作者确认后批量生成单集的首帧图或视频镜头",
+          "单张补图或单条重跑",
+          "按剧本台词生成配音",
+          "按已确认配乐条目生成音乐",
+          "异步任务中断后取回远端结果"
+        ],
+        "prerequisites": [
+          "Python 3.9+ 解释器",
+          "生成接口配置文件存放在项目目录之外",
+          "API 密钥通过环境变量或系统凭据库提供",
+          "上游技能已产出定稿提示词与参考素材",
+          "使用外置适配器包时锁定精确版本号"
+        ],
+        "limits": [
+          "不写提示词、不改台词，提示词与台词归上游技能",
+          "不把预览或定稿当作扣费确认",
+          "未确认前绝不发起任何外部扣费调用",
+          "同一任务单存在未结清 running 记录时禁止重新 prepare、confirm 或 run",
+          "内置文档解析器仅读取参考图片与角色参考音频",
+          "音轨铺入时间线、循环与人声闪避交 short-drama-edit 技能处理"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "视频",
+          "图像",
+          "自动化",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "本技能负责在创作者明确确认后，把定稿提示词与生成参数发往运行环境配置好的生成接口（adapter），并将产物与运行记录落入 `剧集/<EP>/制作成果/`。"
+          },
+          {
+            "field": "does",
+            "quote": "多条资产优先走**批次确认工作流**，先汇总预览整批清单，未确认前绝不发起任何外部扣费调用"
+          },
+          {
+            "field": "does",
+            "quote": "等创作者亲眼看到预览清单后明确回复确认，再运行 `confirm` 写入确认回执"
+          },
+          {
+            "field": "does",
+            "quote": "运行 `run-batch` 顺序执行已确认批次"
+          },
+          {
+            "field": "does",
+            "quote": "先运行 `audit` 检查是否存在 `orphaned_provider_job`（`action: collect_before_retry`），再用 `collect` 直接取回原远端任务结果"
+          },
+          {
+            "field": "does",
+            "quote": "对应条目段落、参考文件、参数或输出路径一旦改动，原确认码自动失效。"
+          },
+          {
+            "field": "inputs",
+            "quote": "指定 `source` 与 `source_entry`（`IMG-*`、`SHOT-*`、`MOTION-*`、`GROUP-*` 或可选 `MUSIC-*`）时，工具自动从该二级标题段落提取可复制提示词与已落盘 `REF-...` 绑定"
+          },
+          {
+            "field": "inputs",
+            "quote": "`<PYTHON>` 指 Python 3.9+ 解释器"
+          },
+          {
+            "field": "outputs",
+            "quote": "图片落入 `剧集/<EP>/制作成果/images/` 后"
+          },
+          {
+            "field": "outputs",
+            "quote": "运行完成后如实汇报产出路径、媒体类型与运行状态"
+          },
+          {
+            "field": "scenarios",
+            "quote": "批量生产建议按单集（或单集内的首帧、视频镜头）建立 `prepare-batch` 批次"
+          },
+          {
+            "field": "scenarios",
+            "quote": "单张补图或单条重跑时运行 `prepare` 展示该条完整预览。"
+          },
+          {
+            "field": "scenarios",
+            "quote": "**配音（`tts`）**：从 `剧本.md` 读取台词原句与情绪括注，不改台词正文。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "生成接口配置文件存放在项目目录之外，API 密钥只从环境变量或系统凭据库读取"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**必须锁定精确版本号**（如 `drama-providers==X.Y.Z`）或指向明确核验过的本地脚本路径"
+          },
+          {
+            "field": "limits",
+            "quote": "不写提示词、不改台词，不把预览或定稿当扣费确认。"
+          },
+          {
+            "field": "limits",
+            "quote": "同一任务单存在未结清的 `running` 记录时，禁止重新执行 `prepare`、`confirm` 或 `run`。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "**严禁**在携带真实付费 API Key 的环境下直接运行未锁版本的浮动远端包"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama-review/SKILL.md",
+      "blob_sha": "d1b72ac8531c23631913d63785b74d92d2aa32c6",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-review/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-review",
+        "description": "独立审查短剧原著拆解、对标拆解、大纲、剧本、视觉设定、提示词、分镜、剪辑单及已生成素材与成片，负责跨场/跨镜连戏核查（轴线、站位、视线、持物、状态与接缝）及出片问题归因。只输出审查问题单、结论与返修要求，不直接改原稿或调用生成。"
+      },
+      "excerpt": "---\nname: short-drama-review\ndescription: 独立审查短剧原著拆解、对标拆解、大纲、剧本、视觉设定、提示词、分镜、剪辑单及已生成素材与成片，负责跨场/跨镜连戏核查（轴线、站位、视线、持物、状态与接缝）及出片问题归因。只输出审查问题单、结论与返修要求，不直接改原稿或调用生成。\nlicense: MIT\n---\n\n# 短剧审查\n\n优先由未参与本轮执笔的独立审稿人执行；执笔人自检时如实标明自检（审查问题单绝不与直接改稿混为一谈）。本技能只负责指出问题、说明影响、明确改稿标准并退回对应负责技能，不直接修改受审原稿，不调用生成接口。\n\n## 快速开始\n\n直接读取用户指定的稿件或看片反馈：\n- **落盘或口头回复**：需要保存审查文档时，单集联审写入 `审查/EP001-审查.md`，专项审查写入 `审查/<主题>-审查.md`；只需口头反馈时直接在对话中回复。\n- **问题单结构**：每条问题单标题采用 `## <Blocker|Major|Minor|Note> · REV-<编号> · <标题>` 格式（如 `REV-001` 或 `REV-EP001-001`，编号至少三位数字以避免与阶段规则号混淆）。\n- **逐行字段与轻量出处**：标题下逐行写出 `- 位置：`、`- 证据：`、`- 影响：`、`- 修改要求：`、`- 规则：`，方便创作台审查卡片完整解析；出处仅引用文件名、标题编号、行号或简短原文摘录，不建隐藏 JSON、哈希值或状态副表。\n\n```markdown\n# EP001 审查\n\n- 范围：剧本、分镜、视频提示词\n- 结论：REVISE\n- 复核方式：<独立审稿 或 自检（二选一填写，勿并列保留）>\n\n## Blocker · REV-001 · 分镜漏拍剧本中的画面文字\n- 位置：剧本.md / EP001-SC002；分镜.md / SHOT-EP001-004\n- 证据：……\n- 影响：……\n- 修改要求：移交 `short-drama-storyboard` 技能补上准确的画面文字内容与景别停顿条件，保持本镜原有的人物站位与情绪反应不变。\n- 规则：SHT-02 · reviewed_invariant\n```\n\n## 按需查阅参考清单\n\n按本次受审对象只打开对应的参考清单，不把整套项目和无关清单全塞进上下文：\n\n- 原著拆解（支持授权章节范围）与本地对标拆解边界：[原著与对标拆解核查清单](references/rubric-source-analysis.md)\n- 故事大纲、剧本、多元题材适配、节奏目标与三轮抽查：[故事大纲与剧本核查清单](references/rubric-story-script.md)\n- 角色/场景/道具设定、连戏锁、跨时代穿帮与生图提示词：[视觉设定与生图提示词核查清单](references/rubric-assets-prompts.md)\n- 剧本落镜完整度、稳机位原则、首尾帧与视频动态提示词：[分镜、首尾帧与视频动态核查清单](references/rubric-visual-motion.md)\n- 生成素材、《剪辑单.md》与整集成片切点接缝核查、六档分流与试拍调优：[成片看片与返工分流指南](references/generated-media.md)\n- 套路重复诊断（区分连戏吃书）、金句放行与返修引导：[去套路与反模板改法](references/anti-template-repair.md)\n- 本阶段职责边界与阻断级规则总表：[审查阶段职责与规则](references/stage-contract.md)\n\n## 工作流\n\n1. **划定受审范围与先查硬账**：确认本次受审文档、章节或镜头范围及创作者已拍板的创作要求（未经创作者逐环确认的全流程预览草稿按待确认稿审视）。先核清标题编号重漏、链接与条目引用悬空、时长与合生分组覆盖、剧本全要素落镜、跨镜连戏状态，以及是否混入私有凭据或本机绝对路径；缺某份前置材料时只跳过依赖它的判断，其余照常审。\n2. **顺链条对账并凭实据开单**：按 `剧本事实 → 视觉设定 → 分镜起止状态 → 首尾帧提示词 → 视频动态 → 下一镜接戏 → 《剪辑单.md》与整集成片切点接缝` 核查上下游是否走样（指认篡改或漏拍须成对列出上下游原文）。每条问题单写清位置、实据、实际影响、局部修法与不得误伤的保留内容、负责技能及严重程度，不空扣“有 AI 味”“不够电影感”帽子。\n3. **局部补丁与亮点保护**：返修意见只针对病灶开最小局部补丁，不借局部毛病要求整集推倒重写。对比新旧稿时若发现润色压稿误删了抓人钩子、高潮金句或精妙包袱，单列 `## 被删的强钩子` 记下原位置与原句供执笔人取舍；复审时只核验返修点是否修通及保留内容是否完好，不翻已放行段落旧账。\n4. **定级、结论判定与返修分派**：按下方两张表确定问题级别与最终结论（详见 [审查阶段职责与规则](references/stage-contract.md)），再按负责技能归拢返修项交创作者拍板（下游返修与复审在用户明确指示时启动）。\n\n### 硬门禁 vs 软门禁与规则等级上限\n\n本套件遵循**软门禁原则**：只有 100% 确定性的机械/安全问题（编号、路径、时长算术、下游必需字段、安全与确认边界）设为脚本硬阻断 `ERROR`（`structural_invariant`）；其余一切启发式检查（如脚本 `WARNING` 提醒）、语义保真、连戏锁正文保留与台词溯源均由本技能在上下文中结合剧情审定（`reviewed_invariant`），避免脚本误杀。\n\n| 严重程度 | 允许对应的规则等级 | 判定标准 | 是否触发 `REVISE` |\n|---|---|---|---|\n| `blocker` | `structural_invariant` / `reviewed_invariant` | 阻断交付的不变量结构错误、核心事实穿帮、泄密违规或不可挽回的成片缺漏 | 是 |\n| `major` | `structural_invariant` / `reviewed_invariant` | 伤及剧情因果理解、跨镜连戏或成片主体与台词完整度的中度硬伤 | 未获创作者豁免时触发 |\n| `minor` | `craft_default` | 套路重复改进建议、局部瑕疵提醒或裁切/后期可修项（绝不升格为 `major`） | 否 |\n| `note` | `craft_default` / `taste_option` | 审稿人个人审美与拍法参考建议、保留沿用备忘（除非撞上创作者已拍板的硬性限制，否则一律只记 `note`） | 否 |\n\n> 所有 `craft_default` / `taste_option` 偏离均不得单独触发 `REVISE`（在 `- 规则：` 字段直接标注 `craft_default` 或 `taste_option`，不虚构阶段规则编号）；唯有台词、正文或成片实质违背已立住的人物硬事实、剧情因果链或上下游不变量规则时，才挂靠对应的 `structural_invariant` / `reviewed_invariant` 规则编号定为 `major` 或 `blocker`。\n\n### 审查结论判定（书面与生成媒体对照）\n\n| 书面结论（`审查/*.md`） | 对应媒体看片结论 | 判定条件 |\n|---|---|---|\n| `APPROVE` | `PASS` | 无 `blocker`，且无未获创作者显式豁免的 `major`（无额外建议） |\n| `APPROVE_WITH_NOTES` | `PASS` | 无 `blocker` 且无未获豁免的 `major`，附 `minor` / `note` 建议或创作者已显式豁免的 `major` 留底 |\n| `PROVISIONAL` | `PROVISIONAL` | 无 `blocker`；仅剩不影响主线推进且已写明下阶段修法的局部问题、待看片拍板的边界项，或尚有关键材料/音画未查看（未看素材如实标未知，不凭文件名猜测） |\n| `REVISE` | `REVISE` / `REJECT` | 存在 `blocker` 或未获创作者豁免的 `major` 硬伤需返工（整批失控需回退重设时，媒体结论记 `REJECT`，书面记 `REVISE` 并标明重设范围） |\n\n生成媒体看片六档分流细则见 [成片看片与返工分流指南](references/generated-media.md)。\n",
+      "card": {
+        "title_zh": "短剧审查",
+        "purpose_zh": "独立审查短剧原著拆解、对标拆解、大纲、剧本、视觉设定、提示词、分镜、剪辑单及已生成素材与成片，负责跨场跨镜连戏核查与出片问题归因，只输出审查问题单、结论与返修要求，不直接改原稿或调用生成。",
+        "does": [
+          "按受审对象查阅对应核查清单，划定范围并先查编号、引用、时长、落镜、连戏等硬账",
+          "顺剧本事实到成片接缝的链条对账，凭上下游原文实据开问题单",
+          "按位置、证据、影响、修改要求、规则逐行写问题单并定级",
+          "只开最小局部补丁，单列被删的强钩子供执笔人取舍",
+          "按严重程度表与结论表判定 APPROVE、APPROVE_WITH_NOTES、PROVISIONAL、REVISE 等结论",
+          "按负责技能归拢返修项交创作者拍板"
+        ],
+        "inputs": [
+          "用户指定的稿件或看片反馈",
+          "受审文档、章节或镜头范围及创作者已拍板的创作要求",
+          "前置材料如剧本、视觉设定、分镜、首尾帧提示词、视频动态、剪辑单与成片"
+        ],
+        "outputs": [
+          "审查问题单（含位置、证据、影响、修改要求、规则字段）",
+          "审查结论（APPROVE、APPROVE_WITH_NOTES、PROVISIONAL、REVISE 或对应媒体结论）",
+          "返修要求与按技能归拢的返修分派",
+          "被删的强钩子记录",
+          "落盘审查文档如 `审查/EP001-审查.md` 或对话口头反馈"
+        ],
+        "scenarios": [
+          "单集联审剧本、分镜与视频提示词",
+          "专项审查视觉设定、生图提示词或成片接缝",
+          "成片看片后做问题归因与返工分流",
+          "复审返修点是否修通及保留内容是否完好",
+          "对比新旧稿发现润色误删钩子"
+        ],
+        "prerequisites": [
+          "优先由未参与本轮执笔的独立审稿人执行，执笔人自检须如实标明自检",
+          "按本次受审对象只打开对应参考清单，不塞入无关清单",
+          "缺某份前置材料时只跳过依赖它的判断"
+        ],
+        "limits": [
+          "不直接修改受审原稿，不调用生成接口",
+          "只输出审查问题单、结论与返修要求",
+          "复审时只核验返修点及保留内容，不翻已放行段落旧账",
+          "craft_default 与 taste_option 偏离不得单独触发 REVISE",
+          "未看素材如实标未知，不凭文件名猜测",
+          "不空扣“有 AI 味”“不够电影感”帽子"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "视频",
+          "写作",
+          "内容运营",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "独立审查短剧原著拆解、对标拆解、大纲、剧本、视觉设定、提示词、分镜、剪辑单及已生成素材与成片，负责跨场/跨镜连戏核查（轴线、站位、视线、持物、状态与接缝）及出片问题归因。"
+          },
+          {
+            "field": "does",
+            "quote": "按 `剧本事实 → 视觉设定 → 分镜起止状态 → 首尾帧提示词 → 视频动态 → 下一镜接戏 → 《剪辑单.md》与整集成片切点接缝` 核查上下游是否走样"
+          },
+          {
+            "field": "does",
+            "quote": "每条问题单写清位置、实据、实际影响、局部修法与不得误伤的保留内容、负责技能及严重程度"
+          },
+          {
+            "field": "does",
+            "quote": "返修意见只针对病灶开最小局部补丁，不借局部毛病要求整集推倒重写。"
+          },
+          {
+            "field": "does",
+            "quote": "单列 `## 被删的强钩子` 记下原位置与原句供执笔人取舍"
+          },
+          {
+            "field": "does",
+            "quote": "按下方两张表确定问题级别与最终结论"
+          },
+          {
+            "field": "does",
+            "quote": "再按负责技能归拢返修项交创作者拍板"
+          },
+          {
+            "field": "inputs",
+            "quote": "直接读取用户指定的稿件或看片反馈"
+          },
+          {
+            "field": "inputs",
+            "quote": "确认本次受审文档、章节或镜头范围及创作者已拍板的创作要求"
+          },
+          {
+            "field": "outputs",
+            "quote": "需要保存审查文档时，单集联审写入 `审查/EP001-审查.md`，专项审查写入 `审查/<主题>-审查.md`；只需口头反馈时直接在对话中回复。"
+          },
+          {
+            "field": "outputs",
+            "quote": "标题下逐行写出 `- 位置：`、`- 证据：`、`- 影响：`、`- 修改要求：`、`- 规则：`"
+          },
+          {
+            "field": "outputs",
+            "quote": "存在 `blocker` 或未获创作者豁免的 `major` 硬伤需返工"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- 范围：剧本、分镜、视频提示词"
+          },
+          {
+            "field": "scenarios",
+            "quote": "生成素材、《剪辑单.md》与整集成片切点接缝核查、六档分流与试拍调优"
+          },
+          {
+            "field": "scenarios",
+            "quote": "复审时只核验返修点是否修通及保留内容是否完好，不翻已放行段落旧账。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "优先由未参与本轮执笔的独立审稿人执行；执笔人自检时如实标明自检"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "按本次受审对象只打开对应的参考清单，不把整套项目和无关清单全塞进上下文"
+          },
+          {
+            "field": "limits",
+            "quote": "本技能只负责指出问题、说明影响、明确改稿标准并退回对应负责技能，不直接修改受审原稿，不调用生成接口。"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama-storyboard/SKILL.md",
+      "blob_sha": "1247db18ad3b02cbd9f8ed51e9bb8e9e3b98fb80",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-storyboard/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-storyboard",
+        "description": "把短剧剧本和视觉设定拆成切镜有据、调度清晰并带首尾帧提示词的分镜，或快速草拟单场镜头与首帧提示词。用于拆分镜、设计镜头表、重头戏场面调度、比选分镜拍法、编写首帧或尾帧提示词；不生成媒体，不做独立连戏审查。"
+      },
+      "excerpt": "---\nname: short-drama-storyboard\ndescription: 把短剧剧本和视觉设定拆成切镜有据、调度清晰并带首尾帧提示词的分镜，或快速草拟单场镜头与首帧提示词。用于拆分镜、设计镜头表、重头戏场面调度、比选分镜拍法、编写首帧或尾帧提示词；不生成媒体，不做独立连戏审查。\nlicense: MIT\n---\n\n# 短剧分镜与首尾帧提示词\n\n把定稿剧本和视觉设定拆成切镜有据、空间连戏、起止画面清楚的 `剧集/<EP>/分镜.md`，并逐镜编写首帧（按需含尾帧）提示词。\n\n## 快速开始\n\n```text\n用 short-drama-storyboard 技能完成 EP001 的正式分镜和每镜首帧提示词\n```\n\n## 模式选择（正式项目 vs 轻量起草）\n\n- **轻量 / 草稿模式**：用户仅要求快速试拆单场分镜、构思调度、起草首尾帧提示词，或顺手衔接单场视频提示词（无完整短剧项目目录）时，直接输出清晰易读的镜头表（镜号、景别/机位、运镜、画面起止、声音）与可直接复制的首尾帧提示词，**不强制套用完整项目全部机读字段与 `REF-`/`PLAN-` 槽位语法**。\n- **正式项目模式**：仅当需要落盘完整项目 `剧集/<EP>/分镜.md`、接入创作台（Dashboard）、跑跨文档自动校验或衔接内置批量生产时，才完整遵循 [分镜文档格式规范](references/format-spec.md)（含 `SHOT-...` 标题、脚本必需字段、出场设定与参考图槽位语法）。\n\n## 入口与语言配置\n\n- **直接动笔**：有定稿剧本与必要视觉设定即可直接开拆（正式项目先读磁盘最新 `剧集/<EP>/剧本.md`，与早期对话草稿有出入时以文件为准）。美术设定图提示词与分镜可并行推进；仅当创作者明确要求比选重头戏拍法时才先给备选方案等拍板，常规拆镜一气呵成。\n- **双语分工**：创作者可读说明跟随项目语言；首尾帧可复制提示词正文跟随 `short-drama.json#/format/prompt_language`（无配置文件时按已有提示词或项目文档语种推断，未指定时使用用户当前语言）。\n- **镜长与节奏**：参考 `short-drama.json` 中的 `native_duration_seconds` 与 `rhythm_profile`（如已确认模型秒数区间，贴合单镜上下限；短于下限的快切可提议多镜合生或演完稳住终点）。未定模型或未填秒数时按对白与动作体量给常规秒数（如 2–6s），**不因此停工追问**。\n\n## 工作流\n\n1. **排定戏剧落点与悬念时机**：顺场理清动作、对白、音效、画面文字与转折落点（若立项或剧本限定了“后半段 / 最后 N 秒首次露面”，按全集目标时长换算到具体秒数位置再排镜）。\n2. **逐镜写清起止、运镜与声音**：顺着 `起点 → 动作 → 终点` 交代人物站位、姿态与持物交接，单镜动作量贴合秒数（见 [镜头设计方法](references/shot-craft.md)）：\n   - `运镜`：运动镜头写清动法与起止落点（开场强钩子或高潮反转可用急推）；固定镜头直接写 `固定`，无需强凑不动理由。\n   - `声音`：排镜时按台词与停顿估准秒数，文档「声音」行清爽写明对白/VO/OS、关键音效与留白即可，免写读秒算术账。\n3. **按需标注空间站位与轴线**：三人以上群戏、复杂空间换位或跨轴调度时，在场头写一段 `场景站位` 标尺；简单双人场直接在各镜起止点写清即可（见 [场面调度手册](references/blocking-playbooks.md)）。动作打斗戏拆法见 [打戏与动作分镜](references/fight-craft.md)。\n4. **编写首尾帧提示词**：`### 首帧提示词` 只定格镜头 `起点` 瞬间画面（带 `连戏锁` 的条目在生效范围内原字保留 `锁定词`），确需锁定收尾构图时另加 `### 尾帧提示词`。全集保持统一画风与同场主光方向，明确标出的闪回、梦境或主观镜头可按剧情意图切换质感或画风；同机位切景或微调表情动作时，允许基于已确认的上一镜首帧配合指令改图派生下一镜首帧（见 [首尾帧构图与写法](references/keyframe-craft.md)）。\n5. **核对关联字段并收束整集**：正式项目按 [分镜文档格式规范](references/format-spec.md) 补齐 `来源`、`出场设定`、`输入参考图` 及可选的 `画面文字` / `图片提示词项`。剧本每个场次均须有镜头覆盖（确需整场略过时在首个 `SHOT-...` 前注明 `- 未拍场次：`）；全集总时长与待拍板事项放在回复或文末独立 `## 整集汇总` 下。\n\n## 出场设定与参考图原则\n\n用户没有手工点名参考图，不等于选择文生视频。正式项目在首尾帧成稿后，对照正文**实际入画**内容核对关联字段（精确标点与完整语法见 [分镜文档格式规范](references/format-spec.md)）：\n\n- **出场设定**：只列本镜画面实际可见的人物、造型、地点与道具，`控制：` 不超出本镜景别可见范围；入画人物身着独立建档的 `造型` 且服装入画可见时须一并列出。正文提及但未入画的条目列在 `画外`，尚未建档的连戏物件在汇总中请 `short-drama-assets` 技能补建。\n- **输入参考图**：先在用户输入、`剧集/<EP>/制作成果/` 与文档已指向的可见媒体中核对真实图片——已有真实图片绑定 `REF-...`，外部工具自挂图片预留 `PLAN-...`，需等实图到位标明 `待补参考图`，确认不垫参考图再写 `无（文生视频）` 或 `无`（只有真实 `REF-...` 可直接交由 `short-drama-produce` 技能图生投产）。\n- **用途配额**：每张参考图只选一项主 `用途`，每镜最多一张 `起始帧` 与一张 `结束帧`，挂 `结束帧` 时必须同时挂 `起始帧`。\n\n## 修订原则\n\n返修分镜时按戏剧职责维护 `SHOT-...` 镜号稳定：\n\n- **调顺序或同镜微调**（改景别、走位或起止细节）→ 保留原 `SHOT-...` 镜号，同步修好相邻镜衔接。\n- **新插独立镜头**（补反应特写或道具插入镜）→ 新开 `SHOT-...` 镜号，后续老镜号不顺延改号。\n- **一镜拆多镜** → 承接原起点与已生成首帧的主半镜可保留原 `SHOT-...` 镜号，仅给新拆出的子镜开新号。\n- **多镜并一镜或整镜推翻重拍** → 停用旧号换新号，已停用废号绝不重用，并在回复中点明需同步更新的下游 `MOTION-...` / `GROUP-...`。\n\n## 按需查阅\n\n- 完整项目文档的机读字段与标点语法：[分镜文档格式规范](references/format-spec.md)\n- 阶段边界与规则分级：[阶段规则](references/stage-contract.md)\n- 节拍拆镜、机位焦段、运镜、时长推算、首尾成对与重头戏构思比选：[镜头设计方法](references/shot-craft.md)\n- 竖屏多人纵深、按需站位块、正反打与画外视线例外：[场面调度手册](references/blocking-playbooks.md)\n- 多招回合与单招落定、受击借位与多人围攻调度：[打戏与动作分镜](references/fight-craft.md)\n- 首尾帧五步写法、同机位首帧派生、实景受光与漫剧专属词条：[首尾帧构图与写法](references/keyframe-craft.md)\n- 从剧本片段拆到英文首帧提示词与关联字段的端到端示范：[剧本到首帧完整示例](references/screenplay-to-keyframe-example.md)\n\n## 完成标准\n\n同轮同时修改《图片提示词.md》与《分镜.md》时当场同步引用，不另建场次核对表文件。需要跨文档结构与连戏自动校验时，如已安装 `short-drama` 技能可交由其按局部或整集模式核对；独立使用本技能时，对照 [分镜文档格式规范](references/format-spec.md) 与 [阶段规则](references/stage-contract.md) 人工自检即可。视频提示词、生成投产与独立连戏审查只在创作者点名时启动。\n",
+      "card": null
+    },
+    {
+      "skill_path": "skills/short-drama-video-prompts/SKILL.md",
+      "blob_sha": "8be5101a97956f1b5dc3316ff1e283181d13e91b",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-video-prompts/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-video-prompts",
+        "description": "把短剧分镜和首帧写成可直接复制的视频提示词，也可独立起草视频动作或成片配乐/主题曲提示词。用于文生/图生视频动作、人物表演、运镜、口型、环境动态、镜头时长与配乐提示词编写；不调生成接口、不写歌词、不改分镜起止状态。"
+      },
+      "excerpt": "---\nname: short-drama-video-prompts\ndescription: 把短剧分镜和首帧写成可直接复制的视频提示词，也可独立起草视频动作或成片配乐/主题曲提示词。用于文生/图生视频动作、人物表演、运镜、口型、环境动态、镜头时长与配乐提示词编写；不调生成接口、不写歌词、不改分镜起止状态。\nlicense: MIT\n---\n\n# 短剧视频与配乐提示词\n\n把已定稿的分镜和首帧写成可直接复制的 `剧集/<EP>/视频提示词.md`，或按要求起草成片配乐与主题曲提示词。\n\n## 快速开始\n\n```text\n用 short-drama-video-prompts 技能把 EP001 分镜逐镜写成可直接复制的视频提示词\n```\n\n## 模式选择（正式项目 vs 轻量起草）\n\n- **轻量 / 草稿模式**：用户仅要求为单场或几个镜头独立起草视频动作提示词、配乐提示词（无完整短剧项目目录）时，直接输出清晰的镜头说明与可直接复制的提示词正文，**不强制套用完整项目的 `MOTION-`/`GROUP-`/`REF-`/`PLAN-` 机读字段**。\n- **正式项目模式**：落盘 `剧集/<EP>/视频提示词.md` 或衔接跨文档校验与批量投产时，完整遵循 [视频提示词格式规范](references/format-spec.md)。\n\n## 入口与边界\n\n视频提示词负责描写镜头从起点到终点的动作、表演、道具变化、运镜与声音，不私自改动分镜定好的起止状态与镜头时长。\n\n- **按分镜「输入参考图」分流**：\n  - **图生视频（含 `REF-...` 或 `PLAN-...`）**：承接分镜参考项，可按目标视频模型模式与本镜焦点合理增减设定板、承接帧或参考音频，保持 `顺序`、`用途`、控制与不得控制范围清晰。`PLAN-...` 供外部工具按序挂图；需交 `short-drama-produce` 技能内置投产时先落盘实图并改绑 `REF-...`。\n  - **文生视频（`无（文生视频）` 或 `无`）**：填写非空「开场画面」，并在可复制正文中自然交代人物、造型、地点陈设、景别焦段与光线。\n  - **参考图待补（`待补参考图`）**：先在用户输入、`剧集/<EP>/制作成果/` 与已引用媒体中核对可用实图（不靠相似文件名猜图）；仍有缺口且创作者未要求停笔等图时，转为 `PLAN-...` 挂图计划照常成稿并附挂图清单，不擅自改成文生视频。无论改绑 `REF-...` 还是转为 `PLAN-...`，均请 `short-drama-storyboard` 技能同步更新《分镜.md》对应镜头。\n- **模型档位与双语配置**：\n  - 创作者可读说明跟随项目语言；读取 `short-drama.json` 目标模型配置，**未指定具体模型时直接采用通用档 `generic` 成稿，不停工追问**（新点名未入配置时交 `short-drama` 技能记录或在文首注明）。\n  - 视频提示词正文语种优先跟随 `short-drama.json#/creator_authority/production_profile/choices/video_prompt_language`，未声明时回退到 `short-drama.json#/format/prompt_language`（无配置文件时按目标模型惯例或用户当前语言）；角色对白、VO、OS 口语语种始终按剧本与声线设定执行。\n\n## 工作流\n\n1. **核对参考素材与生成模式**：确认每镜走图生视频（按参考项 `用途` 组合与模型互斥规则转换为首帧、首尾帧或多图参考）还是文生视频。相邻镜头默认独立按各自首帧或参考图生成，**不默认锁死为“待续接、不可提交”**；仅在跨镜硬切接同一连续动作需像素级咬合或创作者明确要求视频续写时，按 [运镜、现场声与跨镜连戏](references/camera-audio-continuity.md) 走成片或真实末帧续接。\n2. **核算时长与发声窗口**：确认每镜时长与对应 `SHOT-...` 完全相等且落在模型单次支持区间内；含对白、VO 或 OS 时核对留给念词的有效发声窗口（见 [表演弧线与动作计时](references/performance-action-timing.md#台词时长估算)），装不下时精简次要动作或退回分镜/剧本调整。\n3. **组织动作、运镜与声音正文**：按「起手姿态 → 核心动作（触发、方向、接触参照物、落点）→ 微表情与反应层次 → 运镜与焦段 → 声音与终点状态」成文。需卡切点时用互不重叠的标秒时段铺满本镜时长；项目启用多镜合生时按 [目标模型与交付配置指南](references/model-and-delivery-profiles.md) 增补 `GROUP-...` 分组（成员同场紧邻、时长等于成员之和、覆盖无重漏，规则详见 [阶段职责与规则](references/stage-contract.md)）。\n\n## 提示词核心要求\n\n- **参考分工与连戏锁**：已由 `起始帧` 或对应设定条目 `主体` / `造型状态` 参考图锁住外观的对象，专注描写动作与神态演变，**不重复堆砌已知静态外观，免重抄该条静态 `LOCK-...` 锁定词**；文生视频及尚未覆盖该外观的图生视频（含合生分组）仍须原字保留生效的 `LOCK-...` 锁定词（槽位匹配细则见 [视频提示词格式规范](references/format-spec.md)）。\n- **声音分流与台词守真**：后期配音路线（`separate`）专注画面口型与呼吸神态；音画同出路线（`same_pass`）写清声源、说话人、语种、单次逐字台词与环境底声，绑定 `- 参考音频：` 时仅绑本镜实际发声角色。严禁编造《剧本.md》《视觉设定.md》《分镜.md》未声明的人物发声台词。\n- **画面文字与正文纯净度**：防字幕负面词仅在易飘伪字幕的模型或含屏幕/纸页/招牌等文字风险场景中按需添加，剧本要求看清的画内文字写明字样、语种与所在物体表面；可复制提示词内不夹带文件名、路径、规则号或流程备注。\n\n## 配乐提示词与下游衔接\n\n- **成片配乐或主题曲**：按用户要求在《视频提示词.md》末尾单开标准条目 `## MUSIC-... · <名称>`（含铺乐区间、情绪乐器、禁用元素与 `### 可复制提示词` 引用块，详见 [视频提示词格式规范](references/format-spec.md)），便于 `short-drama-produce` 按 `source_entry` 独立提取与追踪；歌词须取自用户来稿或定稿剧本，不自行编造。\n- **下游路由**：实际调接口生成交 `short-drama-produce` 技能；跨文档格式与连戏自动核对交 `short-drama` 技能。\n\n## 按需参考\n\n遇到具体问题时打开对应参考文档（命中专属模型时只读对应模型卡）：\n\n- 完整项目机读字段、参考音频与分组语法：[视频提示词格式规范](references/format-spec.md)\n- 阶段职责与规则分级总表：[视频提示词阶段职责与规则](references/stage-contract.md)\n- 单镜结构、图生/文生锁词分工、焦段词与构图化解技巧：[视频提示词写作指南](references/video-prompt-guide.md)\n- `generic` 默认档、音画同出/后期配音分流与多镜合生：[目标模型与交付配置指南](references/model-and-delivery-profiles.md)\n- 微表情发力先后、多人同框层次与台词发声窗口：[表演弧线与动作计时](references/performance-action-timing.md)\n- 运镜防冲突、现场声衔接与跨镜连续动作末帧精修：[运镜、现场声与跨镜连戏](references/camera-audio-continuity.md)\n- MiniMax H3 三段/六段结构与首帧锁图权衡：[MiniMax H3 提示词写法](references/minimax-h3.md)\n- Seedance 2.0 标记语法与三种互斥起点：[Seedance 2.0 提示词写法](references/seedance-2.0.md)\n- Seedance 2.5 时间戳分段、`任务类型` 与合生注意项：[Seedance 2.5 提示词写法](references/seedance-2.5.md)\n- Wan 3.0 自然指令、`图N` 编号与扩写开关：[Wan 3.0 提示词写法](references/wan-3.0.md)\n",
+      "card": {
+        "title_zh": "短剧视频与配乐提示词",
+        "purpose_zh": "把已定稿的短剧分镜和首帧写成可直接复制的视频提示词，也可独立起草视频动作或成片配乐、主题曲提示词；不调生成接口、不写歌词、不改分镜起止状态。",
+        "does": [
+          "按分镜逐镜撰写视频提示词，描写动作、表演、道具变化、运镜与声音",
+          "按参考图分流处理图生视频、文生视频与待补参考图三种情况",
+          "核算镜头时长与台词发声窗口，组织起手姿态到终点状态的正文",
+          "按需增补多镜合生分组与参考音频绑定",
+          "在文末单开标准条目起草成片配乐或主题曲提示词",
+          "区分后期配音与音画同出路线，处理画面文字与正文纯净度"
+        ],
+        "inputs": [
+          "已定稿的分镜与首帧",
+          "剧集目录下的分镜.md、剧本.md、视觉设定.md",
+          "short-drama.json 中的目标模型与语种配置",
+          "用户来稿或定稿剧本中的歌词",
+          "用户对单场或几个镜头的独立起草要求"
+        ],
+        "outputs": [
+          "剧集/[EP]/视频提示词.md",
+          "可直接复制的镜头视频提示词正文",
+          "文末 MUSIC- 配乐或主题曲标准条目及可复制提示词引用块",
+          "待补参考图时的挂图清单"
+        ],
+        "scenarios": [
+          "为 EP001 分镜逐镜写视频提示词",
+          "为单场或几个镜头独立起草视频动作提示词",
+          "起草成片配乐或主题曲提示词",
+          "按目标视频模型档位调整提示词写法",
+          "核对镜头时长与台词发声窗口"
+        ],
+        "prerequisites": [
+          "已有定稿分镜与首帧，或用户明确要求轻量起草",
+          "正式项目模式需遵循视频提示词格式规范",
+          "读取 short-drama.json 目标模型配置，未指定时用 generic 档",
+          "歌词须取自用户来稿或定稿剧本"
+        ],
+        "limits": [
+          "不调用生成接口",
+          "不写歌词",
+          "不私自改动分镜定好的起止状态与镜头时长",
+          "不编造剧本、视觉设定、分镜未声明的人物发声台词",
+          "不靠相似文件名猜图",
+          "可复制提示词内不夹带文件名、路径、规则号或流程备注",
+          "实际调接口生成需交 short-drama-produce 技能",
+          "跨文档格式与连戏核对需交 short-drama 技能"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "视频",
+          "写作",
+          "内容运营"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "把已定稿的分镜和首帧写成可直接复制的 `剧集/<EP>/视频提示词.md`，或按要求起草成片配乐与主题曲提示词。"
+          },
+          {
+            "field": "does",
+            "quote": "视频提示词负责描写镜头从起点到终点的动作、表演、道具变化、运镜与声音，不私自改动分镜定好的起止状态与镜头时长。"
+          },
+          {
+            "field": "does",
+            "quote": "**图生视频（含 `REF-...` 或 `PLAN-...`）**：承接分镜参考项，可按目标视频模型模式与本镜焦点合理增减设定板、承接帧或参考音频"
+          },
+          {
+            "field": "does",
+            "quote": "**文生视频（`无（文生视频）` 或 `无`）**：填写非空「开场画面」，并在可复制正文中自然交代人物、造型、地点陈设、景别焦段与光线。"
+          },
+          {
+            "field": "does",
+            "quote": "**核算时长与发声窗口**：确认每镜时长与对应 `SHOT-...` 完全相等且落在模型单次支持区间内"
+          },
+          {
+            "field": "does",
+            "quote": "**成片配乐或主题曲**：按用户要求在《视频提示词.md》末尾单开标准条目 `## MUSIC-... · <名称>`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**正式项目模式**：落盘 `剧集/<EP>/视频提示词.md` 或衔接跨文档校验与批量投产时，完整遵循 [视频提示词格式规范](references/format-spec.md)。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "读取 `short-drama.json` 目标模型配置，**未指定具体模型时直接采用通用档 `generic` 成稿，不停工追问**"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "歌词须取自用户来稿或定稿剧本，不自行编造。"
+          },
+          {
+            "field": "limits",
+            "quote": "不调生成接口、不写歌词、不改分镜起止状态。"
+          },
+          {
+            "field": "limits",
+            "quote": "严禁编造《剧本.md》《视觉设定.md》《分镜.md》未声明的人物发声台词。"
+          },
+          {
+            "field": "limits",
+            "quote": "可复制提示词内不夹带文件名、路径、规则号或流程备注。"
+          },
+          {
+            "field": "limits",
+            "quote": "实际调接口生成交 `short-drama-produce` 技能；跨文档格式与连戏自动核对交 `short-drama` 技能。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "落盘 `剧集/<EP>/视频提示词.md`"
+          },
+          {
+            "field": "hosts",
+            "quote": "license: MIT"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama-write/SKILL.md",
+      "blob_sha": "25f157ed1565f8d2d619d3a84c263f38b250c68c",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama-write/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama-write",
+        "description": "编写、修订或格式化可拍摄的短剧与漫剧单集 Markdown 剧本（保留作者原文与口吻）。用户说“写/改一集剧本”“把大纲写成剧本”“优化场景对白”“去 AI 味润色”“续写下一集”或整理现成剧本格式时使用；不负责大纲、视觉设定、分镜、提示词或终审。"
+      },
+      "excerpt": "---\nname: short-drama-write\ndescription: 编写、修订或格式化可拍摄的短剧与漫剧单集 Markdown 剧本（保留作者原文与口吻）。用户说“写/改一集剧本”“把大纲写成剧本”“优化场景对白”“去 AI 味润色”“续写下一集”或整理现成剧本格式时使用；不负责大纲、视觉设定、分镜、提示词或终审。\nlicense: MIT\n---\n\n# 短剧写作\n\n把单集构思写成能演、能拍、能实实在在往前推剧情的 `剧集/<EP>/剧本.md`。\n\n## 快速开始\n\n只维护一份剧本 Markdown，不另建单集卡片、节拍表、段落索引、录音表、质检单或确认记录。\n一级标题写 `# EP001 集名`，场景标题写 `## EP001-SC001 内 · 地点 · 时间/天气`（`·` 两侧空白可灵活排版）。\n对白写 `角色（可选语气/顺手小动作提示）：台词`，支持带空格的外文角色名（如 `Dr. Lin`、`Agent K`）与全半角括号提示；制作标记使用 `[VO]`、`[OS]`、`[SFX]`、`[画面文字]`、`[连续性]`、`[转场]`。动作段开头避免写“短词组＋全角冒号”，以免与对白撞车。\n\n## 入口\n\n- 有分集大纲或合一简纲：看清本集开场接什么局面、人物眼下争什么、核心变化与集尾落点后直接动笔。\n- 只有点子或粗纲：在当前对话里理顺本集核心看点和前因后果，直接写剧本，不必补建上游拆书或长剧状态账。\n- 已有剧本定稿：尊重作者原有文风口吻，只按用户指定位置做局部修改；“去 AI 味”润色不磨平作者个人口吻。\n- 排版不统一的来稿要进制作：原字保留台词与剧情，只把场次、动作、对白和制作标记整理成标准格式。\n\n## 工作流\n\n1. 定准本集核心看点（爽点、悬念、笑点或情感落点）、开场承接局面、当集落定结果与集尾停点。\n2. 在对话上下文里顺清各场戏的作用与场尾变化，不另存节拍表；把动作、对白、画外音、关键音效和画面文字一并写进 `剧本.md`。用户要求写整集就一口气写完整集，分场续写时自动往下接。\n3. 交稿前通读自检一遍：核对现有材料事实与 `必须/禁止` 要求，清掉专替观众补背景、复述刚演完动作或原地车轱辘的废句（创作者原稿台词不删改），对照[精简打磨与删繁就简](references/script-craft.md#81-精简打磨与删繁就简)压实篇幅。\n\n## 写作要求\n\n- 守住现有材料定好的事实、题材路数和集尾落点；严禁凭空编造原稿没有的精确数字、记录、资源、流程、人物关系或机关设定；凡会改写核心剧情走向的分岔点先请用户确认。\n- **对抗场默认做法**：正面交锋场次写清谁占上风、谁拿到筹码或处境更险，破局靠前文有迹可循的实据、权限、代价或人物出招，少靠对手无故失声或天降外援；温情、喜剧、悬疑留白与过场消化戏顺应本场情绪节奏，推进知情范围、人物关系或连戏状态即可，不必场场硬拧反转。\n- 关键剧情转折靠看得见、听得着的动作与物证状态演出来，不拿大段无法拍摄的心理说明替代行动；实拍与漫剧均可适度用 `[VO]` 表现言行反差或跨时空浓缩。挑大梁的对手要有盘算与招数，走过场的龙套干净利索不硬加支线。\n- 全集第一拍单拎出来就要抓人，冲突动作、反常景象，或规则怪谈、系统弹窗、报警录音等强视听冲击的文字/声音钩子均成立（见[开场直接接住上集局面](references/script-craft.md#71-开场直接接住上集局面)）。\n- 两难抉择、争议物证查验、限定次数/轮次、精确倒计时仅在大纲将其作为核心戏眼时启用（见下节参考指南），寻常决定、普通道具和笼统的“赶时间”不硬拔高成精密机关。\n- 前文核心硬代价、关键道具归属、知情范围与连戏状态到集尾前后对得上；制作标记使用固定方括号语法供脚本校验，而 `[连续性]` 只交接前文已演出、后续分镜易漏的状态变化、不单靠备注断言镜头外“从未发生某事”（完整规则见 [阶段职责与规则](references/stage-contract.md)）。`end_on_peak` 为 `true` 时直接卡在高潮点收尾（见[项目节奏设定](references/script-craft.md#64-项目节奏设定)）。\n- 按目标时长压稿时，先砍过场水分、重复查验与嘴碎解释；爽剧对抗高潮推荐保留爆发台词、一锤定音的决绝话与收场动作这组配合，不拿固定字数、镜头数或节拍数硬套填空模板。\n\n## 分场景参考指南\n\n平时只看本说明和手头材料即可；遇到以下情况再翻阅对应文档：\n\n- 本环节职责边界与规则分级：[阶段职责与规则](references/stage-contract.md)\n- 场景标题、对白与制作标记语法，或把现成剧本[整理成标准格式](references/screenplay-format.md#7-现成剧本整理成标准格式)：[剧本格式规范](references/screenplay-format.md)\n- 三角符号等剧组来稿排版转换：[片场制作稿格式](references/production-format-dialect.md)\n- 核心戏剧设计方法（[剧作方法](references/script-craft.md)）：\n  - [两难抉择](references/script-craft.md#33-写两难抉择时两条路都得有得有失)与[争议物证查验](references/script-craft.md#52-证据先改变判断再改变关系)\n  - [精确倒计时](references/script-craft.md#62-倒计时先算动作不要只写数字)与[限定次数或轮次](references/script-craft.md#63-限定次数与轮次按演完结果算数)\n  - [实用声音叙事与留白](references/script-craft.md#65-实用声音叙事与留白)与[低成本视听替代与备选拍法](references/script-craft.md#82-低成本视听替代与备选拍法)\n- 借对白带出往事、拉开人物口吻与潜台词，或写[外语台词](references/dialogue-craft.md#62-外语台词英语先亮结论日韩语切忌套用英语语序)：[对白写法](references/dialogue-craft.md)\n- 使用 `[VO]`、把小说心理描写外化成动作或拍实人物痛点：[能演的不说](references/script-craft.md#44-能演的不说vo内心独白与痛点)\n- `short-drama.json` 中 `creator_authority.rhythm_profile` 状态为 `accepted`：[项目节奏设定](references/script-craft.md#64-项目节奏设定)\n\n## 时长估算（按需）\n\n> 下文命令中 `<SKILL_DIR>` 指本 `SKILL.md` 所在目录，`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）。\n\n用户问起时长、压稿核对篇幅，或需查看 `[VO]` 占比与漫剧 `speech_share` 时，直接对单集剧本运行内存解析估时（无需提前生成索引文件或备份旧稿）：\n\n```text\n<PYTHON> \"<SKILL_DIR>/scripts/duration_estimate.py\" --script 剧集/<EP>/剧本.md\n```\n\n> **无终端 / 无 Python 兜底**：若当前对话环境不支持运行本地脚本，可直接在对话中按台词字数/词数与动作段落数结合项目语速（如中文快节奏参考约 4 字/秒、英文约 3 词/秒）给出透明的估算范围，并标明为口头估算。\n\n有 `short-drama.json` 时可追加 `--project short-drama.json` 读取项目语速与节奏设定；本集单独设了目标时长时可追加 `--target-seconds <秒数>`；若罕见单次角色名触发 `incomplete`，可追加 `--extra-speaker <角色名>`（可重复传入，在自动识别与篇首/场首 `人物：` 声明之上补充；`--speaker <角色名>` 则覆盖说话人白名单）。\n\n统计说明：\n- `dialogue_characters`（含标点）用来算 `vo_share`（`[VO]` 占全部台词字数比例；`[OS]` 计入分母、不计入分子）；`voiced_characters`（去标点实读字）与空格分词外语 `voiced_words` 分别按字数/词数语速折算秒数，未配置语速的单位列在 `untimed_speech`。\n- 全部台词都有语速配置时输出 `speech_seconds` 与 `speech_share`，漫剧参考见[漫剧靠声音往前推](references/script-craft.md#45-漫剧靠声音往前推)。\n- `[画面文字]`、`[SFX]`、`[转场]` 行数列在 `untimed`；配置了 `on_screen_text_characters_per_second` 时，`[画面文字]` 计入 `on_screen_text_seconds`。未配置语速或动作速率时，只报实打实的字数与段落计数，不瞎猜秒数。\n\n## 完成\n\n用户指定的集场范围已写进 `剧本.md`，前后因果顺畅，对白与动作演得出来，集尾落到预定位置即算完稿。视觉设定、分镜、审查与素材生产只在用户点名时才启动；写完后可交 `short-drama` 技能做局部格式与引用核对。\n",
+      "card": {
+        "title_zh": "短剧单集剧本写作",
+        "purpose_zh": "编写、修订或格式化可拍摄的短剧与漫剧单集 Markdown 剧本，保留作者原文与口吻；不负责大纲、视觉设定、分镜、提示词或终审。",
+        "does": [
+          "把单集构思或分集大纲写成可拍摄的 `剧集/[EP]/剧本.md`",
+          "按标准格式整理场次标题、对白与制作标记",
+          "在用户指定位置局部修订已有剧本，保留作者文风",
+          "对来稿做去 AI 味润色与排版规范化",
+          "按需运行脚本估算单集时长与 `[VO]` 占比",
+          "交稿前通读自检，清理废句并压实篇幅"
+        ],
+        "inputs": [
+          "分集大纲或合一简纲",
+          "点子或粗纲",
+          "已有剧本定稿及指定修改位置",
+          "排版不统一的现成剧本来稿",
+          "单集剧本 Markdown 文件",
+          "可选的 `short-drama.json` 项目设定"
+        ],
+        "outputs": [
+          "`剧集/[EP]/剧本.md` 单集剧本 Markdown",
+          "按需的时长估算结果（含 `speech_seconds`、`speech_share`、`vo_share` 等）",
+          "口头估算范围（无终端或无 Python 时）"
+        ],
+        "scenarios": [
+          "用户说“写/改一集剧本”",
+          "把大纲写成剧本",
+          "优化场景对白或去 AI 味润色",
+          "续写下一集",
+          "整理现成剧本格式"
+        ],
+        "prerequisites": [
+          "剧本使用 Markdown 维护，一级标题写 `# EP001 集名`",
+          "场景标题写 `## EP001-SC001 内 · 地点 · 时间/天气`",
+          "对白写 `角色（可选语气/顺手小动作提示）：台词`",
+          "制作标记使用 `[VO]`、`[OS]`、`[SFX]`、`[画面文字]`、`[连续性]`、`[转场]`",
+          "运行时长估算需 Python 3.9+ 解释器"
+        ],
+        "limits": [
+          "不负责大纲、视觉设定、分镜、提示词或终审",
+          "只维护一份剧本 Markdown，不另建单集卡片、节拍表等",
+          "严禁凭空编造原稿没有的精确数字、记录、资源、流程、人物关系或机关设定",
+          "会改写核心剧情走向的分岔点须先请用户确认",
+          "创作者原稿台词不删改",
+          "视觉设定、分镜、审查与素材生产只在用户点名时才启动",
+          "未配置语速或动作速率时只报字数与段落计数，不猜秒数"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "视频",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "编写、修订或格式化可拍摄的短剧与漫剧单集 Markdown 剧本（保留作者原文与口吻）。"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "不负责大纲、视觉设定、分镜、提示词或终审。"
+          },
+          {
+            "field": "does",
+            "quote": "把单集构思写成能演、能拍、能实实在在往前推剧情的 `剧集/<EP>/剧本.md`。"
+          },
+          {
+            "field": "does",
+            "quote": "排版不统一的来稿要进制作：原字保留台词与剧情，只把场次、动作、对白和制作标记整理成标准格式。"
+          },
+          {
+            "field": "does",
+            "quote": "已有剧本定稿：尊重作者原有文风口吻，只按用户指定位置做局部修改；“去 AI 味”润色不磨平作者个人口吻。"
+          },
+          {
+            "field": "does",
+            "quote": "用户问起时长、压稿核对篇幅，或需查看 `[VO]` 占比与漫剧 `speech_share` 时，直接对单集剧本运行内存解析估时"
+          },
+          {
+            "field": "does",
+            "quote": "交稿前通读自检一遍：核对现有材料事实与 `必须/禁止` 要求，清掉专替观众补背景、复述刚演完动作或原地车轱辘的废句"
+          },
+          {
+            "field": "inputs",
+            "quote": "有分集大纲或合一简纲：看清本集开场接什么局面、人物眼下争什么、核心变化与集尾落点后直接动笔。"
+          },
+          {
+            "field": "inputs",
+            "quote": "只有点子或粗纲：在当前对话里理顺本集核心看点和前因后果，直接写剧本"
+          },
+          {
+            "field": "inputs",
+            "quote": "有 `short-drama.json` 时可追加 `--project short-drama.json` 读取项目语速与节奏设定"
+          },
+          {
+            "field": "outputs",
+            "quote": "一级标题写 `# EP001 集名`，场景标题写 `## EP001-SC001 内 · 地点 · 时间/天气`"
+          },
+          {
+            "field": "outputs",
+            "quote": "全部台词都有语速配置时输出 `speech_seconds` 与 `speech_share`"
+          },
+          {
+            "field": "scenarios",
+            "quote": "用户说“写/改一集剧本”“把大纲写成剧本”“优化场景对白”“去 AI 味润色”“续写下一集”或整理现成剧本格式时使用"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "对白写 `角色（可选语气/顺手小动作提示）：台词`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "制作标记使用 `[VO]`、`[OS]`、`[SFX]`、`[画面文字]`、`[连续性]`、`[转场]`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<PYTHON>` 指 Python 3.9+ 解释器"
+          },
+          {
+            "field": "limits",
+            "quote": "只维护一份剧本 Markdown，不另建单集卡片、节拍表、段落索引、录音表、质检单或确认记录。"
+          },
+          {
+            "field": "limits",
+            "quote": "严禁凭空编造原稿没有的精确数字、记录、资源、流程、人物关系或机关设定；凡会改写核心剧情走向的分岔点先请用户确认。"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/short-drama/SKILL.md",
+      "blob_sha": "d4cf0b0a9e3aec1ac5f272b5f6917327a2a139fb",
+      "source_url": "https://github.com/zenstory-ai/drama-skills/blob/82a1ce5750138ada79be6904d1ec72d6a285105d/skills/short-drama/SKILL.md",
+      "fetched_at": "2026-11-25T00:18:31.265Z",
+      "generated_at": "2026-11-25T00:18:31.265Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "short-drama",
+        "description": "创建或继续短剧、漫剧项目，处理全局配置、制作形态选型、视觉定调（Lookdev）统筹、跨环节路由、本地创作台（Dashboard）与交付打包。用于立项、改配置、看进度、启动创作台或导出打包；单一环节的写作、设定、提示词、分镜、剪辑与审查交由对应子技能。"
+      },
+      "excerpt": "---\nname: short-drama\ndescription: 创建或继续短剧、漫剧项目，处理全局配置、制作形态选型、视觉定调（Lookdev）统筹、跨环节路由、本地创作台（Dashboard）与交付打包。用于立项、改配置、看进度、启动创作台或导出打包；单一环节的写作、设定、提示词、分镜、剪辑与审查交由对应子技能。\nlicense: MIT\n---\n\n# 短剧创作路由\n\n本技能负责项目初始化与全局配置、跨环节路由、制作形态选型、视觉风格定调（Lookdev）统筹、交付打包与本地短剧创作台（Dashboard）。\n\n## 快速开始\n\n每集按需直接维护五份核心 Markdown 文档（`剧本.md`、`视觉设定.md`、`分镜.md`、`图片提示词.md`、`视频提示词.md`），不另存重复的结构化副本；具体格式、阶段归属与输出语言规则见 [五份创作文档](references/creator-documents.md)。\n\n> 下文命令中 `<SKILL_DIR>` 指本 `SKILL.md` 所在目录，`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）。\n\n## 环节分工与路由\n\n| 用户要做什么 | 负责技能与产出 |\n|---|---|\n| 开发创意、核心看点、改编方案与分集大纲 | `short-drama-develop` |\n| 拆解长篇原著、抽样快评与分集候选 | `short-drama-novel-analyze` → `项目开发/source-analysis/` |\n| 拆解对标剧、同尺比对差距、视频反推剧本与成片还原 | `short-drama-breakdown` → `项目开发/对标拆解.md` 或 `输入/对标/<REF-ID>/还原/` |\n| 写或改单集剧本 | `short-drama-write` → `剧集/<EP>/剧本.md` |\n| 整理人物、造型、地点、道具与声线设定 | `short-drama-assets` → `剧集/<EP>/视觉设定.md` |\n| 写静态设定图、视觉定调图或单出首尾帧提示词 | `short-drama-image-prompts` → `剧集/<EP>/图片提示词.md` |\n| 做分镜与首尾帧提示词 | `short-drama-storyboard` → `剧集/<EP>/分镜.md` |\n| 写视频动态提示词或配乐提示词 | `short-drama-video-prompts` → `剧集/<EP>/视频提示词.md` |\n| 调用外部模型生成图、视频、配音或配乐 | `short-drama-produce`（先看预览，确认后执行） |\n| 编排剪辑单并渲染成片 | `short-drama-edit` → `剧集/<EP>/剪辑单.md` 与 `制作成果/成片/` |\n| 独立审稿、连戏核查或出片问题归因 | `short-drama-review`（按需启用） |\n| 初始化与修改全局配置、制作形态与 Lookdev 统筹、打开创作台、导出或打包 | 本技能 |\n\n## 执行与写入约定\n\n1. **按需切入与连续推进**：优先使用用户指定的目录，只读取当前任务直接用到的输入文件，不预建空白前序文档。用户交代做到哪一步就完整做到哪一步；分批处理只用于控制单次篇幅，跑通一批直接继续。\n2. **合并补问（最多一次）**：立项或配置缺省时先用合理默认值建项推进；仅在缺少关键信息且不同选法会明显改变剧情走向或画面风格时，在单轮内合并提出不超过 1 次精简补问。下一步要调用外部模型生成素材时，必须先展示预览并等创作者明确确认。\n3. **安全写入与软门禁校验**：直接读写 Markdown 时，写入前确认目标文件未被外部编辑器或创作台修改，如有冲突先重读合并再写入；`.short-drama/`、`输入/` 中的内部记录与密钥绝不写入创作正文。正式成稿阶段每完成一份文档可运行 `<PYTHON> \"<SKILL_DIR>/scripts/creator_markdown_check.py\" <剧集目录> --partial`（五份齐备后跑全量检查）；**探索性草稿、创意构思或单场试写阶段无需强制跑脚本校验**。\n   - **硬门禁 vs 软门禁**：脚本只对 100% 确定性的机械与安全错误（跨文档 ID 悬空、文件路径缺失/软链越界、时长算术不符、槽位语法错误、外发/付费确认令牌）输出硬阻断 `ERROR`（非零退出码）；非 100% 确定性的启发式项与算术风险（如跨语种 `提示词名称` 缺项提醒、按项目已声明语速核算的单镜对白超载提醒）一律作为**软门禁**输出 `WARNING`（退出码保持 `0`）提醒 Agent 重点复核，语义保真与正文连戏锁核查交由 `short-drama-review` 技能结合上下文审定。\n4. **参考图挂接分流**：项目内已有匹配图片时挂 `REF-...`；尚无现成图片且创作者未要求暂停等图时，默认按 `PLAN-...` 写出外部挂图计划，或按创作者意图直接写 `- 输入参考图：无` 走文生视频；仅在创作者明确要求等图进项目时写 `无（待补参考图：……）` 并暂停。\n\n## 项目初始化、全局配置与分集骨架\n\n创建项目时将已知参数一次传入，未定项直接留默认（不反复追问）：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/project_tool.py\" init ./my-drama --title \"示例短剧\" --aspect-ratio 9:16\n```\n\n后续在对话中确定或修改画幅、集数、单集时长、语言、语速、视觉方向、目标视频模型配置（`production_profile`）或节奏目标（`rhythm_profile`）时，直接用 `configure` 增量写入 `short-drama.json` 并标记为已确认（无需手写中间台账文件）。为兼容 Windows PowerShell / CMD 与 Unix 终端，推荐将复杂 JSON 写入临时文件后通过 `--json-file <path>`（或在单个参数中传 `@<path>`）导入，也支持单行传入简单参数：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/project_tool.py\" configure <project> --aspect-ratio 16:9 --episode-count 24 --target-seconds 90 --prompt-language zh-CN\n<PYTHON> \"<SKILL_DIR>/scripts/project_tool.py\" configure <project> --json-file config-patch.json\n```\n\n`config-patch.json` 可按需包含 `prompt_language`、`pacing`、`production_profile`、`rhythm_profile` 等配置块（中文项目若剧本可能含少量英文借词，建议同时填写 `spoken_characters_per_second` 与 `spoken_words_per_second`，例如 `{\"prompt_language\":\"zh-CN\",\"pacing\":{\"spoken_characters_per_second\":4.2,\"spoken_words_per_second\":3.0,\"seconds_per_action_paragraph\":2.5},\"rhythm_profile\":{\"form\":\"国漫二次元\",\"first_hook_seconds\":5}}`）；单个 JSON 参数亦支持 `@<文件路径>`（如 `--production-profile-json @profile.json`）。\n\n- **模型配置（`production_profile`）**：用户在对话中点名具体目标视频模型时，先用 `configure` 写入模型标识、提示词语言、时长范围（按对应模型卡原生区间填写，如 Seedance 2.5 为 `4–30` 秒、Seedance 2.0 / MiniMax H3 为 `4–15` 秒）、是否启用多镜合生（`multi_shot_containers`）及接力路线（`continuation_route`），再开展下游提示词编写；项目模板默认 `prompt_language: \"en\"`，若全链路提示词均用中文写作，记得同步传入 `--prompt-language zh-CN` 与 `video_prompt_language: \"zh-CN\"` 对齐，避免图片/首帧与视频提示词意外分属不同语种。\n- **节奏目标（`rhythm_profile`）**：支持实拍、二维动态漫、风格化三维、水墨笔触、Q 版表达、国漫二次元等全部制作形态名称，按需填写已敲定的部分指标即可，不必凑齐全部字段。可用 `status` 查看当前生效配置。\n- **确定性分集骨架与缺口清单（`scaffold-episode`）**：从已有单集草稿升级为正式项目结构，或快速检查某集缺少哪些标准文档与结构编号时运行：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/project_tool.py\" scaffold-episode <project> EP001\n```\n\n该命令按需补齐最小项目/分集目录与缺失的五文档骨架，并输出确定性 JSON 缺口清单（缺失文档、待补标题/编号），交由 Agent 结合创作者内容补全，不做启发式正文猜测。\n\n## 短剧创作台（Dashboard）\n\n用户要求打开创作台时运行（`--open` 仅在本地桌面环境自动唤起浏览器）：\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/dashboard_server.py\" --workspace <workspace> --port 0 --detach --open\n<PYTHON> \"<SKILL_DIR>/scripts/dashboard_server.py\" --workspace <workspace> --status\n<PYTHON> \"<SKILL_DIR>/scripts/dashboard_server.py\" --workspace <workspace> --stop\n```\n\n`--detach` 在后台运行并把会话信息记入 `<workspace>/.short-drama/dashboard.json`（更换端口或令牌加 `--restart`）。创作台以只读卡片展示五份文档、素材与成片，可在「编辑原文」中直接保存 Markdown。\n\n- **无图形界面 / SSH / 容器环境兜底**：去掉 `--open` 启动后台服务，按 `--status` 输出的回环地址做端口转发访问（如 `ssh -L <本地端口>:127.0.0.1:<服务端口> ...`）；若当前环境不便开端口或无需预览界面，直接跳过创作台，编辑项目内的 Markdown 文档即可。\n\n## 导出与交付校验\n\n```bash\n<PYTHON> \"<SKILL_DIR>/scripts/project_tool.py\" export <project> --out <项目外目录> --manifest\n<PYTHON> \"<SKILL_DIR>/scripts/project_tool.py\" verify <项目外目录>\n```\n\n- `export`：将各集现有创作文档、`剪辑单.md` 与 `制作成果/` 导出到项目外目录（可选 `--episode EP001`、`--no-media`、`--overwrite`）；加上 `--manifest` 时同时生成 `manifest.json` 与 `checksums.sha256`（不含 `输入/` 与 `.short-drama/`，自动拦截符号链接与越界路径）。\n- `verify`：直接校验带清单的导出目录（`<PYTHON> \"<SKILL_DIR>/scripts/project_tool.py\" verify <项目外目录>`），核对文件完整性、哈希校验与路径/符号链接安全；也兼容校验旧版 `交付/<EP>/` 交付包（`verify <project> --episode EP001`）。\n- 旧版 `package <project> --episode EP001` 命令在 v1.x 阶段保持兼容但**已标记弃用**，新交付统一推荐使用 `export --manifest` 搭配 `verify <目录>`。\n\n## 按问题查阅参考文档\n\n- 阶段问题路由与四级规则说明：[规则与路由索引](references/knowhow-index.md)\n- 五份文档格式、文档归属与输出语言：[五份创作文档](references/creator-documents.md)\n- 六种制作形态差异与视觉风格定调（Look Development）试片：[制作形态](references/production-form-profiles.md)\n- 参考图十种用途（含原生多模态 `主体` 参考）与控制边界：[参考图用途](references/reference-roles.md)\n- 按悬念类型交代遮挡与揭晓动作：[信息揭晓时机](references/audience-reveal.md)\n- 母版、局部补拍与替代版的返工归属：[母版、补拍与替代版](references/pickup-and-alternate.md)\n",
+      "card": {
+        "title_zh": "短剧创作路由",
+        "purpose_zh": "负责短剧/漫剧项目的初始化与全局配置、制作形态选型、视觉定调统筹、跨环节路由、本地创作台与交付打包，单一环节创作交由对应子技能。",
+        "does": [
+          "初始化短剧项目并增量写入画幅、集数、时长、语言、语速、模型与节奏等全局配置",
+          "按用户意图把写作、设定、提示词、分镜、剪辑、审查等环节路由到对应子技能",
+          "生成确定性分集骨架并输出缺失文档与编号的缺口清单",
+          "启动、查询状态或停止本地短剧创作台（Dashboard）",
+          "导出项目文档与制作成果，生成清单与校验和并校验导出目录完整性",
+          "运行 Markdown 检查脚本，区分硬门禁 ERROR 与软门禁 WARNING"
+        ],
+        "inputs": [
+          "项目目录与标题、画幅等初始化参数",
+          "配置补丁 JSON 或单行配置参数（画幅、集数、单集时长、提示词语言、语速、production_profile、rhythm_profile）",
+          "剧集编号（如 EP001）",
+          "每集五份核心 Markdown 文档（剧本、视觉设定、分镜、图片提示词、视频提示词）",
+          "导出目标目录与导出选项（--episode、--no-media、--overwrite、--manifest）"
+        ],
+        "outputs": [
+          "项目配置文件 short-drama.json",
+          "分集目录与五文档骨架及 JSON 缺口清单",
+          "创作台会话信息 .short-drama/dashboard.json",
+          "导出目录及 manifest.json、checksums.sha256",
+          "Markdown 检查的 ERROR/WARNING 结果"
+        ],
+        "scenarios": [
+          "立项新短剧或漫剧项目并设定全局参数",
+          "修改画幅、集数、时长、语言或目标视频模型配置",
+          "查看项目进度或打开本地创作台预览文档与素材",
+          "把某集草稿升级为正式项目结构并检查缺失文档",
+          "导出交付包并校验文件完整性与路径安全"
+        ],
+        "prerequisites": [
+          "Python 3.9+ 解释器（Unix/macOS 用 python3，Windows 用 py -3 或 python）",
+          "本技能目录下的 scripts 脚本（project_tool.py、dashboard_server.py、creator_markdown_check.py）",
+          "创作台需本地桌面环境或可做端口转发的环境"
+        ],
+        "limits": [
+          "单一环节的写作、设定、提示词、分镜、剪辑与审查不在本技能范围，交由对应子技能",
+          "脚本只对确定性机械与安全错误硬阻断，启发式项仅输出 WARNING 供复核",
+          "语义保真与正文连戏锁核查交由 short-drama-review 技能审定",
+          "探索性草稿、创意构思或单场试写阶段无需强制跑脚本校验",
+          "旧版 package 命令已标记弃用，新交付推荐 export --manifest 搭配 verify",
+          "导出不含 输入/ 与 .short-drama/，并拦截符号链接与越界路径"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "写作",
+          "视频",
+          "自动化",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "本技能负责项目初始化与全局配置、跨环节路由、制作形态选型、视觉风格定调（Lookdev）统筹、交付打包与本地短剧创作台（Dashboard）。"
+          },
+          {
+            "field": "does",
+            "quote": "创建项目时将已知参数一次传入，未定项直接留默认（不反复追问）："
+          },
+          {
+            "field": "does",
+            "quote": "后续在对话中确定或修改画幅、集数、单集时长、语言、语速、视觉方向、目标视频模型配置（`production_profile`）或节奏目标（`rhythm_profile`）时，直接用 `configure` 增量写入 `short-drama.json` 并标记为已确认"
+          },
+          {
+            "field": "does",
+            "quote": "该命令按需补齐最小项目/分集目录与缺失的五文档骨架，并输出确定性 JSON 缺口清单（缺失文档、待补标题/编号）"
+          },
+          {
+            "field": "does",
+            "quote": "用户要求打开创作台时运行（`--open` 仅在本地桌面环境自动唤起浏览器）："
+          },
+          {
+            "field": "does",
+            "quote": "`export`：将各集现有创作文档、`剪辑单.md` 与 `制作成果/` 导出到项目外目录"
+          },
+          {
+            "field": "does",
+            "quote": "`verify`：直接校验带清单的导出目录"
+          },
+          {
+            "field": "does",
+            "quote": "正式成稿阶段每完成一份文档可运行 `<PYTHON> \"<SKILL_DIR>/scripts/creator_markdown_check.py\" <剧集目录> --partial`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<PYTHON>` 指 Python 3.9+ 解释器（Unix/macOS 用 `python3`，Windows 用 `py -3` 或 `python`）"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`--detach` 在后台运行并把会话信息记入 `<workspace>/.short-drama/dashboard.json`"
+          },
+          {
+            "field": "limits",
+            "quote": "单一环节的写作、设定、提示词、分镜、剪辑与审查交由对应子技能。"
+          },
+          {
+            "field": "limits",
+            "quote": "非 100% 确定性的启发式项与算术风险（如跨语种 `提示词名称` 缺项提醒、按项目已声明语速核算的单镜对白超载提醒）一律作为**软门禁**输出 `WARNING`（退出码保持 `0`）提醒 Agent 重点复核"
+          },
+          {
+            "field": "limits",
+            "quote": "语义保真与正文连戏锁核查交由 `short-drama-review` 技能结合上下文审定。"
+          },
+          {
+            "field": "limits",
+            "quote": "**探索性草稿、创意构思或单场试写阶段无需强制跑脚本校验**。"
+          },
+          {
+            "field": "limits",
+            "quote": "旧版 `package <project> --episode EP001` 命令在 v1.x 阶段保持兼容但**已标记弃用**"
+          },
+          {
+            "field": "limits",
+            "quote": "（不含 `输入/` 与 `.short-drama/`，自动拦截符号链接与越界路径）"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "<PYTHON> \"<SKILL_DIR>/scripts/dashboard_server.py\" --workspace <workspace> --port 0 --detach --open"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "直接读写 Markdown 时，写入前确认目标文件未被外部编辑器或创作台修改"
           }
         ]
       },
