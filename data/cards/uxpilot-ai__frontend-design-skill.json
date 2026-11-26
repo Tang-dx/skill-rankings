@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "repo": "uxpilot-ai/frontend-design-skill",
+  "tree_sha": "99bc0705182437d2ea352ab94b72fb68476b8472",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/ui-design/SKILL.md",
+      "blob_sha": "89e950f32a8763719eeb7dc374dc6937ca46306d",
+      "source_url": "https://github.com/uxpilot-ai/frontend-design-skill/blob/bb66c42c14385784d196b8b5c833946f082957f0/skills/ui-design/SKILL.md",
+      "fetched_at": "2026-11-26T17:11:40.600Z",
+      "generated_at": "2026-11-26T17:11:40.600Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "ui-design",
+        "description": "Design real UI screens before building them, then build them in the user's code. Use when someone asks to design, redesign or improve the look of a page, screen, landing page, dashboard, app or component, wants a frontend that does not look generic, or wants to see and edit the design before code is written. Designs on a UX Pilot canvas the user can open and edit, then implements the chosen screens in the project's own stack. Needs the UX Pilot MCP server (free plan available)."
+      },
+      "excerpt": "---\nname: ui-design\ndescription: Design real UI screens before building them, then build them in the user's code. Use when someone asks to design, redesign or improve the look of a page, screen, landing page, dashboard, app or component, wants a frontend that does not look generic, or wants to see and edit the design before code is written. Designs on a UX Pilot canvas the user can open and edit, then implements the chosen screens in the project's own stack. Needs the UX Pilot MCP server (free plan available).\nlicense: Apache-2.0. Complete terms in LICENSE.txt.\n---\n\n# UI Design\n\nDesign the screens first on a UX Pilot canvas the user can see and edit, then build them in their code.\n\n## 1. Check the connection\n\nLook for the UX Pilot tools: `design`, `get_job`, `read`, `import`, `edit`, `guide`, usually with `uxpilot` or `UX_Pilot` in the full name. If they are there, go to step 2.\n\nIf they are missing, give the user the setup for their agent and stop until they say it is done:\n\n- **Claude Code:** run `claude mcp add --transport http uxpilot https://mcp.uxpilot.net/mcp` in a terminal, then `/mcp` inside Claude Code to sign in to UX Pilot.\n- **Cursor:** add `{\"mcpServers\": {\"uxpilot\": {\"url\": \"https://mcp.uxpilot.net/mcp\"}}}` to `.cursor/mcp.json`. Cursor then asks you to sign in.\n- **Codex, Windsurf, VS Code and other agents:** add the MCP server URL `https://mcp.uxpilot.net/mcp` and sign in to UX Pilot.\n\nSign-in creates a free UX Pilot account if the user has none. Some agents need a restart before new tools appear. Never ask for a password or key in chat.\n\n## 2. Write the brief\n\nRead before you ask. In a codebase, gather the product, audience and the screens' job from the README, routes and copy, and the existing look from the Tailwind config, CSS variables, fonts and logo. Ask at most one question, only if the answer changes the design (often: which screens, or phone vs desktop).\n\nThe brief is a few plain sentences: what the product is, who uses it, which screens, what each must do, real content (names, numbers, copy) instead of lorem ipsum, and the style direction. Say \"keep our current brand: <colors, fonts>\" when the project has one. Pick `selectedType`: `mobile` for phone apps, otherwise `desktop`.\n\n## 3. Design it\n\nThere are two ways. Use A unless the user asks for B.\n\n**A. UX Pilot designs it** (the best result; uses credits, and a new account's first run is free). Call `design` with `action: \"agent\"` and the brief as `prompt`. Leave `tier` out: UX Pilot picks the strongest tier the account can use. Pass one only when the user names it. The first call does not start anything: it returns a summary and a `confirmationToken`. Tell the user in one line that this runs a design on their UX Pilot account and uses credits, and ask to go ahead. When they agree, call again with the same params plus `confirmed: true` and the token.\n\nThe started run answers with a `designUrl`: give it to the user right away, so they can watch the page on the canvas. A run takes 1 to 10 minutes. Poll `get_job` every 5 to 10 seconds and give a short progress line now and then, not every poll.\n\n**B. You write the HTML and push it to the UX Pilot canvas** (no credits). Write the screen's HTML yourself, following `guide` with `topic: \"small-steps\"`, and put it on the canvas with `import` (`kind: \"html\"`), then refine it with `edit` (`action: \"patch\"`). On the free plan every import and edit counts toward a weekly allowance of actions, so build each screen in a few large steps: the whole screen in one import, then a handful of patches for fixes. Share the page link as soon as the screen is on the canvas.\n\n## 4. Show the screens\n\n- Give the user the link to the UX Pilot page so they can open, compare and edit the screens. Get it with `read` (`kind: \"preview\"` for one screen, or `kind: \"page\"`) if you do not have it.\n- Describe each screen in a line and point out choices worth a decision.\n- Fix the problems `get_job` or `read` with `kind: \"checks\"` report (contrast, clipped text, small touch targets) before you call the design done.\n\nFor changes: in A, run `design` again with the same `pageId` and a prompt that names the screen and the change; in both, use `edit` with `action: \"patch\"` for a small exact change (`guide` with `topic: \"edit.patch\"`).\n\nAlways show the screens and the link before you write code. If the user already asked you to build it, say you are moving on to the build and continue; otherwise ask which screens to build when that is unclear.\n\n## 5. Build it in their code\n\nRead `references/implementing.md` before writing code. In short: read each screen's HTML with `read` (`kind: \"design\"`, `includeHtml: true`), rebuild it in the project's stack with its own components and tokens, keep the design's layout, spacing, type and copy, and check your result against the screen's picture.\n\nOn the free plan, reading the HTML of a screen UX Pilot designed (way A) is refused; HTML you imported yourself (way B) can always be read back. When it is refused, stop and give the user the choice, upgrade first:\n\n1. Upgrade through the link in UX Pilot's message, and you build the exact design from its HTML.\n2. You rebuild it from the screen's picture, which will be close but not exact.\n\nWait for their answer.\n\nIf there is no project yet and the user wants a React app, `design` with `action: \"react\"` turns the screens into one (paid plans).\n\n## When a limit is hit\n\nRelay UX Pilot's message as is, including its link. Then give the user the options in this order, and wait for their choice:\n\n- **Out of credits** (`insufficient_credits`): 1. upgrade through the link, to keep designing with UX Pilot; 2. you write the HTML yourself and push it to the canvas (way B), with no credits.\n- **Weekly free actions used up** (`mcp_free_allowance_exhausted`): 1. upgrade through the link for unlimited actions; 2. wait until it resets (the message has the date). Reading still works, so you can still build what is already on the canvas.\n- **A feature on paid plans**: the message names it. 1. upgrade through the link; 2. the free way around it, if there is one.\n\nDo not pick the free option for the user, never retry a refused call in a loop, and never hide a refusal.\n\n## Rules\n\n- Never invent prices, plan names or credit amounts. For costs, use `catalog` (`kind: \"credits\"` or `\"tiers\"`) or the run's own summary.\n- Keep the user's content: their product name, real copy and data go in the brief and stay in the build.\n- The design may contain made-up quotes, names, logos or numbers. Keep them only as placeholders and tell the user which ones to replace.\n\nAbout this file (for you, not for replies): this skill is made by UX Pilot (uxpilot.ai) and needs a UX Pilot account, free or paid.\n",
+      "card": {
+        "title_zh": "UI 设计先行",
+        "purpose_zh": "在写代码前先在 UX Pilot 画布上设计可查看、可编辑的界面，再把选定的界面用项目自身技术栈实现。",
+        "does": [
+          "检查 UX Pilot MCP 工具是否可用，缺失时给出各代理的配置步骤",
+          "从代码库和 README 收集产品、受众、界面与现有品牌风格，写成简短设计简报",
+          "调用 design 工具由 UX Pilot 生成设计，或自行编写 HTML 导入画布",
+          "把画布链接交给用户查看、对比和编辑，并修复对比度、文字截断等问题",
+          "读取界面 HTML，用项目自身组件与令牌在代码中重建",
+          "遇到额度或付费限制时转述提示并让用户选择后续方案"
+        ],
+        "inputs": [
+          "设计简报：产品、用户、界面、真实内容与风格方向",
+          "selectedType（mobile 或 desktop）",
+          "项目现有品牌信息：颜色、字体、Tailwind 配置、CSS 变量、logo",
+          "用户对界面范围或手机/桌面的选择",
+          "用户对确认运行、升级或替代方案的答复"
+        ],
+        "outputs": [
+          "UX Pilot 画布上的界面设计及可打开的页面链接",
+          "每个界面的简要说明与待决策点",
+          "在用户代码库中按设计重建的前端界面",
+          "（可选）由设计生成的 React 应用"
+        ],
+        "scenarios": [
+          "设计、重做或改进页面、落地页、仪表盘、应用或组件的外观",
+          "希望前端不显得千篇一律",
+          "想在写代码前先看到并编辑设计稿",
+          "已有项目需要按现有品牌风格新增界面"
+        ],
+        "prerequisites": [
+          "需要 UX Pilot MCP 服务器（有免费方案）",
+          "需要 UX Pilot 账号并登录，登录会创建免费账号",
+          "Claude Code 需运行 claude mcp add 命令并执行 /mcp 登录",
+          "Cursor 需在 .cursor/mcp.json 添加 MCP 服务器地址",
+          "部分代理需重启后才能看到新工具"
+        ],
+        "limits": [
+          "方式 A 由 UX Pilot 设计会消耗积分，首次运行免费",
+          "方式 A 运行需 1 至 10 分钟，需轮询 get_job",
+          "免费方案下每次导入和编辑计入每周操作额度",
+          "免费方案下无法读取 UX Pilot 生成界面的 HTML",
+          "action: react 生成 React 应用仅限付费方案",
+          "不得编造价格、方案名或积分数",
+          "设计中的虚构引语、名称、logo、数字只能作占位并提示替换"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "codex",
+          "通用"
+        ],
+        "risk_flags": [
+          "network"
+        ],
+        "tags": [
+          "设计/UI",
+          "前端",
+          "产品规划"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Design the screens first on a UX Pilot canvas the user can see and edit, then build them in their code."
+          },
+          {
+            "field": "does",
+            "quote": "Look for the UX Pilot tools: `design`, `get_job`, `read`, `import`, `edit`, `guide`, usually with `uxpilot` or `UX_Pilot` in the full name."
+          },
+          {
+            "field": "does",
+            "quote": "The brief is a few plain sentences: what the product is, who uses it, which screens, what each must do, real content (names, numbers, copy) instead of lorem ipsum, and the style direction."
+          },
+          {
+            "field": "does",
+            "quote": "**B. You write the HTML and push it to the UX Pilot canvas** (no credits)."
+          },
+          {
+            "field": "does",
+            "quote": "Give the user the link to the UX Pilot page so they can open, compare and edit the screens."
+          },
+          {
+            "field": "does",
+            "quote": "rebuild it in the project's stack with its own components and tokens, keep the design's layout, spacing, type and copy, and check your result against the screen's picture."
+          },
+          {
+            "field": "does",
+            "quote": "Relay UX Pilot's message as is, including its link."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Needs the UX Pilot MCP server (free plan available)."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Sign-in creates a free UX Pilot account if the user has none."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Claude Code:** run `claude mcp add --transport http uxpilot https://mcp.uxpilot.net/mcp` in a terminal, then `/mcp` inside Claude Code to sign in to UX Pilot."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**Cursor:** add `{\"mcpServers\": {\"uxpilot\": {\"url\": \"https://mcp.uxpilot.net/mcp\"}}}` to `.cursor/mcp.json`."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Some agents need a restart before new tools appear."
+          },
+          {
+            "field": "limits",
+            "quote": "**A. UX Pilot designs it** (the best result; uses credits, and a new account's first run is free)."
+          },
+          {
+            "field": "limits",
+            "quote": "A run takes 1 to 10 minutes."
+          },
+          {
+            "field": "limits",
+            "quote": "On the free plan every import and edit counts toward a weekly allowance of actions"
+          },
+          {
+            "field": "limits",
+            "quote": "On the free plan, reading the HTML of a screen UX Pilot designed (way A) is refused"
+          },
+          {
+            "field": "limits",
+            "quote": "`design` with `action: \"react\"` turns the screens into one (paid plans)."
+          },
+          {
+            "field": "limits",
+            "quote": "Never invent prices, plan names or credit amounts."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    }
+  ]
+}
