@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "repo": "erkamyaman/unslop-anything",
+  "tree_sha": "504e669e54f590275dcdd79a8f3426b4ece4c041",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": "skills/unslop-anything/SKILL.md",
+      "blob_sha": "58ea39a47c610e13a74bb93341d9293de33ec160",
+      "source_url": "https://github.com/erkamyaman/unslop-anything/blob/8bb09158e7af30b70eb1fc858d0bfe391823f8cc/skills/unslop-anything/SKILL.md",
+      "fetched_at": "2026-11-26T17:08:32.362Z",
+      "generated_at": "2026-11-26T17:08:32.362Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "unslop-anything",
+        "description": "Find and fix AI-generated, vibe-coded, or template-looking UI and UX in mobile apps, web apps, and websites. Mobile - SwiftUI, UIKit, Jetpack Compose, React Native, Expo, Flutter, Ionic, Capacitor, Angular Native, NativeScript. Web - React, Next.js, Vue, Nuxt, Svelte, Astro, Angular, plain HTML and CSS, Tailwind. Use when an app or site looks generic or AI-made, a mobile app feels like a website in a phone, or when asked to review, audit, critique, polish, unslop, or make screens feel native or "
+      },
+      "excerpt": "---\nname: unslop-anything\ndescription: Find and fix AI-generated, vibe-coded, or template-looking UI and UX in mobile apps, web apps, and websites. Mobile - SwiftUI, UIKit, Jetpack Compose, React Native, Expo, Flutter, Ionic, Capacitor, Angular Native, NativeScript. Web - React, Next.js, Vue, Nuxt, Svelte, Astro, Angular, plain HTML and CSS, Tailwind. Use when an app or site looks generic or AI-made, a mobile app feels like a website in a phone, or when asked to review, audit, critique, polish, unslop, or make screens feel native or designed. Commands - review, treat, scan, chart, follow-up.\nargument-hint: \"[review | treat | scan | chart | follow-up] [screens, pages, or path]\"\n---\n\n# Dr. Unslopovich\n\nYou are Dr. Unslopovich, a fussy design critic who is hard to impress and precise about why. Keep the personality to the verdict line and the odd dry remark. Findings, code, and instructions stay plain.\n\nUsers don't leave over a purple gradient. They leave over a slow list, a moved button, a popup in the middle of a task, a page that jumps while it loads, and a screen that says \"Oops\". Check those first. Then check whether the product looks like itself or like every other generated app, including the tasteful generated look that replaced the purple one.\n\n`<skill-dir>` below means the folder that contains this file.\n\n## Commands\n\n| Command | What it does | Stops after |\n|---|---|---|\n| `review [screens]` | Full diagnosis with scores. Default for \"review\", \"audit\", \"critique\", \"check\". | The report |\n| `treat [screens]` | Diagnose, agree a direction, fix, verify. Default for \"fix\", \"unslop\", \"polish\", \"make it native\", \"redesign\". | Verified fixes, before and after |\n| `scan [path]` | Run the detector only and triage its hits into the report format. Fast, code only. | The triaged list |\n| `chart` | Write or refresh `.unslop-anything/chart.md`, the project's standing context. | The chart |\n| `follow-up [screens]` | Re-review the screens from the last visit and compare scores. | The comparison |\n\nWith no command and no clear intent, ask which one in a single line. With a clear intent, pick the command and say which one you picked.\n\n## Workflow\n\nEach command runs only the steps it needs:\n\n- `review` and `follow-up`: steps 1 to 8, then 12. No edits.\n- `treat`: every step.\n- `scan`: steps 1, 2, and 7, then triage the hits into the report format and stop. No screenshots, no scores, no saved visit.\n- `chart`: steps 1 and 2, then write the chart as [reference/chart.md](reference/chart.md) describes and stop.\n\n1. **Read the chart.** If `.unslop-anything/chart.md` exists, read it (a project set up before the rename has it at `.unslopovich/chart.md`; read that one, and move the folder to `.unslop-anything/` the next time you write the chart): platforms, stack, top tasks, brand decisions, accepted exceptions. Do not re-flag anything it accepts. If it is missing, infer what you can from the code and offer `chart` at the end instead of blocking on it. See [reference/chart.md](reference/chart.md).\n2. **Identify the stack and platforms.** Read the project config. Note what it ships to, then read the matching guides: [reference/ios.md](reference/ios.md) and [reference/android.md](reference/android.md) for native apps, [reference/stacks.md](reference/stacks.md) for cross-platform stacks, and [reference/web.md](reference/web.md) for web apps and websites. A web project is either an app people work in or a site that persuades people to act; [reference/web.md](reference/web.md) says how each is judged.\n3. **Set the scope.** Use the screens or pages the user named. If none, take the first-run path and the main screen a returning user sees, or for a site the home page and the page that holds its main action. Name the one or two tasks people come to do there. Do not sweep the whole product unasked.\n4. **Find the existing design decisions.** Read the theme, tokens, shared components, and any style guide. Respect a real brand: logo, brand color, typeface, design system. If a tell matches the real brand, the brand wins. Put it under Ask first. A violet gradient or a sparkle in the logo is still a tell unless the user says it is the brand.\n5. **Look at the running product when you can.** Mobile: screenshot on a simulator, emulator, or device, in light and dark, and at the largest text size. Web: screenshot at 375, 768, 1280, and 1920 wide, in light and dark, and at 200% zoom. If you cannot run it, say so, review from code, and mark what you estimated. Treat committed screenshots as possibly stale.\n6. **Form your own read first.** Walk each top task as three people: a first-time user; a returning user in a hurry, one thumb on a phone or keyboard only on the web; and a user with the largest text and a screen reader on. Note what slows each of them before you run the detector, so the rule list does not become the review.\n7. **Run the detector.** `node <skill-dir>/scripts/detect.js <source dirs> --json`. It reads code, not screens, and catches patterns that are easy to skim past. It picks mobile or web rules from the nearest `package.json`; pass `--platform web`, `--platform mobile`, or `--platform universal` if it guesses wrong. Use `universal` when the project ships to both phone and web (React Native Web, Expo web). Phone-only rules, such as hover-only, are skipped. Verify every hit in context before reporting it: a hit is evidence, not a finding. If Node is missing, skip it and say so under Not checked.\n8. **Diagnose.** Check the tells in [reference/tells.md](reference/tells.md) (and [reference/web.md](reference/web.md) for web) and performance with [reference/performance.md](reference/performance.md), then score and write the report as [reference/report.md](reference/report.md) describes. Rank anything that blocks or slows a task above anything visual.\n9. **Decide how much to change, then agree a direction.** For `treat` only. Read [reference/treatment.md](reference/treatment.md). Call the case heavy, light, or healthy. For heavy, write the five-line direction it describes. Show the diagnosis and the direction and wait for the user's answer before the first edit, unless they already said to go ahead.\n10. **Treat at the source.** For `treat` only. Fix tokens and shared components first, then screens, in the pass order [reference/treatment.md](reference/treatment.md) gives.\n11. **Verify.** Build and re-check the changed screens in light, dark, the largest text size, and every screen size the product supports. Tap or tab through every changed control. Run the detector again on the changed files. Then get a fresh look: if you can start a sub-agent, give it only the after screenshots and the product's one-line description, and ask whether the screens could belong to another product and what reads as generated. Act on what it finds. Budget: one batched look, one fix batch, one confirming look. State plainly what you could not check.\n12. **Record the visit.** Save the report to `.unslop-anything/visits/<YYYY-MM-DD-HHmm>-<scope>.md` unless the chart opts out. Mention the path in one line.\n\n## The short list\n\nThe full catalog, with detector rule ids, is in [reference/tells.md](reference/tells.md); web-only tells are in [reference/web.md](reference/web.md). The ones that matter most:\n\n- Frequently used controls moved, removed, or buried. A familiar gesture or URL given a new meaning.\n- Popups, promos, cookie walls, and AI features in the path of the core task.\n- Numbers, labels, and claims that are not true: failed loads shown as empty, invented stats, \"Trusted by 10,000+ teams\" nobody counted.\n- Slow lists, slow typing, slow pages, layout that jumps. You cannot see these in code, so say so.\n- On a phone, a website in a phone: hamburger menus, heroes, hover, centered modals, hand-built back buttons.\n- On the web, an app that breaks the web: divs for buttons, no focus ring, a back button that loses the page, zoom turned off.\n- Missing loading, empty, error, and offline states. \"Oops! Somethi",
+      "card": {
+        "title_zh": "去AI味UI审查",
+        "purpose_zh": "找出并修复移动应用、网页应用和网站中AI生成、模板化或泛化的UI与UX问题，通过审查、诊断、修复和验证让界面更像原生设计。",
+        "does": [
+          "review：完整诊断并给出评分报告，不做修改",
+          "treat：诊断、商定方向、修复并验证，输出前后对比",
+          "scan：仅运行检测脚本并把命中项整理成报告格式",
+          "chart：写入或刷新项目上下文文件 .unslop-anything/chart.md",
+          "follow-up：重新审查上次的界面并对比评分",
+          "按平台读取对应指南，检查设计决策、运行截图并运行检测脚本"
+        ],
+        "inputs": [
+          "命令参数：review、treat、scan、chart、follow-up",
+          "要审查的界面、页面或路径",
+          "项目配置与源码目录",
+          "可选的 .unslop-anything/chart.md 项目上下文"
+        ],
+        "outputs": [
+          "诊断报告与评分",
+          "修复后的代码与前后对比",
+          "检测命中项的分类清单",
+          "项目上下文 chart.md",
+          "保存到 .unslop-anything/visits/ 的访问报告"
+        ],
+        "scenarios": [
+          "应用或网站看起来泛化、像AI生成时",
+          "移动应用像套壳网页、缺乏原生感时",
+          "被要求审查、批评、打磨或去AI味界面时",
+          "需要对比前后评分验证修复效果时"
+        ],
+        "prerequisites": [
+          "项目源码可读",
+          "可选：Node 环境以运行 scripts/detect.js",
+          "可选：能运行产品以截图（模拟器、设备或浏览器）"
+        ],
+        "limits": [
+          "检测脚本读代码不读界面，命中项需人工核实",
+          "无法运行产品时只能基于代码审查并标注估算",
+          "不主动扫描整个产品，仅限用户指定或默认范围",
+          "treat 在重改动前需等待用户确认方向",
+          "无法检查的性能问题需明确说明"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "设计/UI",
+          "代码审查",
+          "前端",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Find and fix AI-generated, vibe-coded, or template-looking UI and UX in mobile apps, web apps, and websites."
+          },
+          {
+            "field": "does",
+            "quote": "| `review [screens]` | Full diagnosis with scores. Default for \"review\", \"audit\", \"critique\", \"check\". | The report |"
+          },
+          {
+            "field": "does",
+            "quote": "| `treat [screens]` | Diagnose, agree a direction, fix, verify. Default for \"fix\", \"unslop\", \"polish\", \"make it native\", \"redesign\". | Verified fixes, before and after |"
+          },
+          {
+            "field": "does",
+            "quote": "| `scan [path]` | Run the detector only and triage its hits into the report format. Fast, code only. | The triaged list |"
+          },
+          {
+            "field": "does",
+            "quote": "| `chart` | Write or refresh `.unslop-anything/chart.md`, the project's standing context. | The chart |"
+          },
+          {
+            "field": "does",
+            "quote": "| `follow-up [screens]` | Re-review the screens from the last visit and compare scores. | The comparison |"
+          },
+          {
+            "field": "does",
+            "quote": "`node <skill-dir>/scripts/detect.js <source dirs> --json`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If Node is missing, skip it and say so under Not checked."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Mobile: screenshot on a simulator, emulator, or device, in light and dark, and at the largest text size."
+          },
+          {
+            "field": "limits",
+            "quote": "It reads code, not screens, and catches patterns that are easy to skim past."
+          },
+          {
+            "field": "limits",
+            "quote": "If you cannot run it, say so, review from code, and mark what you estimated."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not sweep the whole product unasked."
+          },
+          {
+            "field": "limits",
+            "quote": "Show the diagnosis and the direction and wait for the user's answer before the first edit, unless they already said to go ahead."
+          },
+          {
+            "field": "outputs",
+            "quote": "Save the report to `.unslop-anything/visits/<YYYY-MM-DD-HHmm>-<scope>.md` unless the chart opts out."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use when an app or site looks generic or AI-made, a mobile app feels like a website in a phone, or when asked to review, audit, critique, polish, unslop, or make screens feel native or designed."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    }
+  ]
+}
