@@ -1,0 +1,294 @@
+{
+  "schema": 1,
+  "repo": "croffasia/itsaplan",
+  "tree_sha": "ea986bac9f4dcd50b7306a35db9b53a8dc09f58e",
+  "truncated_paths": 0,
+  "skills": [
+    {
+      "skill_path": ".agents/skills/code-review/SKILL.md",
+      "blob_sha": "f27088a020f34eb8582a1b1bd22a2cbd3b9fc5e0",
+      "source_url": "https://github.com/croffasia/itsaplan/blob/0ca5a1240cecc03a1bbde324da0d71e98bec571f/.agents/skills/code-review/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "code-review",
+        "description": "Use when reviewing code — a diff, a merge request, a file, a directory, or a feature. Produces structured code-review findings, filters out false positives and nitpicks, and prints a concise verdict report. Trigger when the user asks to review a diff, review an MR, or check code for bugs, security issues, or rule violations."
+      },
+      "excerpt": "---\nname: code-review\ndescription: Use when reviewing code — a diff, a merge request, a file, a directory, or a feature. Produces structured code-review findings, filters out false positives and nitpicks, and prints a concise verdict report. Trigger when the user asks to review a diff, review an MR, or check code for bugs, security issues, or rule violations.\n---\n\n# Code Review\n\nThree-stage method: produce findings, filter them, report verdict.\n\nStages 1 and 2 are internal reasoning. Never print them. Only the Stage 3 report reaches the user.\n\n## Review target\n\n- User named a target (file, directory, feature, commit range, MR) → review that.\n- No target named → review current diff (uncommitted changes, or the branch diff against the main branch).\n\nRead the code with workspace tools. When code is supplied inline in the prompt, review what is supplied and read further files only for context.\n\n## Stage 1 — Reviewer\n\nReview target. Collect findings.\n\n### Review algorithm (follow this order)\n\n1. Read project rules — MANDATORY. Read every instruction file covering the reviewed code: root AGENTS.md plus nested ones in the touched directories, and any docs they point to. Project rules override skill rules on conflict\n2. Load skills — MANDATORY. Load workspace skills matching the reviewed stack and area (framework, language, UI text, testing). Read their rule files via workspace tools, never from memory\n3. Big picture — scan the whole change set for cross-file context\n4. Analyze change — split core change vs plumbing. Core design wrong → focus there\n5. Full-file context — check the change makes sense: imports used, removed items not referenced, control flow correct\n6. API compatibility — check callers match changes\n7. Apply skill rules — check violations from this change only, not pre-existing code\n8. Apply project rules — check violations of AGENTS.md\n9. Deduplicate — skip findings already covered by existing review comments\n10. Verify relevance — each finding must fit actual code context (file type, framework, stack), not generic rule mismatch\n11. Verify against source — re-read the cited lines. Drop findings referencing code, symbols, imports, or behavior that does not exist in the file. Never describe code from memory or assumption\n12. Check the fix — proposed fix must be the smallest change that solves the problem. Drop or rewrite fixes that add abstractions, layers, options, or generalization the problem does not need\n13. Keep — only confidence >= 80, reviewed code only, no linter catches or nitpicks. Fix line says WHAT to fix in 1 sentence, not HOW\n\n### Focus on\n\n- Data loss, security holes (XSS, injection, secrets in code)\n- Runtime crashes, unhandled errors, null/undefined access\n- Broken core logic, wrong conditions, off-by-one errors\n- Race conditions, missing await, wrong async handling\n- API contract violations, wrong types passed between components\n- Functions whose behavior contradicts their name or return type\n- Stub or placeholder implementations merged without TODO/FIXME markers\n- Public functions where invalid but plausible input gives silently wrong results instead of error\n- Unreachable code paths or dead branches caused by change\n- New exports or public API surface not consumed anywhere\n- Obvious performance pitfalls: O(n²) or worse in loops over collections, sync blocking in async paths, missing pagination on unbounded queries, repeated expensive operations that should be cached or batched\n- Hardcoded values that clearly should be configurable or computed (e.g., hardcoded URLs, credentials, environment-specific paths, magic numbers used as thresholds or limits) — flag as suggestion unless marked TODO\n- Functions that claim operation by name but have trivial implementation that does not do it (e.g., `isFileExists` returning constant without checking filesystem, `sendEmail` with empty body) — flag unless marked TODO\n- Misused dependencies — components, functions, composables or utilities called with wrong arguments, wrong types, ignored return values, missing required props/options, or invoked in way that violates their contract (when signature visible in provided context)\n- Reinvented shared utilities — new logic that duplicates existing shared helper/component/composable from project (e.g., hand-rolled deep clone, date formatter, query builder, or validator) when equivalent visible in provided context; flag and point to existing one to reuse\n\n### Do NOT check\n\nCode style, naming, missing comments, test coverage, performance micro-optimizations.\n\n### Finding fields\n\nTrack per finding, in your head, not printed at this stage:\n\n- file and line\n- title: short, one line\n- problem: what is wrong\n- fix: what to fix, one sentence\n- severity: critical (confidence 90-100) = data loss, security, crash, broken logic. suggestion (confidence 80-89) = everything else\n- source: which rule triggered the finding. One of `skill:<skill-name>/<rule-name>`, `repository-rules` (AGENTS.md), `general` (Focus on section)\n\nSource priority when a finding matches several categories: repository-rules > skill > general. Use the highest-priority source that applies.\n\n## Stage 2 — Filter\n\nAct as senior code review editor. Filter findings list. Keep ONLY ones that are:\n\n1. **Real issues** — not false positives, not nitpicks, not style preferences\n2. **Actionable** — developer clearly understands what to fix\n3. **High confidence** — you agree with finding after review\n4. **Critical severity** — NEVER drop findings with severity \"critical\". May adjust description but must keep in output. Believe critical finding is false positive → downgrade severity to \"suggestion\" instead of removing.\n\nRemove findings that are:\n\n- Hallucinated — cited line, symbol, or behavior not present in the actual code\n- Overengineered fixes — solution heavier than the problem (new abstraction, config, or layer where a local change is enough)\n- Duplicates or overlapping with other findings\n- Too vague or speculative\n- About pre-existing code patterns (not from this change)\n- Nitpicks disguised as suggestions\n- False positives from incomplete context\n\nFor each kept finding, may adjust confidence, severity, or description.\n\nThen pick a verdict: approve, request_changes, or comment.\n\nVerdict rules:\n\n- approve: no findings kept\n- request_changes: at least one critical finding\n- comment: only suggestions\n\n## Stage 3 — Console report\n\nDo NOT edit, write, or fix any code. This skill only reviews and reports.\n\nPrint the kept findings as plain text for a human reading a terminal. No preamble, no closing summary, no extra commentary, only the report below.\n\nFormat:\n\n```\nVerdict: <verdict> (<N> critical, <M> suggestions)\nReviewed: <what was reviewed>, <K> files\n\nCRITICAL\n  <file>:<line>  <title>  [<source>]\n    <problem>\n    Fix: <fix>\n\nSUGGESTIONS\n  <file>:<line>  <title>  [<source>]\n    <problem>\n    Fix: <fix>\n```\n\nExample:\n\n```\nVerdict: request_changes (1 critical, 1 suggestion)\nReviewed: uncommitted changes, 3 files\n\nCRITICAL\n  apps/api/src/planner/issues.ts:118  Transaction never committed\n    The early return on a validation error leaves the transaction open, so the connection leaks.\n    Fix: commit or roll back before returning.\n    [general]\n\nSUGGESTIONS\n  apps/web/src/features/board/Column.tsx:64  Board key hardcoded\n    \"IAP\" is written inline instead of coming from props.\n    Fix: take the key from the project prop.\n    [repository-rules]\n```\n\nRules:\n\n- Critical findings first, then suggestions. Omit an empty section.\n- No findings at all: print only `Verdict: approve (no issues found)` plus the `Reviewed:` line.\n- One line per field. Problem and fix stay one sentence each. No paragraphs, no tables, no JSON.\n- Source tag in brackets so the reader knows whether it came from project rules, a skill, or built-in checks.\n- Sort findings inside a section by file, then by line.\n",
+      "card": {
+        "title_zh": "代码审查报告",
+        "purpose_zh": "对 diff、MR、文件、目录或功能做结构化代码审查，过滤误报与吹毛求疵，输出简洁的裁决报告。",
+        "does": [
+          "按三阶段方法产出发现、过滤发现、输出裁决报告",
+          "未指定目标时审查当前 diff 或分支差异",
+          "先读取项目规则与匹配的工作区技能再审查",
+          "聚焦数据丢失、安全漏洞、崩溃、逻辑错误、异步与 API 契约问题",
+          "按置信度与严重度筛选，保留 critical 与高置信 suggestion",
+          "以纯文本格式打印裁决、问题与修复建议"
+        ],
+        "inputs": [
+          "审查目标：文件、目录、功能、提交范围或 MR",
+          "未指定目标时的当前 diff 或分支差异",
+          "项目规则文件（如 AGENTS.md）",
+          "匹配技术栈的工作区技能规则文件",
+          "提示中内联提供的代码"
+        ],
+        "outputs": [
+          "终端纯文本审查报告",
+          "裁决结果：approve、request_changes 或 comment",
+          "critical 与 suggestion 分组的发现列表",
+          "每条发现含文件行号、标题、问题、修复建议与来源标签"
+        ],
+        "scenarios": [
+          "审查未提交的改动或分支 diff",
+          "审查合并请求（MR）",
+          "审查指定文件或目录",
+          "审查某个功能相关代码",
+          "检查代码中的 bug、安全问题或规则违规"
+        ],
+        "prerequisites": [
+          "可用的工作区工具以读取代码与规则文件",
+          "项目根目录及嵌套目录的指令文件（如 AGENTS.md）",
+          "与审查技术栈匹配的工作区技能"
+        ],
+        "limits": [
+          "只审查和报告，不编辑、写入或修复任何代码",
+          "阶段一与阶段二为内部推理，不向用户打印",
+          "不检查代码风格、命名、注释、测试覆盖率与微性能优化",
+          "只保留置信度不低于 80 的发现",
+          "不报告已有审查评论覆盖的重复问题",
+          "不审查本次改动之外的既有代码模式"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "安全",
+          "测试",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Produces structured code-review findings, filters out false positives and nitpicks, and prints a concise verdict report."
+          },
+          {
+            "field": "does",
+            "quote": "Three-stage method: produce findings, filter them, report verdict."
+          },
+          {
+            "field": "does",
+            "quote": "No target named → review current diff (uncommitted changes, or the branch diff against the main branch)."
+          },
+          {
+            "field": "does",
+            "quote": "Read project rules — MANDATORY."
+          },
+          {
+            "field": "does",
+            "quote": "Load skills — MANDATORY."
+          },
+          {
+            "field": "does",
+            "quote": "Data loss, security holes (XSS, injection, secrets in code)"
+          },
+          {
+            "field": "does",
+            "quote": "Keep — only confidence >= 80, reviewed code only, no linter catches or nitpicks."
+          },
+          {
+            "field": "outputs",
+            "quote": "Verdict: <verdict> (<N> critical, <M> suggestions)"
+          },
+          {
+            "field": "outputs",
+            "quote": "Source tag in brackets so the reader knows whether it came from project rules, a skill, or built-in checks."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Trigger when the user asks to review a diff, review an MR, or check code for bugs, security issues, or rule violations."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read every instruction file covering the reviewed code: root AGENTS.md plus nested ones in the touched directories"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Load workspace skills matching the reviewed stack and area (framework, language, UI text, testing)."
+          },
+          {
+            "field": "limits",
+            "quote": "Do NOT edit, write, or fix any code. This skill only reviews and reports."
+          },
+          {
+            "field": "limits",
+            "quote": "Stages 1 and 2 are internal reasoning. Never print them."
+          },
+          {
+            "field": "limits",
+            "quote": "Do NOT check\n\nCode style, naming, missing comments, test coverage, performance micro-optimizations."
+          },
+          {
+            "field": "limits",
+            "quote": "About pre-existing code patterns (not from this change)"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": ".agents/skills/security-audit/SKILL.md",
+      "blob_sha": "92178dad304d3f63e37582a297026a7874e12c62",
+      "source_url": "https://github.com/croffasia/itsaplan/blob/0ca5a1240cecc03a1bbde324da0d71e98bec571f/.agents/skills/security-audit/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": null,
+      "model": null,
+      "status": "failed",
+      "last_error": "Skill card failed schema or evidence validation",
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "security-audit",
+        "description": "Security guidance and vulnerability review for codebases, APIs, services, CLI tools, libraries, and daemons. Use for security questions, focused reviews, vulnerability research, security audits, or pen tests. Run the complete workflow only for explicit codebase audit or pen-test requests, full/comprehensive/end-to-end reviews, or requested report artifacts."
+      },
+      "excerpt": "---\nname: security-audit\ndescription: Security guidance and vulnerability review for codebases, APIs, services, CLI tools, libraries, and daemons. Use for security questions, focused reviews, vulnerability research, security audits, or pen tests. Run the complete workflow only for explicit codebase audit or pen-test requests, full/comprehensive/end-to-end reviews, or requested report artifacts.\n---\n\n# Security Audit\n\nFind vulnerabilities that violate a real trust boundary, then give owners the source evidence, safe reproduction, priority, and smallest effective fix. This is a defensive, source-first workflow. A candidate without a concrete affected principal, resource, or security outcome is not a confirmed finding.\n\n## Operating modes\n\nThis skill is guidance by default. Loading it does not authorize the complete audit workflow or file creation.\n\n- **Guidance mode**: For security questions, focused reviews, methodology, triage, or investigation of specific findings, use only the relevant parts of this skill. Do not automatically run all six phases, create an output directory, or write audit artifacts. You may launch focused agents when useful; they return results to the current task.\n- **Full audit mode**: Use the complete workflow when the user explicitly asks to audit or pen-test a codebase, asks for a full, comprehensive, or end-to-end security review, or requests report artifacts. Run all six phases and write the files defined below.\n\nIf the request could mean either mode, ask one focused question before creating files or starting the complete workflow.\n\n## Platform terminology\n\nThis skill is agent-neutral:\n\n- **Parent** is the agent that coordinates the run and owns shared state.\n- **Task tool** is the platform's delegation or sub-agent mechanism.\n- **`research` agent** is a delegated agent for focused source exploration and factual verification.\n- **`general` agent** is a delegated agent for broad investigation and bounded local execution.\n- **`subagent_type:`** in a heading names which of these two delegated agent roles runs that work.\n\nUse equivalent platform capabilities while preserving role, write-isolation, prompt, and independence boundaries.\n\n## Universal execution safety\n\nThese rules apply in both operating modes. Source inspection is read-only. Run target-controlled builds, tests, processes, browsers, emulators, fuzzers, and fixture processing only inside an OS-enforced sandbox that provides all of these controls:\n\n- no external network; use only an isolated loopback namespace when the check needs local client/server traffic;\n- an empty environment populated from an explicit allowlist with safe values, with scratch-local `HOME`, temporary directories, and caches;\n- a read-only target and toolchain, with the target-controlled process able to write only inside its assigned `scratch/` directory; and\n- explicit low CPU, memory, process, file-size, disk, and wall-clock limits.\n\nThe agent, outside the target-controlled process, may make a disposable source copy in an assigned `scratch/` directory when a build must write beside source. In guidance mode, do not retain target-controlled files. In full audit mode, only trusted parent-side code may promote the minimum non-secret result to retained `artifacts/` using the procedure under Write isolation. Never expose a retained output directory (other than the agent's own assigned `scratch/`), another agent's directory, the host home directory, credentials, sockets, or shared services to target code. Do not install dependencies or let builds fetch them. Use only tools and dependencies already available locally. If every control cannot be enforced, do not execute target code: report the missing sandbox capability as a needs-validation blocker and give a safe validation plan.\n\nUse dummy principals, fixtures, and secrets. Do not probe deployed endpoints, external services, shared infrastructure, production identities, other users' data, or live control planes. Do not test availability against a live or shared process, publish artifacts, alter releases, spend paid API quota, or continue beyond the minimum local effect needed to establish a defect. If the decisive fact is outside source or the sandboxed fixture, report it as needing validation.\n\n## Full audit setup\n\nIn full audit mode, resolve these values before reconnaissance:\n\n- **Skill directory**: the absolute directory containing this `SKILL.md`.\n- **Target**: the absolute repository root under review.\n- **Repo name**: a stable repository identifier from the directory or local Git remote.\n- **Output directory**: a new writable directory outside the target, defaulting to `~/security-audit-skill/<repo-name>/run-<N>`, where `<N>` is the next unused integer. Use a directory inside the target only when the user explicitly selects it and the parent verifies that version control ignores the whole directory. Otherwise stop and request an external path.\n- **Source ref**: the reviewed commit and whether the worktree is dirty. Do not treat unreviewed generated or modified files as another revision.\n\n### Write isolation\n\nThe parent creates and is the only writer of shared run files:\n\n- `run-metadata.json`\n- `architecture.md`\n- `coverage-ledger.json`\n- `findings.json`\n- `REPORT.md`\n- `FINDINGS-DETAIL.md`\n- `NEEDS-VALIDATION.md`\n\nEach hunter or verifier receives a unique root under `<output-dir>/agents/<agent-id>/`, with separate `scratch/` and `artifacts/` directories. Canonical agent IDs match `^[a-z0-9][a-z0-9_-]{0,63}$` and must not equal a Windows device name such as `con`, `prn`, `aux`, `nul`, `com1` through `com9`, or `lpt1` through `lpt9`. Lowercase IDs prevent case-fold collisions. The agent and every target-controlled process may write only to `scratch/`; retained `artifacts/` is parent-owned, is never exposed to the sandbox, and is writable only by trusted parent-side promotion code. Agents may not change shared files, target source, retained artifacts, or another agent's directory. Do not use `/tmp` or the host home directory as a writable fallback.\n\nBefore execution, the parent opens and retains trusted, non-inheritable directory descriptors for the agent's `scratch/` and `artifacts/` roots, and records an allowlist of expected scratch-relative artifact files plus explicit per-file and cumulative byte limits. Never pass those descriptors to the agent or sandbox. After the sandbox and all its processes terminate, trusted parent-side code promotes each allowlisted file separately:\n\n1. Validate the declared relative path: reject absolute, empty, `.`, `..`, or symlinked components.\n2. Walk each parent component from the retained scratch-root descriptor with no-follow directory-relative operations; never reopen by path.\n3. Open the leaf no-follow and nonblocking.\n4. Verify with `fstat` that it is a regular file with link count exactly one and within the recorded per-file and cumulative byte limits.\n5. Enforce those limits again while reading from that descriptor.\n6. Copy exactly the verified size, repeat `fstat`, and reject a changed identity, type, link count, or size.\n7. For the destination, walk every parent component from the retained artifacts-root descriptor with no-follow directory-relative operations; require each existing component to be a real directory, and create any missing directory exclusively before reopening and verifying it no-follow.\n8. Create the leaf exclusively without following links, verify that the opened destination is a regular file with link count exactly one, and copy from the verified source descriptor without reopening either path.\n9. Use equivalent race-safe APIs on non-POSIX systems.\n10. Never recursively copy or glob scratch, extract an archive into artifacts, or open or promote a symlink, FIFO, socket, device, directory, hard-linked file, changing file, or file that exceeds its bound.\n11. If any check is unavailable, cannot be enforced, or fails, discard the scratch entry; if it is decisive evidence, retain `needs_v",
+      "card": null
+    },
+    {
+      "skill_path": ".agents/skills/tidy/SKILL.md",
+      "blob_sha": "889a4f12899d41085e03469b0e26c776405a4136",
+      "source_url": "https://github.com/croffasia/itsaplan/blob/0ca5a1240cecc03a1bbde324da0d71e98bec571f/.agents/skills/tidy/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "tidy",
+        "description": "Simplifies and refines code for clarity, consistency, and maintainability while preserving all functionality. Focuses on recently modified code unless instructed otherwise."
+      },
+      "excerpt": "---\nname: tidy\ndescription: Simplifies and refines code for clarity, consistency, and maintainability while preserving all functionality. Focuses on recently modified code unless instructed otherwise.\n---\n\nYou expert code simplifier. Make code clear, consistent, maintainable — behavior never change. Apply project best practices. Prefer readable explicit code over compact tricks. Balance mastered from years as expert engineer.\n\nAnalyze recently modified code, apply refinements that:\n\n1. **Preserve Functionality**: Never change what code does — only how. All features, outputs, behaviors stay intact.\n\n2. **Apply Project Standards**: Defer to project canonical standards, not restate here. Consult in precedence order: project guide (`AGENTS.md`), `.cursor/rules/` rules, relevant project skills, module-local conventions. Align refinements with what they define (component style, TypeScript strictness, UI library, state management, naming). When unsure, match surrounding module patterns.\n\n3. **Enhance Clarity**: Simplify structure by:\n\n   - Cut needless complexity and nesting\n   - Kill redundant code and abstractions\n   - Clear variable and function names\n   - Consolidate related logic\n   - IMPORTANT: No nested ternaries — use switch or if/else chains for multiple conditions\n   - Clarity over brevity. Explicit beat compact\n\n4. **Remove Speculative Generality (YAGNI)**: Code for presumed future need adds complexity now, rarely fits need when it arrives. Simplify to what current callers use:\n\n   - Inline interfaces, base classes, type parameters with single implementation or single concrete use. Bring abstraction back when second real case appear, not before.\n   - Remove unused parameters, options, fields, config flags, hooks no caller sets. Element used only by tests = unused.\n   - Delete thin wrapper layers that only forward to library or module \"in case we swap later\" — wrapper coupled to library anyway, just adds file to read.\n   - Collapse indirection built for flexibility nobody asked: factories building one product, event/plugin mechanisms with one listener, layered pass-through functions.\n   - Duplication beat forced abstraction. No merge of two similar paths until shared concept clear (rule of three). Wrong abstraction cost more than repeated code. Abstraction stretched with parameters and conditionals to fit diverging cases: split back apart.\n   - Not apply to code that make software easier to change or verify: tests, clear module boundaries, small focused functions are not speculative.\n   - Before delete, confirm no callers outside visible code: public API surface, other packages, serialized data, dynamic access.\n\n5. **Drop Redundant Explicit Defaults**: Argument or prop whose value equal callee's own default say nothing. Reader must open the definition to learn that. Remove it, let default apply:\n\n   - Component prop set to that component's default value: `<Button size=\"md\">` when `size` default `\"md\"`, `<Input disabled={false}>` when `disabled` default `false`.\n   - Function, hook, or composable argument equal to its declared default parameter. Options object where every remaining key repeat a default → drop the whole argument.\n   - Caller re-applying fallback the callee already apply: `f(x ?? 10)` when `f` default `10`. Watch the difference — default parameter fire on `undefined` only, `??` also on `null`. Drop caller's fallback only when `null` cannot reach it.\n   - Read the actual default before removing — signature, `defaultProps`, destructuring defaults, library docs for the installed version. Default that differ from assumed value make this a behavior change, not a cleanup.\n   - Own code default safe to lean on. Third-party default: remove when value not load-bearing; keep explicit when a major version changing it would break the call, and state that in one short comment.\n   - Required (non-optional) prop or parameter has no default. Passing it is not redundancy — leave it.\n   - Sibling entries in same list, table, or variant set pass differing values → explicit default keep the column readable. Keep it there.\n   - Inverse signal: every caller pass the same non-default value → the default is wrong. Change the default, or drop the parameter (item 4), instead of repeating the value at every call site.\n\n6. **Enforce Structural Conventions**: Code belong where project layout says. For each recently modified file, check placement and reuse:\n\n   - Follow established directory structure: utilities in module utils, hooks in hooks, types in types, components in feature folder that owns them. Infer convention from existing layout and `AGENTS.md`. No inventing new structure.\n   - Before keeping local helper, search shared locations (workspace packages, app shared/lib folders, module utils) for equivalent. Exists → use it, delete local copy. Shared one almost fits → extend it there, no diverging local variant.\n   - Same helper now in several modules → consolidate in nearest shared location all users can import from. Never move single-user helper to shared location \"for the future\" — that speculative generality. Keep local to only caller.\n   - Respect dependency direction: module may use project-level or module-level shared code, but shared code must not import from feature module. No such cycle when consolidating.\n   - Moves are pure relocations: same code, updated imports, no behavior change. Reorganize only files touched this session. Flag broader structural drift instead of fixing.\n\n7. **Keep Comments Few, Load-Bearing, and True**: Comment earn its place by carrying info the code cannot. It work at different detail level than code next to it: lower (exact units, ranges, boundary conditions, invariants) or higher (intent, rationale, contract caller need). Comment at same level as code is noise, and noise cost real attention — reader who learn that comments in this file restate code stop reading them, including the one that would have saved them.\n\n   **The test**: cover comment with your hand, read code under it. Fact recoverable from code alone → delete comment. Not recoverable → keep. Run this on every comment in touched code. Lists below name common cases; when a case is unclear or two of them collide, this test decide.\n\n   Keep or add comment when it state:\n\n   - **Rationale**: why this algorithm, this order, this tradeoff, or which business rule force it.\n   - **Unidiomatic code**: line that look wrong but is not, so next reader does not \"fix\" it and break it.\n   - **Workarounds and bug fixes**: why workaround exist, with issue link, and what removes it.\n   - **Non-obvious contract**: units, valid range, null behavior, ordering guarantee, failure mode, when not to call. Belong in docstring/JSDoc of exported thing, not body.\n   - **External facts**: external API behavior, spec or RFC implemented, source of copied code. Put link exactly where reader need it.\n   - **Incompleteness**: `TODO(<owner>): <what and under what condition>`, never bare `TODO` and never vague \"someday\".\n\n   Remove comment when it:\n\n   - Restates name, signature, or next line: header narrating JSX, branches, or parameters that follow.\n   - Describes entries already visible — one line per prop, per field, per key, per case. Most common source of bloat, see below.\n   - Compensates for unclear name or structure. Fix name or structure instead. Comment no excuse for unclear code.\n   - Is longer than code it covers.\n   - Restates convention already in project guide or visible in file layout.\n   - Records edit history, past decisions, or argument with earlier draft. State current design only.\n   - Is commented-out code. Git keep it.\n   - Raises more questions than it answers (\"do not touch\", no reason).\n\n   **Contract is not inventory**: exported thing deserve comment when caller need fact beyond its name and type — units, bounds, null behavior, ordering, when not to use it. It does not deserve comment restating what it is. Interface where every member carry a line naming that membe",
+      "card": {
+        "title_zh": "代码简化整理",
+        "purpose_zh": "在不改变行为的前提下，简化并精炼最近修改的代码，提升清晰度、一致性与可维护性，并遵循项目既有规范。",
+        "does": [
+          "分析最近修改的代码并做保持功能不变的简化",
+          "按项目规范（AGENTS.md、.cursor/rules 等）对齐代码风格",
+          "减少嵌套与冗余抽象，禁用嵌套三元表达式",
+          "删除为假想未来需求而写的泛化代码与无用参数",
+          "移除与默认值重复的显式传参",
+          "检查文件放置与复用，合并重复 helper，精简注释"
+        ],
+        "inputs": [
+          "最近修改的代码文件",
+          "项目规范文件（如 AGENTS.md、.cursor/rules/ 规则）",
+          "模块内既有约定与周边代码模式"
+        ],
+        "outputs": [
+          "简化后的代码改动（行为不变）",
+          "删除的冗余抽象、参数与注释",
+          "结构调整建议（仅限本次涉及文件）"
+        ],
+        "scenarios": [
+          "提交前整理刚写的代码",
+          "清理过度抽象与冗余默认值",
+          "统一代码风格与目录结构",
+          "精简注释与删除注释掉的代码"
+        ],
+        "prerequisites": [
+          "能读取项目规范文件与目录结构",
+          "能查看被修改代码的调用方与默认值定义"
+        ],
+        "limits": [
+          "不改变任何功能与输出行为",
+          "仅处理最近修改的代码，除非另有指示",
+          "结构调整限于本次涉及文件，更大范围只标记不修改",
+          "删除前需确认无外部调用方、公共 API、序列化数据或动态访问",
+          "第三方默认值若为关键依赖需保留并加简短注释"
+        ],
+        "hosts": [
+          "通用"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Simplifies and refines code for clarity, consistency, and maintainability while preserving all functionality."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Focuses on recently modified code unless instructed otherwise."
+          },
+          {
+            "field": "does",
+            "quote": "Analyze recently modified code, apply refinements that:"
+          },
+          {
+            "field": "does",
+            "quote": "**Preserve Functionality**: Never change what code does — only how."
+          },
+          {
+            "field": "does",
+            "quote": "Consult in precedence order: project guide (`AGENTS.md`), `.cursor/rules/` rules, relevant project skills, module-local conventions."
+          },
+          {
+            "field": "does",
+            "quote": "IMPORTANT: No nested ternaries — use switch or if/else chains for multiple conditions"
+          },
+          {
+            "field": "does",
+            "quote": "**Remove Speculative Generality (YAGNI)**: Code for presumed future need adds complexity now, rarely fits need when it arrives."
+          },
+          {
+            "field": "does",
+            "quote": "**Drop Redundant Explicit Defaults**: Argument or prop whose value equal callee's own default say nothing."
+          },
+          {
+            "field": "does",
+            "quote": "Before keeping local helper, search shared locations (workspace packages, app shared/lib folders, module utils) for equivalent."
+          },
+          {
+            "field": "does",
+            "quote": "**Keep Comments Few, Load-Bearing, and True**: Comment earn its place by carrying info the code cannot."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Read the actual default before removing — signature, `defaultProps`, destructuring defaults, library docs for the installed version."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Infer convention from existing layout and `AGENTS.md`."
+          },
+          {
+            "field": "limits",
+            "quote": "Before delete, confirm no callers outside visible code: public API surface, other packages, serialized data, dynamic access."
+          },
+          {
+            "field": "limits",
+            "quote": "Reorganize only files touched this session. Flag broader structural drift instead of fixing."
+          },
+          {
+            "field": "limits",
+            "quote": "Third-party default: remove when value not load-bearing; keep explicit when a major version changing it would break the call, and state that in one short comment."
+          },
+          {
+            "field": "limits",
+            "quote": "Moves are pure relocations: same code, updated imports, no behavior change."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    }
+  ]
+}

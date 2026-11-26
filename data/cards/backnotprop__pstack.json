@@ -1,0 +1,1409 @@
+{
+  "schema": 1,
+  "repo": "backnotprop/pstack",
+  "tree_sha": "8d91aae8e6739dc0866619dcbc05242ecbcac233",
+  "truncated_paths": 50,
+  "skills": [
+    {
+      "skill_path": "skills/architect/SKILL.md",
+      "blob_sha": "0c1a1338ff46497bf9086abab9dd9c44d244cd66",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/architect/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "architect",
+        "description": "Sketch types, signatures, and module structure before code, then stay in the loop while implementation fills in. Use for /architect, 'architect this', 'design this', or non-trivial work where jumping to code would lock in the wrong shape."
+      },
+      "excerpt": "---\nname: architect\ndescription: \"Sketch types, signatures, and module structure before code, then stay in the loop while implementation fills in. Use for /architect, 'architect this', 'design this', or non-trivial work where jumping to code would lock in the wrong shape.\"\ndisable-model-invocation: true\n---\n\n# Architect\n\nBefore writing code, trace every system the change touches, then sketch two different shapes for it (types, signatures, module boundaries) and pick the one where each piece of state has one owner, each task has one way to do it, and callers need to know least. Redesign instead of patching if workarounds repeat.\n\nFor a large or contested design, run the **arena** skill instead of sketching alone.\n",
+      "card": {
+        "title_zh": "架构草图设计",
+        "purpose_zh": "在写代码前先梳理改动涉及的系统，勾画两种不同的结构方案（类型、签名、模块边界），并选出状态单一归属、任务单一做法、调用方知情最少的方案。",
+        "does": [
+          "在写代码前追踪改动触及的每个系统",
+          "为改动勾画两种不同的结构方案，涵盖类型、签名与模块边界",
+          "按状态单一归属、任务单一做法、调用方知情最少的标准选定方案",
+          "当变通做法反复出现时，改为重新设计而不是打补丁",
+          "大型或有争议的设计建议改用 arena 技能"
+        ],
+        "inputs": [],
+        "outputs": [],
+        "scenarios": [
+          "执行 /architect 命令时",
+          "用户说 architect this 或 design this 时",
+          "直接跳到写代码会锁定错误结构形态的非平凡工作时",
+          "大型或有争议的设计（原文建议改用 arena 技能）"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "原文未说明具体平台或宿主",
+          "大型或有争议的设计不在本技能单独处理，原文建议改用 arena 技能",
+          "原文未说明输入输出格式或验证方式"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "产品规划",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Before writing code, trace every system the change touches, then sketch two different shapes for it (types, signatures, module boundaries)"
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "pick the one where each piece of state has one owner, each task has one way to do it, and callers need to know least"
+          },
+          {
+            "field": "does",
+            "quote": "trace every system the change touches"
+          },
+          {
+            "field": "does",
+            "quote": "sketch two different shapes for it (types, signatures, module boundaries)"
+          },
+          {
+            "field": "does",
+            "quote": "Redesign instead of patching if workarounds repeat."
+          },
+          {
+            "field": "does",
+            "quote": "For a large or contested design, run the **arena** skill instead of sketching alone."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use for /architect, 'architect this', 'design this', or non-trivial work where jumping to code would lock in the wrong shape."
+          },
+          {
+            "field": "limits",
+            "quote": "For a large or contested design, run the **arena** skill instead of sketching alone."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/arena/SKILL.md",
+      "blob_sha": "1cdad31a08df518f9640d44f85d6cb442ffb2f0c",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/arena/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "arena",
+        "description": "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for /arena, 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape."
+      },
+      "excerpt": "---\nname: arena\ndescription: \"Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it. Use for /arena, 'arena this', 'throw it in the arena', or when one attempt at a non-trivial artifact would lock in the wrong shape.\"\ndisable-model-invocation: true\n---\n\n# Arena\n\nOpen a todolist with one entry per phase (Frame, Fan out, Cross-judge, Pick, Graft, Verify) before launching anything.\n\n## Phase A: Frame\n\nEvery candidate gets the same prompt, so the prompt is the contract.\n\n1. State the artifact each candidate is producing.\n2. Derive the rubric, 3-6 concrete gradeable criteria for what success looks like on *this* task. It is the picker's tool in Phase D. Candidates only see the task.\n3. Pick the runners from the `arena runners` line in the pstack settings file (`~/.cursor/rules/pstack-models.mdc` in Cursor, `~/.claude/rules/pstack-models.md` in Claude Code, `~/.agents/pstack-models.md` in other harnesses), by default `claude-fable-5-2-high`, `claude-opus-5-5-high-fast`, and `gemini-4-neon-xhigh`. An `auto` or `inherit-parent` entry is the parent model, so omit `model` and spawn a general-purpose subagent (`generalPurpose` in Cursor). If your subagent tool rejects a slug, use the nearest valid slug of the same family from its error message or your harness's model list, or drop the seat, keep at least two runners, and say so. Families go by prefix, and the longest match wins: `claude-fable-*`, `claude-*`, and `gemini-*`, after dropping a leading `cursor-`. Any other slug's family is its text before the first hyphen. Spawn more for multiple design directions, and repeat one model when the work is generation-bound, not judgment-sensitive. Pick each subagent's reasoning level per the Subagents section of the **poteto-mode** skill.\n4. Give each candidate its own output location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`), per the **separate-before-serializing-shared-state** principle skill.\n\n## Phase B: Fan out\n\nSpawn all N subagents in one message with `run_in_background: true`, each with the task, the path to the shared grounding, its own output path, and instructions to produce the artifact and a short rationale naming the alternatives it considered and what it rejected.\n\nIf a candidate produces no output, proceed with N-1 and note the dropout.\n\n## Phase C: Cross-judge\n\nAfter all Phase B candidates complete, spawn one readonly judge from the `arena cross-judge pool` line in the pstack settings file (`~/.cursor/rules/pstack-models.mdc` in Cursor, `~/.claude/rules/pstack-models.md` in Claude Code, `~/.agents/pstack-models.md` in other harnesses), by default `claude-opus-5-5-high-fast`, `gemini-4-neon-xhigh`. The judge is never from the parent's vendor, and Fable counts as Claude for that check, so use the first entry from another vendor. An `auto` or `inherit-parent` entry is the parent model. If you do not know the parent's model, use the first real slug and say that the vendor check did not run. If your subagent tool rejects a slug, use the nearest valid slug of the same family from its error message or your harness's model list, then the next such entry, or skip the judge, and say so. While you read in Phase D, the judge scores each candidate, by path label, on each rubric criterion and recommends a base.\n\n## Phase D: Pick a base\n\nRead every candidate end to end before picking. Score each against the rubric criterion by criterion, not on holistic feel, and compare with the cross-judge when Phase C ran one. Agreement on the base confirms the pick. Disagreement means one of you is biased or the rubric was ambiguous. Read both rationales before deciding.\n\nPick the base a future maintainer can extend most easily without breaking invariants. When two feel tied, prefer the cleaner boundary or smaller API, per the Laziness Protocol.\n\n## Phase E: Graft\n\nWalk each losing candidate once more for what is worth porting into the base, usually one or two things per candidate, not most of it. Fold each graft in by hand, per the **redesign-from-first-principles** principle skill, so the result stays coherent under one mental model. Don't paste mechanically.\n\nIf the candidates converge on one shape, that is strong agreement. Note it and ship the consensus shape. No graft is needed. If they wildly diverge, Phase A was under-specified. Reframe and re-run rather than averaging the divergence.\n\n## Phase F: Verify\n\nVerify the synthesized artifact like any other output, per the **prove-it-works** principle skill. If verification finds a problem the arena missed, either Phase A was wrong (re-frame and re-run) or a candidate caught it and you missed the graft (go back to Phase E). Don't paper over it.\n\n## Outputs\n\nOne synthesized artifact, with a short synthesis note alongside naming the base and why, the cross-judge's verdict or that Phase C skipped the judge, each graft with its source candidate, what was rejected and why, any convergence or dropouts, and the verification result.\n",
+      "card": {
+        "title_zh": "多候选竞技择优",
+        "purpose_zh": "对同一任务并行生成多个候选产物，交叉评审后选出基底，手工移植落选者的优点，再验证合成结果。",
+        "does": [
+          "先建六阶段待办：框定、并行生成、交叉评审、选基底、移植、验证",
+          "为任务定义3-6条可评分标准，并给每个候选分配独立输出位置",
+          "一次性并行启动多个子代理，各自产出产物和取舍理由",
+          "由非父模型厂商的只读评审按标准打分并推荐基底",
+          "逐条评分选出最易维护的基底，手工移植落选候选的一两处优点",
+          "按验证原则检查合成产物，并记录合成说明"
+        ],
+        "inputs": [
+          "同一份任务提示与共享背景材料路径",
+          "3-6条可评分标准",
+          "pstack 设置文件中的 runners 与 cross-judge pool 配置",
+          "每个候选的独立输出路径"
+        ],
+        "outputs": [
+          "一个合成后的产物",
+          "合成说明：基底及理由、评审结论或跳过说明、每处移植来源、被拒内容、收敛或掉队情况、验证结果"
+        ],
+        "scenarios": [
+          "一次尝试可能锁定错误形态的非平凡产物",
+          "需要多个设计方向并行比较",
+          "生成量大的任务需要多模型重复产出"
+        ],
+        "prerequisites": [
+          "可用的子代理工具与后台并行能力",
+          "pstack 设置文件（如 ~/.cursor/rules/pstack-models.mdc 或 ~/.claude/rules/pstack-models.md）",
+          "git worktree 或 /tmp 下的独立输出目录"
+        ],
+        "limits": [
+          "候选无输出时以 N-1 继续并记录掉队",
+          "子代理拒绝模型 slug 时改用同族最近有效 slug 或减座，至少保留两个 runner",
+          "评审不得来自父模型厂商，Fable 计为 Claude",
+          "候选严重分歧说明框定不足，应重框重跑而非取平均",
+          "移植需手工融合，不可机械粘贴"
+        ],
+        "hosts": [
+          "claude-code",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "writes_files"
+        ],
+        "tags": [
+          "自动化",
+          "代码审查",
+          "产品规划",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Spawn N parallel candidates at the same task, pick a base, graft the strongest parts of the losers into it."
+          },
+          {
+            "field": "does",
+            "quote": "Open a todolist with one entry per phase (Frame, Fan out, Cross-judge, Pick, Graft, Verify) before launching anything."
+          },
+          {
+            "field": "does",
+            "quote": "Derive the rubric, 3-6 concrete gradeable criteria for what success looks like on *this* task."
+          },
+          {
+            "field": "does",
+            "quote": "Spawn all N subagents in one message with `run_in_background: true`"
+          },
+          {
+            "field": "does",
+            "quote": "The judge is never from the parent's vendor, and Fable counts as Claude for that check, so use the first entry from another vendor."
+          },
+          {
+            "field": "does",
+            "quote": "Pick the base a future maintainer can extend most easily without breaking invariants."
+          },
+          {
+            "field": "does",
+            "quote": "Walk each losing candidate once more for what is worth porting into the base, usually one or two things per candidate, not most of it."
+          },
+          {
+            "field": "does",
+            "quote": "Verify the synthesized artifact like any other output, per the **prove-it-works** principle skill."
+          },
+          {
+            "field": "outputs",
+            "quote": "One synthesized artifact, with a short synthesis note alongside naming the base and why"
+          },
+          {
+            "field": "inputs",
+            "quote": "Every candidate gets the same prompt, so the prompt is the contract."
+          },
+          {
+            "field": "inputs",
+            "quote": "each with the task, the path to the shared grounding, its own output path"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "(`~/.cursor/rules/pstack-models.mdc` in Cursor, `~/.claude/rules/pstack-models.md` in Claude Code, `~/.agents/pstack-models.md` in other harnesses)"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Give each candidate its own output location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`)"
+          },
+          {
+            "field": "limits",
+            "quote": "If a candidate produces no output, proceed with N-1 and note the dropout."
+          },
+          {
+            "field": "limits",
+            "quote": "If they wildly diverge, Phase A was under-specified. Reframe and re-run rather than averaging the divergence."
+          },
+          {
+            "field": "limits",
+            "quote": "Don't paste mechanically."
+          },
+          {
+            "field": "hosts",
+            "quote": "`~/.claude/rules/pstack-models.md` in Claude Code"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Give each candidate its own output location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`)"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/automate-me/SKILL.md",
+      "blob_sha": "c316d723475091312b39e833d3fec1c9e65c0312",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/automate-me/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "automate-me",
+        "description": "Use for \"automate me\", \"create/update/refresh my -mode skill\", \"turn/capture my preferences or working style into a skill\", or wanting agents to follow how the user works. Drafts or revises a personal -mode skill via create-skill + unslop, optionally pulling fresh evidence from recent transcripts."
+      },
+      "excerpt": "---\nname: automate-me\ndescription: \"Use for \\\"automate me\\\", \\\"create/update/refresh my -mode skill\\\", \\\"turn/capture my preferences or working style into a skill\\\", or wanting agents to follow how the user works. Drafts or revises a personal -mode skill via create-skill + unslop, optionally pulling fresh evidence from recent transcripts.\"\ndisable-model-invocation: true\n---\n\n# Automate me\n\nA guided flow for turning the user's working conventions into a skill agents will follow. The output is one `-mode` skill tailored to them (e.g. `jay-mode`, `priya-mode`).\n\nThis skill orchestrates three others: an inline mining pass (see step 1), your harness's skill-authoring skill (authoring), and the **unslop** skill (prose discipline). It sequences them. It doesn't replace them.\n\nThe skill-authoring skill is `create-skill` in Cursor (built in) or Anthropic's `skill-creator`. If you have neither, follow the Agent Skills format at agentskills.io. \"`create-skill`\" below means whichever of these you use.\n\n## Flow\n\n### 0. Check for an existing skill\n\nLook recursively for `*-mode/SKILL.md` matching the user's handle in your harness's skill folders. In the project: `.cursor/skills/` (Cursor), `.claude/skills/` (Claude Code), `.pi/skills/` (Pi), or `.agents/skills/` (Codex, OpenCode, and others). For the user: `~/.cursor/skills/`, `~/.claude/skills/`, `~/.pi/agent/skills/`, `~/.codex/skills/`, `~/.config/opencode/skills/`, or `~/.agents/skills/`. Mode skills can live in a personal category directory (`<skills>/<handle>/`), not only at the top level. If one exists, confirm intent with your structured-question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code, `question` in OpenCode) unless they already said \"update my skill\" or similar:\n\n- Update the existing skill (default for repeat runs)\n- Start fresh (rare, ask why before doing it)\n\nUpdate mode changes the rest of the flow:\n- Step 1 mines only history since the skill was last edited (`git log -1 --format=%cI <path>`).\n- Step 2 asks what's changed or missing, not what to capture from zero.\n- Step 4 edits the existing file in place. Preserve sections the user hasn't contradicted. Revise ones with new evidence. Add new sections only for genuinely new rules.\n\n### 1. Mine their history\n\nLocate the active workspace's transcripts before fanning out. Use only that workspace's directory. Don't glob across every project's directory. That crosses workspace boundaries and reads private chats from unrelated projects. Where they live depends on your harness:\n\n- **Cursor:** the system prompt names the workspace's `agent-transcripts/` directory under `~/.cursor/projects/`.\n- **Claude Code:** `~/.claude/projects/<slug>/*.jsonl`, where `<slug>` is the workspace path with every character that isn't a letter or digit turned into \"-\".\n- **Pi:** `~/.pi/agent/sessions/--<slug>--/*.jsonl`, where `<slug>` is the workspace path with the leading slash dropped and each \"/\" turned into \"-\".\n- **Codex:** `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`. Keep only files whose first line has `payload.cwd` equal to the workspace path.\n- **Other harnesses:** the harness's session directory for this workspace.\n\nSurvey recent agent conversations within that scope for recurring patterns. Run multiple parallel subagents across slices of history (e.g. last 2-4 weeks, split into 3 slices so each has enough material). Pick each subagent's reasoning level for the job, per the Subagents section of the **poteto-mode** skill. Each slice mining subagent reads transcripts from the workspace-scoped path the parent provides, looks for the signals below, and returns a short structured list of patterns it saw with evidence pointers. Default signals worth hunting:\n\n- Response preferences (length, tone, format, \"dumb it down\" corrections)\n- Delegation habits (subagents, models, specialized workflows, parallelism)\n- Verification posture (what \"done\" means, unit tests vs live repro, reviewers)\n- Code and prose discipline (style, principles cited, lint/format tools)\n- Process conventions (worktrees, commits, PRs, review/merge tooling)\n- Meta preferences (fixing skills mid-task, proposing new ones)\n\nCross-check across slices before elevating a signal. Patterns seen in 2+ slices are high-confidence. Lone signals are weak and usually get dropped.\n\n### 2. Ask the user directly\n\nMining misses intent that hasn't come up yet. Use your structured-question tool (structured multi-choice: `AskQuestion` in Cursor, `AskUserQuestion` in Claude Code, `question` in OpenCode) rather than asking the user to type from scratch. If your harness has none, ask in chat with numbered options.\n\nShape: one or two questions with 4-6 options each, multi-select (`allow_multiple: true` in Cursor) for category questions. Start broad (\"Which areas matter most?\"), then follow up on selected areas with specific options. After the structured rounds, one free-form chat question catches anything the options missed.\n\nDon't dump 20 questions.\n\n### 3. Cluster findings\n\nGroup the combined signals into sections. Common ones (use only what applies):\n\n- **Response style**: length, tone, format.\n- **Autonomy**: how much to do without asking, MCP tool use.\n- **Understand first**: which skills to reach for when scoping or investigating a change.\n- **Subagents**: default, parallelism, model-to-task, specialized workflows.\n- **Prose / code discipline**: principles, lint tools, style guides.\n- **Review and verify**: repro posture, verification skills, live-testing tools.\n- **Process**: git worktrees, commits, PRs, review/merge tooling.\n- **Skills**: skill-authoring habits, fix-the-skill-first, proposing new skills.\n\nThe **poteto-mode** skill shows the shape. Read it for granularity. Don't copy its content. The user's rules are not the same as poteto-mode's.\n\n### 4. Draft the skill\n\nUse your skill-authoring skill (`create-skill`) to author the skill. Placement:\n\n- Path: preserve an existing mode skill's category. For a new mode, use `<skills>/<handle>/<handle>-mode/SKILL.md` when the repo has an established personal category for that handle. Otherwise default to `<skills>/<handle>-mode/SKILL.md` in the project, or the user-level skill folder if the user prefers a personal skill. `<skills>` is your harness's skill folder from step 0.\n- Handle: the user's first name or chosen identifier.\n- Frontmatter `description`: trigger on their name + `/<handle>-mode` + \"work in their style\", not on generic keywords like \"write code\" or \"review PR\".\n- Frontmatter formatting: follow `create-skill`'s YAML rules. Keep `description` as one YAML scalar. Quote it or use `description: >-` with indented continuation lines when punctuation or wrapping requires it.\n- Frontmatter `disable-model-invocation: true` by default. Opt out only if the user explicitly wants their mode to apply on every turn.\n\n### 5. Iterate on prose\n\nApply the **unslop** skill and `create-skill`'s writing guidelines to every line.\n\nShow the draft to the user and take feedback. Expect multiple iterations. Cut ruthlessly. A mode skill is not a manual.\n\n### 6. Land it\n\nWork in a worktree off main. Commit and open a PR. Don't push to main directly.\n\n## Guardrails\n\n- **Don't overfit to one conversation.** A preference stated once and contradicted another time is noise. Require multiple instances before codifying it.\n- **Don't be clever.** Restating other skills' contents, inventing metaphors, or writing \"poetic\" prose for an agent reader is cost without benefit. Keep it operational.\n- **Reference, don't inline.** Other skills the user relies on should appear as path references, not pasted excerpts. Same for any principle docs they maintain elsewhere.\n- **Keep sections minimal.** Only add a section if the user has a specific, non-default rule there. \"Communicate clearly\" is not a section. \"Short paragraphs. Tables when comparing options. Bullets only when items are genuinely parallel.\" is.\n- **Name conventions generic.** Use \"the user\" or \"the human\" in imperative",
+      "card": {
+        "title_zh": "个人工作模式技能生成",
+        "purpose_zh": "把用户的工作习惯与偏好整理成一个供智能体遵循的个人 -mode 技能，可新建或更新，并可选地从近期对话记录中挖掘证据。",
+        "does": [
+          "检查已有 *-mode/SKILL.md，确认是更新还是新建",
+          "按工作区范围挖掘近期对话记录，寻找重复出现的偏好信号",
+          "用结构化提问向用户补充挖掘不到的意图",
+          "把信号聚类成响应风格、自主性、子代理、流程等章节",
+          "用 create-skill 起草技能文件并确定路径与 frontmatter",
+          "用 unslop 打磨文字，展示草稿并迭代，最后在 worktree 中提交并开 PR"
+        ],
+        "inputs": [
+          "用户的工作习惯与偏好",
+          "近期工作区对话记录（transcript）",
+          "用户对结构化问题的回答",
+          "已有 -mode 技能文件（更新时）"
+        ],
+        "outputs": [
+          "一个定制的 -mode 技能文件（SKILL.md）",
+          "包含该技能的提交与 PR"
+        ],
+        "scenarios": [
+          "用户说“automate me”或“把我的工作方式变成技能”",
+          "用户想更新或刷新已有的个人模式技能",
+          "用户希望智能体按自己的风格工作"
+        ],
+        "prerequisites": [
+          "具备技能创作能力：Cursor 内置 create-skill 或 Anthropic skill-creator，否则遵循 agentskills.io 格式",
+          "能访问对应 harness 的技能目录与工作区对话记录目录",
+          "有结构化提问工具，或退化为聊天中编号选项"
+        ],
+        "limits": [
+          "只读取当前工作区的对话记录，不跨工作区 glob",
+          "单一信号视为噪声，需在 2 个以上切片重复才采纳",
+          "不内联其他技能内容，只做路径引用",
+          "章节保持最小化，只写非默认规则",
+          "默认 disable-model-invocation: true",
+          "不直接推送 main"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "writes_files",
+          "shell"
+        ],
+        "tags": [
+          "写作",
+          "文档",
+          "自动化",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "A guided flow for turning the user's working conventions into a skill agents will follow."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Drafts or revises a personal -mode skill via create-skill + unslop, optionally pulling fresh evidence from recent transcripts."
+          },
+          {
+            "field": "does",
+            "quote": "Look recursively for `*-mode/SKILL.md` matching the user's handle in your harness's skill folders."
+          },
+          {
+            "field": "does",
+            "quote": "Survey recent agent conversations within that scope for recurring patterns."
+          },
+          {
+            "field": "does",
+            "quote": "Use your structured-question tool (structured multi-choice: `AskQuestion` in Cursor, `AskUserQuestion` in Claude Code, `question` in OpenCode) rather than asking the user to type from scratch."
+          },
+          {
+            "field": "does",
+            "quote": "Group the combined signals into sections."
+          },
+          {
+            "field": "does",
+            "quote": "Use your skill-authoring skill (`create-skill`) to author the skill."
+          },
+          {
+            "field": "does",
+            "quote": "Apply the **unslop** skill and `create-skill`'s writing guidelines to every line."
+          },
+          {
+            "field": "does",
+            "quote": "Work in a worktree off main. Commit and open a PR. Don't push to main directly."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "The skill-authoring skill is `create-skill` in Cursor (built in) or Anthropic's `skill-creator`. If you have neither, follow the Agent Skills format at agentskills.io."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If your harness has none, ask in chat with numbered options."
+          },
+          {
+            "field": "limits",
+            "quote": "Use only that workspace's directory. Don't glob across every project's directory."
+          },
+          {
+            "field": "limits",
+            "quote": "Patterns seen in 2+ slices are high-confidence. Lone signals are weak and usually get dropped."
+          },
+          {
+            "field": "limits",
+            "quote": "Reference, don't inline."
+          },
+          {
+            "field": "limits",
+            "quote": "Frontmatter `disable-model-invocation: true` by default."
+          },
+          {
+            "field": "hosts",
+            "quote": "In the project: `.cursor/skills/` (Cursor), `.claude/skills/` (Claude Code), `.pi/skills/` (Pi), or `.agents/skills/` (Codex, OpenCode, and others)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Step 1 mines only history since the skill was last edited (`git log -1 --format=%cI <path>`)."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Step 4 edits the existing file in place."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/benchmark-checklist/SKILL.md",
+      "blob_sha": "88546fa684c003625a13d61b975ced97b8fcb90e",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/benchmark-checklist/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "benchmark-checklist",
+        "description": "Vet a perf measurement (limiter, tuning, limits, errors, repeatability, relevance, and whether the work happened) before you report or act on it. Use when you run a benchmark or report a speedup or regression you measured."
+      },
+      "excerpt": "---\nname: benchmark-checklist\ndescription: \"Vet a perf measurement (limiter, tuning, limits, errors, repeatability, relevance, and whether the work happened) before you report or act on it. Use when you run a benchmark or report a speedup or regression you measured.\"\ndisable-model-invocation: true\n---\n\n# Benchmark checklist\n\nUse this when you produce a performance number: a PR's before and after, a regression claim, a hillclimb harness, or a library or config choice. Answer each question with evidence from a run, not a guess about the code.\n\nFor a quick ballpark the user asked for, one run is enough. Still check questions 4 and 7, and say that it is one run. Skip the rest unless that run looks wrong. A choice between options is never a ballpark.\n\n## Before you run anything\n\n- Write down the claim you expect to make, in the words you would ship (\"export is 30% faster at p50 on the 60k-row dataset\"). The questions test that sentence.\n- Read the measurement script. Note what it times, counts, and ignores.\n- Check the load average with `uptime` and the core count with `nproc`. If the machine is busy, find out what is running. If you cannot stop it, interleave the sides so both see the same noise, and say so in the report.\n\n## The questions\n\n1. **Why not double?** Name the limiter. Profile in a run you do not report, because profilers and tracers slow the work down. Use CPU per process (`top`, `pidstat`), a runtime profiler (`node --cpu-prof`, `py-spy`, `perf`), I/O wait, and syscall counts (`strace -c` on Linux), then map the hot spot to source. Watch the load generator too: if it saturates first, you measured the load generator. If a change did not move the number, the limiter explains why, so find it before you call the change useless.\n2. **Was it tuned?** Run every side the way production runs it: release builds, production flags and env, batching and transaction settings, connection pools, caches as warm or cold as production sees them, and the same versions and data. If one side runs on defaults, you compared configurations, not implementations. A limiter that is a setting (a commit per row, a debug build, a missing index) means that side is untuned. Tune it and measure again before you pick a winner. If you cannot tune it, do not pick a winner from that run. When the user is choosing what to adopt, narrowing the claim to the code as it ships today does not fix this, because they adopt the option, not today's settings.\n3. **Did it break limits?** Do the arithmetic. Compare bytes per second with disk and network bandwidth, operations per second times cost per operation with your cores, and the time saved with the time the changed piece took. Removing a piece that takes 10% of the run can make the run at most about 11% faster. A result past a limit measured something other than the work, such as a cache, a no-op, or a bug.\n4. **Did it error?** Count failures and non-success responses, and check that outputs are correct, not just present. Rejections are often fast, and timeouts and retries are slow. If the script does not count errors, add the count.\n5. **Does it reproduce?** Run each side at least 5 times, alternating (A, B, A, B, and so on) so warmup, lazy initialization, caches, and drift favor neither. Report the median and range. A gap smaller than the run-to-run variation is no measurable difference. When the call is close, use a rank-sum test or the harness's own statistics.\n6. **Does it matter?** Next to any micro result, measure the end-to-end path a user waits on, with realistic data sizes and concurrency, and report the micro result as a share of the whole. A helper that takes 1% of a request can make the request at most 1% faster, however fast the helper gets.\n7. **Did it even happen?** Confirm the work ran inside the timed region: the request reached the server, the rows were written, the bytes were read, and the code used the result. Lazy code (generators nobody iterates, promises nobody awaits, results the JIT can discard) and timeouts produce numbers for work that never happened.\n\n## Report\n\n- Lead with the verdict: faster, slower, no measurable difference, or inconclusive.\n- Give the number with its unit, the run count, the range, and the limiter. For example, \"p50 41 ms → 33 ms, median of 7 runs per side, range 32 to 35 ms after, bound by JSON parsing on one core.\"\n- Call the verdict inconclusive when you claim a difference but cannot name the limiter, when a side ran untuned, or when you could not check questions 4 and 7. Name the gap.\n- Keep a PR body to one primary number. Put the runs, range, and limiter evidence in a linked artifact or notes file.\n\n## Other perf material\n\n- Vet the **Perf issue** playbook's baseline before the playbook plans from it, and every number after that.\n- Vet the **Hillclimb** playbook's harness before it is frozen. The frozen harness then prints error and work counts, so each keep-or-revert checks questions 4 and 7 for free.\n",
+      "card": {
+        "title_zh": "基准测试核查清单",
+        "purpose_zh": "在报告或依据性能测量结果行动前，核查限速因素、调优、极限、错误、可复现性、相关性以及工作是否真正发生。",
+        "does": [
+          "运行前写下预期结论并阅读测量脚本，记录计时、计数与忽略内容",
+          "用 uptime 和 nproc 检查机器负载与核数，必要时交错运行两侧",
+          "逐条回答七个问题：限速因素、是否调优、是否突破极限、是否报错、是否可复现、是否有意义、工作是否真的发生",
+          "要求每侧至少交替运行5次，报告中位数与范围",
+          "报告先给结论，再给数字、单位、运行次数、范围与限速因素",
+          "无法命名限速因素或未调优时判定为不确定"
+        ],
+        "inputs": [
+          "预期要发布的性能结论",
+          "测量脚本",
+          "运行环境与数据"
+        ],
+        "outputs": [
+          "性能结论：更快、更慢、无可测差异或不确定",
+          "带单位、运行次数、范围和限速因素的数字",
+          "PR 正文中的一个主要数字及附带的运行记录"
+        ],
+        "scenarios": [
+          "报告 PR 的前后性能对比",
+          "提出性能回归声明",
+          "搭建或冻结 hillclimb 测试框架",
+          "在库或配置之间做选择",
+          "核查 Perf issue 的基线"
+        ],
+        "prerequisites": [
+          "有可运行的测量脚本",
+          "能访问运行环境以检查负载与核数"
+        ],
+        "limits": [
+          "快速估算只需一次运行，但仍需检查第4和第7问并说明只有一次运行",
+          "选项之间的选择不能只做一次快速估算",
+          "无法调优某一侧时不得据此选出胜者",
+          "无法命名限速因素或无法检查第4、7问时应判为不确定"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "测试",
+          "数据分析",
+          "代码审查",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Vet a perf measurement (limiter, tuning, limits, errors, repeatability, relevance, and whether the work happened) before you report or act on it."
+          },
+          {
+            "field": "does",
+            "quote": "Write down the claim you expect to make, in the words you would ship"
+          },
+          {
+            "field": "does",
+            "quote": "Check the load average with `uptime` and the core count with `nproc`."
+          },
+          {
+            "field": "does",
+            "quote": "Run each side at least 5 times, alternating (A, B, A, B, and so on)"
+          },
+          {
+            "field": "does",
+            "quote": "Lead with the verdict: faster, slower, no measurable difference, or inconclusive."
+          },
+          {
+            "field": "does",
+            "quote": "Call the verdict inconclusive when you claim a difference but cannot name the limiter, when a side ran untuned, or when you could not check questions 4 and 7."
+          },
+          {
+            "field": "inputs",
+            "quote": "Read the measurement script. Note what it times, counts, and ignores."
+          },
+          {
+            "field": "outputs",
+            "quote": "Give the number with its unit, the run count, the range, and the limiter."
+          },
+          {
+            "field": "outputs",
+            "quote": "Keep a PR body to one primary number."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use this when you produce a performance number: a PR's before and after, a regression claim, a hillclimb harness, or a library or config choice."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Vet the **Perf issue** playbook's baseline before the playbook plans from it, and every number after that."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "For a quick ballpark the user asked for, one run is enough. Still check questions 4 and 7, and say that it is one run."
+          },
+          {
+            "field": "limits",
+            "quote": "A choice between options is never a ballpark."
+          },
+          {
+            "field": "limits",
+            "quote": "If you cannot tune it, do not pick a winner from that run."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Check the load average with `uptime` and the core count with `nproc`."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/blast-radius/SKILL.md",
+      "blob_sha": "1f5c95140597b8aa42fadf165e1aa0bca01639ff",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/blast-radius/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "blast-radius",
+        "description": "Find what a change could break somewhere else before it ships, beyond the diff, and prove the one fact it's safe because of by running real code instead of writing it up. Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust."
+      },
+      "excerpt": "---\nname: blast-radius\ndescription: \"Find what a change could break somewhere else before it ships, beyond the diff, and prove the one fact it's safe because of by running real code instead of writing it up. Use for 'blast radius of X', 'what could this break', or reviewing a small diff you don't trust.\"\ndisable-model-invocation: true\n---\n\n# Blast radius\n\nFind what a change breaks somewhere else, before it ships. Use for \"blast radius of X\", \"what could this break\", or reviewing a small diff you don't trust yet.\n\nCompanion to `how` and `why`. `how` tells you what the code does. `why` tells you why it's shaped that way. Blast radius tells you what it breaks somewhere else.\n\nListing the callers is not the job. The agent can grep those in a second. The job is the breakage grep won't show you.\n\n## Don't trust your own writeup\n\nA blast-radius writeup that sounds right is worthless. It reads as convincing whether or not it's true. So don't hand back the writeup. Find the one or two facts the whole thing depends on and prove them by running code.\n\n### How sure are you\n\nFor each fact the change's safety depends on, get it as far down this list as is cheap, and say where it stopped.\n\n1. You said so. Worthless on its own.\n2. You pointed at the line. A real `file:line`, or the library's own source.\n3. You showed the bad case can't happen. You walked the failure step by step and it doesn't reach.\n4. You ran it. A script or test that calls the real code and fails loud if you're wrong.\n5. You reproduced it in the running app.\n\nStep 4 is usually one small script that imports the same library the app ships and calls the exact function you're worried about.\n\n## Steps\n\n1. Read the change. The diff, the symbols it adds, changes, and deletes, and what it now does differently, including the part the diff doesn't spell out. Pull the PR and its commits.\n2. Find the one fact it's safe because of. Most changes that look risky are safe because of a single fact, like \"this call only drops already-dead cache entries and does nothing else\". Find that fact. If it holds, most risky cases are cleared at once. Spend your time here, not on a long list of maybes.\n3. Look where grep stops. Read the source of the library you call, and check its pinned version and any local patch. Work out when things run: microtasks, unmount and teardown, Solid versus React. Follow what a symbol search misses: the JSON an API returns, a DB column, a wire format, another language reading the same bytes, a feature flag, code three hops downstream.\n4. Be honest about each risk. Give it a real chance of happening and a real cost if it does. Keep the risks you confirmed. List the ones you checked and cleared separately. Cite a real `file:line`, a search that finds nothing is still an answer, and never make up a caller or an API.\n5. Prove the one fact. Write a script or test that runs the real code, run it, and paste what happened.\n6. For a big or wide change, run it as an `arena`. Ask more than one model the same question and merge the answers. Different models catch different real bugs.\n\n## What to hand back\n\n- **What it does.** What changed, including the part that isn't obvious.\n- **The one fact it's safe because of.** State it, say which step you got it to, and show the proof. If you couldn't prove it, write unproven.\n- **Risks.** Each names how it breaks, the `file:line`, how likely and how bad, and how to check. Paste the proof for the ones that matter.\n- **Cleared.** What you checked and why it's fine.\n- **Before you merge.** The cheapest test or repro that catches the real bug, including the script you wrote.\n\nWrite it through `unslop`, cite real code, and strip anything private before it goes anywhere public.\n\n**Reply:** the writeup above, with the one safety fact either proven or marked unproven.\n",
+      "card": {
+        "title_zh": "变更影响半径分析",
+        "purpose_zh": "在变更上线前找出它在别处可能破坏什么，超出 diff 范围；并针对安全所依赖的关键事实，通过运行真实代码来证明，而不是只写分析报告。",
+        "does": [
+          "读取变更 diff、新增/修改/删除的符号及其行为差异，并拉取 PR 与提交",
+          "找出该变更之所以安全所依赖的一两个关键事实，集中验证",
+          "检查 grep 覆盖不到的地方：依赖库源码、锁定版本、本地补丁、执行时机、API 返回、数据库列、线格式、特性开关、下游多跳代码",
+          "对每个风险给出触发方式、file:line、可能性与严重度，并单列已排查清除的项",
+          "编写并运行调用真实代码的脚本或测试来证明关键事实，粘贴运行结果",
+          "对大型或广泛变更以 arena 方式让多个模型回答同一问题并合并结果"
+        ],
+        "inputs": [
+          "变更的 diff 或 PR 及其提交",
+          "待审查的代码库与依赖库源码",
+          "依赖库的锁定版本与本地补丁信息"
+        ],
+        "outputs": [
+          "变更做了什么（含不明显部分）的说明",
+          "安全所依赖的关键事实及其证明步骤与证据，或标注 unproven",
+          "风险清单：触发方式、file:line、可能性、严重度、检查方法",
+          "已排查并清除的项及理由",
+          "合并前最省成本的测试或复现脚本"
+        ],
+        "scenarios": [
+          "评估某个变更的影响半径",
+          "判断这次改动可能破坏什么",
+          "审查一个自己还不信任的小 diff"
+        ],
+        "prerequisites": [
+          "可访问变更的 diff、PR 与提交",
+          "可读取依赖库源码及其锁定版本",
+          "能运行脚本或测试调用真实代码"
+        ],
+        "limits": [
+          "明确不把列出调用方当作任务本身",
+          "仅凭自述或指向代码行不足以作为证明，需尽量运行验证",
+          "无法证明的关键事实须标注 unproven",
+          "公开前需剔除任何私有信息"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell"
+        ],
+        "tags": [
+          "代码审查",
+          "测试",
+          "调研"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Find what a change breaks somewhere else, before it ships."
+          },
+          {
+            "field": "does",
+            "quote": "Read the change. The diff, the symbols it adds, changes, and deletes, and what it now does differently, including the part the diff doesn't spell out. Pull the PR and its commits."
+          },
+          {
+            "field": "does",
+            "quote": "Find the one fact it's safe because of."
+          },
+          {
+            "field": "does",
+            "quote": "Look where grep stops. Read the source of the library you call, and check its pinned version and any local patch."
+          },
+          {
+            "field": "does",
+            "quote": "Be honest about each risk. Give it a real chance of happening and a real cost if it does. Keep the risks you confirmed. List the ones you checked and cleared separately."
+          },
+          {
+            "field": "does",
+            "quote": "Prove the one fact. Write a script or test that runs the real code, run it, and paste what happened."
+          },
+          {
+            "field": "does",
+            "quote": "For a big or wide change, run it as an `arena`. Ask more than one model the same question and merge the answers."
+          },
+          {
+            "field": "outputs",
+            "quote": "**The one fact it's safe because of.** State it, say which step you got it to, and show the proof. If you couldn't prove it, write unproven."
+          },
+          {
+            "field": "outputs",
+            "quote": "**Risks.** Each names how it breaks, the `file:line`, how likely and how bad, and how to check."
+          },
+          {
+            "field": "outputs",
+            "quote": "**Before you merge.** The cheapest test or repro that catches the real bug, including the script you wrote."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Use for \"blast radius of X\", \"what could this break\", or reviewing a small diff you don't trust yet."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Step 4 is usually one small script that imports the same library the app ships and calls the exact function you're worried about."
+          },
+          {
+            "field": "limits",
+            "quote": "Listing the callers is not the job. The agent can grep those in a second."
+          },
+          {
+            "field": "limits",
+            "quote": "A blast-radius writeup that sounds right is worthless."
+          },
+          {
+            "field": "limits",
+            "quote": "If you couldn't prove it, write unproven."
+          },
+          {
+            "field": "limits",
+            "quote": "strip anything private before it goes anywhere public"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Write a script or test that runs the real code, run it, and paste what happened."
+          },
+          {
+            "field": "hosts",
+            "quote": "disable-model-invocation: true"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/bro/SKILL.md",
+      "blob_sha": "b1701b778639c08bfc306291d70170c525c66a68",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/bro/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "bro",
+        "description": "Restate the last message in plain human language, with no jargon."
+      },
+      "excerpt": "---\nname: bro\ndescription: Restate the last message in plain human language, with no jargon.\ndisable-model-invocation: true\n---\n\nRestate your last message. Stop using jargon and speak coherently. State it more simply and concisely, like one human talking to another.\n",
+      "card": {
+        "title_zh": "大白话重述",
+        "purpose_zh": "把上一条消息用通俗、简洁、连贯的人类语言重新表述，去掉术语。",
+        "does": [
+          "重述上一条消息",
+          "避免使用行话术语",
+          "表达更简单简洁",
+          "像人与人交谈一样表述"
+        ],
+        "inputs": [],
+        "outputs": [],
+        "scenarios": [
+          "上一条回复术语过多需要通俗化",
+          "希望把内容说得更简洁易懂"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "原文未说明具体适用范围或限制",
+          "原文未说明输出格式"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "写作",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Restate the last message in plain human language, with no jargon."
+          },
+          {
+            "field": "does",
+            "quote": "Restate your last message. Stop using jargon and speak coherently."
+          },
+          {
+            "field": "does",
+            "quote": "State it more simply and concisely, like one human talking to another."
+          },
+          {
+            "field": "title_zh",
+            "quote": "name: bro"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/correct/SKILL.md",
+      "blob_sha": "c45e06f48a0982ae19f92c6e83a8cd05988097a3",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/correct/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "correct",
+        "description": "Find the mistakes agents keep repeating in this repo and make each one impossible. Try architecture first, then types, then a lint whose error names the fix, then a test, and write docs last. Prove each check fails on a real past mistake. Repeat this each time the operator corrects you. Use for /correct."
+      },
+      "excerpt": "---\nname: correct\ndescription: \"Find the mistakes agents keep repeating in this repo and make each one impossible. Try architecture first, then types, then a lint whose error names the fix, then a test, and write docs last. Prove each check fails on a real past mistake. Repeat this each time the operator corrects you. Use for /correct.\"\ndisable-model-invocation: true\n---\n\n# Correct\n\nThe operator keeps correcting agents in this repo for the same mistakes. Change the repo so the next agent can't make them.\n\nAssume every contributor is an agent that sees only the files it opened, copies the nearest example, and takes the shortest path that compiles. Design the repo so a change that looks right from one file is right for the whole repo.\n\n## Find the mistake classes\n\nFirst, read recent commits, reverts, review comments, agent instruction files, and comments that explain workarounds. Group the mistakes into classes. A class counts once it has happened twice.\n\n## Fix each class at the highest level that works\n\n1. **Eliminate it with architecture.** Give each piece of state one owner and each task one supported way. Hide internals so the wrong import fails. Replace hand-synced lists with one source of truth. Delete old ways and dead code an agent would copy.\n2. **Enforce it with types so the bad state can't be written.** If bad code still compiles, add a lint or CI check whose error names the file, type, or function to use instead. If the pattern is already common, fail only when a change adds more.\n3. **Test the behavior.** Fix or delete any test that still passes when the behavior it checks breaks, or that fails when only the internals change.\n4. **Write docs or agent rules last, only for judgment calls.** Nothing fails when an agent skips them.\n\n## Fix and prove\n\nThen fix the most frequent classes now, one commit each. Prove each new check fails on a real past mistake. Run the same command locally and in CI. Exceptions go on the offending line with a reason, an expiry date, and a human's approval.\n\n## Keep the rule table\n\nLast, keep a table in the agent instruction file that pairs each rule with what enforces it. When the operator corrects you, fix the mistake and add the rule. If the rule was already there and nothing enforces it, that's a repeat, so fix it at the highest level in the same change. Drop a rule once its mistake can't happen.\n\n**Reply:** each class with its evidence, the level you picked, and why a higher level didn't work.\n",
+      "card": {
+        "title_zh": "纠错固化",
+        "purpose_zh": "找出本仓库中智能体反复犯的错误，按架构、类型、检查、测试、文档的优先级逐层修复，使同类错误无法再发生，并维护规则与执行方式的对照表。",
+        "does": [
+          "阅读近期提交、回滚、评审意见、智能体指令文件与变通注释，把重复出现的错误归类",
+          "按最高可行层级修复每类错误：架构消除、类型约束、lint或CI检查、行为测试、最后写文档或规则",
+          "为每个新检查证明它能在真实历史错误上失败，并在本地与CI运行同一命令",
+          "把例外写在问题行上，附原因、到期日期与人工批准",
+          "在智能体指令文件中维护规则与执行方式的对照表，操作者纠正后补规则并在同一变更中按最高层级修复",
+          "删除已不可能发生的规则"
+        ],
+        "inputs": [
+          "仓库近期提交、回滚与评审评论",
+          "智能体指令文件与解释变通做法的注释",
+          "操作者的纠正反馈"
+        ],
+        "outputs": [
+          "按错误类别给出的证据、所选层级及更高层级不可行的原因",
+          "每类错误一个提交的修复",
+          "能在真实历史错误上失败的新检查",
+          "规则与执行方式对照表"
+        ],
+        "scenarios": [
+          "仓库中智能体反复犯同类错误需要根治",
+          "操作者纠正智能体后需要把纠正固化为仓库约束",
+          "需要为已有规则补充强制执行手段"
+        ],
+        "prerequisites": [
+          "仓库有可读的提交历史、评审记录与智能体指令文件",
+          "能修改仓库代码、类型、lint或CI配置与测试"
+        ],
+        "limits": [
+          "文档或智能体规则放在最后，仅用于需要判断的情况",
+          "例外需附原因、到期日期与人工批准",
+          "一类错误需至少发生两次才计入",
+          "原文未说明具体支持的语言、lint工具或CI平台"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "writes_files",
+          "shell"
+        ],
+        "tags": [
+          "代码审查",
+          "测试",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "The operator keeps correcting agents in this repo for the same mistakes. Change the repo so the next agent can't make them."
+          },
+          {
+            "field": "does",
+            "quote": "First, read recent commits, reverts, review comments, agent instruction files, and comments that explain workarounds. Group the mistakes into classes. A class counts once it has happened twice."
+          },
+          {
+            "field": "does",
+            "quote": "Eliminate it with architecture."
+          },
+          {
+            "field": "does",
+            "quote": "Enforce it with types so the bad state can't be written."
+          },
+          {
+            "field": "does",
+            "quote": "Test the behavior."
+          },
+          {
+            "field": "does",
+            "quote": "Write docs or agent rules last, only for judgment calls."
+          },
+          {
+            "field": "does",
+            "quote": "Prove each new check fails on a real past mistake. Run the same command locally and in CI."
+          },
+          {
+            "field": "does",
+            "quote": "Exceptions go on the offending line with a reason, an expiry date, and a human's approval."
+          },
+          {
+            "field": "does",
+            "quote": "keep a table in the agent instruction file that pairs each rule with what enforces it."
+          },
+          {
+            "field": "does",
+            "quote": "Drop a rule once its mistake can't happen."
+          },
+          {
+            "field": "inputs",
+            "quote": "read recent commits, reverts, review comments, agent instruction files, and comments that explain workarounds"
+          },
+          {
+            "field": "outputs",
+            "quote": "each class with its evidence, the level you picked, and why a higher level didn't work."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Then fix the most frequent classes now, one commit each."
+          },
+          {
+            "field": "limits",
+            "quote": "A class counts once it has happened twice."
+          },
+          {
+            "field": "limits",
+            "quote": "Nothing fails when an agent skips them."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Run the same command locally and in CI."
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Then fix the most frequent classes now, one commit each."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/create-formal-verification-skill/SKILL.md",
+      "blob_sha": "92f7aa4fa966b857dd7fcc994b3c59650767c878",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/create-formal-verification-skill/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "create-formal-verification-skill",
+        "description": "Generate a project-local skill that formally verifies the code where a bug costs the most and tests reach the least, in any language, with whichever verification tool fits. Use for /create-formal-verification-skill, \"model-check this race\", \"prove this invariant\", or when concurrency, retries, state machines, parsers, or unsafe code need more than tests."
+      },
+      "excerpt": "---\nname: create-formal-verification-skill\ndescription: \"Generate a project-local skill that formally verifies the code where a bug costs the most and tests reach the least, in any language, with whichever verification tool fits. Use for /create-formal-verification-skill, \\\"model-check this race\\\", \\\"prove this invariant\\\", or when concurrency, retries, state machines, parsers, or unsafe code need more than tests.\"\ndisable-model-invocation: true\n---\n\n# Create a formal verification skill\n\nA test checks the cases that someone thought to write. Formal verification checks every case in a stated scope: every order of steps in a model, every input up to a bound, or every input. This skill finds the part of the repo where that matters most, verifies one property of it, and leaves a project-local skill that lets the next agent check a change against that property. Write that skill for an agent who reads it cold, mid-change, and has never seen your work. The user must be able to trust the result and act on it without learning the verification language.\n\n## Choose the target from the code\n\nAnswer from the codebase, and ask the user only what you cannot observe. If the user named an area or a bug, start there.\n\nA good target is a promise the code makes, where a break harms users and tests rarely reach the case that breaks it. Choose the strongest such target in the repo, not the one that is easiest to verify.\n\n## Let the question choose the tool\n\nPick the tool that answers the question at the lowest cost: a model checker, a proof assistant, an SMT-backed verifier, or another tool. Whether events can happen in a bad order usually suits a model checker over a small model of the design, and TLA+ is the default for that in any language. Whether the code itself behaves for every input, as with memory safety, overflow, or a data-structure invariant, usually suits a verifier that runs on the code. If no verifier runs on this language, say so, and test the real code with generated inputs, not a hand model of the function. A property that must hold at every size, where a bound is not enough, can need a proof. Prefer a tool that the repo's developers can install and run, and tell the user why you chose it.\n\n## What makes it good\n\n- **True to the code.** Every part of the model or proof points to code that a reviewer can open. What the verification treats as one indivisible step is one indivisible step in the code. Names come from this repo.\n- **Able to fail.** A check that you have never seen fail proves nothing. Show each property failing on a broken variant of the code it guards, such as a removed check or a reordered step.\n- **Findings stay findings.** When the current code breaks the property, report it with the counterexample in the code's terms. Do not weaken the property or the model until it passes, and do not change product code unless the user asks.\n- **Honest about scope.** Say what is verified, under which bounds and assumptions, and what is left out. A pass covers the model or the bound, not the whole system.\n- **Readable without the tool.** State the property and the harm in one plain sentence each. Tell a counterexample as a short sequence of steps in the code's words.\n- **Cheap to rerun.** One command, a reproducible tool version, and a run short enough that the next agent will use it on every relevant change.\n- **Kept in step with the code.** Record which files and functions each check covers, and the commit at which you last confirmed that the verification describes them. When the covered code changes after that commit, the next agent can see that the verification needs another look.\n\n## Generate the verify skill\n\nWrite a project-local skill with frontmatter that names the area and says when to use it. Without frontmatter, the skill never registers. From the skill alone, the next agent must be able to tell whether a change touches the verified code, run the check, tell a real bug from a modeling error, and update the verification when a change is intended. Put the coverage record and the sync commit in the skill, and tell the next agent to move the sync commit forward only after it confirms that the verification describes the code at the new commit. Use this repo's real commands, paths, and nouns, and leave no placeholders.\n\nIf the check is a TLA+ model, tell the next agent to read every result with the pstack [`/statechart`](../statechart/SKILL.md) skill. It shows each invariant violation the checker finds as its shortest path in plain words. When the check passes, `/statechart` draws a chart of how the system moves between states. Refer to `/statechart` by name. Its commands, options, and file paths change between releases and machines, so copy none of them into the generated skill or its scripts.\n\n## Prove it before you hand off\n\nFollow the generated skill once, as the next agent would, on a scratch change that breaks the property in the real code. It must catch the break. Then drop the scratch change and confirm that the check is back where it started: passing, or failing only on the findings you will report. A verify skill that was never run is a draft. If the skill misses the break or a step does not run, fix the skill or the verification, not the scratch change.\n\n## Hand off\n\nTell the user what you verified, which tool you used and why, the bounds, what the check found in plain words, how to run it, and what it does not cover. Suggest a second target only if you found a close one. Point the user at `/maintain-formal-verification-skill` for bringing the verification back in line after changes that did not recheck it.\n",
+      "card": {
+        "title_zh": "形式化验证技能生成",
+        "purpose_zh": "在代码库中找出测试覆盖最少、出错代价最高的部分，用合适的形式化验证工具验证其中一条性质，并生成项目本地的验证技能，供后续代理在改动后复查。",
+        "does": [
+          "从代码库中选出出错代价高、测试覆盖少的验证目标",
+          "根据问题类型选择模型检查器、证明助手或 SMT 验证器等工具",
+          "构建与代码对应的模型或证明，并展示性质在破坏版本上确实失败",
+          "生成带 frontmatter 的项目本地验证技能，含覆盖记录与同步提交",
+          "按生成的技能在临时破坏性改动上试跑，确认能捕获问题",
+          "向用户说明验证范围、边界、运行方式与未覆盖内容"
+        ],
+        "inputs": [
+          "代码库",
+          "用户指定的区域或缺陷（可选）",
+          "用户可观察到的补充信息"
+        ],
+        "outputs": [
+          "项目本地验证技能文件",
+          "验证结果与反例说明",
+          "覆盖记录与同步提交信息",
+          "工具选择理由与边界说明"
+        ],
+        "scenarios": [
+          "并发、重试、状态机、解析器或 unsafe 代码需要超出测试的保证",
+          "用户要求对某条不变量做模型检查或证明",
+          "需要为后续代理留下可复跑的验证流程"
+        ],
+        "prerequisites": [
+          "代码库中存在可验证的明确性质",
+          "所选验证工具能被仓库开发者安装和运行",
+          "若为 TLA+ 模型，后续需配合 `/statechart` 技能解读结果"
+        ],
+        "limits": [
+          "验证只覆盖模型或给定边界，不等于整个系统",
+          "当前代码违反性质时只报告发现，不削弱性质或模型",
+          "不修改产品代码，除非用户要求",
+          "未在破坏性改动上试跑过的验证技能只是草稿",
+          "TLA+ 结果需借助 `/statechart` 解读，其命令不写入生成的技能"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "测试",
+          "代码审查",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "This skill finds the part of the repo where that matters most, verifies one property of it, and leaves a project-local skill that lets the next agent check a change against that property."
+          },
+          {
+            "field": "does",
+            "quote": "A good target is a promise the code makes, where a break harms users and tests rarely reach the case that breaks it."
+          },
+          {
+            "field": "does",
+            "quote": "Pick the tool that answers the question at the lowest cost: a model checker, a proof assistant, an SMT-backed verifier, or another tool."
+          },
+          {
+            "field": "does",
+            "quote": "Show each property failing on a broken variant of the code it guards, such as a removed check or a reordered step."
+          },
+          {
+            "field": "does",
+            "quote": "Write a project-local skill with frontmatter that names the area and says when to use it."
+          },
+          {
+            "field": "does",
+            "quote": "Follow the generated skill once, as the next agent would, on a scratch change that breaks the property in the real code."
+          },
+          {
+            "field": "does",
+            "quote": "Tell the user what you verified, which tool you used and why, the bounds, what the check found in plain words, how to run it, and what it does not cover."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Prefer a tool that the repo's developers can install and run, and tell the user why you chose it."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the check is a TLA+ model, tell the next agent to read every result with the pstack [`/statechart`](../statechart/SKILL.md) skill."
+          },
+          {
+            "field": "limits",
+            "quote": "A pass covers the model or the bound, not the whole system."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not weaken the property or the model until it passes, and do not change product code unless the user asks."
+          },
+          {
+            "field": "limits",
+            "quote": "A verify skill that was never run is a draft."
+          },
+          {
+            "field": "limits",
+            "quote": "Its commands, options, and file paths change between releases and machines, so copy none of them into the generated skill or its scripts."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/create-verification-skill/SKILL.md",
+      "blob_sha": "442292dc607c81a421a2714066c14a338e061500",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/create-verification-skill/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "create-verification-skill",
+        "description": "Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform. Use for /create-verification-skill, \"make a control skill for this repo\", or when a project has no scripted way to prove UI/CLI/service behavior."
+      },
+      "excerpt": "---\nname: create-verification-skill\ndescription: \"Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform. Use for /create-verification-skill, \\\"make a control skill for this repo\\\", or when a project has no scripted way to prove UI/CLI/service behavior.\"\ndisable-model-invocation: true\n---\n\n# Create a verification skill\n\nEvery serious project needs a scripted way to drive the real app and prove behavior: launch it, exercise a feature the way a user would, and capture evidence. This skill generates that as a project-local skill (`<skills>/verify-<app>/`) tailored to the repo. `<skills>` is your harness's project skill folder: `.cursor/skills/` in Cursor, `.claude/skills/` in Claude Code, `.pi/skills/` in Pi, `.agents/skills/` in Codex, OpenCode, and others. If the repo already keeps skills in one of these, use that one. You write the generator's output for the next agent, not for a human: it will be read cold, mid-task, by an agent that has never seen the app.\n\n## 1. Interview the repo, not the user\n\nAnswer these from the codebase and only ask the user what you cannot observe:\n\n- **Surface:** what does a user actually touch? A web UI, a CLI/TUI, a desktop app, an API, a mobile app, a library? A repo can have several; pick the primary one and note the rest.\n- **Run:** how does the app start locally? Prefer the repo's own documented dev command (package scripts, Makefile, README quickstart). Note ports, env vars, seed data, auth.\n- **Drive:** how can an agent interact with it programmatically? Existing harnesses first — Playwright/Cypress specs, expect scripts, PTY helpers, curl-able endpoints, a debug port. Only then pick a generic recipe: browser/CDP for web and Electron, a tmux/PTY harness for CLI/TUI, plain HTTP for services.\n- **Observe:** what evidence can be captured? Screenshots, terminal transcripts, response bodies, logs, exit codes, DB state.\n- **Isolate:** can two instances run side by side (ports, data dirs, profiles)? If not, say so in the generated skill: refusing to double-drive a shared instance beats corrupting the user's session.\n\nIf the checkout doesn't build or start as-is, fix that first (or report it precisely) before generating; a skill written against a broken base teaches wrong steps. When an irrelevant missing asset blocks startup (a static dir the API never serves, a sample config), the generated skill may create it, clearly marked as verification scaffolding, and remove it in cleanup.\n\n## 2. Generate the skill\n\nWrite `<skills>/verify-<app>/SKILL.md` with YAML frontmatter (`name: verify-<app>` and a `description` that names the app, the surface, and when to reach for it — without frontmatter the skill never registers) and these sections, each grounded in what the interview actually found (no placeholders left):\n\n- **Launch:** the exact command that starts the app for verification, and how to tell it's ready (a log line, a prompt). Launch must reach a usable state from an empty data dir, including any migrations and seed data. Ready means usable, not just that a process answers. A database health check can pass while its init scripts are still running. Include teardown. For a short-lived CLI or TUI there is no server to keep alive: launch means build the binary (or install deps) once, then start each drive in its own isolated PTY or tmux session.\n- **Doctor:** one read-only check that answers \"is this instance worth driving?\" — process up, right version/build, port owned by us, auth valid. An agent runs this first whenever anything looks off.\n- **Drive:** the harness recipe with real selectors/commands from this repo, not examples. Prefer stable handles (ARIA labels, data attributes, prompt strings, route paths) over coordinates and tab order.\n- **Evidence:** what to capture for a proof and where it goes. State the proof standards: exercise the real user path, not internal setters or test-only endpoints; capture the action and the resulting state, not just the final screen; verify side effects (files written, rows inserted, messages sent) alongside what's visible; mocks only where a production boundary already isolates the external system. When the safe path is a dry-run or test mode, verify what it actually skips by observing (files, network, git refs) rather than trusting its name: some dry-runs still touch the network or open a browser.\n- **Cleanup:** how to tear down instances the run created. Never kill by process name; kill what you started. Cleanup removes instances and scratch state, never the evidence: proof artifacts survive the teardown, in a location the skill names.\n- **Helpers:** any script the skill ships is executable and its invocation is shown in the skill body. A helper the reader has to reverse-engineer is not a helper.\n\n## 3. Seed the feature map\n\nCreate `<skills>/verify-<app>/features/README.md` plus one file per user-facing feature you can identify (aim for the top 3-5 to start, from routes, commands, menus, or docs). Follow the shape in [`references/feature-map-example/`](references/feature-map-example/), with a README index and one file per feature. Each file answers, from the user's point of view: what the feature is, how to reach it, how to drive it with the harness, and what observable end state proves it works. The four H2s are `Sub-features`, `How to get to it (user POV)`, `Driving it with <harness>`, and `Gotchas`. If the seed data lacks a precondition that a journey needs, the journey reports a failure and the reason goes in that feature's `Gotchas`. Never weaken the journey to make it pass. The map is the repo's maintained verification source; a proof that drives one convenient entry point is incomplete when the map lists others.\n\n## 4. Prove the generated skill before handing it over\n\nRun its own instructions end to end once: launch, doctor, drive ONE mapped feature (one is enough; the map exists so later runs can cover the rest), capture evidence, clean up. After cleanup, confirm the evidence still exists at the named location — a cleanup that eats the proof fails this step. Fix what fails, and run the generated cleanup after every failed iteration too, so broken attempts don't strand processes and ports. A generated skill that was never executed is a draft, not a deliverable. If you proved it in a stand-in for the real target (a container in place of a fresh VM, a local stack in place of a remote one), list every setup step the stand-in did that the target will not. Those steps stay unverified until a run on the real target covers them.\n\n## 5. Offer the maintenance loop\n\nPoint the user at `/maintain-verification-skill` for keeping the map honest as the app changes. Suggest a cadence only if they ask.\n",
+      "card": {
+        "title_zh": "生成验证技能",
+        "purpose_zh": "为项目生成一个项目本地的验证技能，让后续代理能像用户一样启动真实应用、驱动功能并采集证据，以证明 UI、CLI 或服务行为。",
+        "does": [
+          "访谈代码库，识别用户接触面、启动方式、可编程驱动方式、可采集证据与实例隔离能力",
+          "在项目技能目录生成 verify-[app]/SKILL.md，含启动、Doctor、驱动、证据、清理、辅助脚本等章节",
+          "生成 features/README.md 及每个用户可见功能的特性文件，含子功能、到达路径、驱动方式与注意事项",
+          "端到端执行生成的技能一次：启动、Doctor、驱动一个已映射功能、采集证据、清理并确认证据仍在",
+          "指出用 /maintain-verification-skill 维护特性地图"
+        ],
+        "inputs": [
+          "仓库代码库（路由、命令、菜单、文档、package 脚本、Makefile、README）",
+          "用户补充的无法从代码观察到的信息",
+          "仓库已有的测试或驱动工具（Playwright/Cypress 规格、expect 脚本、PTY 辅助、可 curl 端点、调试端口）"
+        ],
+        "outputs": [
+          "项目本地技能文件 [skills]/verify-[app]/SKILL.md",
+          "特性地图 [skills]/verify-[app]/features/README.md 及每个功能一个文件",
+          "技能附带的可执行辅助脚本",
+          "一次端到端验证运行产生的证据产物"
+        ],
+        "scenarios": [
+          "项目缺少脚本化方式证明 UI、CLI 或服务行为",
+          "用户要求为仓库做一个控制技能",
+          "需要让后续代理冷启动时能驱动真实应用并采集证据"
+        ],
+        "prerequisites": [
+          "仓库能按原样构建并启动；若不能需先修复或精确报告",
+          "确定宿主对应的项目技能目录（如 .cursor/skills/、.claude/skills/、.pi/skills/、.agents/skills/）",
+          "能从代码库观察或由用户提供启动命令、端口、环境变量、种子数据与认证信息"
+        ],
+        "limits": [
+          "生成的技能必须实际端到端执行过一次才算交付，否则只是草稿",
+          "不得为让旅程通过而削弱旅程；种子数据缺前置条件时报告失败并记入 Gotchas",
+          "清理只移除实例与临时状态，不得删除证据",
+          "不得按进程名杀进程，只能杀自己启动的",
+          "若在替代环境（容器代替全新虚拟机等）验证，需列出替代环境做过而真实目标不会做的步骤，这些步骤在真实目标运行前仍未验证",
+          "若无法并行运行两个实例，生成的技能应说明并拒绝双重驱动共享实例"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "测试",
+          "自动化",
+          "文档",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Every serious project needs a scripted way to drive the real app and prove behavior: launch it, exercise a feature the way a user would, and capture evidence."
+          },
+          {
+            "field": "does",
+            "quote": "Write `<skills>/verify-<app>/SKILL.md` with YAML frontmatter"
+          },
+          {
+            "field": "does",
+            "quote": "Create `<skills>/verify-<app>/features/README.md` plus one file per user-facing feature you can identify"
+          },
+          {
+            "field": "does",
+            "quote": "Run its own instructions end to end once: launch, doctor, drive ONE mapped feature (one is enough; the map exists so later runs can cover the rest), capture evidence, clean up."
+          },
+          {
+            "field": "does",
+            "quote": "Point the user at `/maintain-verification-skill` for keeping the map honest as the app changes."
+          },
+          {
+            "field": "inputs",
+            "quote": "Answer these from the codebase and only ask the user what you cannot observe"
+          },
+          {
+            "field": "inputs",
+            "quote": "Prefer the repo's own documented dev command (package scripts, Makefile, README quickstart)."
+          },
+          {
+            "field": "outputs",
+            "quote": "Create `<skills>/verify-<app>/features/README.md` plus one file per user-facing feature you can identify (aim for the top 3-5 to start, from routes, commands, menus, or docs)."
+          },
+          {
+            "field": "outputs",
+            "quote": "any script the skill ships is executable and its invocation is shown in the skill body"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If the checkout doesn't build or start as-is, fix that first (or report it precisely) before generating"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "`<skills>` is your harness's project skill folder: `.cursor/skills/` in Cursor, `.claude/skills/` in Claude Code, `.pi/skills/` in Pi, `.agents/skills/` in Codex, OpenCode, and others."
+          },
+          {
+            "field": "limits",
+            "quote": "A generated skill that was never executed is a draft, not a deliverable."
+          },
+          {
+            "field": "limits",
+            "quote": "Never weaken the journey to make it pass."
+          },
+          {
+            "field": "limits",
+            "quote": "Never kill by process name; kill what you started. Cleanup removes instances and scratch state, never the evidence"
+          },
+          {
+            "field": "limits",
+            "quote": "If you proved it in a stand-in for the real target (a container in place of a fresh VM, a local stack in place of a remote one), list every setup step the stand-in did that the target will not."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/figure-it-out/SKILL.md",
+      "blob_sha": "625a53c4d8be54dcca071952859aeaa1e0ccff9c",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/figure-it-out/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "figure-it-out",
+        "description": "Design an auditable playbook when no narrower one fits: a large migration, an ambitious multi-part change, or work a human reviews after stepping away. Scales rigor to the task, runs a hypothesis loop, and logs decisions. Use for /figure-it-out or 'figure it out'."
+      },
+      "excerpt": "---\nname: figure-it-out\ndescription: \"Design an auditable playbook when no narrower one fits: a large migration, an ambitious multi-part change, or work a human reviews after stepping away. Scales rigor to the task, runs a hypothesis loop, and logs decisions. Use for /figure-it-out or 'figure it out'.\"\ndisable-model-invocation: true\n---\n\n# Figure it out\n\nWhen the task matches no playbook, design one. The deliverable before any code is the workflow itself: a sequence of phases that scales rigor to the task, runs the scientific method, and leaves a decision trail a human can audit after stepping away.\n\n## Start\n\nOpen a todolist whose first item is to read the Principles section of the **poteto-mode** skill. Then add the phases below as todos.\n\n## Phase A: Frame\n\nGround first, then commit. Don't start the run until you can state:\n\n- The definition of done as a falsifiable predicate (the **prove-it-works** principle skill).\n- Scope, quantified: rough units and effort, plus the blockers grounding surfaced.\n- The rigor level, biased high. One-way doors and high blast radius get more. Reversible low-stakes steps get less. Rigor is gates and artifacts, not \"try harder\".\n\nPresent the framing and tradeoffs before committing to a long run. Reversible work proceeds (the **never-block-on-the-human** principle skill), but a multi-hour run earns one checkpoint.\n\n## Phase B: Design the workflow\n\nDecompose into atomic, independently-landable units. Sequence riskiest-unknown-first. Scaffold and verification come before features (the **foundational-thinking** principle skill).\n\n- Build the verification harness before the work, with the baseline captured from the pre-change state, so the check reads as \"old value vs new value\".\n- For one-way-door design decisions, run the **architect** skill (it runs **arena**). Skip it for mechanical work whose shape is already concrete. A second arena over a settled design is over-engineering (the **laziness-protocol** principle skill).\n- Decide what fans out. Parallelize only across seams, and give each worker its own worktree or branch (the **separate-before-serializing-shared-state** principle skill). Don't over-fan. Pick each subagent's reasoning level for the job, per the Subagents section of the **poteto-mode** skill.\n- Write the designed phase list down. That list is what the human reviews.\n\nThen execute the design. Add its steps to the todolist as concrete items between the Phase C and Phase D entries. Run each under the Phase C loop discipline, and weave the Phase D log through them, a row as each step lands, rather than saving the whole trail for the end.\n\n## Phase C: Run the loop\n\nEach unit is an experiment. State the hypothesis, make the smallest change, measure against the predicate on the real artifact, keep it if it advanced, revert it if it didn't. Apply the **sequence-verifiable-units** principle skill, verifying each unit before starting the next instead of batching checks at the end.\n\n- Verify by inspecting the artifact, never a self-report. When something passes too easily, suspect the observation method before the system.\n- Pair delegated work with a judge. If a worker games the gate, reset and harden the contract. If the gate itself is wrong, fix the gate in its own change rather than routing around it.\n- A verdict is VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Inconclusive is not a pass. Don't hide a negative.\n\n## Phase D: Keep the audit trail\n\nLog the run via the **show-me-your-work** skill. figure-it-out's work is usually ambitious enough to commit the trail so the reviewer can read it in the PR. The trail plus the diff is what lets the human come back and trust the work.\n\n## Phase E: Verify and hand back\n\nCheck the whole against the Phase A predicate on the real product, not just the harness. Encode any recurring correction as a gate, a lint rule, a check, or a script (the **encode-lessons-in-structure** principle skill).\n\n**Reply:** the playbook you designed, the rigor level and why, the decision-trail path, what's verified against the predicate, and what's still open.\n",
+      "card": {
+        "title_zh": "自主设计工作流",
+        "purpose_zh": "当没有现成流程可套用时，为大型迁移或多部分改动设计一套可审计的工作流：先框定目标与严格度，再拆解阶段、跑假设循环并记录决策，最后按可证伪标准验收并交回。",
+        "does": [
+          "先框定完成定义（可证伪谓词）、量化范围与严格度，并在长任务前设检查点",
+          "把任务拆成可独立落地的原子单元，风险未知优先，先建验证脚手架再写功能",
+          "每个单元按假设-最小改动-实测-保留或回滚的循环推进，逐单元验证",
+          "用 VERIFIED、NOT VERIFIED、INCONCLUSIVE 三态判定，不把不确定当通过",
+          "通过 show-me-your-work 记录决策轨迹，通常随 PR 提交供人审阅",
+          "整体对照 Phase A 谓词验收，并把重复纠正固化为门禁、lint 或脚本"
+        ],
+        "inputs": [
+          "待处理的任务描述（如大型迁移、多部分改动）",
+          "可证伪的完成定义",
+          "范围与工作量估算",
+          "验证脚手架与改动前基线"
+        ],
+        "outputs": [
+          "设计好的阶段化工作流（playbook）",
+          "严格度等级及理由",
+          "决策轨迹路径",
+          "对照谓词的验证结论与未决事项"
+        ],
+        "scenarios": [
+          "没有更窄流程可套用的大型迁移",
+          "需要人离开后回来审阅的长期改动",
+          "多部分、目标宏大的变更",
+          "需要留下可审计决策链的工作"
+        ],
+        "prerequisites": [
+          "先阅读 poteto-mode 技能中的 Principles 部分",
+          "建立以阅读原则为第一项的待办清单"
+        ],
+        "limits": [
+          "原文未说明具体平台或宿主",
+          "严格度偏向高，但原文未给出量化标准",
+          "并行仅限清晰接缝，且每个 worker 需独立 worktree 或分支"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "自动化",
+          "产品规划",
+          "文档",
+          "代码审查"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "When the task matches no playbook, design one."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "a sequence of phases that scales rigor to the task, runs the scientific method, and leaves a decision trail a human can audit after stepping away."
+          },
+          {
+            "field": "does",
+            "quote": "The definition of done as a falsifiable predicate"
+          },
+          {
+            "field": "does",
+            "quote": "Decompose into atomic, independently-landable units. Sequence riskiest-unknown-first."
+          },
+          {
+            "field": "does",
+            "quote": "Build the verification harness before the work, with the baseline captured from the pre-change state"
+          },
+          {
+            "field": "does",
+            "quote": "Each unit is an experiment. State the hypothesis, make the smallest change, measure against the predicate on the real artifact, keep it if it advanced, revert it if it didn't."
+          },
+          {
+            "field": "does",
+            "quote": "A verdict is VERIFIED, NOT VERIFIED, or INCONCLUSIVE. Inconclusive is not a pass."
+          },
+          {
+            "field": "does",
+            "quote": "Log the run via the **show-me-your-work** skill."
+          },
+          {
+            "field": "does",
+            "quote": "Encode any recurring correction as a gate, a lint rule, a check, or a script"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Open a todolist whose first item is to read the Principles section of the **poteto-mode** skill."
+          },
+          {
+            "field": "limits",
+            "quote": "The rigor level, biased high."
+          },
+          {
+            "field": "limits",
+            "quote": "Parallelize only across seams, and give each worker its own worktree or branch"
+          },
+          {
+            "field": "outputs",
+            "quote": "**Reply:** the playbook you designed, the rigor level and why, the decision-trail path, what's verified against the predicate, and what's still open."
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/how/SKILL.md",
+      "blob_sha": "f1bcf012d95276150b2429ee1eed72bd095f30e1",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/how/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "how",
+        "description": "Use for \"how does X work\", code walkthroughs before changing something, and placement / ownership / layering questions (\"where should this live\", \"which package owns this\", \"is this the right layer\"). Explains subsystem architecture, runtime flow, onboarding mental models. Use why for motivation."
+      },
+      "excerpt": "---\nname: how\ndescription: \"Use for \\\"how does X work\\\", code walkthroughs before changing something, and placement / ownership / layering questions (\\\"where should this live\\\", \\\"which package owns this\\\", \\\"is this the right layer\\\"). Explains subsystem architecture, runtime flow, onboarding mental models. Use why for motivation.\"\ndisable-model-invocation: true\n---\n\n# How\n\nExplore the codebase to answer \"how does X work?\" questions.\n\nIf the scope is ambiguous, state your interpretation and explore. The user can redirect.\n\n## 1. Explain\n\nSpawn one read-only general-purpose subagent that explores and explains in one pass: `Task` with `subagent_type: generalPurpose` and `readonly: true` in Cursor, `Agent` in Claude Code (`subagent_type: general-purpose`), `task` in OpenCode (`subagent_type: general`), `spawn_agent` in Codex. If your harness has no subagent tool, as in Pi without an extension, do the exploring and writing yourself. Give it the user's question and this brief:\n\n> You are writing an architectural explanation for a senior engineer. Explore the codebase and write an explanation that a senior engineer unfamiliar with this area could read and walk away with a solid mental model. They should understand the architecture well enough to start working in it confidently. You have read-only access to the codebase.\n\n## 2. Present\n\nPresent the subagent's output. Light edits for clarity or context from the conversation are fine. Do not substantially rewrite it.\n",
+      "card": {
+        "title_zh": "代码架构讲解",
+        "purpose_zh": "回答“X 是如何工作的”类问题，探索代码库并产出面向资深工程师的架构说明，帮助建立子系统架构、运行时流程与上手心智模型。",
+        "does": [
+          "探索代码库以回答“X 是如何工作的”问题",
+          "范围不明确时先说明自己的理解再探索",
+          "派发一个只读的通用子代理，一次完成探索与讲解",
+          "要求子代理写出资深工程师可读懂、能据此上手工作的架构说明",
+          "呈现子代理输出，仅做清晰度或上下文相关的轻微编辑",
+          "不实质性重写子代理的输出"
+        ],
+        "inputs": [
+          "用户关于“X 是如何工作的”的问题",
+          "用户对代码位置、归属、分层等问题的疑问"
+        ],
+        "outputs": [
+          "面向资深工程师的架构讲解文本",
+          "子系统架构、运行时流程与上手心智模型说明"
+        ],
+        "scenarios": [
+          "询问某功能或子系统如何运作",
+          "修改代码前先做代码走读",
+          "判断某段代码应放在哪里、由哪个包负责、是否属于正确分层",
+          "新成员了解某区域的架构与心智模型"
+        ],
+        "prerequisites": [
+          "可访问的代码库",
+          "宿主环境提供子代理工具（如 Cursor 的 Task、Claude Code 的 Agent、OpenCode 的 task、Codex 的 spawn_agent）；无子代理工具时由自身完成探索与写作"
+        ],
+        "limits": [
+          "子代理仅有只读权限，不修改代码",
+          "不实质性重写子代理输出",
+          "动机类问题应改用 why 技能，而非本技能",
+          "范围模糊时按自身理解探索，可能需用户纠正"
+        ],
+        "hosts": [
+          "claude-code",
+          "codex",
+          "cursor",
+          "通用"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "文档",
+          "代码审查",
+          "学习辅导"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Explore the codebase to answer \"how does X work?\" questions."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Explains subsystem architecture, runtime flow, onboarding mental models."
+          },
+          {
+            "field": "does",
+            "quote": "Spawn one read-only general-purpose subagent that explores and explains in one pass"
+          },
+          {
+            "field": "does",
+            "quote": "If the scope is ambiguous, state your interpretation and explore. The user can redirect."
+          },
+          {
+            "field": "does",
+            "quote": "Present the subagent's output. Light edits for clarity or context from the conversation are fine. Do not substantially rewrite it."
+          },
+          {
+            "field": "does",
+            "quote": "You are writing an architectural explanation for a senior engineer."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "If your harness has no subagent tool, as in Pi without an extension, do the exploring and writing yourself."
+          },
+          {
+            "field": "limits",
+            "quote": "You have read-only access to the codebase."
+          },
+          {
+            "field": "limits",
+            "quote": "Use why for motivation."
+          },
+          {
+            "field": "hosts",
+            "quote": "`Agent` in Claude Code"
+          },
+          {
+            "field": "hosts",
+            "quote": "`spawn_agent` in Codex"
+          },
+          {
+            "field": "hosts",
+            "quote": "`Task` with `subagent_type: generalPurpose` and `readonly: true` in Cursor"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "skills/in-your-own-words/SKILL.md",
+      "blob_sha": "4b2a476a9017863032c8dba9d12f0a2026943292",
+      "source_url": "https://github.com/backnotprop/pstack/blob/c81f1bf680803f9e3f0cade6adb62593f43fb61f/skills/in-your-own-words/SKILL.md",
+      "fetched_at": "2026-11-26T00:18:14.427Z",
+      "generated_at": "2026-11-26T00:18:14.427Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "in-your-own-words",
+        "description": "Restate in your own words what you think the user's goals are and what problem they're trying to solve. Use for /in-your-own-words."
+      },
+      "excerpt": "---\nname: in-your-own-words\ndescription: \"Restate in your own words what you think the user's goals are and what problem they're trying to solve. Use for /in-your-own-words.\"\ndisable-model-invocation: true\n---\n\nRestate in your own words what you think the user's goals are and what problem they're trying to solve.\n",
+      "card": {
+        "title_zh": "复述用户目标",
+        "purpose_zh": "用自己的话复述用户的目标，以及用户想解决的问题。",
+        "does": [
+          "用自己的话复述用户想达成的目标",
+          "用自己的话复述用户试图解决的问题"
+        ],
+        "inputs": [],
+        "outputs": [],
+        "scenarios": [
+          "用户想确认自己的目标是否被正确理解"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "原文未说明具体输出格式或长度要求",
+          "原文未说明适用平台或调用方式细节"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Restate in your own words what you think the user's goals are and what problem they're trying to solve."
+          },
+          {
+            "field": "does",
+            "quote": "Restate in your own words what you think the user's goals are and what problem they're trying to solve."
+          },
+          {
+            "field": "title_zh",
+            "quote": "name: in-your-own-words"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    }
+  ]
+}
