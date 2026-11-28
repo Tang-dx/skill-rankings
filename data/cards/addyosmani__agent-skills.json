@@ -1,14 +1,154 @@
 {
   "schema": 1,
   "repo": "addyosmani/agent-skills",
-  "tree_sha": "f6cf69d25c76d19be91cf3609c227a6b826eea5d",
-  "truncated_paths": 13,
+  "tree_sha": "e3efe619ae879ab25d9ccb5eabb1089620fcb315",
+  "truncated_paths": 14,
   "skills": [
+    {
+      "skill_path": "skills/accessibility-engineering/SKILL.md",
+      "blob_sha": "6ac467875c614a3354a4df1afa432ab02d4bc705",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/accessibility-engineering/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "accessibility-engineering",
+        "description": "Audits existing interfaces for WCAG 2.2 AA conformance and remediates the violations found. Use when auditing a page or component for accessibility, running axe-core or pa11y, triaging a11y violations, or checking screen reader and contrast issues before shipping."
+      },
+      "excerpt": "---\nname: accessibility-engineering\ndescription: Audits existing interfaces for WCAG 2.2 AA conformance and remediates the violations found. Use when auditing a page or component for accessibility, running axe-core or pa11y, triaging a11y violations, or checking screen reader and contrast issues before shipping.\n---\n\n# Accessibility Engineering\n\n## Overview\n\nAccessibility is not a polish step — it's a legal requirement in many jurisdictions, an engineering quality standard, and a prerequisite for shipping. This skill audits existing interfaces, triages the findings, and remediates verified violations. The goal is WCAG 2.2 AA compliance supported by automated tools and manual testing.\n\n## When to Use\n\n- Before shipping a user-facing change that needs an accessibility audit\n- When a11y issues are reported (e.g., \"screen reader can't read this\", \"keyboard navigation broken\")\n- When auditing an existing interface for compliance\n- When triaging axe-core or pa11y findings\n- When remediating verified accessibility violations\n\n**Do NOT use** for building new UI components from scratch; use `frontend-ui-engineering` for construction guidance. Do not use for backend-only changes, CLIs, or library code with no UI output.\n\n## Workflow\n\n### Phase 1: Route New UI Work\n\nFor component construction, interaction patterns, and focus-management guidance, use `../frontend-ui-engineering/SKILL.md`. Do not restate that skill here. Return to this workflow once an interface exists and needs auditing or remediation.\n\n### Phase 2: Run Automated Audit\n\nExecute accessibility checks in this order:\n\n```bash\n# axe-core rules through pinned @axe-core/cli (the axe-core package ships no CLI)\nnpx --yes @axe-core/cli@4.13.0 http://localhost:3000 --exit\n\n# Keep the JSON for the accessibility-auditor\nnpx --yes @axe-core/cli@4.13.0 http://localhost:3000 --dir ./a11y-reports --save axe.json\n\n# Pinned pa11y for HTML validation (WCAG2AA rules via HTML_CodeSniffer)\nnpx --yes pa11y@9.1.1 http://localhost:3000\n```\n\nFor a combined report, resolve [scripts/audit-a11y.sh](scripts/audit-a11y.sh) relative to this skill's directory, then run `bash \"<absolute-skill-directory>/scripts/audit-a11y.sh\" url <url> --json`. Replace `<absolute-skill-directory>` with the absolute path to the directory containing this loaded `SKILL.md`; a plugin or per-skill install may place it outside the project being audited. It runs both pinned tools, records their status and versions, and fails rather than reporting a clean result when either tool does not produce a valid report.\n\nReview the violations grouped by severity:\n- **Critical** — Blocks screen reader access entirely (missing alt text on info images, empty buttons)\n- **Serious** — Makes content difficult or impossible to access (low contrast, missing labels)\n- **Moderate** — Causes confusion or extra effort (heading level skips, redundant ARIA)\n- **Minor** — Cosmetic or progressive enhancement (missing lang attribute on inner elements)\n\nFor each violation, verify it's a real issue (not a false positive) by inspecting the element in the browser.\n\n### Phase 3: Manual Testing\n\nAutomated checks are a smoke test, not proof of conformance. Complete the audit manually.\n\n**Keyboard audit:**\n1. Tab through every interactive element — can you see where you are?\n2. Activate buttons and links with Enter/Space\n3. Close modals with Escape\n4. Navigate lists with Arrow keys\n5. Verify no keyboard traps exist\n\n**Screen reader audit (VoiceOver on macOS, NVDA on Windows):**\n1. Navigate by heading (VoiceOver: Ctrl+Option+Cmd+H) — is the structure logical?\n2. Navigate by landmark (open the rotor with Ctrl+Option+U, choose Landmarks) — are regions labeled?\n3. Navigate by link (open the rotor with Ctrl+Option+U, choose Links) — do link descriptions make sense out of context?\n4. Interact with a form — are labels announced? Are error messages read?\n5. Navigate a dynamic update — are changes announced?\n\n**Visual audit:**\n1. Verify color contrast (4.5:1 text, 3:1 large text, 3:1 UI components)\n2. Zoom to 200% — does layout break or overlap?\n3. Test with forced colors / high contrast mode (Windows High Contrast)\n4. Reduce motion (prefers-reduced-motion) — are animations disabled?\n5. Test focus visibility — is the focus ring visible against all backgrounds?\n\n### Phase 4: Fix Violations\n\nFor each finding, apply the remediation in order:\n\n1. **Fix the root cause** — Replace a `<div>` with `<button>`, add `<label>`, set `alt` text\n2. **Add ARIA as bridge** — If native HTML can't express the pattern, add ARIA attributes\n3. **Test the fix** — Re-run the automated check and manual verification\n\nApply the accessibility checklist (`references/shared/accessibility-checklist.md`) as a minimal baseline.\n\n## Common Rationalizations\n\n| Rationalization | Reality |\n|---|---|\n| \"We'll fix a11y later\" | Delayed remediation compounds across components and can create legal liability. Audit before shipping. |\n| \"Automated tools caught everything\" | Automated checks cannot prove keyboard or screen reader behavior. Manual testing is mandatory. |\n| \"Screen reader users are a tiny minority\" | Accessibility is a requirement, not a usage-share calculation. Keyboard navigation, captions, and clear structure also help users across contexts. |\n| \"This is an internal tool, it doesn't need a11y\" | Internal tools are subject to the same regulations. Disabled employees and contractors need access. |\n| \"I'll just use aria-label everywhere\" | ARIA is a bridge, not a foundation. Semantic HTML first. Overusing ARIA creates maintenance burden and can make things worse. |\n| \"The design system handles accessibility\" | Design systems provide accessible primitives. How you compose them determines whether the result is accessible. |\n| \"The audit passed axe-core, so we're done\" | Pass axe-core as a smoke test, then test with screen readers and keyboard. A green lighthouse score is not a clean bill of health. |\n\n## Red Flags\n\n- Elements that look clickable but aren't keyboard-focusable\n- Color as the sole indicator of state (red for error, green for success)\n- Focus outline removed without a visible replacement\n- Missing labels on form inputs\n- No heading hierarchy or skipped heading levels\n- Empty or unlabeled buttons and links\n- Modals that don't trap focus or restore focus on close\n- No `alt` text on meaningful images (or `alt=\"\"` missing on decorative ones)\n- Touch targets that fail SC 2.5.8's 24x24 CSS px size-or-spacing requirement and do not qualify for an exception (AA; 44x44 is the AAA target, SC 2.5.5)\n- Autoplaying video or audio without controls\n- Low contrast text (especially on hover, disabled states, placeholders)\n\n## See Also\n\n- `references/shared/accessibility-checklist.md` — Quick reference for WCAG 2.2 AA\n- `../frontend-ui-engineering/SKILL.md` — Building accessible components from the start\n- `../../agents/accessibility-auditor.md` — Dedicated a11y audit persona for deep reviews\n\n## Verification\n\nAfter completing the accessibility workflow:\n\n- [ ] Automated audit passes with no Critical or Serious violations\n- [ ] All interactive elements are keyboard accessible (Tab, Enter, Escape, Arrow keys)\n- [ ] Screen reader navigation by heading, landmark, and link verified with a named browser + AT pair (or recorded as `manual` and untested — never reported as verified)\n- [ ] Focus order matches visual order\n- [ ] Color contrast passes 4.5:1 text / 3:1 large text / 3:1 UI components\n- [ ] All form inputs have associated labels\n- [ ] All images have appropriate `alt` text\n- [ ] Dynamic content changes are announced (aria-live)\n- [ ] Page is usable at 200% zoom with no content loss\n- [ ] Touch targets satisfy SC 2.5.8's 24x24 CSS px size-or-spacing requirement or a normative exception (AA); 44x44 is the enhanced AAA target (SC 2.5.5)\n",
+      "card": {
+        "title_zh": "无障碍工程审计",
+        "purpose_zh": "审计现有界面是否符合 WCAG 2.2 AA，并对已确认的违规进行修复；适用于发布前无障碍审计、axe-core/pa11y 结果分诊、屏幕阅读器与对比度检查。",
+        "does": [
+          "按固定顺序运行 axe-core CLI 与 pa11y 自动化审计并保存 JSON 报告",
+          "按严重程度（Critical/Serious/Moderate/Minor）分组审查违规并核实误报",
+          "执行键盘、屏幕阅读器（VoiceOver/NVDA）与视觉（对比度、缩放、高对比度、减少动效）手动测试",
+          "按先修根因、再用 ARIA 桥接、最后复测的顺序修复违规",
+          "应用 WCAG 2.2 AA 检查清单作为最低基线",
+          "按验证清单确认审计与修复结果"
+        ],
+        "inputs": [
+          "待审计页面的 URL（如 http://localhost:3000）",
+          "现有界面或组件代码",
+          "axe-core/pa11y 生成的 JSON 报告",
+          "浏览器与辅助技术（VoiceOver 或 NVDA）手动测试环境"
+        ],
+        "outputs": [
+          "a11y-reports 目录下的 axe.json 等审计报告",
+          "按严重程度分组的违规清单与误报核实结论",
+          "修复后的界面代码与复测结果",
+          "手动测试记录（含标记为 manual 未测试的项）"
+        ],
+        "scenarios": [
+          "发布面向用户变更前的无障碍审计",
+          "收到无障碍问题报告（屏幕阅读器无法读取、键盘导航失效）",
+          "审计现有界面的合规性",
+          "分诊 axe-core 或 pa11y 的检查结果",
+          "修复已确认的无障碍违规"
+        ],
+        "prerequisites": [
+          "界面已存在，可被访问或运行",
+          "可执行 npx 命令并访问被审计 URL",
+          "具备浏览器与屏幕阅读器（VoiceOver 或 NVDA）用于手动测试"
+        ],
+        "limits": [
+          "不用于从零构建新 UI 组件，应改用 frontend-ui-engineering",
+          "不适用于纯后端变更、CLI 或无 UI 输出的库代码",
+          "自动化检查只是冒烟测试，不能证明键盘或屏幕阅读器行为",
+          "未实际测试的屏幕阅读器项须记为 manual，不得报告为已验证"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files",
+          "installs_packages"
+        ],
+        "tags": [
+          "测试",
+          "前端",
+          "代码审查",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Audits existing interfaces for WCAG 2.2 AA conformance and remediates the violations found."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "This skill audits existing interfaces, triages the findings, and remediates verified violations."
+          },
+          {
+            "field": "does",
+            "quote": "npx --yes @axe-core/cli@4.13.0 http://localhost:3000 --dir ./a11y-reports --save axe.json"
+          },
+          {
+            "field": "does",
+            "quote": "npx --yes pa11y@9.1.1 http://localhost:3000"
+          },
+          {
+            "field": "does",
+            "quote": "Review the violations grouped by severity:"
+          },
+          {
+            "field": "does",
+            "quote": "Automated checks are a smoke test, not proof of conformance. Complete the audit manually."
+          },
+          {
+            "field": "does",
+            "quote": "**Fix the root cause** — Replace a `<div>` with `<button>`, add `<label>`, set `alt` text"
+          },
+          {
+            "field": "does",
+            "quote": "Apply the accessibility checklist (`references/shared/accessibility-checklist.md`) as a minimal baseline."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Return to this workflow once an interface exists and needs auditing or remediation."
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Screen reader audit (VoiceOver on macOS, NVDA on Windows):"
+          },
+          {
+            "field": "limits",
+            "quote": "**Do NOT use** for building new UI components from scratch; use `frontend-ui-engineering` for construction guidance."
+          },
+          {
+            "field": "limits",
+            "quote": "Do not use for backend-only changes, CLIs, or library code with no UI output."
+          },
+          {
+            "field": "limits",
+            "quote": "(or recorded as `manual` and untested — never reported as verified)"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "npx --yes @axe-core/cli@4.13.0 http://localhost:3000 --exit"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "--dir ./a11y-reports --save axe.json"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "then run `bash \"<absolute-skill-directory>/scripts/audit-a11y.sh\" url <url> --json`"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
     {
       "skill_path": "skills/api-and-interface-design/SKILL.md",
       "blob_sha": "ce58d72ed0ee6568400f36564c94becfaeede717",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/api-and-interface-design/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/api-and-interface-design/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
       "generated_at": "2026-11-13T10:31:07.365Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -130,8 +270,8 @@
     {
       "skill_path": "skills/browser-testing-with-devtools/SKILL.md",
       "blob_sha": "ca0044e859e5637c33250dbba1fc1a24540b7ad3",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/browser-testing-with-devtools/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/browser-testing-with-devtools/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
       "generated_at": "2026-11-13T10:31:07.365Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -256,10 +396,10 @@
     },
     {
       "skill_path": "skills/ci-cd-and-automation/SKILL.md",
-      "blob_sha": "531bb8f085950cf0823296610b7d6350a918b0c6",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/ci-cd-and-automation/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
-      "generated_at": "2026-11-13T10:31:07.365Z",
+      "blob_sha": "eab42601b1d0d780cdf3b998e11c48773b75a436",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/ci-cd-and-automation/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
       "model": "deepseek-flash",
       "status": "ok",
       "last_error": null,
@@ -268,51 +408,49 @@
         "name": "ci-cd-and-automation",
         "description": "Automates CI/CD pipeline setup. Use when setting up or modifying build and deployment pipelines. Use when you need to automate quality gates, configure test runners in CI, or establish deployment strategies."
       },
-      "excerpt": "---\nname: ci-cd-and-automation\ndescription: Automates CI/CD pipeline setup. Use when setting up or modifying build and deployment pipelines. Use when you need to automate quality gates, configure test runners in CI, or establish deployment strategies.\n---\n\n# CI/CD and Automation\n\n## Overview\n\nAutomate quality gates so that no change reaches production without passing tests, lint, type checking, and build. CI/CD is the enforcement mechanism for every other skill — it catches what humans and agents miss, and it does so consistently on every single change.\n\n**Shift Left:** Catch problems as early in the pipeline as possible. A bug caught in linting costs minutes; the same bug caught in production costs hours. Move checks upstream — static analysis before tests, tests before staging, staging before production.\n\n**Faster is Safer:** Smaller batches and more frequent releases reduce risk, not increase it. A deployment with 3 changes is easier to debug than one with 30. Frequent releases build confidence in the release process itself.\n\n## When to Use\n\n- Setting up a new project's CI pipeline\n- Adding or modifying automated checks\n- Configuring deployment pipelines\n- When a change should trigger automated verification\n- Debugging CI failures\n\n## The Quality Gate Pipeline\n\nEvery change goes through these gates before merge:\n\n```\nPull Request Opened\n    │\n    ▼\n┌─────────────────┐\n│   LINT CHECK     │  eslint, prettier\n│   ↓ pass         │\n│   TYPE CHECK     │  tsc --noEmit\n│   ↓ pass         │\n│   UNIT TESTS     │  jest/vitest\n│   ↓ pass         │\n│   BUILD          │  npm run build\n│   ↓ pass         │\n│   INTEGRATION    │  API/DB tests\n│   ↓ pass         │\n│   E2E (optional) │  Playwright/Cypress\n│   ↓ pass         │\n│   SECURITY AUDIT │  npm audit\n│   ↓ pass         │\n│   BUNDLE SIZE    │  bundlesize check\n└─────────────────┘\n    │\n    ▼\n  Ready for review\n```\n\n**No gate can be skipped.** If lint fails, fix lint — don't disable the rule. If a test fails, fix the code — don't skip the test.\n\n## GitHub Actions Configuration\n\n### Basic CI Pipeline\n\n```yaml\n# .github/workflows/ci.yml\nname: CI\n\non:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [main]\n\njobs:\n  quality:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n\n      - uses: actions/setup-node@v4\n        with:\n          node-version: '22'\n          cache: 'npm'\n\n      - name: Install dependencies\n        run: npm ci\n\n      - name: Lint\n        run: npm run lint\n\n      - name: Type check\n        run: npx tsc --noEmit\n\n      - name: Test\n        run: npm test -- --coverage\n\n      - name: Build\n        run: npm run build\n\n      - name: Security audit\n        run: npm audit --audit-level=high\n```\n\n### With Database Integration Tests\n\n```yaml\n  integration:\n    runs-on: ubuntu-latest\n    services:\n      postgres:\n        image: postgres:16\n        env:\n          POSTGRES_DB: testdb\n          POSTGRES_USER: ci_user\n          POSTGRES_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}\n        ports:\n          - 5432:5432\n        options: >-\n          --health-cmd pg_isready\n          --health-interval 10s\n          --health-timeout 5s\n          --health-retries 5\n\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: '22'\n          cache: 'npm'\n      - run: npm ci\n      - name: Run migrations\n        run: npx prisma migrate deploy\n        env:\n          DATABASE_URL: postgresql://ci_user:${{ secrets.CI_DB_PASSWORD }}@localhost:5432/testdb\n      - name: Integration tests\n        run: npm run test:integration\n        env:\n          DATABASE_URL: postgresql://ci_user:${{ secrets.CI_DB_PASSWORD }}@localhost:5432/testdb\n```\n\n> **Note:** Even for CI-only test databases, use GitHub Secrets for credentials rather than hardcoding values. This builds good habits and prevents accidental reuse of test credentials in other contexts.\n\n### E2E Tests\n\n```yaml\n  e2e:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: '22'\n          cache: 'npm'\n      - run: npm ci\n      - name: Install Playwright\n        run: npx playwright install --with-deps chromium\n      - name: Build\n        run: npm run build\n      - name: Run E2E tests\n        run: npx playwright test\n      - uses: actions/upload-artifact@v4\n        if: failure()\n        with:\n          name: playwright-report\n          path: playwright-report/\n```\n\n## Feeding CI Failures Back to Agents\n\nThe power of CI with AI agents is the feedback loop. When CI fails:\n\n```\nCI fails\n    │\n    ▼\nCopy the failure output\n    │\n    ▼\nFeed it to the agent:\n\"The CI pipeline failed with this error:\n[paste specific error]\nFix the issue and verify locally before pushing again.\"\n    │\n    ▼\nAgent fixes → pushes → CI runs again\n```\n\n**Key patterns:**\n\n```\nLint failure → Agent runs `npm run lint -- --fix` and commits\nType error  → Agent reads the error location and fixes the type\nTest failure → Agent follows debugging-and-error-recovery skill\nBuild error → Agent checks config and dependencies\n```\n\n## Deployment Strategies\n\n### Preview Deployments\n\nEvery PR gets a preview deployment for manual testing:\n\n```yaml\n# Deploy preview on PR (Vercel/Netlify/etc.)\ndeploy-preview:\n  runs-on: ubuntu-latest\n  if: github.event_name == 'pull_request'\n  steps:\n    - uses: actions/checkout@v4\n    - name: Deploy preview\n      run: npx vercel --token=${{ secrets.VERCEL_TOKEN }}\n```\n\n### Feature Flags\n\nFeature flags decouple deployment from release. Deploy incomplete or risky features behind flags so you can:\n\n- **Ship code without enabling it.** Merge to main early, enable when ready.\n- **Roll back without redeploying.** Disable the flag instead of reverting code.\n- **Canary new features.** Enable for 1% of users, then 10%, then 100%.\n- **Run A/B tests.** Compare behavior with and without the feature.\n\n```typescript\n// Simple feature flag pattern\nif (featureFlags.isEnabled('new-checkout-flow', { userId })) {\n  return renderNewCheckout();\n}\nreturn renderLegacyCheckout();\n```\n\n**Flag lifecycle:** Create → Enable for testing → Canary → Full rollout → Remove the flag and dead code. Flags that live forever become technical debt — set a cleanup date when you create them.\n\n### Staged Rollouts\n\n```\nPR merged to main\n    │\n    ▼\n  Staging deployment (auto)\n    │ Manual verification\n    ▼\n  Production deployment (manual trigger or auto after staging)\n    │\n    ▼\n  Monitor for errors (15-minute window)\n    │\n    ├── Errors detected → Rollback\n    └── Clean → Done\n```\n\n### Rollback Plan\n\nEvery deployment should be reversible:\n\n```yaml\n# Manual rollback workflow\nname: Rollback\non:\n  workflow_dispatch:\n    inputs:\n      version:\n        description: 'Version to rollback to'\n        required: true\n\njobs:\n  rollback:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Rollback deployment\n        env:\n          VERSION: ${{ inputs.version }}\n        run: |\n          # Deploy the specified previous version. Pass the input through env,\n          # never interpolate it into the script (shell injection).\n          npx vercel rollback \"$VERSION\"\n```\n\n## Environment Management\n\n```\n.env.example       → Committed (template for developers)\n.env                → NOT committed (local development)\n.env.test           → Committed (test environment, no real secrets)\nCI secrets          → Stored in GitHub Secrets / vault\nProduction secrets  → Stored in deployment platform / vault\n```\n\nCI should never have production secrets. Use separate secrets for CI testing.\n\n## Automation Beyond CI\n\n### Dependabot / Renovate\n\n```yaml\n# .github/dependabot.yml\nversion: 2\nupdates:\n  - package-ecosystem: npm\n    directory: /\n    schedule:\n      interval: weekly\n    open-pull-requests-limit: 5\n```\n\n### Build Cop Role\n\nDesignate someone responsible for keeping CI green. When the build breaks, the Build Cop's job is to fix or revert — not the person whose change caused the break. Thi",
+      "excerpt": "---\nname: ci-cd-and-automation\ndescription: Automates CI/CD pipeline setup. Use when setting up or modifying build and deployment pipelines. Use when you need to automate quality gates, configure test runners in CI, or establish deployment strategies.\n---\n\n# CI/CD and Automation\n\n## Overview\n\nAutomate quality gates so that no change reaches production without passing tests, lint, type checking, and build. CI/CD is the enforcement mechanism for every other skill — it catches what humans and agents miss, and it does so consistently on every single change.\n\n**Shift Left:** Catch problems as early in the pipeline as possible. A bug caught in linting costs minutes; the same bug caught in production costs hours. Move checks upstream — static analysis before tests, tests before staging, staging before production.\n\n**Faster is Safer:** Smaller batches and more frequent releases reduce risk, not increase it. A deployment with 3 changes is easier to debug than one with 30. Frequent releases build confidence in the release process itself.\n\n## When to Use\n\n- Setting up a new project's CI pipeline\n- Adding or modifying automated checks\n- Configuring deployment pipelines\n- When a change should trigger automated verification\n- Debugging CI failures\n\n## The Quality Gate Pipeline\n\nEvery change goes through these gates before merge:\n\n```\nPull Request Opened\n    │\n    ▼\n┌─────────────────┐\n│   LINT CHECK     │  eslint, prettier\n│   ↓ pass         │\n│   TYPE CHECK     │  tsc --noEmit\n│   ↓ pass         │\n│   UNIT TESTS     │  jest/vitest\n│   ↓ pass         │\n│   BUILD          │  npm run build\n│   ↓ pass         │\n│   INTEGRATION    │  API/DB tests\n│   ↓ pass         │\n│   E2E (optional) │  Playwright/Cypress\n│   ↓ pass         │\n│   SECURITY AUDIT │  npm audit\n│   ↓ pass         │\n│   BUNDLE SIZE    │  bundlesize check\n└─────────────────┘\n    │\n    ▼\n  Ready for review\n```\n\n**No gate can be skipped.** If lint fails, fix lint — don't disable the rule. If a test fails, fix the code — don't skip the test.\n\n## GitHub Actions Configuration\n\n### Basic CI Pipeline\n\n```yaml\n# .github/workflows/ci.yml\nname: CI\n\non:\n  pull_request:\n    branches: [main]\n  push:\n    branches: [main]\n\njobs:\n  quality:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n\n      - uses: actions/setup-node@v6\n        with:\n          node-version: '22'\n          cache: 'npm'\n\n      - name: Install dependencies\n        run: npm ci\n\n      - name: Lint\n        run: npm run lint\n\n      - name: Type check\n        run: npx tsc --noEmit\n\n      - name: Test\n        run: npm test -- --coverage\n\n      - name: Build\n        run: npm run build\n\n      - name: Security audit\n        run: npm audit --audit-level=high\n```\n\n### With Database Integration Tests\n\n```yaml\n  integration:\n    runs-on: ubuntu-latest\n    services:\n      postgres:\n        image: postgres:16\n        env:\n          POSTGRES_DB: testdb\n          POSTGRES_USER: ci_user\n          POSTGRES_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}\n        ports:\n          - 5432:5432\n        options: >-\n          --health-cmd pg_isready\n          --health-interval 10s\n          --health-timeout 5s\n          --health-retries 5\n\n    steps:\n      - uses: actions/checkout@v6\n      - uses: actions/setup-node@v6\n        with:\n          node-version: '22'\n          cache: 'npm'\n      - run: npm ci\n      - name: Run migrations\n        run: npx prisma migrate deploy\n        env:\n          DATABASE_URL: postgresql://ci_user:${{ secrets.CI_DB_PASSWORD }}@localhost:5432/testdb\n      - name: Integration tests\n        run: npm run test:integration\n        env:\n          DATABASE_URL: postgresql://ci_user:${{ secrets.CI_DB_PASSWORD }}@localhost:5432/testdb\n```\n\n> **Note:** Even for CI-only test databases, use GitHub Secrets for credentials rather than hardcoding values. This builds good habits and prevents accidental reuse of test credentials in other contexts.\n\n### E2E Tests\n\n```yaml\n  e2e:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v6\n      - uses: actions/setup-node@v6\n        with:\n          node-version: '22'\n          cache: 'npm'\n      - run: npm ci\n      - name: Install Playwright\n        run: npx playwright install --with-deps chromium\n      - name: Build\n        run: npm run build\n      - name: Run E2E tests\n        run: npx playwright test\n      - uses: actions/upload-artifact@v6\n        if: failure()\n        with:\n          name: playwright-report\n          path: playwright-report/\n```\n\n## Feeding CI Failures Back to Agents\n\nThe power of CI with AI agents is the feedback loop. When CI fails:\n\n```\nCI fails\n    │\n    ▼\nCopy the failure output\n    │\n    ▼\nFeed it to the agent:\n\"The CI pipeline failed with this error:\n[paste specific error]\nFix the issue and verify locally before pushing again.\"\n    │\n    ▼\nAgent fixes → pushes → CI runs again\n```\n\n**Key patterns:**\n\n```\nLint failure → Agent runs `npm run lint -- --fix` and commits\nType error  → Agent reads the error location and fixes the type\nTest failure → Agent follows debugging-and-error-recovery skill\nBuild error → Agent checks config and dependencies\n```\n\n## Deployment Strategies\n\n### Preview Deployments\n\nEvery PR gets a preview deployment for manual testing:\n\n```yaml\n# Deploy preview on PR (Vercel/Netlify/etc.)\ndeploy-preview:\n  runs-on: ubuntu-latest\n  if: github.event_name == 'pull_request'\n  steps:\n    - uses: actions/checkout@v6\n    - name: Deploy preview\n      run: npx vercel --token=${{ secrets.VERCEL_TOKEN }}\n```\n\n### Feature Flags\n\nFeature flags decouple deployment from release. Deploy incomplete or risky features behind flags so you can:\n\n- **Ship code without enabling it.** Merge to main early, enable when ready.\n- **Roll back without redeploying.** Disable the flag instead of reverting code.\n- **Canary new features.** Enable for 1% of users, then 10%, then 100%.\n- **Run A/B tests.** Compare behavior with and without the feature.\n\n```typescript\n// Simple feature flag pattern\nif (featureFlags.isEnabled('new-checkout-flow', { userId })) {\n  return renderNewCheckout();\n}\nreturn renderLegacyCheckout();\n```\n\n**Flag lifecycle:** Create → Enable for testing → Canary → Full rollout → Remove the flag and dead code. Flags that live forever become technical debt — set a cleanup date when you create them.\n\n### Staged Rollouts\n\n```\nPR merged to main\n    │\n    ▼\n  Staging deployment (auto)\n    │ Manual verification\n    ▼\n  Production deployment (manual trigger or auto after staging)\n    │\n    ▼\n  Monitor for errors (15-minute window)\n    │\n    ├── Errors detected → Rollback\n    └── Clean → Done\n```\n\n### Rollback Plan\n\nEvery deployment should be reversible:\n\n```yaml\n# Manual rollback workflow\nname: Rollback\non:\n  workflow_dispatch:\n    inputs:\n      version:\n        description: 'Version to rollback to'\n        required: true\n\njobs:\n  rollback:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Rollback deployment\n        env:\n          VERSION: ${{ inputs.version }}\n          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}\n        run: |\n          # Deploy the specified previous version. Pass the input through env,\n          # never interpolate it into the script (shell injection). The runner\n          # has no Vercel login, so the CLI needs the token explicitly.\n          npx vercel rollback \"$VERSION\" --token \"$VERCEL_TOKEN\" --yes\n```\n\n## Environment Management\n\n```\n.env.example       → Committed (template for developers)\n.env                → NOT committed (local development)\n.env.test           → Committed (test environment, no real secrets)\nCI secrets          → Stored in GitHub Secrets / vault\nProduction secrets  → Stored in deployment platform / vault\n```\n\nCI should never have production secrets. Use separate secrets for CI testing.\n\n## Automation Beyond CI\n\n### Dependabot / Renovate\n\n```yaml\n# .github/dependabot.yml\nversion: 2\nupdates:\n  - package-ecosystem: npm\n    directory: /\n    schedule:\n      interval: weekly\n    open-pull-requests-limit: 5\n```\n\n### Build Cop Role\n\nD",
       "card": {
-        "title_zh": "CI/CD与自动化",
-        "purpose_zh": "用于搭建或修改构建与部署流水线，通过自动化质量门禁确保变更在通过 lint、类型检查、测试、构建、安全审计等检查后才进入生产。",
+        "title_zh": "CI/CD 与自动化",
+        "purpose_zh": "用于搭建或修改构建与部署流水线，通过自动化质量门禁确保每次变更都通过 lint、类型检查、测试与构建后才进入生产。",
         "does": [
-          "提供 GitHub Actions 基础 CI 流水线配置示例（lint、类型检查、测试、构建、安全审计）",
-          "给出带 PostgreSQL 服务的数据库集成测试与 E2E 测试配置示例",
-          "说明将 CI 失败输出反馈给 AI 代理修复的循环模式",
-          "介绍预览部署、功能开关、分阶段发布与回滚工作流",
-          "说明环境与密钥管理约定，CI 不应持有生产密钥",
-          "提供 CI 优化策略：缓存依赖、并行任务、路径过滤、矩阵构建等"
+          "搭建 GitHub Actions CI 流水线，串联 lint、类型检查、单元测试、构建、集成测试、E2E、安全审计与包体积检查",
+          "配置带 PostgreSQL 服务的数据库集成测试与迁移步骤",
+          "配置 Playwright E2E 测试并在失败时上传报告产物",
+          "把 CI 失败输出反馈给 AI 代理，形成修复再推送的闭环",
+          "设计预览部署、功能开关、分阶段发布与回滚流程",
+          "管理环境变量与密钥分层，并配置 Dependabot 依赖更新"
         ],
         "inputs": [
-          "项目现有 CI 配置与构建脚本",
-          "CI 失败的具体错误输出",
-          "部署平台令牌与数据库凭据等密钥",
-          "回滚时指定的目标版本号"
+          "项目代码仓库与现有构建/测试脚本",
+          "CI 平台配置文件（如 .github/workflows/ci.yml）",
+          "数据库连接与 CI 专用密钥（GitHub Secrets）",
+          "CI 失败时的具体错误输出"
         ],
         "outputs": [
-          "GitHub Actions 工作流 YAML 配置",
+          "CI 工作流 YAML 配置",
           "质量门禁流水线设计",
           "部署与回滚策略方案",
-          "CI 优化建议"
+          "功能开关使用模式与生命周期建议"
         ],
         "scenarios": [
           "为新项目搭建 CI 流水线",
-          "添加或修改自动化检查",
-          "配置部署流水线",
-          "调试 CI 失败",
-          "为变更建立自动化验证"
+          "增加或修改自动化检查",
+          "配置部署流水线与预览环境",
+          "变更触发自动验证",
+          "排查 CI 失败"
         ],
         "prerequisites": [
           "使用 GitHub Actions 作为 CI 平台",
-          "项目使用 npm 与 Node.js 工具链（示例为 Node 22）",
-          "部署示例依赖 Vercel 等平台及对应令牌",
-          "密钥存放于 GitHub Secrets 或密钥管理服务"
+          "项目具备 npm 脚本（lint、test、build）",
+          "CI 凭据存放于 GitHub Secrets，CI 不持有生产密钥"
         ],
         "limits": [
-          "示例以 GitHub Actions、npm、Node.js、Vercel 为主，其他平台未展开",
-          "未说明该技能在具体 AI 宿主中的调用方式",
-          "E2E 测试标注为可选",
-          "流水线目标为 10 分钟内完成测试套件"
+          "示例以 Node.js/npm 与 GitHub Actions 为主，其他技术栈未展开",
+          "功能开关仅给出简单模式，未涉及具体开关服务实现",
+          "回滚示例依赖 Vercel CLI 与令牌"
         ],
         "hosts": [
-          "未说明"
+          "通用"
         ],
         "risk_flags": [
           "shell",
@@ -325,7 +463,7 @@
           "运维部署",
           "自动化",
           "测试",
-          "安全"
+          "代码审查"
         ],
         "evidence": [
           {
@@ -338,15 +476,23 @@
           },
           {
             "field": "does",
-            "quote": "- name: Lint\n        run: npm run lint\n\n      - name: Type check\n        run: npx tsc --noEmit\n\n      - name: Test\n        run: npm test -- --coverage"
+            "quote": "│   LINT CHECK     │  eslint, prettier"
           },
           {
             "field": "does",
-            "quote": "- name: Run migrations\n        run: npx prisma migrate deploy"
+            "quote": "- name: Security audit\n        run: npm audit --audit-level=high"
           },
           {
             "field": "does",
-            "quote": "Feed it to the agent:\n\"The CI pipeline failed with this error:"
+            "quote": "- name: Install Playwright\n        run: npx playwright install --with-deps chromium"
+          },
+          {
+            "field": "does",
+            "quote": "- uses: actions/upload-artifact@v6\n        if: failure()"
+          },
+          {
+            "field": "does",
+            "quote": "Feed it to the agent:"
           },
           {
             "field": "does",
@@ -354,69 +500,177 @@
           },
           {
             "field": "does",
+            "quote": "npx vercel rollback \"$VERSION\" --token \"$VERCEL_TOKEN\" --yes"
+          },
+          {
+            "field": "does",
+            "quote": "# .github/dependabot.yml"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "CI secrets          → Stored in GitHub Secrets / vault"
+          },
+          {
+            "field": "prerequisites",
             "quote": "CI should never have production secrets. Use separate secrets for CI testing."
           },
           {
-            "field": "inputs",
-            "quote": "description: 'Version to rollback to'"
-          },
-          {
-            "field": "inputs",
-            "quote": "POSTGRES_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}"
-          },
-          {
-            "field": "outputs",
-            "quote": "# .github/workflows/ci.yml\nname: CI"
-          },
-          {
-            "field": "scenarios",
-            "quote": "- Setting up a new project's CI pipeline\n- Adding or modifying automated checks\n- Configuring deployment pipelines"
-          },
-          {
             "field": "prerequisites",
-            "quote": "- uses: actions/setup-node@v4\n        with:\n          node-version: '22'\n          cache: 'npm'"
-          },
-          {
-            "field": "prerequisites",
-            "quote": "run: npx vercel --token=${{ secrets.VERCEL_TOKEN }}"
+            "quote": "- name: Install dependencies\n        run: npm ci"
           },
           {
             "field": "limits",
-            "quote": "E2E (optional)"
+            "quote": "Even for CI-only test databases, use GitHub Secrets for credentials rather than hardcoding values."
+          },
+          {
+            "field": "limits",
+            "quote": "The runner\n          # has no Vercel login, so the CLI needs the token explicitly."
           },
           {
             "field": "risk_flags",
-            "quote": "run: npx playwright install --with-deps chromium"
+            "quote": "POSTGRES_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}"
           },
           {
             "field": "risk_flags",
-            "quote": "npx vercel rollback \"$VERSION\""
+            "quote": "run: npx vercel --token=${{ secrets.VERCEL_TOKEN }}"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "# never interpolate it into the script (shell injection)."
           }
         ]
-      }
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": "skills/code-review-and-quality/SKILL.md",
-      "blob_sha": "15ea44c93c61dcec705720342c1fd78755702f85",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/code-review-and-quality/SKILL.md",
-      "fetched_at": "2026-11-14T00:18:33.358Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "blob_sha": "1c5ab78da82fc6965c0b57b295560327b19c6098",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/code-review-and-quality/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "code-review-and-quality",
-        "description": "Conducts multi-axis code review. Use before merging any change. Use when reviewing code written by yourself, another agent, or a human. Use when you need to assess code quality across multiple dimensions before it enters the main branch. Use when asked to review a diff or a pull request, even when the diff is pasted inline."
+        "description": "Conducts multi-axis code review. Use before merging any change. Use when reviewing code written by yourself, another agent, or a human. Use when you need to assess code quality across multiple dimensions before it enters the main branch. Use when asked to review a diff or a pull request, even when the diff is pasted inline and the review looks quick to do from reading it."
       },
-      "excerpt": "---\nname: code-review-and-quality\ndescription: Conducts multi-axis code review. Use before merging any change. Use when reviewing code written by yourself, another agent, or a human. Use when you need to assess code quality across multiple dimensions before it enters the main branch. Use when asked to review a diff or a pull request, even when the diff is pasted inline.\n---\n\n# Code Review and Quality\n\n## Overview\n\nMulti-dimensional code review with quality gates. Every change gets reviewed before merge — no exceptions. Review covers five axes: correctness, readability, architecture, security, and performance.\n\n**The approval standard:** Approve a change when it definitely improves overall code health, even if it isn't perfect. Perfect code doesn't exist — the goal is continuous improvement. Don't block a change because it isn't exactly how you would have written it. If it improves the codebase and follows the project's conventions, approve it.\n\n## When to Use\n\n- Before merging any PR or change\n- After completing a feature implementation\n- When another agent or model produced code you need to evaluate\n- When refactoring existing code\n- After any bug fix (review both the fix and the regression test)\n\n## The Five-Axis Review\n\nEvery review evaluates code across these dimensions:\n\n### 1. Correctness\n\nDoes the code do what it claims to do?\n\n- Does it match the spec or task requirements?\n- Are edge cases handled (null, empty, boundary values)?\n- Are error paths handled (not just the happy path)?\n- Does it pass all tests? Are the tests actually testing the right things?\n- Are there off-by-one errors, race conditions, or state inconsistencies?\n\n### 2. Readability & Simplicity\n\nCan another engineer (or agent) understand this code without the author explaining it?\n\n- Are names descriptive and consistent with project conventions? (No `temp`, `data`, `result` without context)\n- Is the control flow straightforward (avoid nested ternaries, deep callbacks)?\n- Is the code organized logically (related code grouped, clear module boundaries)?\n- Are there any \"clever\" tricks that should be simplified?\n- **Could this be done in fewer lines?** (1000 lines where 100 suffice is a failure)\n- **Are abstractions earning their complexity?** (Don't generalize until the third use case)\n- Would comments help clarify non-obvious intent? (But don't comment obvious code.)\n- Are there dead code artifacts: no-op variables (`_unused`), backwards-compat shims, or `// removed` comments?\n- **Is a new conditional bolted onto an unrelated flow?** That's a design smell, not a nit — push the logic into its own helper, state, or policy instead of tangling an existing path.\n- **Do repeated conditionals on the same shape appear?** They signal a missing model or dispatcher. A \"temporary\" branch is usually permanent debt.\n\n### 3. Architecture\n\nDoes the change fit the system's design?\n\n- Does it follow existing patterns or introduce a new one? If new, is it justified?\n- Does it maintain clean module boundaries?\n- Is there code duplication that should be shared?\n- Are dependencies flowing in the right direction (no circular dependencies)?\n- Is the abstraction level appropriate (not over-engineered, not too coupled)?\n- **Does this refactor reduce complexity or just relocate it?** Count the concepts a reader must hold to follow the change. If a \"cleaner\" version leaves that count unchanged, it isn't cleaner — prefer the restructuring that makes whole branches, modes, or layers disappear over one that re-centralizes the same logic. Prefer deleting an abstraction to polishing it.\n- **Is feature-specific logic leaking into a shared or general-purpose module?** Keep logic in its owning layer, reuse the existing canonical helper instead of a near-duplicate, and don't normalize architectural drift.\n- **Are type boundaries explicit?** Question gratuitous `any`/`unknown`/optional/casts and silent fallbacks that paper over an unclear invariant — making the boundary explicit often makes the surrounding control flow simpler.\n\n### 4. Security\n\nFor detailed security guidance, see `security-and-hardening`. Does the change introduce vulnerabilities?\n\n- Is user input validated and sanitized?\n- Are secrets kept out of code, logs, and version control?\n- Is authentication/authorization checked where needed?\n- Are SQL queries parameterized (no string concatenation)?\n- Are outputs encoded to prevent XSS?\n- Are dependencies from trusted sources with no known vulnerabilities?\n- Is data from external sources (APIs, logs, user content, config files) treated as untrusted?\n- Are external data flows validated at system boundaries before use in logic or rendering?\n\n### 5. Performance\n\nFor detailed profiling and optimization, see `performance-optimization`. Does the change introduce performance problems?\n\n- Any N+1 query patterns?\n- Any unbounded loops or unconstrained data fetching?\n- Any synchronous operations that should be async?\n- Any unnecessary re-renders in UI components?\n- Any missing pagination on list endpoints?\n- Any large objects created in hot paths?\n\n## Structural Remedies\n\nWhen you flag a structural problem, propose the move — not just the problem. A review that only says \"this is complex\" leaves the author guessing. Reach for a named restructuring:\n\n- **Replace a chain of conditionals** with a typed model or an explicit dispatcher.\n- **Collapse duplicate branches** into a single clearer flow.\n- **Separate orchestration from business logic** so each reads on its own.\n- **Move feature-specific logic** out of a shared module into the package that owns the concept.\n- **Reuse the canonical helper** instead of a bespoke near-duplicate.\n- **Make a type boundary explicit** so downstream branching disappears.\n- **Delete a pass-through wrapper** that adds indirection without clarifying the API.\n- **Extract a helper, or split a large file** into focused modules.\n\nPrefer the remedy that removes moving pieces over one that spreads the same complexity around.\n\n## Change Sizing\n\nSmall, focused changes are easier to review, faster to merge, and safer to deploy. Target these sizes:\n\n```\n~100 lines changed   → Good. Reviewable in one sitting.\n~300 lines changed   → Acceptable if it's a single logical change.\n~1000 lines changed  → Too large. Split it.\n```\n\n**Watch file size, not just diff size.** A small diff can still push a file past a healthy boundary — around 1000 *total* lines in a single file (distinct from the ~1000 *changed*-lines threshold above) is a common inspection signal, not a hard cap. When a change materially grows an already-large file, ask whether to extract helpers, subcomponents, or modules *first*, before piling more on. Decompose, then add.\n\n**What counts as \"one change\":** A single self-contained modification that addresses one thing, includes related tests, and keeps the system functional after submission. One part of a feature — not the whole feature.\n\n**Splitting strategies when a change is too large:**\n\n| Strategy | How | When |\n|----------|-----|------|\n| **Stack** | Submit a small change, start the next one based on it | Sequential dependencies |\n| **By file group** | Separate changes for groups needing different reviewers | Cross-cutting concerns |\n| **Horizontal** | Create shared code/stubs first, then consumers | Layered architecture |\n| **Vertical** | Break into smaller full-stack slices of the feature | Feature work |\n\n**When large changes are acceptable:** Complete file deletions and automated refactoring where the reviewer only needs to verify intent, not every line.\n\n**Separate refactoring from feature work.** A change that refactors existing code and adds new behavior is two changes — submit them separately. Small cleanups (variable renaming) can be included at reviewer discretion.\n\n## Change Descriptions\n\nEvery change needs a description that stands alone in version control history.\n\n**First line:** Short, imperative, standalone. \"Delete the FizzBuzz RPC\" not \"Deleting the FizzBuzz RPC.\" Must",
-      "card": null
+      "excerpt": "---\nname: code-review-and-quality\ndescription: Conducts multi-axis code review. Use before merging any change. Use when reviewing code written by yourself, another agent, or a human. Use when you need to assess code quality across multiple dimensions before it enters the main branch. Use when asked to review a diff or a pull request, even when the diff is pasted inline and the review looks quick to do from reading it.\n---\n\n# Code Review and Quality\n\n## Overview\n\nMulti-dimensional code review with quality gates. Every change gets reviewed before merge — no exceptions. Review covers five axes: correctness, readability, architecture, security, and performance.\n\n**The approval standard:** Approve a change when it definitely improves overall code health, even if it isn't perfect. Perfect code doesn't exist — the goal is continuous improvement. Don't block a change because it isn't exactly how you would have written it. If it improves the codebase and follows the project's conventions, approve it.\n\n## When to Use\n\n- Before merging any PR or change\n- After completing a feature implementation\n- When another agent or model produced code you need to evaluate\n- When refactoring existing code\n- After any bug fix (review both the fix and the regression test)\n\n## The Five-Axis Review\n\nEvery review evaluates code across these dimensions:\n\n### 1. Correctness\n\nDoes the code do what it claims to do?\n\n- Does it match the spec or task requirements?\n- Are edge cases handled (null, empty, boundary values)?\n- Are error paths handled (not just the happy path)?\n- Does it pass all tests? Are the tests actually testing the right things?\n- Are there off-by-one errors, race conditions, or state inconsistencies?\n\n### 2. Readability & Simplicity\n\nCan another engineer (or agent) understand this code without the author explaining it?\n\n- Are names descriptive and consistent with project conventions? (No `temp`, `data`, `result` without context)\n- Is the control flow straightforward (avoid nested ternaries, deep callbacks)?\n- Is the code organized logically (related code grouped, clear module boundaries)?\n- Are there any \"clever\" tricks that should be simplified?\n- **Could this be done in fewer lines?** (1000 lines where 100 suffice is a failure)\n- **Are abstractions earning their complexity?** (Don't generalize until the third use case)\n- Would comments help clarify non-obvious intent? (But don't comment obvious code.)\n- Are there dead code artifacts: no-op variables (`_unused`), backwards-compat shims, or `// removed` comments?\n- **Is a new conditional bolted onto an unrelated flow?** That's a design smell, not a nit — push the logic into its own helper, state, or policy instead of tangling an existing path.\n- **Do repeated conditionals on the same shape appear?** They signal a missing model or dispatcher. A \"temporary\" branch is usually permanent debt.\n\n### 3. Architecture\n\nDoes the change fit the system's design?\n\n- Does it follow existing patterns or introduce a new one? If new, is it justified?\n- Does it maintain clean module boundaries?\n- Is there code duplication that should be shared?\n- Are dependencies flowing in the right direction (no circular dependencies)?\n- Is the abstraction level appropriate (not over-engineered, not too coupled)?\n- **Does this refactor reduce complexity or just relocate it?** Count the concepts a reader must hold to follow the change. If a \"cleaner\" version leaves that count unchanged, it isn't cleaner — prefer the restructuring that makes whole branches, modes, or layers disappear over one that re-centralizes the same logic. Prefer deleting an abstraction to polishing it.\n- **Is feature-specific logic leaking into a shared or general-purpose module?** Keep logic in its owning layer, reuse the existing canonical helper instead of a near-duplicate, and don't normalize architectural drift.\n- **Are type boundaries explicit?** Question gratuitous `any`/`unknown`/optional/casts and silent fallbacks that paper over an unclear invariant — making the boundary explicit often makes the surrounding control flow simpler.\n\n### 4. Security\n\nFor detailed security guidance, see `security-and-hardening`. Does the change introduce vulnerabilities?\n\n- Is user input validated and sanitized?\n- Are secrets kept out of code, logs, and version control?\n- Is authentication/authorization checked where needed?\n- Are SQL queries parameterized (no string concatenation)?\n- Are outputs encoded to prevent XSS?\n- Are dependencies from trusted sources with no known vulnerabilities?\n- Is data from external sources (APIs, logs, user content, config files) treated as untrusted?\n- Are external data flows validated at system boundaries before use in logic or rendering?\n\n### 5. Performance\n\nFor detailed profiling and optimization, see `performance-optimization`. Does the change introduce performance problems?\n\n- Any N+1 query patterns?\n- Any unbounded loops or unconstrained data fetching?\n- Any synchronous operations that should be async?\n- Any unnecessary re-renders in UI components?\n- Any missing pagination on list endpoints?\n- Any large objects created in hot paths?\n\n## Structural Remedies\n\nWhen you flag a structural problem, propose the move — not just the problem. A review that only says \"this is complex\" leaves the author guessing. Reach for a named restructuring:\n\n- **Replace a chain of conditionals** with a typed model or an explicit dispatcher.\n- **Collapse duplicate branches** into a single clearer flow.\n- **Separate orchestration from business logic** so each reads on its own.\n- **Move feature-specific logic** out of a shared module into the package that owns the concept.\n- **Reuse the canonical helper** instead of a bespoke near-duplicate.\n- **Make a type boundary explicit** so downstream branching disappears.\n- **Delete a pass-through wrapper** that adds indirection without clarifying the API.\n- **Extract a helper, or split a large file** into focused modules.\n\nPrefer the remedy that removes moving pieces over one that spreads the same complexity around.\n\n## Change Sizing\n\nSmall, focused changes are easier to review, faster to merge, and safer to deploy. Target these sizes:\n\n```\n~100 lines changed   → Good. Reviewable in one sitting.\n~300 lines changed   → Acceptable if it's a single logical change.\n~1000 lines changed  → Too large. Split it.\n```\n\n**Watch file size, not just diff size.** A small diff can still push a file past a healthy boundary — around 1000 *total* lines in a single file (distinct from the ~1000 *changed*-lines threshold above) is a common inspection signal, not a hard cap. When a change materially grows an already-large file, ask whether to extract helpers, subcomponents, or modules *first*, before piling more on. Decompose, then add.\n\n**What counts as \"one change\":** A single self-contained modification that addresses one thing, includes related tests, and keeps the system functional after submission. One part of a feature — not the whole feature.\n\n**Splitting strategies when a change is too large:**\n\n| Strategy | How | When |\n|----------|-----|------|\n| **Stack** | Submit a small change, start the next one based on it | Sequential dependencies |\n| **By file group** | Separate changes for groups needing different reviewers | Cross-cutting concerns |\n| **Horizontal** | Create shared code/stubs first, then consumers | Layered architecture |\n| **Vertical** | Break into smaller full-stack slices of the feature | Feature work |\n\n**When large changes are acceptable:** Complete file deletions and automated refactoring where the reviewer only needs to verify intent, not every line.\n\n**Separate refactoring from feature work.** A change that refactors existing code and adds new behavior is two changes — submit them separately. Small cleanups (variable renaming) can be included at reviewer discretion.\n\n## Change Descriptions\n\nEvery change needs a description that stands alone in version control history.\n\n**First line:** Short, imperative, standalone. \"Delete the Fi",
+      "card": {
+        "title_zh": "多轴代码审查",
+        "purpose_zh": "在合并任何变更前，从正确性、可读性、架构、安全、性能五个维度进行代码审查，并给出质量门禁与结构性改进建议。",
+        "does": [
+          "按正确性、可读性、架构、安全、性能五个维度审查代码变更",
+          "依据“整体代码健康确有改善即批准”的标准给出通过判断",
+          "对结构性问题提出具名重构方案而非仅指出问题",
+          "评估变更规模并给出拆分策略（堆叠、按文件组、横向、纵向）",
+          "要求变更附带可独立成立的描述，并区分重构与功能开发"
+        ],
+        "inputs": [
+          "待审查的 diff 或 pull request",
+          "变更说明与相关任务需求",
+          "项目既有约定与代码模式"
+        ],
+        "outputs": [
+          "五维度审查意见",
+          "是否批准的结论",
+          "结构性改进与拆分建议"
+        ],
+        "scenarios": [
+          "合并 PR 或变更之前",
+          "完成功能实现之后",
+          "评估其他 agent 或模型产出的代码",
+          "重构既有代码时",
+          "修复 bug 后审查修复与回归测试"
+        ],
+        "prerequisites": [],
+        "limits": [
+          "约 1000 行变更视为过大需拆分",
+          "单文件约 1000 总行数仅作检查信号而非硬性上限",
+          "完整文件删除与自动化重构可接受较大规模",
+          "小范围清理（如变量重命名）是否并入由审查者裁量"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [],
+        "tags": [
+          "代码审查",
+          "测试",
+          "安全",
+          "文档"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "Multi-dimensional code review with quality gates."
+          },
+          {
+            "field": "purpose_zh",
+            "quote": "Review covers five axes: correctness, readability, architecture, security, and performance."
+          },
+          {
+            "field": "does",
+            "quote": "Every review evaluates code across these dimensions:"
+          },
+          {
+            "field": "does",
+            "quote": "Approve a change when it definitely improves overall code health, even if it isn't perfect."
+          },
+          {
+            "field": "does",
+            "quote": "When you flag a structural problem, propose the move — not just the problem."
+          },
+          {
+            "field": "does",
+            "quote": "Small, focused changes are easier to review, faster to merge, and safer to deploy."
+          },
+          {
+            "field": "does",
+            "quote": "Separate refactoring from feature work."
+          },
+          {
+            "field": "does",
+            "quote": "Every change needs a description that stands alone in version control history."
+          },
+          {
+            "field": "limits",
+            "quote": "~1000 lines changed  → Too large. Split it."
+          },
+          {
+            "field": "limits",
+            "quote": "around 1000 *total* lines in a single file (distinct from the ~1000 *changed*-lines threshold above) is a common inspection signal, not a hard cap."
+          },
+          {
+            "field": "limits",
+            "quote": "Complete file deletions and automated refactoring where the reviewer only needs to verify intent, not every line."
+          },
+          {
+            "field": "limits",
+            "quote": "Small cleanups (variable renaming) can be included at reviewer discretion."
+          },
+          {
+            "field": "scenarios",
+            "quote": "Before merging any PR or change"
+          },
+          {
+            "field": "scenarios",
+            "quote": "When another agent or model produced code you need to evaluate"
+          },
+          {
+            "field": "scenarios",
+            "quote": "After any bug fix (review both the fix and the regression test)"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": "skills/code-simplification/SKILL.md",
       "blob_sha": "c4f794aa3fc63ea041989b30be7a3887c79c53ed",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/code-simplification/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/code-simplification/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
       "generated_at": "2026-11-13T10:31:07.365Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -549,10 +803,10 @@
     },
     {
       "skill_path": "skills/constraint-driven-development/SKILL.md",
-      "blob_sha": "d41ab055104f249d505fb6ea706e20b15f439a9f",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/constraint-driven-development/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
-      "generated_at": "2026-11-13T10:31:07.365Z",
+      "blob_sha": "20cef20c0938923fe784c77c625f9f9256d665fe",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/constraint-driven-development/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
       "model": "deepseek-flash",
       "status": "ok",
       "last_error": null,
@@ -564,65 +818,57 @@
       "excerpt": "---\nname: constraint-driven-development\ndescription: Establishes a project's quality bar as a written contract and stops agents quietly lowering it. Interviews the user on which dimensions matter, supplies sane default thresholds when they have no number in mind, records everything in CONSTRAINTS.md, and watches the diff for a weakened bar — new @ts-ignore or eslint-disable suppressions, skipped or deleted tests, assertions stripped out, unimplemented stubs, thresholds edited down. Use when no quality bar is written down, when the user says \"set up constraints\" or \"define our standards\", when the user wants dimensions they care about — accessibility, web performance, coverage — set up as enforced constraints, when an agent keeps silencing checks or skipping tests to get to green, when you need a coverage or performance threshold and don't know what number to pick, or when an agent writes more code than anyone will read.\n---\n\n# Constraint-Driven Development\n\n## Overview\n\nOther skills in this pack describe what good looks like. `code-review-and-quality` gives you five axes. `test-driven-development` gives you a cycle. `security-and-hardening` gives you a threat list. All of that lives in prose the agent reads and may or may not follow, and none of it survives the end of the session.\n\nThis skill produces something different: a written record of **this project's** bar, with numbers, that outlives the conversation and can be checked mechanically.\n\nThe reason matters. When you wrote the code, reading it told you whether it was any good. An agent writes more in an afternoon than you will read that week, so the judgement moves out of your head and into checks that run around the loop. Those checks need to exist, they need numbers you actually chose, and they need to fire close enough to the work that the agent fixes its own output.\n\nSpec-driven development says what to build. Test-driven development proves it works. Constraint-driven development defines what \"good enough to ship\" means, before anyone argues about it in a pull request.\n\n## When to Use\n\nApply this skill when:\n\n- Starting a project or a significant feature and no quality bar is written down\n- The user asks to \"set up constraints\", \"add quality gates\", \"define our standards\", or \"stop the agent shipping junk\"\n- An agent is producing volume nobody is reading line by line\n- CI has checks but nobody can say which ones block a merge and which ones are decoration\n- Coverage, performance, or accessibility numbers get argued about per-PR instead of decided once\n- You're about to run `/build auto` or any autonomous loop, and the only thing standing between it and main is a test suite the agent also wrote\n\n**When NOT to use:**\n\n- The project already has a `CONSTRAINTS.md` and the user isn't changing it — read it and follow it instead\n- One-off scripts, spikes, throwaway prototypes\n- The user wants a code review right now (`code-review-and-quality`) or a CI pipeline built (`ci-cd-and-automation`)\n- Pre-product-market-fit code with a two-week expected lifetime — the floor below is still worth it, the rest isn't\n\n## Loading Constraints\n\nThe interview needs a live user. **Don't run it in non-interactive contexts** (CI, `/loop`, autonomous runs). If constraints are missing and you're in one of those, apply the Floor below, note that you did, and flag the rest for a human.\n\n## The Process\n\n### Step 1: Detect before you ask\n\nNever ask what you can read. Before the first question, gather:\n\n| What | Where to look |\n|------|---------------|\n| Language and stack | `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml` |\n| Test runner | dev dependencies, `test` script, existing test files |\n| Existing linters | `eslint.config.*`, `biome.json`, `.ruff.toml` |\n| Coverage today | `coverage/` output, or run the suite once |\n| CI | `.github/workflows/`, `.gitlab-ci.yml` |\n| Agent harness | `.claude/`, `.codex/`, `AGENTS.md` |\n\nReport what you found in two lines, then ask only what's left.\n\n### Step 2: Four questions, each with a default\n\nFollow the one-question-at-a-time discipline from `interview-me`, with one change: every question here has a default, so \"I don't know\" is a complete answer that still produces a working config.\n\n```\nQ1: Beyond the floor, which of these do you want enforced?\n    (a) Test coverage on new code\n    (b) Security scanning\n    (c) Performance budgets\n    (d) Accessibility\n    (e) Architecture boundaries\nGUESS: (a) and (b) — you have a test runner already and you're handling user input.\nDEFAULT if unsure: (a) and (b).\nSay what each pick costs: (c) and (d) need a running URL, (e) needs a rules file written.\n```\n\n```\nQ2: When a check fails while the agent is mid-task, should it block or warn?\nGUESS: Block. You're running agents unattended and a warning nobody reads is a warning.\nDEFAULT if unsure: Block on the floor, warn on everything else for the first two weeks.\n```\n\n```\nQ3: Do you have target numbers in mind, or should I measure where you are today and hold that line?\nGUESS: Measure. Most teams don't have a number, and an invented one gets ignored.\nDEFAULT if unsure: Measure and hold. See \"Ratchets\" below.\n```\n\n```\nQ4: What's the slowest check you'll tolerate before the agent hands work back?\nGUESS: About 90 seconds. Longer and you'll stop running it.\nDEFAULT if unsure: 90 seconds at task end, unlimited in CI.\n```\n\nStop at four. A twelve-question intake produces a config nobody understands and a user who regrets starting.\n\n### Step 3: Write CONSTRAINTS.md\n\nOne file at the repo root. Any agent on any harness can read it, and a change to it shows up in review where it belongs.\n\n```markdown\n# Constraints\n\nLast reviewed: 2026-08-08 by @addy\n\n## Floor (always enforced, no setup required)\n\n- No new suppression comments: `@ts-ignore`, `eslint-disable`, `# noqa`, `# type: ignore`\n- No unimplemented stubs: `throw new Error(\"Not implemented\")`, empty `catch {}`\n- No skipped or deleted tests without a reason in the commit message\n- No secrets in source\n- This file does not get weakened to make a change pass\n\n## Enforced with numbers\n\n| Dimension | Rule | Checked by | Runs at |\n|-----------|------|-----------|---------|\n| Types | Zero type errors | `tsc --noEmit` | every edit |\n| Lint | Zero errors from our config | `biome check` | every edit |\n| Secrets | No secrets in source | `gitleaks dir . --redact` | every edit |\n| Coverage | Changed lines ≥ 80% covered | `vitest run --coverage` + git diff | task end, CI |\n| Security: code | Nothing at high or above | `npm run check:security` | CI |\n| Security: deps | Nothing at high or above | `osv-scanner scan source -r .` | CI |\n| Accessibility | Zero critical or serious | `npm run check:a11y` | preview deploy |\n| Performance | LCP ≤ 2500ms, CLS ≤ 0.1 | `lighthouse $PREVIEW_URL --output=json` | preview deploy |\n\nEvery row names the command that produces the verdict. A dimension with a\nnumber and no command in this column is an aspiration, not a constraint.\n\n## Measured, not yet enforced\n\n| Metric | Today | Direction |\n|--------|-------|-----------|\n| Project coverage | 62.4% | must not fall |\n| Bundle size (main) | 184 kB | must not grow |\n\n## Exceptions\n\n| ID | Rule | Path | Reason | Owner | Expires |\n|----|------|------|--------|-------|---------|\n| W1 | `no-explicit-any` | `src/legacy/**` | Rewrite tracked in ENG-441 | @addy | 2026-11-01 |\n```\n\nThen add one line to `AGENTS.md` and `CLAUDE.md`: `Read CONSTRAINTS.md before writing code. Do not weaken it to make a change pass.`\n\n### Step 4: Install what each dimension needs\n\nPicking a dimension means installing something. Don't leave the user with a number and no mechanism, and don't invent your own checker when a de facto one exists — these tools are listed because their rule formats and thresholds are what everything else in the ecosystem targets, so the team's existing config keeps working.\n\n| Dimension | Tool | Install | Run | Gate on |\n|-----------|------|---------|-----|---------|\n| Types (TS) | tsc | ",
       "card": {
         "title_zh": "约束驱动开发",
-        "purpose_zh": "把项目质量门槛写成带数字的书面契约 CONSTRAINTS.md，访谈用户确定维度与阈值，并检查 diff 中是否出现被悄悄放宽的门槛。",
+        "purpose_zh": "把项目质量底线写成带数字的书面契约 CONSTRAINTS.md，防止智能体悄悄降低标准，并让检查可机械执行。",
         "does": [
-          "先读取项目栈、测试运行器、linter、覆盖率与 CI 配置，再只问剩余问题",
-          "用四个带默认值的问题确定强制维度、阻断或警告、目标数字与检查耗时上限",
-          "在仓库根目录写出 CONSTRAINTS.md，含底线、带数字规则表、实测指标与例外表",
-          "为每个维度给出对应工具与安装、运行命令，并写入项目 scripts",
-          "检查 diff 中新增的抑制注释、跳过的测试、被删断言、未实现桩与下调的阈值",
-          "在 AGENTS.md 和 CLAUDE.md 加一行要求先读 CONSTRAINTS.md 且不得为通过而削弱它"
+          "先读取项目技术栈、测试运行器、现有 linter、覆盖率、CI 与智能体配置，再只问剩余问题",
+          "用四个带默认值的问题访谈用户：强制维度、失败时阻断或警告、目标数字、可容忍的最慢检查耗时",
+          "在仓库根目录写出 CONSTRAINTS.md，含底线规则、带数字的强制维度表、已测量未强制指标与例外表",
+          "在 AGENTS.md 和 CLAUDE.md 各加一行，要求写代码前读 CONSTRAINTS.md 且不得为通过改动而削弱它",
+          "为每个选定维度安装对应工具并指定运行时机与判定门槛",
+          "监视 diff 中出现的削弱迹象：新增抑制注释、跳过或删除测试、剥离断言、未实现桩、下调阈值"
         ],
         "inputs": [
-          "项目现有配置文件（package.json、pyproject.toml、go.mod、Cargo.toml）",
-          "测试运行器与现有测试文件",
-          "现有 linter 配置与覆盖率输出",
-          "CI 配置与 agent harness 目录",
-          "用户对四个问题的回答（可回答不知道以采用默认值）"
+          "用户对四个问题的回答（可回答不知道，使用默认值）",
+          "项目现有配置文件与目录：package.json、pyproject.toml、go.mod、Cargo.toml、linter 配置、CI 配置、覆盖率输出、AGENTS.md 等",
+          "用户对强制维度、阻断策略、目标数字、检查耗时上限的选择"
         ],
         "outputs": [
-          "仓库根目录的 CONSTRAINTS.md",
-          "AGENTS.md 与 CLAUDE.md 中的一行约束说明",
-          "项目 scripts 中的 check:fast、check:task、check:security、check:a11y、check:full 命令",
-          "各维度工具安装与运行命令清单"
+          "仓库根目录的 CONSTRAINTS.md 文件",
+          "AGENTS.md 与 CLAUDE.md 中各一行约束提示",
+          "各维度对应的检查工具与运行配置"
         ],
         "scenarios": [
-          "新项目或重要功能尚无书面质量门槛",
-          "用户要求设置约束、添加质量门或定义标准",
-          "agent 产出量无人逐行阅读",
-          "覆盖率、性能或无障碍数字在每个 PR 里反复争论",
-          "即将运行自主循环，而唯一防线是 agent 自己写的测试"
+          "新项目或重要功能尚无书面质量标准",
+          "用户要求设置约束、添加质量门禁、定义标准或阻止智能体交付劣质代码",
+          "智能体产出量无人逐行阅读",
+          "覆盖率、性能或无障碍数字在每次 PR 中被争论而非一次决定",
+          "即将运行自主循环，而唯一防线是智能体自己写的测试套件"
         ],
         "prerequisites": [
-          "需要可交互的实时用户；不要在 CI、/loop 或自主运行等非交互环境执行访谈",
-          "项目需有可读取的配置、测试与 CI 信息",
-          "性能与无障碍检查需要可访问的运行 URL",
-          "需安装所选维度对应的工具"
+          "需要真实用户参与访谈，不可在 CI、循环或自主运行等非交互环境执行",
+          "若在非交互环境且缺少约束，则套用底线规则并标注，其余留给人工",
+          "项目已有 CONSTRAINTS.md 且用户不改动时，应直接阅读遵循而非重写"
         ],
         "limits": [
-          "访谈只问四个问题，不做十二题式问卷",
-          "项目已有 CONSTRAINTS.md 且用户不改时不应使用本技能",
-          "不适用于一次性脚本、探索性原型或两周寿命的代码",
-          "无 URL 的 CLI、库或桌面应用应放弃性能与无障碍维度",
-          "Stryker 全仓库运行耗时数小时，应只针对改动文件",
-          "Semgrep 与 axe 可能对发现项返回退出码 0，需质量门脚本强制阈值",
-          "gitleaks 必须加 --redact，否则密钥会进入 agent 记录"
+          "访谈只问四个问题，避免过多问题导致配置无人理解",
+          "不适用于一次性脚本、探索性试验和临时原型",
+          "不替代即时代码审查或 CI 流水线搭建",
+          "产品市场契合前的短命代码只值得套用底线部分",
+          "有数字但无对应命令的维度只是愿望而非约束"
         ],
         "hosts": [
           "通用"
         ],
         "risk_flags": [
-          "shell",
-          "network",
           "writes_files",
           "installs_packages"
         ],
         "tags": [
           "测试",
           "代码审查",
-          "安全",
-          "运维部署",
-          "文档"
+          "文档",
+          "自动化",
+          "产品规划"
         ],
         "evidence": [
           {
@@ -631,7 +877,7 @@
           },
           {
             "field": "purpose_zh",
-            "quote": "records everything in CONSTRAINTS.md, and watches the diff for a weakened bar"
+            "quote": "This skill produces something different: a written record of **this project's** bar, with numbers, that outlives the conversation and can be checked mechanically."
           },
           {
             "field": "does",
@@ -639,44 +885,73 @@
           },
           {
             "field": "does",
-            "quote": "Four questions, each with a default"
+            "quote": "Follow the one-question-at-a-time discipline from `interview-me`, with one change: every question here has a default, so \"I don't know\" is a complete answer that still produces a working config."
           },
           {
             "field": "does",
-            "quote": "One file at the repo root. Any agent on any harness can read it"
+            "quote": "One file at the repo root. Any agent on any harness can read it, and a change to it shows up in review where it belongs."
           },
           {
             "field": "does",
+            "quote": "Then add one line to `AGENTS.md` and `CLAUDE.md`: `Read CONSTRAINTS.md before writing code. Do not weaken it to make a change pass.`"
+          },
+          {
+            "field": "does",
+            "quote": "Picking a dimension means installing something. Don't leave the user with a number and no mechanism"
+          },
+          {
+            "field": "does",
+            "quote": "watches the diff for a weakened bar — new @ts-ignore or eslint-disable suppressions, skipped or deleted tests, assertions stripped out, unimplemented stubs, thresholds edited down"
+          },
+          {
+            "field": "inputs",
+            "quote": "Q1: Beyond the floor, which of these do you want enforced?"
+          },
+          {
+            "field": "inputs",
+            "quote": "| Language and stack | `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml` |"
+          },
+          {
+            "field": "outputs",
+            "quote": "One file at the repo root."
+          },
+          {
+            "field": "outputs",
             "quote": "Then add one line to `AGENTS.md` and `CLAUDE.md`"
           },
           {
-            "field": "does",
-            "quote": "Picking a dimension means installing something."
+            "field": "scenarios",
+            "quote": "- Starting a project or a significant feature and no quality bar is written down"
+          },
+          {
+            "field": "scenarios",
+            "quote": "- The user asks to \"set up constraints\", \"add quality gates\", \"define our standards\", or \"stop the agent shipping junk\""
+          },
+          {
+            "field": "scenarios",
+            "quote": "- Coverage, performance, or accessibility numbers get argued about per-PR instead of decided once"
           },
           {
             "field": "prerequisites",
             "quote": "The interview needs a live user. **Don't run it in non-interactive contexts** (CI, `/loop`, autonomous runs)."
           },
           {
-            "field": "limits",
-            "quote": "Stop at four."
+            "field": "prerequisites",
+            "quote": "The project already has a `CONSTRAINTS.md` and the user isn't changing it — read it and follow it instead"
           },
           {
             "field": "limits",
-            "quote": "The project already has a `CONSTRAINTS.md` and the user isn't changing it"
-          },
-          {
-            "field": "limits",
-            "quote": "One-off scripts, spikes, throwaway prototypes"
+            "quote": "Stop at four. A twelve-question intake produces a config nobody understands and a user who regrets starting."
           }
         ]
-      }
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": "skills/context-engineering/SKILL.md",
       "blob_sha": "abdfe2732255de944db13d0312a1634a425c7c5d",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/context-engineering/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/context-engineering/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
       "generated_at": "2026-11-13T10:31:07.365Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -802,57 +1077,57 @@
     },
     {
       "skill_path": "skills/debugging-and-error-recovery/SKILL.md",
-      "blob_sha": "13c1a431626c23270542c7b570d7193ba79c3a96",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/debugging-and-error-recovery/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
-      "generated_at": "2026-11-13T10:31:07.365Z",
+      "blob_sha": "a078674507959e787e0bc031aaf65fa919382375",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/debugging-and-error-recovery/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
       "model": "deepseek-flash",
       "status": "ok",
       "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "debugging-and-error-recovery",
-        "description": "Guides systematic root-cause debugging. Use when tests fail, builds break, something that worked yesterday broke, behavior doesn't match expectations, or you encounter any unexpected error. Use when you need to figure out what broke and why — a systematic approach to finding and fixing the root cause rather than guessing."
+        "description": "Guides systematic root-cause debugging. Use when tests fail, builds break, something that worked yesterday broke, behavior doesn't match expectations, or you encounter any unexpected error. Use when you need to figure out what broke and why — a systematic approach to finding and fixing the root cause rather than guessing. Use when asked what broke, why a test started failing, or why code throws, even when the diff, the function, or the stack trace is pasted inline and the cause looks obvious fro"
       },
-      "excerpt": "---\nname: debugging-and-error-recovery\ndescription: Guides systematic root-cause debugging. Use when tests fail, builds break, something that worked yesterday broke, behavior doesn't match expectations, or you encounter any unexpected error. Use when you need to figure out what broke and why — a systematic approach to finding and fixing the root cause rather than guessing.\n---\n\n# Debugging and Error Recovery\n\n## Overview\n\nSystematic debugging with structured triage. When something breaks, stop adding features, preserve evidence, and follow a structured process to find and fix the root cause. Guessing wastes time. The triage checklist works for test failures, build errors, runtime bugs, and production incidents.\n\n## When to Use\n\n- Tests fail after a code change\n- The build breaks\n- Runtime behavior doesn't match expectations\n- A bug report arrives\n- An error appears in logs or console\n- Something worked before and stopped working\n\n## The Stop-the-Line Rule\n\nWhen anything unexpected happens:\n\n```\n1. STOP adding features or making changes\n2. PRESERVE evidence (error output, logs, repro steps)\n3. DIAGNOSE using the triage checklist\n4. FIX the root cause\n5. GUARD against recurrence\n6. RESUME only after verification passes\n```\n\n**Don't push past a failing test or broken build to work on the next feature.** Errors compound. A bug in Step 3 that goes unfixed makes Steps 4-6 wrong.\n\n## The Triage Checklist\n\nWork through these steps in order. Do not skip steps.\n\n### Step 1: Reproduce\n\nMake the failure happen reliably. If you can't reproduce it, you can't fix it with confidence.\n\n```\nCan you reproduce the failure?\n├── YES → Proceed to Step 2\n└── NO\n    ├── Gather more context (logs, environment details)\n    ├── Try reproducing in a minimal environment\n    └── If truly non-reproducible, document conditions and monitor\n```\n\n**When a bug is non-reproducible:**\n\n```\nCannot reproduce on demand:\n├── Timing-dependent?\n│   ├── Add timestamps to logs around the suspected area\n│   ├── Try with artificial delays (setTimeout, sleep) to widen race windows\n│   └── Run under load or concurrency to increase collision probability\n├── Environment-dependent?\n│   ├── Compare Node/browser versions, OS, environment variables\n│   ├── Check for differences in data (empty vs populated database)\n│   └── Try reproducing in CI where the environment is clean\n├── State-dependent?\n│   ├── Check for leaked state between tests or requests\n│   ├── Look for global variables, singletons, or shared caches\n│   └── Run the failing scenario in isolation vs after other operations\n└── Truly random?\n    ├── Add defensive logging at the suspected location\n    ├── Set up an alert for the specific error signature\n    └── Document the conditions observed and revisit when it recurs\n```\n\nFor test failures (npm shown — substitute the repository's own test command, per the test-driven-development skill's Discover the Stack First section):\n```bash\n# Run the specific failing test\nnpm test -- --grep \"test name\"\n\n# Run with verbose output\nnpm test -- --verbose\n\n# Run in isolation (rules out test pollution)\nnpm test -- specific-file --runInBand\n```\n\n### Step 2: Localize\n\nNarrow down WHERE the failure happens:\n\n```\nWhich layer is failing?\n├── UI/Frontend     → Check console, DOM, network tab\n├── API/Backend     → Check server logs, request/response\n├── Database        → Check queries, schema, data integrity\n├── Build tooling   → Check config, dependencies, environment\n├── External service → Check connectivity, API changes, rate limits\n└── Test itself     → Check if the test is correct (false negative)\n```\n\n**Use bisection for regression bugs:**\n```bash\n# Find which commit introduced the bug\ngit bisect start\ngit bisect bad                    # Current commit is broken\ngit bisect good <known-good-sha> # This commit worked\n# Git will checkout midpoint commits; run your test at each\ngit bisect run npm test -- --grep \"failing test\"  # substitute the repository's focused-test command\n```\n\n### Step 3: Reduce\n\nCreate the minimal failing case:\n\n- Remove unrelated code/config until only the bug remains\n- Simplify the input to the smallest example that triggers the failure\n- Strip the test to the bare minimum that reproduces the issue\n\nA minimal reproduction makes the root cause obvious and prevents fixing symptoms instead of causes.\n\n### Step 4: Fix the Root Cause\n\nFix the underlying issue, not the symptom:\n\n```\nSymptom: \"The user list shows duplicate entries\"\n\nSymptom fix (bad):\n  → Deduplicate in the UI component: [...new Set(users)]\n\nRoot cause fix (good):\n  → The API endpoint has a JOIN that produces duplicates\n  → Fix the query, add a DISTINCT, or fix the data model\n```\n\nAsk: \"Why does this happen?\" until you reach the actual cause, not just where it manifests.\n\n### Step 5: Guard Against Recurrence\n\nWrite a test that catches this specific failure:\n\n```typescript\n// The bug: task titles with special characters broke the search\nit('finds tasks with special characters in title', async () => {\n  await createTask({ title: 'Fix \"quotes\" & <brackets>' });\n  const results = await searchTasks('quotes');\n  expect(results).toHaveLength(1);\n  expect(results[0].title).toBe('Fix \"quotes\" & <brackets>');\n});\n```\n\nThis test will prevent the same bug from recurring. It should fail without the fix and pass with it.\n\n### Step 6: Verify End-to-End\n\nAfter fixing, verify the complete scenario with the repository's own commands (npm shown):\n\n```bash\n# Run the specific test\nnpm test -- --grep \"specific test\"\n\n# Run the full test suite (check for regressions)\nnpm test\n\n# Build the project (check for type/compilation errors)\nnpm run build\n\n# Manual spot check if applicable\nnpm run dev  # Verify in browser\n```\n\n## Error-Specific Patterns\n\n### Test Failure Triage\n\n```\nTest fails after code change:\n├── Did you change code the test covers?\n│   └── YES → Check if the test or the code is wrong\n│       ├── Test is outdated → Update the test\n│       └── Code has a bug → Fix the code\n├── Did you change unrelated code?\n│   └── YES → Likely a side effect → Check shared state, imports, globals\n└── Test was already flaky?\n    └── Check for timing issues, order dependence, external dependencies\n```\n\n### Build Failure Triage\n\n```\nBuild fails:\n├── Type error → Read the error, check the types at the cited location\n├── Import error → Check the module exists, exports match, paths are correct\n├── Config error → Check build config files for syntax/schema issues\n├── Dependency error → Check package.json, run npm install\n└── Environment error → Check Node version, OS compatibility\n```\n\n### Runtime Error Triage\n\n```\nRuntime error:\n├── TypeError: Cannot read property 'x' of undefined\n│   └── Something is null/undefined that shouldn't be\n│       → Check data flow: where does this value come from?\n├── Network error / CORS\n│   └── Check URLs, headers, server CORS config\n├── Render error / White screen\n│   └── Check error boundary, console, component tree\n└── Unexpected behavior (no error)\n    └── Add logging at key points, verify data at each step\n```\n\n## Safe Fallback Patterns\n\nWhen under time pressure, use safe fallbacks:\n\n```typescript\n// Safe default + warning (instead of crashing)\nfunction getConfig(key: string): string {\n  const value = process.env[key];\n  if (!value) {\n    console.warn(`Missing config: ${key}, using default`);\n    return DEFAULTS[key] ?? '';\n  }\n  return value;\n}\n\n// Graceful degradation (instead of broken feature)\nfunction renderChart(data: ChartData[]) {\n  if (data.length === 0) {\n    return <EmptyState message=\"No data available for this period\" />;\n  }\n  try {\n    return <Chart data={data} />;\n  } catch (error) {\n    console.error('Chart render failed:', error);\n    return <ErrorState message=\"Unable to display chart\" />;\n  }\n}\n```\n\n## Instrumentation Guidelines\n\nAdd logging only when it helps. Remove it when done.\n\n**When to add instrumentation:**\n- You can't localize the failure to a specific line\n- The issue is intermittent and needs monitori",
+      "excerpt": "---\nname: debugging-and-error-recovery\ndescription: Guides systematic root-cause debugging. Use when tests fail, builds break, something that worked yesterday broke, behavior doesn't match expectations, or you encounter any unexpected error. Use when you need to figure out what broke and why — a systematic approach to finding and fixing the root cause rather than guessing. Use when asked what broke, why a test started failing, or why code throws, even when the diff, the function, or the stack trace is pasted inline and the cause looks obvious from reading it, so that the cause is named, the fix is minimal, and the reply says how to confirm it.\n---\n\n# Debugging and Error Recovery\n\n## Overview\n\nSystematic debugging with structured triage. When something breaks, stop adding features, preserve evidence, and follow a structured process to find and fix the root cause. Guessing wastes time. The triage checklist works for test failures, build errors, runtime bugs, and production incidents.\n\n## When to Use\n\n- Tests fail after a code change\n- The build breaks\n- Runtime behavior doesn't match expectations\n- A bug report arrives\n- An error appears in logs or console\n- Something worked before and stopped working\n\n## The Stop-the-Line Rule\n\nWhen anything unexpected happens:\n\n```\n1. STOP adding features or making changes\n2. PRESERVE evidence (error output, logs, repro steps)\n3. DIAGNOSE using the triage checklist\n4. FIX the root cause\n5. GUARD against recurrence\n6. RESUME only after verification passes\n```\n\n**Don't push past a failing test or broken build to work on the next feature.** Errors compound. A bug in Step 3 that goes unfixed makes Steps 4-6 wrong.\n\n## The Triage Checklist\n\nWork through these steps in order. Do not skip steps.\n\n### Step 1: Reproduce\n\nMake the failure happen reliably. If you can't reproduce it, you can't fix it with confidence.\n\n```\nCan you reproduce the failure?\n├── YES → Proceed to Step 2\n└── NO\n    ├── Gather more context (logs, environment details)\n    ├── Try reproducing in a minimal environment\n    └── If truly non-reproducible, document conditions and monitor\n```\n\n**When a bug is non-reproducible:**\n\n```\nCannot reproduce on demand:\n├── Timing-dependent?\n│   ├── Add timestamps to logs around the suspected area\n│   ├── Try with artificial delays (setTimeout, sleep) to widen race windows\n│   └── Run under load or concurrency to increase collision probability\n├── Environment-dependent?\n│   ├── Compare Node/browser versions, OS, environment variables\n│   ├── Check for differences in data (empty vs populated database)\n│   └── Try reproducing in CI where the environment is clean\n├── State-dependent?\n│   ├── Check for leaked state between tests or requests\n│   ├── Look for global variables, singletons, or shared caches\n│   └── Run the failing scenario in isolation vs after other operations\n└── Truly random?\n    ├── Add defensive logging at the suspected location\n    ├── Set up an alert for the specific error signature\n    └── Document the conditions observed and revisit when it recurs\n```\n\nFor test failures (npm shown — substitute the repository's own test command, per the test-driven-development skill's Discover the Stack First section):\n```bash\n# Run the specific failing test\nnpm test -- --grep \"test name\"\n\n# Run with verbose output\nnpm test -- --verbose\n\n# Run in isolation (rules out test pollution)\nnpm test -- specific-file --runInBand\n```\n\n### Step 2: Localize\n\nNarrow down WHERE the failure happens:\n\n```\nWhich layer is failing?\n├── UI/Frontend     → Check console, DOM, network tab\n├── API/Backend     → Check server logs, request/response\n├── Database        → Check queries, schema, data integrity\n├── Build tooling   → Check config, dependencies, environment\n├── External service → Check connectivity, API changes, rate limits\n└── Test itself     → Check if the test is correct (false negative)\n```\n\n**Use bisection for regression bugs:**\n```bash\n# Find which commit introduced the bug\ngit bisect start\ngit bisect bad                    # Current commit is broken\ngit bisect good <known-good-sha> # This commit worked\n# Git will checkout midpoint commits; run your test at each\ngit bisect run npm test -- --grep \"failing test\"  # substitute the repository's focused-test command\n```\n\n### Step 3: Reduce\n\nCreate the minimal failing case:\n\n- Remove unrelated code/config until only the bug remains\n- Simplify the input to the smallest example that triggers the failure\n- Strip the test to the bare minimum that reproduces the issue\n\nA minimal reproduction makes the root cause obvious and prevents fixing symptoms instead of causes.\n\n### Step 4: Fix the Root Cause\n\nFix the underlying issue, not the symptom:\n\n```\nSymptom: \"The user list shows duplicate entries\"\n\nSymptom fix (bad):\n  → Deduplicate in the UI component: [...new Set(users)]\n\nRoot cause fix (good):\n  → The API endpoint has a JOIN that produces duplicates\n  → Fix the query, add a DISTINCT, or fix the data model\n```\n\nAsk: \"Why does this happen?\" until you reach the actual cause, not just where it manifests.\n\n### Step 5: Guard Against Recurrence\n\nWrite a test that catches this specific failure:\n\n```typescript\n// The bug: task titles with special characters broke the search\nit('finds tasks with special characters in title', async () => {\n  await createTask({ title: 'Fix \"quotes\" & <brackets>' });\n  const results = await searchTasks('quotes');\n  expect(results).toHaveLength(1);\n  expect(results[0].title).toBe('Fix \"quotes\" & <brackets>');\n});\n```\n\nThis test will prevent the same bug from recurring. It should fail without the fix and pass with it.\n\n### Step 6: Verify End-to-End\n\nAfter fixing, verify the complete scenario with the repository's own commands (npm shown):\n\n```bash\n# Run the specific test\nnpm test -- --grep \"specific test\"\n\n# Run the full test suite (check for regressions)\nnpm test\n\n# Build the project (check for type/compilation errors)\nnpm run build\n\n# Manual spot check if applicable\nnpm run dev  # Verify in browser\n```\n\n## Error-Specific Patterns\n\n### Test Failure Triage\n\n```\nTest fails after code change:\n├── Did you change code the test covers?\n│   └── YES → Check if the test or the code is wrong\n│       ├── Test is outdated → Update the test\n│       └── Code has a bug → Fix the code\n├── Did you change unrelated code?\n│   └── YES → Likely a side effect → Check shared state, imports, globals\n└── Test was already flaky?\n    └── Check for timing issues, order dependence, external dependencies\n```\n\n### Build Failure Triage\n\n```\nBuild fails:\n├── Type error → Read the error, check the types at the cited location\n├── Import error → Check the module exists, exports match, paths are correct\n├── Config error → Check build config files for syntax/schema issues\n├── Dependency error → Check package.json, run npm install\n└── Environment error → Check Node version, OS compatibility\n```\n\n### Runtime Error Triage\n\n```\nRuntime error:\n├── TypeError: Cannot read property 'x' of undefined\n│   └── Something is null/undefined that shouldn't be\n│       → Check data flow: where does this value come from?\n├── Network error / CORS\n│   └── Check URLs, headers, server CORS config\n├── Render error / White screen\n│   └── Check error boundary, console, component tree\n└── Unexpected behavior (no error)\n    └── Add logging at key points, verify data at each step\n```\n\n## Safe Fallback Patterns\n\nWhen under time pressure, use safe fallbacks:\n\n```typescript\n// Safe default + warning (instead of crashing)\nfunction getConfig(key: string): string {\n  const value = process.env[key];\n  if (!value) {\n    console.warn(`Missing config: ${key}, using default`);\n    return DEFAULTS[key] ?? '';\n  }\n  return value;\n}\n\n// Graceful degradation (instead of broken feature)\nfunction renderChart(data: ChartData[]) {\n  if (data.length === 0) {\n    return <EmptyState message=\"No data available for this period\" />;\n  }\n  try {\n    return <Chart data={data} />;\n  } catch (error) {\n    console.error('Chart render failed:', error);\n    return <",
       "card": {
         "title_zh": "系统化调试与错误恢复",
-        "purpose_zh": "提供系统化的根因调试流程：当测试失败、构建中断、行为不符预期或出现意外错误时，先停止加功能、保留证据，再按分诊清单定位并修复根因，而非猜测。",
+        "purpose_zh": "指导系统化的根因调试：当测试失败、构建中断、行为不符预期或出现意外错误时，先停止加功能、保留证据，再按结构化分诊流程定位并修复根因，而非猜测。",
         "does": [
-          "给出停止加功能、保留证据、诊断、修复根因、防复发、验证后恢复的六步规则",
-          "提供复现、定位、最小化、修根因、加回归测试、端到端验证的分诊清单",
-          "针对不可复现问题按时序、环境、状态、随机四类给出排查思路",
+          "提供停止线规则：停止加功能、保留证据、诊断、修复根因、防复发、验证后恢复",
+          "给出六步分诊清单：复现、定位、缩小、修复根因、防复发、端到端验证",
+          "针对不可复现缺陷按时序、环境、状态、随机四类给出排查路径",
+          "用二分法定位引入缺陷的提交",
           "按测试失败、构建失败、运行时错误分别给出分诊决策树",
-          "建议用 git bisect 定位引入缺陷的提交",
-          "提供安全兜底写法与日志埋点增删指南，并强调错误输出应视为不可信数据"
+          "建议为缺陷补写回归测试并运行完整测试与构建验证"
         ],
         "inputs": [
-          "失败现象与错误输出、日志、堆栈",
+          "失败现象与错误输出、日志",
           "可复现步骤与环境信息",
-          "仓库自身的测试与构建命令",
-          "疑似相关代码变更或提交历史"
+          "测试命令与仓库自身命令",
+          "疑似相关代码或提交范围"
         ],
         "outputs": [
-          "已定位并修复的根因说明",
-          "最小复现用例",
-          "防止复发的回归测试",
-          "端到端验证结果（测试通过、构建成功）"
+          "根因说明",
+          "最小修复方案",
+          "防复发的回归测试",
+          "验证方式与结果"
         ],
         "scenarios": [
           "代码改动后测试失败",
-          "构建中断或类型/依赖报错",
-          "运行时行为与预期不符或白屏",
-          "收到缺陷报告或日志中出现错误",
-          "问题时好时坏、难以稳定复现"
+          "构建中断",
+          "运行时行为与预期不符",
+          "收到缺陷报告或日志报错",
+          "原本可用功能突然失效"
         ],
         "prerequisites": [
-          "需要能运行仓库自身的测试与构建命令",
-          "需要能访问日志、错误输出与版本历史（如 git）"
+          "可运行测试与构建的项目环境",
+          "能访问日志与版本控制历史"
         ],
         "limits": [
-          "仅为流程与方法指导，不提供具体语言或框架的修复代码",
-          "示例命令以 npm 为主，需替换为仓库自身命令",
-          "不可复现的问题只能记录条件并监控，无法保证当场修复"
+          "原文以 npm 与 TypeScript 示例为主，需替换为仓库自身命令",
+          "对真正不可复现的问题只能记录条件并监控",
+          "未涉及具体调试工具或平台配置"
         ],
         "hosts": [
           "通用"
@@ -863,8 +1138,9 @@
         "tags": [
           "测试",
           "代码审查",
-          "自动化",
-          "文档"
+          "后端",
+          "前端",
+          "其他"
         ],
         "evidence": [
           {
@@ -877,44 +1153,49 @@
           },
           {
             "field": "does",
-            "quote": "Cannot reproduce on demand:\n├── Timing-dependent?"
+            "quote": "Use bisection for regression bugs:"
           },
           {
             "field": "does",
-            "quote": "### Test Failure Triage"
+            "quote": "Write a test that catches this specific failure:"
           },
           {
             "field": "does",
-            "quote": "git bisect run npm test -- --grep \"failing test\""
+            "quote": "After fixing, verify the complete scenario with the repository's own commands (npm shown):"
+          },
+          {
+            "field": "inputs",
+            "quote": "- Tests fail after a code change\n- The build breaks\n- Runtime behavior doesn't match expectations"
+          },
+          {
+            "field": "outputs",
+            "quote": "Ask: \"Why does this happen?\" until you reach the actual cause, not just where it manifests."
+          },
+          {
+            "field": "scenarios",
+            "quote": "- A bug report arrives\n- An error appears in logs or console\n- Something worked before and stopped working"
           },
           {
             "field": "prerequisites",
-            "quote": "For test failures (npm shown — substitute the repository's own test command, per the test-driven-development skill's Discover the Stack First section)"
-          },
-          {
-            "field": "prerequisites",
-            "quote": "# Find which commit introduced the bug\ngit bisect start"
+            "quote": "For test failures (npm shown — substitute the repository's own test command, per the test-driven-development skill's Discover the Stack First section):"
           },
           {
             "field": "limits",
             "quote": "If truly non-reproducible, document conditions and monitor"
           },
           {
-            "field": "hosts",
-            "quote": "The triage checklist works for test failures, build errors, runtime bugs, and production incidents."
-          },
-          {
             "field": "risk_flags",
-            "quote": "npm test -- --grep \"test name\""
+            "quote": "git bisect run npm test -- --grep \"failing test\"  # substitute the repository's focused-test command"
           }
         ]
-      }
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": "skills/deprecation-and-migration/SKILL.md",
       "blob_sha": "8789d4e0eba0f65b35da842430b345d4c76877e9",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/deprecation-and-migration/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/deprecation-and-migration/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
       "generated_at": "2026-11-13T10:31:07.365Z",
       "model": "deepseek-flash",
       "status": "ok",
@@ -1020,65 +1301,61 @@
     },
     {
       "skill_path": "skills/documentation-and-adrs/SKILL.md",
-      "blob_sha": "eff8fddc25d972bc0e3b367d23afa0705b7a87b5",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/documentation-and-adrs/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
-      "generated_at": "2026-11-13T11:43:07.027Z",
+      "blob_sha": "019bf43d1845051775f83b4d894ee090365091b0",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/documentation-and-adrs/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
       "model": "deepseek-flash",
       "status": "ok",
       "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
         "name": "documentation-and-adrs",
-        "description": "Records decisions and documentation. Use when you need to document an architecture decision (ADR) or the reasoning behind a design choice, when changing public APIs, shipping features, or when you need to record context that future engineers and agents will need to understand the codebase."
+        "description": "Records decisions and documentation, and detects when documentation has drifted from the code it describes. Use when you need to document an architecture decision (ADR) or the reasoning behind a design choice, when changing public APIs, shipping features, when docs may be stale or out of sync with the code they describe, when working out which module docs are still accurate, or when setting up a check so docs cannot silently go out of date again."
       },
-      "excerpt": "---\nname: documentation-and-adrs\ndescription: Records decisions and documentation. Use when you need to document an architecture decision (ADR) or the reasoning behind a design choice, when changing public APIs, shipping features, or when you need to record context that future engineers and agents will need to understand the codebase.\n---\n\n# Documentation and ADRs\n\n## Overview\n\nDocument decisions, not just code. The most valuable documentation captures the *why* — the context, constraints, and trade-offs that led to a decision. Code shows *what* was built; documentation explains *why it was built this way* and *what alternatives were considered*. This context is essential for future humans and agents working in the codebase.\n\n## When to Use\n\n- Making a significant architectural decision\n- Choosing between competing approaches\n- Adding or changing a public API\n- Shipping a feature that changes user-facing behavior\n- Onboarding new team members (or agents) to the project\n- When you find yourself explaining the same thing repeatedly\n\n**When NOT to use:** Don't document obvious code. Don't add comments that restate what the code already says. Don't write docs for throwaway prototypes.\n\n## Architecture Decision Records (ADRs)\n\nADRs capture the reasoning behind significant technical decisions. They're the highest-value documentation you can write.\n\n### When to Write an ADR\n\n- Choosing a framework, library, or major dependency\n- Designing a data model or database schema\n- Selecting an authentication strategy\n- Deciding on an API architecture (REST vs. GraphQL vs. tRPC)\n- Choosing between build tools, hosting platforms, or infrastructure\n- Any decision that would be expensive to reverse\n\n### Match the existing convention first\n\nBefore creating an ADR, inspect the available repository context for an established convention — existing ADRs, project instructions, and ADR-related configuration or tooling (e.g. an `.adr-dir` file). An established convention overrides the defaults below. Match:\n\n- **Location and format** — e.g. `docs/adr/*.md`, `Documentation/Decisions/*.rst`, a MADR layout, or an `adr-tools` setup. Match the existing directory, file extension, and markup (Markdown vs reStructuredText).\n- **Numbering and naming** — continue the existing sequence and filename pattern (`ADR-004-Title.rst`, `0004-title.md`, …); don't restart at 001 or introduce a second scheme.\n- **Section headings** — reuse the project's heading set rather than imposing this template's.\n\nIf the available evidence conflicts, surface the conflict rather than silently introducing another scheme. Only when no convention can be established do you apply the default below.\n\n### ADR Template\n\nStore ADRs in `docs/decisions/` with sequential numbering (unless the project already uses another location — see above):\n\n```markdown\n# ADR-001: Use PostgreSQL for primary database\n\n## Status\nProposed | Accepted | Superseded by ADR-XXX | Deprecated\n\n## Date\n2025-01-15\n\n## Context\nWe need a primary database for the task management application. Key requirements:\n- Relational data model (users, tasks, teams with relationships)\n- ACID transactions for task state changes\n- Support for full-text search on task content\n- Managed hosting available (for small team, limited ops capacity)\n\n## Decision\nUse PostgreSQL with Prisma ORM.\n\n## Alternatives Considered\n\n### MongoDB\n- Pros: Flexible schema, easy to start with\n- Cons: Our data is inherently relational; would need to manage relationships manually\n- Rejected: Relational data in a document store leads to complex joins or data duplication\n\n### SQLite\n- Pros: Zero configuration, embedded, fast for reads\n- Cons: Limited concurrent write support, no managed hosting for production\n- Rejected: Not suitable for multi-user web application in production\n\n### MySQL\n- Pros: Mature, widely supported\n- Cons: PostgreSQL has better JSON support, full-text search, and ecosystem tooling\n- Rejected: PostgreSQL is the better fit for our feature requirements\n\n## Consequences\n- Prisma provides type-safe database access and migration management\n- We can use PostgreSQL's full-text search instead of adding Elasticsearch\n- Team needs PostgreSQL knowledge (standard skill, low risk)\n- Hosting on managed service (Supabase, Neon, or RDS)\n```\n\n### ADR Lifecycle\n\n```\nPROPOSED → ACCEPTED → (SUPERSEDED or DEPRECATED)\n```\n\n- **Don't delete old ADRs.** They capture historical context.\n- When a decision changes, write a new ADR that references and supersedes the old one.\n\n## Inline Documentation\n\n### When to Comment\n\nComment the *why*, not the *what*:\n\n```typescript\n// BAD: Restates the code\n// Increment counter by 1\ncounter += 1;\n\n// GOOD: Explains non-obvious intent\n// Rate limit uses a fixed window that opens on the first request after the\n// previous one expires, not on a clock schedule. Known gap: a client can spend\n// the full limit just before a reset and again just after (2x in a moment)\nif (now - windowStart > WINDOW_SIZE_MS) {\n  counter = 0;\n  windowStart = now;\n}\n```\n\n### When NOT to Comment\n\n```typescript\n// Don't comment self-explanatory code\nfunction calculateTotal(items: CartItem[]): number {\n  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);\n}\n\n// Don't leave TODO comments for things you should just do now\n// TODO: add error handling  ← Just add it\n\n// Don't leave commented-out code\n// const oldImplementation = () => { ... }  ← Delete it, git has history\n```\n\n### Document Known Gotchas\n\n```typescript\n/**\n * IMPORTANT: This function must be called before the first render.\n * If called after hydration, it causes a flash of unstyled content\n * because the theme context isn't available during SSR.\n *\n * See ADR-003 for the full design rationale.\n */\nexport function initializeTheme(theme: Theme): void {\n  // ...\n}\n```\n\n## API Documentation\n\nFor public APIs (REST, GraphQL, library interfaces):\n\n### Inline with Types (Preferred for TypeScript)\n\n```typescript\n/**\n * Creates a new task.\n *\n * @param input - Task creation data (title required, description optional)\n * @returns The created task with server-generated ID and timestamps\n * @throws {ValidationError} If title is empty or exceeds 200 characters\n * @throws {AuthenticationError} If the user is not authenticated\n *\n * @example\n * const task = await createTask({ title: 'Buy groceries' });\n * console.log(task.id); // \"task_abc123\"\n */\nexport async function createTask(input: CreateTaskInput): Promise<Task> {\n  // ...\n}\n```\n\n### OpenAPI / Swagger for REST APIs\n\n```yaml\npaths:\n  /api/tasks:\n    post:\n      summary: Create a task\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: '#/components/schemas/CreateTaskInput'\n      responses:\n        '201':\n          description: Task created\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/Task'\n        '422':\n          description: Validation error\n```\n\n## README Structure\n\nEvery project should have a README that covers:\n\n```markdown\n# Project Name\n\nOne-paragraph description of what this project does.\n\n## Quick Start\n1. Clone the repo\n2. Install dependencies: `npm install`\n3. Set up environment: `cp .env.example .env`\n4. Run the dev server: `npm run dev`\n\n## Commands\n| Command | Description |\n|---------|-------------|\n| `npm run dev` | Start development server |\n| `npm test` | Run tests |\n| `npm run build` | Production build |\n| `npm run lint` | Run linter |\n\n## Architecture\nBrief overview of the project structure and key design decisions.\nLink to ADRs for details.\n\n## Contributing\nHow to contribute, coding standards, PR process.\n```\n\n## Changelog Maintenance\n\nFor shipped features:\n\n```markdown\n# Changelog\n\n## [1.2.0] - 2025-01-20\n### Added\n- Task sharing: users can share tasks with team members (#123)\n- Email notifications for task assignments (#124)\n\n### Fixed\n- Duplicate tasks appearing when rapidly clicking create button (#12",
+      "excerpt": "---\nname: documentation-and-adrs\ndescription: Records decisions and documentation, and detects when documentation has drifted from the code it describes. Use when you need to document an architecture decision (ADR) or the reasoning behind a design choice, when changing public APIs, shipping features, when docs may be stale or out of sync with the code they describe, when working out which module docs are still accurate, or when setting up a check so docs cannot silently go out of date again.\n---\n\n# Documentation and ADRs\n\n## Overview\n\nDocument decisions, not just code. The most valuable documentation captures the *why* — the context, constraints, and trade-offs that led to a decision. Code shows *what* was built; documentation explains *why it was built this way* and *what alternatives were considered*. This context is essential for future humans and agents working in the codebase.\n\n## When to Use\n\n- Making a significant architectural decision\n- Choosing between competing approaches\n- Adding or changing a public API\n- Shipping a feature that changes user-facing behavior\n- Onboarding new team members (or agents) to the project\n- When you find yourself explaining the same thing repeatedly\n\n**When NOT to use:** Don't document obvious code. Don't add comments that restate what the code already says. Don't write docs for throwaway prototypes.\n\n## Architecture Decision Records (ADRs)\n\nADRs capture the reasoning behind significant technical decisions. They're the highest-value documentation you can write.\n\n### When to Write an ADR\n\n- Choosing a framework, library, or major dependency\n- Designing a data model or database schema\n- Selecting an authentication strategy\n- Deciding on an API architecture (REST vs. GraphQL vs. tRPC)\n- Choosing between build tools, hosting platforms, or infrastructure\n- Any decision that would be expensive to reverse\n\n### Match the existing convention first\n\nBefore creating an ADR, inspect the available repository context for an established convention — existing ADRs, project instructions, and ADR-related configuration or tooling (e.g. an `.adr-dir` file). An established convention overrides the defaults below. Match:\n\n- **Location and format** — e.g. `docs/adr/*.md`, `Documentation/Decisions/*.rst`, a MADR layout, or an `adr-tools` setup. Match the existing directory, file extension, and markup (Markdown vs reStructuredText).\n- **Numbering and naming** — continue the existing sequence and filename pattern (`ADR-004-Title.rst`, `0004-title.md`, …); don't restart at 001 or introduce a second scheme.\n- **Section headings** — reuse the project's heading set rather than imposing this template's.\n\nIf the available evidence conflicts, surface the conflict rather than silently introducing another scheme. Only when no convention can be established do you apply the default below.\n\n### ADR Template\n\nStore ADRs in `docs/decisions/` with sequential numbering (unless the project already uses another location — see above):\n\n```markdown\n# ADR-001: Use PostgreSQL for primary database\n\n## Status\nProposed | Accepted | Superseded by ADR-XXX | Deprecated\n\n## Date\n2025-01-15\n\n## Context\nWe need a primary database for the task management application. Key requirements:\n- Relational data model (users, tasks, teams with relationships)\n- ACID transactions for task state changes\n- Support for full-text search on task content\n- Managed hosting available (for small team, limited ops capacity)\n\n## Decision\nUse PostgreSQL with Prisma ORM.\n\n## Alternatives Considered\n\n### MongoDB\n- Pros: Flexible schema, easy to start with\n- Cons: Our data is inherently relational; would need to manage relationships manually\n- Rejected: Relational data in a document store leads to complex joins or data duplication\n\n### SQLite\n- Pros: Zero configuration, embedded, fast for reads\n- Cons: Limited concurrent write support, no managed hosting for production\n- Rejected: Not suitable for multi-user web application in production\n\n### MySQL\n- Pros: Mature, widely supported\n- Cons: PostgreSQL has better JSON support, full-text search, and ecosystem tooling\n- Rejected: PostgreSQL is the better fit for our feature requirements\n\n## Consequences\n- Prisma provides type-safe database access and migration management\n- We can use PostgreSQL's full-text search instead of adding Elasticsearch\n- Team needs PostgreSQL knowledge (standard skill, low risk)\n- Hosting on managed service (Supabase, Neon, or RDS)\n```\n\n### ADR Lifecycle\n\n```\nPROPOSED → ACCEPTED → (SUPERSEDED or DEPRECATED)\n```\n\n- **Don't delete old ADRs.** They capture historical context.\n- When a decision changes, write a new ADR that references and supersedes the old one.\n\n## Inline Documentation\n\n### When to Comment\n\nComment the *why*, not the *what*:\n\n```typescript\n// BAD: Restates the code\n// Increment counter by 1\ncounter += 1;\n\n// GOOD: Explains non-obvious intent\n// Rate limit uses a fixed window that opens on the first request after the\n// previous one expires, not on a clock schedule. Known gap: a client can spend\n// the full limit just before a reset and again just after (2x in a moment)\nif (now - windowStart > WINDOW_SIZE_MS) {\n  counter = 0;\n  windowStart = now;\n}\n```\n\n### When NOT to Comment\n\n```typescript\n// Don't comment self-explanatory code\nfunction calculateTotal(items: CartItem[]): number {\n  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);\n}\n\n// Don't leave TODO comments for things you should just do now\n// TODO: add error handling  ← Just add it\n\n// Don't leave commented-out code\n// const oldImplementation = () => { ... }  ← Delete it, git has history\n```\n\n### Document Known Gotchas\n\n```typescript\n/**\n * IMPORTANT: This function must be called before the first render.\n * If called after hydration, it causes a flash of unstyled content\n * because the theme context isn't available during SSR.\n *\n * See ADR-003 for the full design rationale.\n */\nexport function initializeTheme(theme: Theme): void {\n  // ...\n}\n```\n\n## API Documentation\n\nFor public APIs (REST, GraphQL, library interfaces):\n\n### Inline with Types (Preferred for TypeScript)\n\n```typescript\n/**\n * Creates a new task.\n *\n * @param input - Task creation data (title required, description optional)\n * @returns The created task with server-generated ID and timestamps\n * @throws {ValidationError} If title is empty or exceeds 200 characters\n * @throws {AuthenticationError} If the user is not authenticated\n *\n * @example\n * const task = await createTask({ title: 'Buy groceries' });\n * console.log(task.id); // \"task_abc123\"\n */\nexport async function createTask(input: CreateTaskInput): Promise<Task> {\n  // ...\n}\n```\n\n### OpenAPI / Swagger for REST APIs\n\n```yaml\npaths:\n  /api/tasks:\n    post:\n      summary: Create a task\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              $ref: '#/components/schemas/CreateTaskInput'\n      responses:\n        '201':\n          description: Task created\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/Task'\n        '422':\n          description: Validation error\n```\n\n## README Structure\n\nEvery project should have a README that covers:\n\n```markdown\n# Project Name\n\nOne-paragraph description of what this project does.\n\n## Quick Start\n1. Clone the repo\n2. Install dependencies: `npm install`\n3. Set up environment: `cp .env.example .env`\n4. Run the dev server: `npm run dev`\n\n## Commands\n| Command | Description |\n|---------|-------------|\n| `npm run dev` | Start development server |\n| `npm test` | Run tests |\n| `npm run build` | Production build |\n| `npm run lint` | Run linter |\n\n## Architecture\nBrief overview of the project structure and key design decisions.\nLink to ADRs for details.\n\n## Contributing\nHow to contribute, coding standards, PR process.\n```\n\n## Changelog Maintenance\n\nFor shipped features:\n\n```markdown\n# Changelog\n\n## [1.2.0] - 2025-01-20\n### Added\n- Task sharing: users can share ",
       "card": {
         "title_zh": "文档与架构决策记录",
-        "purpose_zh": "记录架构决策与设计理由，编写内联注释、API 文档、README 和变更日志，并审校文档措辞，让后续工程师和 AI 代理理解代码库的为什么。",
+        "purpose_zh": "记录架构决策与文档，并检测文档是否已与所描述的代码脱节；适用于撰写 ADR、变更公共 API、发布功能或排查过期文档。",
         "does": [
-          "指导编写架构决策记录（ADR），包含状态、上下文、决策、备选方案与后果",
-          "要求先匹配仓库既有 ADR 约定（位置、编号、标题），无约定才用默认模板",
-          "区分该注释与不该注释的代码，强调解释为什么而非复述代码",
-          "提供 TypeScript 内联类型文档与 OpenAPI/Swagger 的 REST API 文档写法",
-          "给出 README 结构（快速开始、命令、架构、贡献）与变更日志维护格式",
-          "提供面向 AI 代理的文档建议（CLAUDE.md、规格文件、ADR、内联陷阱）及文档措辞审校步骤"
+          "撰写架构决策记录（ADR），记录背景、决策、备选方案与后果",
+          "先匹配仓库既有 ADR 约定（位置、格式、编号、标题），无约定时用默认模板",
+          "指导内联注释：解释为什么而非重复代码，记录已知陷阱",
+          "为公共 API 提供类型内联文档与 OpenAPI/Swagger 规范示例",
+          "给出 README 结构与 Changelog 维护写法",
+          "检测文档是否与代码漂移、判断哪些模块文档仍准确"
         ],
         "inputs": [
           "架构决策的背景、约束与备选方案",
-          "现有仓库的 ADR 约定与配置（如 .adr-dir）",
-          "待文档化的代码、公共 API 或功能变更",
-          "README、变更日志等现有文档",
-          "项目术语与既有约定"
+          "仓库既有 ADR 约定（目录、扩展名、编号、标题）",
+          "公共 API 或功能变更内容",
+          "可能过期的文档与对应代码"
         ],
         "outputs": [
-          "ADR 文档（含状态、日期、上下文、决策、备选方案、后果）",
-          "内联注释与类型化 API 文档",
-          "OpenAPI/Swagger 规范片段",
-          "README 与变更日志内容",
-          "文档审校后的修订稿与核查清单结果"
+          "ADR 文档（状态、日期、背景、决策、备选、后果）",
+          "内联注释与 API 文档示例",
+          "README 与 Changelog 结构",
+          "文档漂移检测结论"
         ],
         "scenarios": [
-          "做出重大架构决策或选择框架、数据库、认证策略时",
+          "做出重大架构决策或选型时",
           "新增或变更公共 API 时",
           "发布改变用户可见行为的功能时",
-          "新成员或 AI 代理加入项目需要理解代码库时",
-          "同一件事被反复解释时"
+          "怀疑文档过期或与代码不同步时",
+          "新成员或代理加入项目时"
         ],
         "prerequisites": [
-          "需要能访问仓库上下文以确认既有 ADR 约定",
-          "需要了解决策的背景、约束与被否决的备选方案",
-          "需要核对代码与决策上下文以验证文档中的事实"
+          "需先检查仓库中既有的 ADR 约定（如 `.adr-dir`、现有 ADR、项目说明）",
+          "既有约定优先于技能默认模板"
         ],
         "limits": [
-          "不记录显而易见的代码，不为一次性原型写文档",
-          "不写复述代码的注释，不留注释掉的代码与长期 TODO",
-          "不得用编造的示例或更强的保证替代无依据的说法",
-          "措辞审校不得改变决策或其限制",
-          "原文未提供具体工具或自动化脚本"
+          "不记录显而易见的代码，不写重复代码含义的注释",
+          "不为一次性原型写文档",
+          "不删除旧 ADR，决策变更应写新 ADR 取代旧者",
+          "原文未给出具体自动化漂移检测的实现方式"
         ],
         "hosts": [
-          "通用"
+          "未说明"
         ],
         "risk_flags": [],
         "tags": [
@@ -1090,7 +1367,7 @@
         "evidence": [
           {
             "field": "purpose_zh",
-            "quote": "Document decisions, not just code. The most valuable documentation captures the *why* — the context, constraints, and trade-offs that led to a decision."
+            "quote": "Records decisions and documentation, and detects when documentation has drifted from the code it describes."
           },
           {
             "field": "does",
@@ -1109,30 +1386,47 @@
             "quote": "Every project should have a README that covers:"
           },
           {
+            "field": "does",
+            "quote": "For shipped features:"
+          },
+          {
             "field": "prerequisites",
-            "quote": "If the available evidence conflicts, surface the conflict rather than silently introducing another scheme. Only when no convention can be established do you apply the default below."
+            "quote": "An established convention overrides the defaults below."
           },
           {
             "field": "limits",
-            "quote": "**When NOT to use:** Don't document obvious code. Don't add comments that restate what the code already says. Don't write docs for throwaway prototypes."
+            "quote": "Don't document obvious code. Don't add comments that restate what the code already says. Don't write docs for throwaway prototypes."
           },
           {
             "field": "limits",
-            "quote": "- **Don't delete old ADRs.** They capture historical context."
+            "quote": "**Don't delete old ADRs.** They capture historical context."
           },
           {
-            "field": "limits",
-            "quote": "// Don't leave TODO comments for things you should just do now"
+            "field": "scenarios",
+            "quote": "Making a significant architectural decision"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Adding or changing a public API"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Shipping a feature that changes user-facing behavior"
+          },
+          {
+            "field": "scenarios",
+            "quote": "when docs may be stale or out of sync with the code they describe"
           }
         ]
-      }
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": "skills/doubt-driven-development/SKILL.md",
-      "blob_sha": "8e6d12737711d4926d87303ab0c111deb43ab8b2",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/doubt-driven-development/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
-      "generated_at": "2026-11-13T10:31:07.365Z",
+      "blob_sha": "482bb4253ad86e1abdc2a55ee759b7139aaf35da",
+      "source_url": "https://github.com/addyosmani/agent-skills/blob/e997ac5b9a74eab332d5e9793bb38a38c8cfdd74/skills/doubt-driven-development/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
       "model": "deepseek-flash",
       "status": "ok",
       "last_error": null,
@@ -1141,50 +1435,46 @@
         "name": "doubt-driven-development",
         "description": "Subjects every non-trivial decision to a fresh-context adversarial review before it stands. Use when you want every assumption cross-examined before proceeding, when stress-testing a plan for hidden failure modes, when correctness matters more than speed, when working in unfamiliar code, when stakes are high (production auth, security-sensitive logic, a high-stakes migration, irreversible operations), or any time a confident output would be cheaper to verify now than to debug later."
       },
-      "excerpt": "---\nname: doubt-driven-development\ndescription: Subjects every non-trivial decision to a fresh-context adversarial review before it stands. Use when you want every assumption cross-examined before proceeding, when stress-testing a plan for hidden failure modes, when correctness matters more than speed, when working in unfamiliar code, when stakes are high (production auth, security-sensitive logic, a high-stakes migration, irreversible operations), or any time a confident output would be cheaper to verify now than to debug later.\n---\n\n# Doubt-Driven Development\n\n## Overview\n\nA confident answer is not a correct one. Long sessions accumulate context that quietly turns assumptions into \"facts\" without anyone noticing. Doubt-driven development is the discipline of materializing a fresh-context reviewer — biased to **disprove**, not approve — before any non-trivial output stands.\n\nThis is not `/review`. `/review` is a verdict on a finished artifact. This is an in-flight posture: non-trivial decisions get cross-examined while course-correction is still cheap.\n\n## When to Use\n\nA decision is **non-trivial** when at least one of these is true:\n\n- It introduces or modifies branching logic\n- It crosses a module or service boundary\n- It asserts a property the type system or compiler cannot verify (thread safety, idempotence, ordering, invariants)\n- Its correctness depends on context the future reader cannot see\n- Its blast radius is irreversible (production deploy, data migration, public API change)\n\nApply the skill when:\n\n- About to make an architectural decision under uncertainty\n- About to commit non-trivial code\n- About to claim a non-obvious fact (\"this is safe\", \"this scales\", \"this matches the spec\")\n- Working in code you don't fully understand\n\n**When NOT to use:**\n\n- Mechanical operations (renaming, formatting, file moves)\n- Following a clear, unambiguous user instruction\n- Reading or summarizing existing code\n- One-line changes with obvious correctness\n- Pure tooling operations (running tests, listing files)\n- The user has explicitly asked for speed over verification\n\nIf you doubt every keystroke, you ship nothing. The skill applies only to non-trivial decisions as defined above.\n\n## Loading Constraints\n\nThis skill is designed for the **main-session orchestrator**, where Step 3 (DOUBT, detailed below) can spawn a fresh-context reviewer.\n\n- **Do NOT add this skill to a persona's `skills:` frontmatter.** A persona that follows Step 3 would spawn another persona — the orchestration anti-pattern explicitly forbidden by `../../references/orchestration-patterns.md` (\"personas do not invoke other personas\").\n- **If you find yourself applying this skill from inside a subagent context** (where Claude Code prevents nested subagent spawn): the preferred path is to surface to the user that doubt-driven cannot run nested and let the main session handle it. As a last resort only, a degraded self-questioning fallback exists — rewrite ARTIFACT + CONTRACT as a fresh self-prompt with a hard mental separator from your prior reasoning, and walk Steps 1–5. This is **not fresh-context review** (you carry your own context with you), so flag the result as degraded and prefer escalation whenever the user is reachable.\n\n## The Process\n\nCopy this checklist when applying the skill:\n\n```\nDoubt cycle:\n- [ ] Step 1: CLAIM — wrote the claim + why-it-matters\n- [ ] Step 2: EXTRACT — isolated artifact + contract, stripped reasoning\n- [ ] Step 3: DOUBT — invoked fresh-context reviewer with adversarial prompt\n- [ ] Step 4: RECONCILE — classified every finding against the artifact text\n- [ ] Step 5: STOP — met stop condition (trivial findings, 3 cycles, or user override)\n```\n\n### Step 1: CLAIM — Surface what stands\n\nName the decision in two or three lines:\n\n```\nCLAIM: \"The new caching layer is thread-safe under the\n        read-heavy workload described in the spec.\"\nWHY THIS MATTERS: a race here corrupts user data and is\n                  hard to detect in QA.\n```\n\nIf you can't write the claim that compactly, you have a vibe, not a decision. Surface it before scrutinizing it.\n\n### Step 2: EXTRACT — Smallest reviewable unit\n\nA fresh-context reviewer needs the **artifact** and the **contract**, not the journey.\n\n- Code: the diff or the function — not the whole file\n- Decision: the proposal in 3–5 sentences plus the constraints it has to satisfy\n- Assertion: the claim plus the evidence that supposedly supports it (kept distinct from the Step 1 CLAIM block, which is the orchestrator's hypothesis under scrutiny)\n\nStrip your reasoning. If you hand over conclusions, you'll get back validation of your conclusions. The unit must be small enough that a reviewer can hold it in mind in one read — if it's a 500-line PR, decompose first.\n\nStrip reasoning, not evidence: if a caller, guard or test contradicts the claim, include it in the unit.\n\n### Step 3: DOUBT — Invoke the fresh-context reviewer\n\nThe reviewer's prompt **must be adversarial**. Framing decides the answer.\n\n```\nAdversarial review. Find what is wrong with this artifact.\nAssume the author is overconfident. Look for:\n- Unstated assumptions\n- Edge cases not handled\n- Hidden coupling or shared state\n- Ways the contract could be violated\n- Existing conventions this might break\n- Failure modes under unexpected input\n\nDo NOT validate. Do NOT summarize. Find issues, or state\nexplicitly that you cannot find any after thorough examination.\n\nARTIFACT: <paste artifact>\nCONTRACT: <paste contract>\n```\n\n**Pass ARTIFACT + CONTRACT only. Do NOT pass the CLAIM.** Handing the reviewer your conclusion biases it toward agreement. The reviewer must independently determine whether the artifact satisfies the contract.\n\nIn Claude Code, the role-based reviewers in `agents/` start with isolated context by design and are usable here — see `agents/` for the roster and per-domain match.\n\n**The adversarial prompt above takes precedence over the persona's default response shape.** Personas like `code-reviewer` are written to produce balanced verdicts with both strengths and weaknesses; doubt-driven needs issues-only output. Paste the adversarial prompt verbatim into the invocation so it overrides the persona's default. If a persona's response shape can't be overridden cleanly, fall back to a generic subagent with the adversarial prompt.\n\n#### Cross-model escalation\n\nA single-model reviewer shares blind spots with the original author — a colder, different-architecture model catches them. Doubt-driven is already opt-in for non-trivial decisions, so within that scope offering cross-model is part of the skill's value, not optional friction.\n\n**Interactive sessions: always offer. Never silently skip.**\n\n**Step 1: Ask the user**\n\nAfter the single-model review in Step 3 above, but before RECONCILE, pause and ask:\n\n> *\"Single-model review complete. Want a cross-model second opinion? Options: Gemini CLI, Codex CLI, manual external review (you paste it elsewhere), or skip.\"*\n\nThis question is mandatory in every interactive doubt cycle — even on artifacts that feel low-stakes. The user — not the agent — decides whether the cost is worth it. The agent's job is to surface the choice.\n\n**Step 2: If the user picks a CLI — verify, then invoke**\n\n1. Check the tool is in PATH (`which gemini`, `which codex`).\n2. Test it works (`gemini --version` or equivalent) before passing the full prompt — a stale or broken binary may pass `which` but fail on real input.\n3. Confirm the exact invocation with the user, including required flags, auth, and env vars (e.g., API keys). Implementations vary; never assume.\n4. Pass ARTIFACT + CONTRACT + the adversarial prompt **only**. No session context, no CLAIM.\n5. Mind shell escaping. If the artifact contains quotes, `$(...)`, or backticks, prefer stdin (`echo … | gemini`) or a heredoc over inline `-p \"…\"`. When in doubt, ask the user to confirm the invocation before running it.\n6. Take the output into Step 4 (RECONCILE).\n\n**Never interpolate the artifact in",
+      "excerpt": "---\nname: doubt-driven-development\ndescription: Subjects every non-trivial decision to a fresh-context adversarial review before it stands. Use when you want every assumption cross-examined before proceeding, when stress-testing a plan for hidden failure modes, when correctness matters more than speed, when working in unfamiliar code, when stakes are high (production auth, security-sensitive logic, a high-stakes migration, irreversible operations), or any time a confident output would be cheaper to verify now than to debug later.\n---\n\n# Doubt-Driven Development\n\n## Overview\n\nA confident answer is not a correct one. Long sessions accumulate context that quietly turns assumptions into \"facts\" without anyone noticing. Doubt-driven development is the discipline of materializing a fresh-context reviewer — biased to **disprove**, not approve — before any non-trivial output stands.\n\nThis is not `/review`. `/review` is a verdict on a finished artifact. This is an in-flight posture: non-trivial decisions get cross-examined while course-correction is still cheap.\n\n## When to Use\n\nA decision is **non-trivial** when at least one of these is true:\n\n- It introduces or modifies branching logic\n- It crosses a module or service boundary\n- It asserts a property the type system or compiler cannot verify (thread safety, idempotence, ordering, invariants)\n- Its correctness depends on context the future reader cannot see\n- Its blast radius is irreversible (production deploy, data migration, public API change)\n\nApply the skill when:\n\n- About to make an architectural decision under uncertainty\n- About to commit non-trivial code\n- About to claim a non-obvious fact (\"this is safe\", \"this scales\", \"this matches the spec\")\n- Working in code you don't fully understand\n\n**When NOT to use:**\n\n- Mechanical operations (renaming, formatting, file moves)\n- Following a clear, unambiguous user instruction\n- Reading or summarizing existing code\n- One-line changes with obvious correctness\n- Pure tooling operations (running tests, listing files)\n- The user has explicitly asked for speed over verification\n\nIf you doubt every keystroke, you ship nothing. The skill applies only to non-trivial decisions as defined above.\n\n## Loading Constraints\n\nThis skill is designed for the **main-session orchestrator**, where Step 3 (DOUBT, detailed below) can spawn a fresh-context reviewer.\n\n- **Do NOT add this skill to a persona's `skills:` frontmatter.** A persona that follows Step 3 would spawn another persona — the orchestration anti-pattern explicitly forbidden by `references/shared/orchestration-patterns.md` (\"personas do not invoke other personas\").\n- **If you find yourself applying this skill from inside a subagent context** (where Claude Code prevents nested subagent spawn): the preferred path is to surface to the user that doubt-driven cannot run nested and let the main session handle it. As a last resort only, a degraded self-questioning fallback exists — rewrite ARTIFACT + CONTRACT as a fresh self-prompt with a hard mental separator from your prior reasoning, and walk Steps 1–5. This is **not fresh-context review** (you carry your own context with you), so flag the result as degraded and prefer escalation whenever the user is reachable.\n\n## The Process\n\nCopy this checklist when applying the skill:\n\n```\nDoubt cycle:\n- [ ] Step 1: CLAIM — wrote the claim + why-it-matters\n- [ ] Step 2: EXTRACT — isolated artifact + contract, stripped reasoning\n- [ ] Step 3: DOUBT — invoked fresh-context reviewer with adversarial prompt\n- [ ] Step 4: RECONCILE — classified every finding against the artifact text\n- [ ] Step 5: STOP — met stop condition (trivial findings, 3 cycles, or user override)\n```\n\n### Step 1: CLAIM — Surface what stands\n\nName the decision in two or three lines:\n\n```\nCLAIM: \"The new caching layer is thread-safe under the\n        read-heavy workload described in the spec.\"\nWHY THIS MATTERS: a race here corrupts user data and is\n                  hard to detect in QA.\n```\n\nIf you can't write the claim that compactly, you have a vibe, not a decision. Surface it before scrutinizing it.\n\n### Step 2: EXTRACT — Smallest reviewable unit\n\nA fresh-context reviewer needs the **artifact** and the **contract**, not the journey.\n\n- Code: the diff or the function — not the whole file\n- Decision: the proposal in 3–5 sentences plus the constraints it has to satisfy\n- Assertion: the claim plus the evidence that supposedly supports it (kept distinct from the Step 1 CLAIM block, which is the orchestrator's hypothesis under scrutiny)\n\nStrip your reasoning. If you hand over conclusions, you'll get back validation of your conclusions. The unit must be small enough that a reviewer can hold it in mind in one read — if it's a 500-line PR, decompose first.\n\nStrip reasoning, not evidence: if a caller, guard or test contradicts the claim, include it in the unit.\n\n### Step 3: DOUBT — Invoke the fresh-context reviewer\n\nThe reviewer's prompt **must be adversarial**. Framing decides the answer.\n\n```\nAdversarial review. Find what is wrong with this artifact.\nAssume the author is overconfident. Look for:\n- Unstated assumptions\n- Edge cases not handled\n- Hidden coupling or shared state\n- Ways the contract could be violated\n- Existing conventions this might break\n- Failure modes under unexpected input\n\nDo NOT validate. Do NOT summarize. Find issues, or state\nexplicitly that you cannot find any after thorough examination.\n\nARTIFACT: <paste artifact>\nCONTRACT: <paste contract>\n```\n\n**Pass ARTIFACT + CONTRACT only. Do NOT pass the CLAIM.** Handing the reviewer your conclusion biases it toward agreement. The reviewer must independently determine whether the artifact satisfies the contract.\n\nIn Claude Code, the role-based reviewers in `agents/` start with isolated context by design and are usable here — see `agents/` for the roster and per-domain match.\n\n**The adversarial prompt above takes precedence over the persona's default response shape.** Personas like `code-reviewer` are written to produce balanced verdicts with both strengths and weaknesses; doubt-driven needs issues-only output. Paste the adversarial prompt verbatim into the invocation so it overrides the persona's default. If a persona's response shape can't be overridden cleanly, fall back to a generic subagent with the adversarial prompt.\n\n#### Cross-model escalation\n\nA single-model reviewer shares blind spots with the original author — a colder, different-architecture model catches them. Doubt-driven is already opt-in for non-trivial decisions, so within that scope offering cross-model is part of the skill's value, not optional friction.\n\n**Interactive sessions: always offer. Never silently skip.**\n\n**Step 1: Ask the user**\n\nAfter the single-model review in Step 3 above, but before RECONCILE, pause and ask:\n\n> *\"Single-model review complete. Want a cross-model second opinion? Options: Gemini CLI, Codex CLI, manual external review (you paste it elsewhere), or skip.\"*\n\nThis question is mandatory in every interactive doubt cycle — even on artifacts that feel low-stakes. The user — not the agent — decides whether the cost is worth it. The agent's job is to surface the choice.\n\n**Step 2: If the user picks a CLI — verify, then invoke**\n\n1. Check the tool is in PATH (`which gemini`, `which codex`).\n2. Test it works (`gemini --version` or equivalent) before passing the full prompt — a stale or broken binary may pass `which` but fail on real input.\n3. Confirm the exact invocation with the user, including required flags, auth, and env vars (e.g., API keys). Implementations vary; never assume.\n4. Pass ARTIFACT + CONTRACT + the adversarial prompt **only**. No session context, no CLAIM.\n5. Mind shell escaping. If the artifact contains quotes, `$(...)`, or backticks, prefer stdin (`echo … | gemini`) or a heredoc over inline `-p \"…\"`. When in doubt, ask the user to confirm the invocation before running it.\n6. Take the output into Step 4 (RECONCILE).\n\n**Never interpolate the artifact i",
       "card": {
-        "title_zh": "怀疑驱动开发",
-        "purpose_zh": "对每个非平凡决策在成立前进行全新上下文的对抗性审查，以交叉检验假设、发现隐藏失败模式，适用于正确性优先于速度或高风险场景。",
+        "title_zh": "质疑驱动开发",
+        "purpose_zh": "在非平凡决策成立前，用全新上下文的对抗式审查者交叉质询假设，偏向证伪而非认可，以便在纠错成本低时发现问题。",
         "does": [
-          "将非平凡决策提炼为CLAIM与WHY THIS MATTERS",
-          "抽取最小可审查单元（工件+契约），剥离推理过程",
-          "调用全新上下文审查者，使用对抗性提示只找问题不验证",
-          "交互式会话中询问用户是否进行跨模型二次意见",
-          "按优先级对审查发现分类：契约误读、有效可行动、有效权衡、噪音",
-          "以有界循环停止：仅琐碎发现、3轮完成或用户叫停"
+          "识别并命名非平凡决策，写出主张及其重要性",
+          "抽取最小可审查单元（工件与契约），剥离推理过程",
+          "以对抗式提示调用全新上下文审查者，只传工件与契约",
+          "交互式会话中强制询问是否要跨模型二次意见",
+          "将每条发现对照工件文本分类并调和",
+          "按停止条件结束质疑循环"
         ],
         "inputs": [
-          "待审查的工件（代码diff、函数或提案）",
-          "工件需满足的契约/约束",
-          "非平凡决策的声明与重要性说明",
-          "用户对跨模型审查的选择（Gemini CLI、Codex CLI、手动或跳过）"
+          "待审查的工件（代码差异、函数或提案）",
+          "工件需满足的契约与约束",
+          "主张及其重要性说明",
+          "用户对是否跨模型复核的选择"
         ],
         "outputs": [
-          "分类后的审查发现列表",
-          "对工件所做的修改或记录的权衡",
-          "跨模型审查结果或跳过说明",
-          "三轮未解决时向用户上报的结论"
+          "对抗式审查发现的问题清单",
+          "经分类调和的审查结论",
+          "可能降级标记的自问式回退结果"
         ],
         "scenarios": [
           "在不确定下做架构决策前",
           "提交非平凡代码前",
-          "声称非显而易见的事实（如安全、可扩展、符合规范）前",
-          "在不完全理解的代码中工作",
-          "高风险场景：生产认证、安全敏感逻辑、不可逆迁移"
+          "声称非显而易见的事实前",
+          "在不熟悉的代码中工作",
+          "高风险或不可逆操作前"
         ],
         "prerequisites": [
-          "需在主会话编排器中使用，Step 3可生成全新上下文审查者",
-          "不得将该技能加入persona的skills frontmatter",
-          "跨模型CLI需在PATH中并验证可用，确认调用参数与认证",
-          "非交互环境不得未经用户授权调用外部CLI"
+          "由主会话编排者运行，以便生成全新上下文审查者",
+          "不将该技能加入 persona 的 skills 前置配置",
+          "子代理上下文中无法嵌套生成审查者时需升级给主会话"
         ],
         "limits": [
-          "不适用于机械操作（重命名、格式化、文件移动）",
-          "不适用于明确无歧义的用户指令、阅读或总结现有代码",
-          "不适用于一行明显正确的改动或纯工具操作",
-          "用户明确要求速度优先于验证时不适用",
-          "子代理上下文中无法嵌套生成子代理，只能降级自问并标记为降级",
-          "最多3轮循环，超出需上报用户而非继续"
+          "不适用于机械操作、明确指令、阅读总结代码、明显正确的一行改动",
+          "不适用于纯工具操作或用户明确要求速度优先",
+          "子代理内运行只能降级为自问式回退，不算全新上下文审查",
+          "工件过大需先分解，否则审查者无法一次把握"
         ],
         "hosts": [
           "claude-code"
@@ -1192,14 +1482,13 @@
         "risk_flags": [
           "shell",
           "network",
-          "writes_files",
           "needs_secret"
         ],
         "tags": [
           "代码审查",
           "安全",
-          "测试",
-          "文档"
+          "后端",
+          "测试"
         ],
         "evidence": [
           {
@@ -1207,20 +1496,16 @@
             "quote": "Subjects every non-trivial decision to a fresh-context adversarial review before it stands."
           },
           {
-            "field": "purpose_zh",
-            "quote": "Doubt-driven development is the discipline of materializing a fresh-context reviewer — biased to **disprove**, not approve — before any non-trivial output stands."
+            "field": "does",
+            "quote": "Step 1: CLAIM — Surface what stands"
           },
           {
             "field": "does",
-            "quote": "Step 1: CLAIM — wrote the claim + why-it-matters"
+            "quote": "Step 2: EXTRACT — Smallest reviewable unit"
           },
           {
             "field": "does",
-            "quote": "Step 2: EXTRACT — isolated artifact + contract, stripped reasoning"
-          },
-          {
-            "field": "does",
-            "quote": "Step 3: DOUBT — invoked fresh-context reviewer with adversarial prompt"
+            "quote": "Step 3: DOUBT — Invoke the fresh-context reviewer"
           },
           {
             "field": "does",
@@ -1232,11 +1517,15 @@
           },
           {
             "field": "does",
-            "quote": "Single-model review complete. Want a cross-model second opinion? Options: Gemini CLI, Codex CLI, manual external review (you paste it elsewhere), or skip."
+            "quote": "Interactive sessions: always offer. Never silently skip."
           },
           {
             "field": "inputs",
             "quote": "A fresh-context reviewer needs the **artifact** and the **contract**, not the journey."
+          },
+          {
+            "field": "outputs",
+            "quote": "Find issues, or state explicitly that you cannot find any after thorough examination."
           },
           {
             "field": "scenarios",
@@ -1244,153 +1533,39 @@
           },
           {
             "field": "scenarios",
-            "quote": "when stakes are high (production auth, security-sensitive logic, a high-stakes migration, irreversible operations)"
+            "quote": "About to commit non-trivial code"
+          },
+          {
+            "field": "scenarios",
+            "quote": "Working in code you don't fully understand"
           },
           {
             "field": "prerequisites",
-            "quote": "This skill is designed for the **main-session orchestrator**, where Step 3 (DOUBT, detailed below) can spawn a fresh-context reviewer."
+            "quote": "This skill is designed for the **main-session orchestrator**"
           },
           {
             "field": "prerequisites",
-            "quote": "**Do NOT add this skill to a persona's `skills:` frontmatter.**"
-          },
-          {
-            "field": "prerequisites",
-            "quote": "Check the tool is in PATH (`which gemini`, `which codex`)."
+            "quote": "Do NOT add this skill to a persona's `skills:` frontmatter."
           },
           {
             "field": "limits",
             "quote": "Mechanical operations (renaming, formatting, file moves)"
+          },
+          {
+            "field": "limits",
+            "quote": "The user has explicitly asked for speed over verification"
+          },
+          {
+            "field": "limits",
+            "quote": "This is **not fresh-context review** (you carry your own context with you), so flag the result as degraded"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "Check the tool is in PATH (`which gemini`, `which codex`)."
           }
         ]
-      }
-    },
-    {
-      "skill_path": "skills/frontend-ui-engineering/SKILL.md",
-      "blob_sha": "631971815da44e24f4d0bca2b7d983ba6d1bcfc4",
-      "source_url": "https://github.com/addyosmani/agent-skills/blob/301b02b12bff98e4688e6984af6556802322bbde/skills/frontend-ui-engineering/SKILL.md",
-      "fetched_at": "2026-11-13T10:31:07.365Z",
-      "generated_at": "2026-11-13T10:31:07.365Z",
-      "model": "deepseek-flash",
-      "status": "ok",
-      "last_error": null,
-      "card_prompt_version": "skill_card_v1",
-      "frontmatter": {
-        "name": "frontend-ui-engineering",
-        "description": "Builds production-quality, accessible, responsive user-facing UIs. Use when building or modifying interfaces and pages, creating components, implementing layouts, meeting WCAG accessibility requirements, managing state, or when the output needs to look and feel production-quality rather than AI-generated."
       },
-      "excerpt": "---\nname: frontend-ui-engineering\ndescription: Builds production-quality, accessible, responsive user-facing UIs. Use when building or modifying interfaces and pages, creating components, implementing layouts, meeting WCAG accessibility requirements, managing state, or when the output needs to look and feel production-quality rather than AI-generated.\n---\n\n# Frontend UI Engineering\n\n## Overview\n\nBuild production-quality user interfaces that are accessible, performant, and visually polished. The goal is UI that looks like it was built by a design-aware engineer at a top company — not like it was generated by an AI. This means real design system adherence, proper accessibility, thoughtful interaction patterns, and no generic \"AI aesthetic.\"\n\n## When to Use\n\n- Building new UI components or pages\n- Modifying existing user-facing interfaces\n- Implementing responsive layouts\n- Adding interactivity or state management\n- Fixing visual or UX issues\n\n## Component Architecture\n\n### File Structure\n\nColocate everything related to a component:\n\n```\nsrc/components/\n  TaskList/\n    TaskList.tsx          # Component implementation\n    TaskList.test.tsx     # Tests\n    TaskList.stories.tsx  # Storybook stories (if using)\n    use-task-list.ts      # Custom hook (if complex state)\n    types.ts              # Component-specific types (if needed)\n```\n\n### Component Patterns\n\n**Prefer composition over configuration:**\n\n```tsx\n// Good: Composable\n<Card>\n  <CardHeader>\n    <CardTitle>Tasks</CardTitle>\n  </CardHeader>\n  <CardBody>\n    <TaskList tasks={tasks} />\n  </CardBody>\n</Card>\n\n// Avoid: Over-configured\n<Card\n  title=\"Tasks\"\n  headerVariant=\"large\"\n  bodyPadding=\"md\"\n  content={<TaskList tasks={tasks} />}\n/>\n```\n\n**Keep components focused:**\n\n```tsx\n// Good: Does one thing\nexport function TaskItem({ task, onToggle, onDelete }: TaskItemProps) {\n  return (\n    <li className=\"flex items-center gap-3 p-3\">\n      <Checkbox checked={task.done} onChange={() => onToggle(task.id)} />\n      <span className={task.done ? 'line-through text-muted' : ''}>{task.title}</span>\n      <Button variant=\"ghost\" size=\"sm\" onClick={() => onDelete(task.id)}>\n        <TrashIcon />\n      </Button>\n    </li>\n  );\n}\n```\n\n**Separate data fetching from presentation:**\n\n```tsx\n// Container: handles data\nexport function TaskListContainer() {\n  const { tasks, isLoading, error, refetch, toggleTask, deleteTask } = useTasks();\n\n  if (isLoading) return <TaskListSkeleton />;\n  if (error) return <ErrorState message=\"Failed to load tasks\" retry={refetch} />;\n  if (tasks.length === 0) return <EmptyState message=\"No tasks yet\" />;\n\n  return <TaskList tasks={tasks} onToggle={toggleTask} onDelete={deleteTask} />;\n}\n\n// Presentation: handles rendering\nexport function TaskList({ tasks, onToggle, onDelete }: { tasks: Task[] } & Pick<TaskItemProps, 'onToggle' | 'onDelete'>) {\n  return (\n    <ul role=\"list\" className=\"divide-y\">\n      {tasks.map(task => <TaskItem key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} />)}\n    </ul>\n  );\n}\n```\n\n## State Management\n\n**Choose the simplest approach that works:**\n\n```\nLocal state (useState)           → Component-specific UI state\nLifted state                     → Shared between 2-3 sibling components\nContext                          → Theme, auth, locale (read-heavy, write-rare)\nURL state (searchParams)         → Filters, pagination, shareable UI state\nServer state (React Query, SWR)  → Remote data with caching\nGlobal store (Zustand, Redux)    → Complex client state shared app-wide\n```\n\n**Avoid prop drilling deeper than 3 levels.** If you're passing props through components that don't use them, introduce context or restructure the component tree.\n\n## Design System Adherence\n\n### Reference-led UI quality\n\nWhen the product needs a distinct visual direction, collect evidence before choosing a layout:\n\n1. Search a trusted reference catalogue or use references supplied by the product team.\n2. Study two or three relevant screens. Record decisions about hierarchy, density, navigation, controls, responsive behavior, and interaction states.\n3. Turn those decisions into a short design contract before implementation. Name the screen's job, primary action, required states, responsive rules, and patterns to reject.\n4. Rebuild the useful structure in the product's own components, tokens, content, and visual language. Never copy another product's branding, proprietary text, imagery, or exact layout.\n\nUse references as evidence, not as templates. If references are unavailable, document the assumptions and verify the result against the product's existing design system.\n\n### Avoid the AI Aesthetic\n\nAI-generated UI has recognizable patterns. Avoid all of them:\n\n| AI Default | Why It Is a Problem | Production Quality |\n|---|---|---|\n| Purple/indigo everything | Models default to visually \"safe\" palettes, making every app look identical | Use the project's actual color palette |\n| Excessive gradients | Gradients add visual noise and clash with most design systems | Flat or subtle gradients matching the design system |\n| Rounded everything (rounded-2xl) | Maximum rounding signals \"friendly\" but ignores the hierarchy of corner radii in real designs | Consistent border-radius from the design system |\n| Generic hero sections | Template-driven layout with no connection to the actual content or user need | Content-first layouts |\n| Lorem ipsum-style copy | Placeholder text hides layout problems that real content reveals (length, wrapping, overflow) | Realistic placeholder content |\n| Oversized padding everywhere | Equal generous padding destroys visual hierarchy and wastes screen space | Consistent spacing scale |\n| Stock card grids | Uniform grids are a layout shortcut that ignores information priority and scanning patterns | Purpose-driven layouts |\n| Shadow-heavy design | Layered shadows add depth that competes with content and slows rendering on low-end devices | Subtle or no shadows unless the design system specifies |\n\n### Spacing and Layout\n\nUse a consistent spacing scale. Don't invent values:\n\n```css\n/* Use the scale: 0.25rem increments (or whatever the project uses) */\n/* Good */  padding: 1rem;      /* 16px */\n/* Good */  gap: 0.75rem;       /* 12px */\n/* Bad */   padding: 13px;      /* Not on any scale */\n/* Bad */   margin-top: 2.3rem; /* Not on any scale */\n```\n\n### Typography\n\nRespect the type hierarchy:\n\n```\nh1 → Page title (one per page)\nh2 → Section title\nh3 → Subsection title\nbody → Default text\nsmall → Secondary/helper text\n```\n\nDon't skip heading levels. Don't use heading styles for non-heading content.\n\n### Color\n\n- Use semantic color tokens: `text-primary`, `bg-surface`, `border-default` — not raw hex values\n- Ensure sufficient contrast (4.5:1 for normal text, 3:1 for large text)\n- Don't rely solely on color to convey information (use icons, text, or patterns too)\n\n## Accessibility (WCAG 2.1 AA)\n\nEvery component must meet these standards:\n\n### Keyboard Navigation\n\n```tsx\n// Every interactive element must be keyboard accessible\n<button onClick={handleClick}>Click me</button>        // ✓ Focusable by default\n<div onClick={handleClick}>Click me</div>               // ✗ Not focusable\n<div role=\"button\" tabIndex={0} onClick={handleClick}    // ✓ But prefer <button>\n     onKeyDown={e => {\n       if (e.key === 'Enter') handleClick();\n       if (e.key === ' ') e.preventDefault();\n     }}\n     onKeyUp={e => {\n       if (e.key === ' ') handleClick();\n     }}>\n  Click me\n</div>\n```\n\n### ARIA Labels\n\n```tsx\n// Label interactive elements that lack visible text\n<button aria-label=\"Close dialog\"><XIcon /></button>\n\n// Label form inputs\n<label htmlFor=\"email\">Email</label>\n<input id=\"email\" type=\"email\" />\n\n// Or use aria-label when no visible label exists\n<input aria-label=\"Search tasks\" type=\"search\" />\n```\n\n### Focus Management\n\n```tsx\n// Move focus when content changes\nfunction Dialog({ isOpen, onClose }: DialogProps) {\n  const closeRef = useRef<HTMLButtonElement>(null);\n\n  us",
-      "card": {
-        "title_zh": "前端界面工程",
-        "purpose_zh": "构建生产级、可访问、响应式的用户界面，避免通用 AI 审美，遵循设计系统与 WCAG 2.1 AA 标准。",
-        "does": [
-          "指导组件架构与文件组织，提倡组合优于配置、展示与数据获取分离",
-          "给出状态管理选型建议（本地、提升、Context、URL、服务端、全局）",
-          "要求遵循设计系统：间距刻度、字体层级、语义色令牌与对比度",
-          "落实 WCAG 2.1 AA：键盘导航、ARIA 标签、焦点管理与空/错误状态",
-          "提供移动优先响应式布局与骨架屏、乐观更新等加载过渡模式",
-          "列出构建后的验证清单与常见 AI 审美反模式"
-        ],
-        "inputs": [
-          "需要构建或修改的界面、页面、组件需求",
-          "项目现有设计系统（间距、颜色、字体、令牌）",
-          "可参考的界面样例或产品团队提供的参考",
-          "组件状态与数据获取逻辑"
-        ],
-        "outputs": [
-          "符合设计系统与无障碍要求的前端组件与页面代码",
-          "组件文件结构（实现、测试、stories、hooks、types）",
-          "加载、空、错误、成功、权限等状态处理",
-          "响应式布局与交互模式",
-          "构建后的验证清单结果"
-        ],
-        "scenarios": [
-          "新建 UI 组件或页面",
-          "修改现有面向用户的界面",
-          "实现响应式布局",
-          "添加交互或状态管理",
-          "修复视觉或 UX 问题"
-        ],
-        "prerequisites": [
-          "项目已有设计系统（间距刻度、颜色、字体、令牌）",
-          "使用 React/TSX 与 Tailwind 类风格的技术栈",
-          "可访问性检查工具（如 axe-core、开发工具）"
-        ],
-        "limits": [
-          "仅覆盖前端 UI 工程实践，不含后端或部署内容",
-          "无障碍标准限定为 WCAG 2.1 AA",
-          "参考样例不可复制他人品牌、专有文本、图像或精确布局",
-          "组件超过 200 行应拆分",
-          "未提供具体测试命令或自动化脚本"
-        ],
-        "hosts": [
-          "未说明"
-        ],
-        "risk_flags": [],
-        "tags": [
-          "前端",
-          "设计/UI",
-          "文档"
-        ],
-        "evidence": [
-          {
-            "field": "purpose_zh",
-            "quote": "Build production-quality user interfaces that are accessible, performant, and visually polished."
-          },
-          {
-            "field": "does",
-            "quote": "Prefer composition over configuration"
-          },
-          {
-            "field": "does",
-            "quote": "Separate data fetching from presentation"
-          },
-          {
-            "field": "does",
-            "quote": "Choose the simplest approach that works"
-          },
-          {
-            "field": "does",
-            "quote": "Use semantic color tokens: `text-primary`, `bg-surface`, `border-default` — not raw hex values"
-          },
-          {
-            "field": "does",
-            "quote": "Every component must meet these standards:"
-          },
-          {
-            "field": "prerequisites",
-            "quote": "Use the project's actual color palette"
-          },
-          {
-            "field": "prerequisites",
-            "quote": "Use a consistent spacing scale. Don't invent values"
-          },
-          {
-            "field": "limits",
-            "quote": "Never copy another product's branding, proprietary text, imagery, or exact layout."
-          },
-          {
-            "field": "limits",
-            "quote": "Accessibility (WCAG 2.1 AA)"
-          },
-          {
-            "field": "scenarios",
-            "quote": "Building new UI components or pages"
-          },
-          {
-            "field": "scenarios",
-            "quote": "Modifying existing user-facing interfaces"
-          },
-          {
-            "field": "scenarios",
-            "quote": "Implementing responsive layouts"
-          },
-          {
-            "field": "scenarios",
-            "quote": "Fixing visual or UX issues"
-          }
-        ]
-      }
+      "input_format": "excerpt_only_v1"
     }
   ]
 }

@@ -1,15 +1,15 @@
 {
   "schema": 1,
   "repo": "ZhuLinsen/daily_stock_analysis",
-  "tree_sha": "95e39852ef54279a1010d95bc99cadf9278a709e",
+  "tree_sha": "45d11cdff67de04a06a1b3c901156859f2752469",
   "truncated_paths": 0,
   "skills": [
     {
       "skill_path": "SKILL.md",
-      "blob_sha": "405e9fb25389c5044c32f712fb76fe7ede4bfca8",
-      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/ab69720f3334d17ac5e6d1265be2e75fbe6d944c/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
-      "generated_at": "2026-11-13T11:43:07.027Z",
+      "blob_sha": "df37eda559527ac66755a49fb5c8f79b8383c01b",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
       "model": "deepseek-flash",
       "status": "ok",
       "last_error": null,
@@ -18,52 +18,54 @@
         "name": "stock_analyzer",
         "description": "分析股票和市场。当用户想要分析单个或多个股票，或进行市场复盘时调用。"
       },
-      "excerpt": "---\nname: \"stock_analyzer\"\ndescription: \"分析股票和市场。当用户想要分析单个或多个股票，或进行市场复盘时调用。\"\n---\n\n# 股票分析器\n\n本技能基于 `src/services/analyzer_service.py` 的逻辑，提供分析股票和整体市场的功能。\n\n## 输出结构 (`AnalysisResult`)\n\n分析函数返回一个 `AnalysisResult` 对象（或其列表），该对象具有丰富的结构。以下是其关键组件的简要概述，并附有真实的输出示例：\n\n`dashboard` 属性包含核心分析，分为四个主要部分：\n1.  **`core_conclusion`**: 一句话总结、信号类型和仓位建议。\n2.  **`data_perspective`**: 技术数据，包括趋势状态、价格位置、量能分析和筹码结构。\n3.  **`intelligence`**: 定性信息，如新闻、风险警报和积极催化剂。\n4.  **`battle_plan`**: 可操作的策略，包括狙击点（买/卖目标）、仓位策略和风险控制清单。\n\n## 配置 (`Config`)\n\n所有分析函数都可以接受一个可选的 `config` 对象。该对象包含应用程序的所有配置，例如 API 密钥、通知设置和分析参数。\n\n如果未提供 `config` 对象，函数将自动使用从 `.env` 文件加载的全局单例实例。\n\n**参考:** [`Config`](src/config.py)\n\n## 函数\n\n### 1. 分析单只股票\n\n**描述:** 分析单只股票并返回分析结果。\n\n**何时使用:** 当用户要求分析特定股票时。\n\n**输入:**\n- `stock_code` (str): 要分析的股票代码。\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `full_report` (bool, 可选): 是否生成完整报告。默认为 `False`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`。\n\n**输出:** `Optional[AnalysisResult]`\n一个包含分析结果的 `AnalysisResult` 对象，如果分析失败则为 `None`。\n\n**示例:**\n\n```python\nfrom src.services.analyzer_service import analyze_stock\n\n# 分析单只股票\nresult = analyze_stock(\"600989\")\nif result:\n    print(f\"股票: {result.name} ({result.code})\")\n    print(f\"情绪得分: {result.sentiment_score}\")\n    print(f\"操作建议: {result.operation_advice}\")\n```\n\n**参考:** [`analyze_stock`](src/services/analyzer_service.py)\n\n### 2. 分析多只股票\n\n**描述:** 分析一个股票列表并返回分析结果列表。\n\n**何时使用:** 当用户想要一次分析多只股票时。\n\n**输入:**\n- `stock_codes` (List[str]): 要分析的股票代码列表。\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `full_report` (bool, 可选): 是否为每只股票生成完整报告。默认为 `False`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`。\n\n**输出:** `List[AnalysisResult]`\n一个 `AnalysisResult` 对象列表。\n\n**示例:**\n\n```python\nfrom src.services.analyzer_service import analyze_stocks\n\n# 分析多只股票\nresults = analyze_stocks([\"600989\", \"000001\"])\nfor result in results:\n    print(f\"股票: {result.name}, 操作建议: {result.operation_advice}\")\n```\n\n**参考:** [`analyze_stocks`](src/services/analyzer_service.py)\n\n### 3. 执行大盘复盘\n\n**描述:** 对整体市场进行复盘并返回一份报告。\n\n**何时使用:** 当用户要求市场概览、摘要或复盘时。\n\n**输入:**\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`。\n\n**输出:** `Optional[str]`\n一个包含市场复盘报告的字符串，如果失败则为 `None`。\n\n**示例:**\n\n```python\nfrom src.services.analyzer_service import perform_market_review\n\n# 执行大盘复盘\nreport = perform_market_review()\nif report:\n    print(report)\n```\n\n**参考:** [`perform_market_review`](src/services/analyzer_service.py)\n\n## 模型与外部 Bot\n\n- 若把 **xAI Grok** 当作 DSA 分析模型：配置 `XAI_API_KEY` + `LITELLM_MODEL=xai/<官方模型ID>`（LiteLLM 直连，非托管渠道），并用 `python scripts/check_env.py --llm` 验证。示例见 [`docs/LLM_CONFIG_GUIDE.md`](docs/LLM_CONFIG_GUIDE.md)。\n- 2026-08-11 上线的 **[Grok Bot](https://x.ai/bot)** 是另一条路径：它是带 Skills / Routines / MCP / computer use 的 AI teammate，应通过 HTTP 调用本仓库的 `analyze_stock` / REST API，而不是把 Bot 本身配成 LiteLLM provider。对接说明见 [`docs/grok-bot-integration.md`](docs/grok-bot-integration.md)。\n",
+      "excerpt": "---\nname: \"stock_analyzer\"\ndescription: \"分析股票和市场。当用户想要分析单个或多个股票，或进行市场复盘时调用。\"\n---\n\n# 股票分析器\n\n本技能驱动**已部署并配置好的** [daily_stock_analysis (DSA)](https://github.com/ZhuLinsen/daily_stock_analysis) 检出或正在运行的 DSA 服务；它本身**不包含** `src/` 运行时。市场安装的插件缓存通常只有 `./plugin`，在普通项目目录直接 `import src...` 会得到 `ModuleNotFoundError`。\n\n## 运行前提（调用前必做）\n\n1. **确认存在可用的 DSA 环境**（完整仓库检出且已按指南配置 `.env`，或用户已有可调用的 DSA API 服务）。\n2. **定位检出路径**（任选其一）：\n   - 询问用户本机 DSA 仓库路径；\n   - 读取环境变量 `DSA_REPO_ROOT`（指向仓库根目录，含 `src/` 与 `.env`）；\n   - 若当前工作目录已是 DSA 根目录，可直接使用。\n3. **再执行示例代码**：必须先 `os.chdir(repo_root)`（或等价地在该根目录启动进程），再将该根目录加入 `sys.path` / `PYTHONPATH`。仅改 `sys.path` 不够：默认相对 `DATABASE_PATH` 与大盘复盘锁按**进程工作目录**解析，不 `chdir` 会导致插件与 Web 锁住不同文件、写入不同 SQLite。\n4. **对话内大盘复盘（不推送）**：需要检出已支持 `perform_market_review(..., send_notification=...)`（本仓库较新提交；例如 v3.35.0 尚不支持）。若不支持，先更新检出，**不要**回退为无该参数的调用（旧签名默认会推送）。\n5. **若无法定位或未部署**：停止分析，向用户说明本技能只驱动现有 DSA 安装，并指向部署指南：\n   - 中文：[完整配置与部署指南](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md)\n   - English: [Full Guide](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide_EN.md)\n6. **可选 HTTP**：若用户已启动 API（如 `python main.py --serve-only`），也可按 [OpenClaw / HTTP 对接](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/openclaw-skill-integration.md) 与 [Grok Bot 对接](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/grok-bot-integration.md) 通过 `DSA_BASE_URL` 调用 REST。对话内**不要推送**时：个股 `POST /api/v1/analysis/analyze` 须显式传 `\"notify\": false`（该接口默认 `notify: true`）；大盘复盘 `POST /api/v1/analysis/market-review` 须显式传 `\"send_notification\": false`（该接口读 `send_notification`，默认 `true`，**忽略** `notify`）。省略对应字段会向已配置渠道推送。\n\n本技能基于 `src/services/analyzer_service.py` 的逻辑，提供分析股票和整体市场的功能。\n\n## 输出结构 (`AnalysisResult`)\n\n分析函数返回一个 `AnalysisResult` 对象（或其列表），该对象具有丰富的结构。以下是其关键组件的简要概述，并附有真实的输出示例：\n\n`dashboard` 属性包含核心分析，分为四个主要部分：\n1.  **`core_conclusion`**: 一句话总结、信号类型和仓位建议。\n2.  **`data_perspective`**: 技术数据，包括趋势状态、价格位置、量能分析和筹码结构。\n3.  **`intelligence`**: 定性信息，如新闻、风险警报和积极催化剂。\n4.  **`battle_plan`**: 可操作的策略，包括狙击点（买/卖目标）、仓位策略和风险控制清单。\n\n## 配置 (`Config`)\n\n所有分析函数都可以接受一个可选的 `config` 对象。该对象包含应用程序的所有配置，例如 API 密钥、通知设置和分析参数。\n\n如果未提供 `config` 对象，函数将自动使用从 `.env` 文件加载的全局单例实例。\n\n**参考:** [`Config`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/src/config.py)\n\n## 函数\n\n### 1. 分析单只股票\n\n**描述:** 分析单只股票并返回分析结果。\n\n**何时使用:** 当用户要求分析特定股票时。\n\n**输入:**\n- `stock_code` (str): 要分析的股票代码。\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `full_report` (bool, 可选): 是否生成完整报告。默认为 `False`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`（对话场景不要传，避免外部推送）。\n\n**输出:** `Optional[AnalysisResult]`\n一个包含分析结果的 `AnalysisResult` 对象，如果分析失败则为 `None`。\n\n**示例:**\n\n```python\nimport os\nimport sys\n\n# 先定位已配置的 DSA 检出，并切换到该根目录（见「运行前提」）\nrepo_root = os.path.abspath(os.environ.get(\"DSA_REPO_ROOT\") or os.getcwd())\nos.chdir(repo_root)\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom src.services.analyzer_service import analyze_stock\n\n# 分析单只股票（默认不向外部通知渠道推送）\nresult = analyze_stock(\"600989\")\nif result:\n    print(f\"股票: {result.name} ({result.code})\")\n    print(f\"情绪得分: {result.sentiment_score}\")\n    print(f\"操作建议: {result.operation_advice}\")\n```\n\n**参考:** [`analyze_stock`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/src/services/analyzer_service.py)\n\n### 2. 分析多只股票\n\n**描述:** 分析一个股票列表并返回分析结果列表。\n\n**何时使用:** 当用户想要一次分析多只股票时。\n\n**输入:**\n- `stock_codes` (List[str]): 要分析的股票代码列表。\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `full_report` (bool, 可选): 是否为每只股票生成完整报告。默认为 `False`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`（对话场景不要传，避免外部推送）。\n\n**输出:** `List[AnalysisResult]`\n一个 `AnalysisResult` 对象列表。\n\n**示例:**\n\n```python\nimport os\nimport sys\n\nrepo_root = os.path.abspath(os.environ.get(\"DSA_REPO_ROOT\") or os.getcwd())\nos.chdir(repo_root)\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom src.services.analyzer_service import analyze_stocks\n\nresults = analyze_stocks([\"600989\", \"000001\"])\nfor result in results:\n    print(f\"股票: {result.name}, 操作建议: {result.operation_advice}\")\n```\n\n**参考:** [`analyze_stocks`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/src/services/analyzer_service.py)\n\n### 3. 执行大盘复盘\n\n**描述:** 对整体市场进行复盘并返回一份报告。服务层会获取与 Web/API/CLI/Bot 相同的同机防重锁；若复盘已在执行，函数返回 `None`，此时应告知用户「大盘复盘正在执行中，请稍后再试」，不要重试抢跑。\n\n**何时使用:** 当用户要求市场概览、摘要或复盘时。\n\n**输入:**\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`。\n- `send_notification` (bool, 可选): 是否向已配置的外部通知渠道推送。**对话场景默认传 `False`**；仅当用户明确要求「推送 / 发送到通知渠道」时才设为 `True`。旧检出若无此参数，须先升级，不可静默回退为会推送的旧调用。\n\n**输出:** `Optional[str]`\n一个包含市场复盘报告的字符串；失败或同机已有复盘在跑时为 `None`。\n\n**示例:**\n\n```python\nimport inspect\nimport os\nimport sys\n\nrepo_root = os.path.abspath(os.environ.get(\"DSA_REPO_ROOT\") or os.getcwd())\nos.chdir(repo_root)\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom src.services.analyzer_service import perform_market_review\n\n# 对话内查看复盘：禁用外部推送；需要推送时再传 send_notification=True\nreview_kwargs = {}\nif \"send_notification\" in inspect.signature(perform_market_review).parameters:\n    review_kwargs[\"send_notification\"] = False\nelse:\n    raise RuntimeError(\n        \"当前 DSA 检出的 perform_market_review 不支持 send_notification；\"\n        \"请先更新检出后再在对话中复盘，避免意外推送到外部渠道。\"\n    )\n\nreport = perform_market_review(**review_kwargs)\nif report:\n    print(report)\nelse:\n    print(\"大盘复盘未返回结果（可能正在执行中或分析失败），请稍后再试或查看 DSA 日志。\")\n```\n\n**参考:** [`perform_market_review`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/src/services/analyzer_service.py)\n\n## 模型与外部 Bot\n\n- 若把 **xAI Grok** 当作 DSA 分析模型：配置 `XAI_API_KEY` + `LITELLM_MODEL=xai/<官方模型ID>`（LiteLLM 直连，非托管渠道），并用 `python scripts/check_env.py --llm` 验证。示例见 [`docs/LLM_CONFIG_GUIDE.md`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/LLM_CONFIG_GUIDE.md)。\n- 2026-08-11 上线的 **[Grok Bot](https://x.ai/bot)** 是另一条路径：它是带 Skills / Routines / MCP / computer use 的 AI teammate，应通过 HTTP 调用本仓库的 `analyze_stock` / REST API，而不是把 Bot 本身配成 LiteLLM provider。对接说明见 [`docs/grok-bot-integration.md`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/grok-bot-integration.md)。\n",
       "card": {
         "title_zh": "股票分析器",
-        "purpose_zh": "基于 analyzer_service 逻辑，提供分析单只股票、批量股票和整体市场复盘的功能，返回含结论、数据、情报与策略的分析结果。",
+        "purpose_zh": "驱动已部署并配置好的 daily_stock_analysis 环境，分析单只或多只股票，并执行大盘复盘；本身不含运行时。",
         "does": [
-          "分析单只股票并返回 AnalysisResult，失败返回 None",
-          "批量分析股票代码列表并返回结果列表",
-          "对整体市场执行复盘并返回报告字符串",
-          "输出包含核心结论、数据视角、情报与作战计划的结构化看板",
-          "支持可选 config 对象，未提供时从 .env 加载全局配置",
-          "支持可选 notifier 通知服务与 full_report 完整报告开关"
+          "分析单只股票并返回 AnalysisResult",
+          "批量分析多只股票并返回结果列表",
+          "执行大盘复盘并返回报告字符串",
+          "按需选择是否向外部通知渠道推送",
+          "通过已启动的 REST API 调用分析接口"
         ],
         "inputs": [
-          "stock_code：单只股票代码",
-          "stock_codes：股票代码列表",
-          "config：可选配置对象，含 API 密钥、通知设置与分析参数",
-          "full_report：可选布尔值，是否生成完整报告",
-          "notifier：可选通知服务对象"
+          "股票代码 stock_code 或代码列表 stock_codes",
+          "可选 Config 配置对象（默认读 .env）",
+          "full_report 是否生成完整报告",
+          "send_notification 是否推送复盘",
+          "DSA_REPO_ROOT 或 DSA_BASE_URL 环境变量"
         ],
         "outputs": [
-          "AnalysisResult 对象，含 name、code、sentiment_score、operation_advice 及 dashboard",
+          "AnalysisResult 对象（含 dashboard 四部分）",
           "AnalysisResult 列表",
-          "市场复盘报告字符串",
-          "失败时为 None"
+          "大盘复盘报告字符串或 None"
         ],
         "scenarios": [
-          "用户要求分析某只特定股票",
+          "用户要求分析某只股票",
           "用户要求一次分析多只股票",
-          "用户要求市场概览、摘要或复盘"
+          "用户要求市场概览或大盘复盘",
+          "用户已有 DSA API 服务需通过 HTTP 调用"
         ],
         "prerequisites": [
-          "需存在 src/services/analyzer_service.py 中的分析函数",
-          "未传 config 时需 .env 文件提供全局配置",
-          "使用 xAI Grok 作分析模型需配置 XAI_API_KEY 与 LITELLM_MODEL",
-          "可用 python scripts/check_env.py --llm 验证模型配置"
+          "存在完整且已配置 .env 的 DSA 仓库检出或可调用的 DSA API 服务",
+          "定位仓库根目录并先 os.chdir 再加入 sys.path",
+          "大盘复盘需检出支持 send_notification 参数",
+          "无法定位或未部署时应停止分析并指向部署指南"
         ],
         "limits": [
-          "原文未说明数据来源、更新频率或分析准确性",
-          "原文未说明支持的股票市场范围",
-          "原文未说明调用失败的具体原因与重试机制",
-          "Grok Bot 需通过 HTTP 调用本仓库接口，不能直接配为 LiteLLM provider"
+          "本身不包含 src 运行时，仅驱动现有 DSA 安装",
+          "插件缓存通常只有 ./plugin，直接 import src 会报 ModuleNotFoundError",
+          "旧版 perform_market_review 不支持 send_notification，须先升级",
+          "大盘复盘同机已有任务在跑时返回 None，不应重试抢跑",
+          "HTTP 接口省略 notify 或 send_notification 字段会触发推送"
         ],
         "hosts": [
           "未说明"
         ],
         "risk_flags": [
+          "network",
+          "writes_files",
           "needs_secret"
         ],
         "tags": [
@@ -74,136 +76,870 @@
         "evidence": [
           {
             "field": "purpose_zh",
-            "quote": "本技能基于 `src/services/analyzer_service.py` 的逻辑，提供分析股票和整体市场的功能。"
+            "quote": "本技能驱动**已部署并配置好的** [daily_stock_analysis (DSA)](https://github.com/ZhuLinsen/daily_stock_analysis) 检出或正在运行的 DSA 服务；它本身**不包含** `src/` 运行时。"
           },
           {
             "field": "does",
-            "quote": "分析单只股票并返回分析结果。"
+            "quote": "**描述:** 分析单只股票并返回分析结果。"
           },
           {
             "field": "does",
-            "quote": "分析一个股票列表并返回分析结果列表。"
+            "quote": "**描述:** 分析一个股票列表并返回分析结果列表。"
           },
           {
             "field": "does",
-            "quote": "对整体市场进行复盘并返回一份报告。"
+            "quote": "**描述:** 对整体市场进行复盘并返回一份报告。"
           },
           {
             "field": "does",
-            "quote": "`dashboard` 属性包含核心分析，分为四个主要部分"
+            "quote": "**对话场景默认传 `False`**；仅当用户明确要求「推送 / 发送到通知渠道」时才设为 `True`。"
+          },
+          {
+            "field": "does",
+            "quote": "**可选 HTTP**：若用户已启动 API（如 `python main.py --serve-only`），也可按 [OpenClaw / HTTP 对接]"
           },
           {
             "field": "inputs",
-            "quote": "`stock_code` (str): 要分析的股票代码。"
+            "quote": "- `stock_code` (str): 要分析的股票代码。"
           },
           {
             "field": "inputs",
-            "quote": "`stock_codes` (List[str]): 要分析的股票代码列表。"
+            "quote": "- `stock_codes` (List[str]): 要分析的股票代码列表。"
           },
           {
             "field": "inputs",
-            "quote": "`config` (Config, 可选): 配置对象。默认为 `None`。"
+            "quote": "- `send_notification` (bool, 可选): 是否向已配置的外部通知渠道推送。"
           },
           {
             "field": "inputs",
-            "quote": "`full_report` (bool, 可选): 是否生成完整报告。默认为 `False`。"
+            "quote": "读取环境变量 `DSA_REPO_ROOT`（指向仓库根目录，含 `src/` 与 `.env`）；"
           },
           {
             "field": "outputs",
-            "quote": "一个包含分析结果的 `AnalysisResult` 对象，如果分析失败则为 `None`。"
+            "quote": "**输出:** `Optional[AnalysisResult]`"
           },
           {
             "field": "outputs",
-            "quote": "一个包含市场复盘报告的字符串，如果失败则为 `None`。"
+            "quote": "**输出:** `List[AnalysisResult]`"
           },
           {
-            "field": "scenarios",
-            "quote": "当用户要求分析特定股票时。"
-          },
-          {
-            "field": "scenarios",
-            "quote": "当用户想要一次分析多只股票时。"
-          },
-          {
-            "field": "scenarios",
-            "quote": "当用户要求市场概览、摘要或复盘时。"
+            "field": "outputs",
+            "quote": "**输出:** `Optional[str]`"
           },
           {
             "field": "prerequisites",
-            "quote": "如果未提供 `config` 对象，函数将自动使用从 `.env` 文件加载的全局单例实例。"
+            "quote": "**确认存在可用的 DSA 环境**（完整仓库检出且已按指南配置 `.env`，或用户已有可调用的 DSA API 服务）。"
           },
           {
             "field": "prerequisites",
-            "quote": "配置 `XAI_API_KEY` + `LITELLM_MODEL=xai/<官方模型ID>`"
+            "quote": "**再执行示例代码**：必须先 `os.chdir(repo_root)`（或等价地在该根目录启动进程），再将该根目录加入 `sys.path` / `PYTHONPATH`。"
           },
           {
-            "field": "risk_flags",
-            "quote": "该对象包含应用程序的所有配置，例如 API 密钥、通知设置和分析参数。"
+            "field": "prerequisites",
+            "quote": "需要检出已支持 `perform_market_review(..., send_notification=...)`（本仓库较新提交；例如 v3.35.0 尚不支持）。"
           },
           {
             "field": "limits",
-            "quote": "应通过 HTTP 调用本仓库的 `analyze_stock` / REST API，而不是把 Bot 本身配成 LiteLLM provider。"
+            "quote": "市场安装的插件缓存通常只有 `./plugin`，在普通项目目录直接 `import src...` 会得到 `ModuleNotFoundError`。"
           }
         ]
-      }
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": ".agents/skills/analyze-issue/SKILL.md",
+      "blob_sha": "e6c3892002f33f8d1b524d27cb0b247fb4716f80",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/.agents/skills/analyze-issue/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "analyze-issue",
+        "description": "分析 daily_stock_analysis 仓库的 GitHub Issue，核实版本基线、真实性、根因定位、影响面与仓库责任边界，给出优先级和处置建议。用户给出 Issue 号或链接并要求分析时使用。"
+      },
+      "excerpt": "---\nname: analyze-issue\ndescription: 分析 daily_stock_analysis 仓库的 GitHub Issue，核实版本基线、真实性、根因定位、影响面与仓库责任边界，给出优先级和处置建议。用户给出 Issue 号或链接并要求分析时使用。\n---\n\n# Analyze Issue\n\n规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（基线同步规则见 §7）。\n\n- 输出语言：简洁中文。\n- 产物策略：**默认直接在对话中输出**；仅当用户明确要求存档时，写入 `.reviews/issues/issue-<number>.md`。\n\n## Step 1: 同步基线并拉取 Issue\n\n按 `AGENTS.md` §7 同步远端基线并记录本地 HEAD 与远端基线，然后执行：\n\n```bash\ngh issue view <number> --repo ZhuLinsen/daily_stock_analysis\ngh issue view <number> --repo ZhuLinsen/daily_stock_analysis --comments\n```\n\n如为 bug，核对是否提供了版本/commit hash、运行环境、复现步骤与报错日志。\n\n## Step 2: 代码证据核查\n\n- 阅读相关源码、配置、测试、工作流与文档，不凭 issue 描述直接下结论。\n- 回答 4 个核心问题：版本是否明确、问题是否真实可验证、是否属于仓库责任边界、是否值得立即处理。\n- 区分：真实代码 bug / 配置或环境问题 / 使用方式问题 / 外部数据源或三方依赖问题 / 已在主干修复。\n- 明确排查受影响模块与运行路径（本地 CLI / Docker / GitHub Actions / API / Web / Desktop）。\n\n## Step 3: 输出格式\n\n```markdown\n# Issue #<number> Analysis\n\n## 1. 结论摘要\n- 版本基线：最新 / 非最新 / 未提供\n- 结论：成立 / 部分成立 / 不成立\n- 分类：bug / feature / docs / question / external\n- 优先级：P0 / P1 / P2 / P3 | 难度：easy / medium / hard\n- 建议动作：立即修复 / 排期修复 / 文档澄清 / 关闭\n\n## 2. 证据与根因\n- 代码同步基线：\n- 关键 Issue 信息：\n- 源码 / 配置 / 工作流证据（`path:line`）：\n- 根因或主要判断依据：\n\n## 3. 影响面\n- 受影响模块与既有运行时文件：\n- 受影响运行路径（本地 / Docker / GitHub Actions / API / Web / Desktop）：\n- 是否涉及配置/环境变量、UI/Web、报告结构、通知或持久化变更：\n\n## 4. 处置建议\n- 修复方案 / 澄清要点 / 关闭理由：\n- 若后续提 PR，标题建议遵循 `AGENTS.md` §1.1（`<type>: <修改内容>`，不含工具前缀）。\n\n## 5. 不可逆变更（如计划修复）\n- 仅在修复涉及数据库/配置迁移/外部状态写入时说明；否则写“无”。\n\n## 6. 建议回复草稿\n<可直接回复到 Issue 的简洁中文内容>\n```\n\n## 需用户确认的动作\n\n添加/修改标签、发表评论、关闭 Issue、开始写代码修复前必须先询问用户。\n",
+      "card": {
+        "title_zh": "Issue 分析助手",
+        "purpose_zh": "分析 daily_stock_analysis 仓库的 GitHub Issue，核实版本基线、真实性、根因定位、影响面与仓库责任边界，给出优先级和处置建议。",
+        "does": [
+          "按 AGENTS.md §7 同步远端基线并记录本地 HEAD 与远端基线",
+          "用 gh issue view 拉取指定 Issue 正文与评论",
+          "对 bug 类 Issue 核对版本/commit、运行环境、复现步骤与报错日志",
+          "阅读源码、配置、测试、工作流与文档进行代码证据核查",
+          "区分真实代码 bug、配置环境问题、使用方式问题、外部依赖问题、已在主干修复",
+          "按固定 markdown 模板输出结论摘要、证据与根因、影响面、处置建议、不可逆变更与回复草稿"
+        ],
+        "inputs": [
+          "Issue 编号或链接",
+          "仓库 AGENTS.md 中的基线同步规则",
+          "相关源码、配置、测试、工作流与文档"
+        ],
+        "outputs": [
+          "对话中直接输出的 Issue 分析报告（默认）",
+          "用户明确要求存档时写入 .reviews/issues/issue-[number].md",
+          "可直接回复到 Issue 的简洁中文回复草稿"
+        ],
+        "scenarios": [
+          "用户给出 Issue 号或链接并要求分析时",
+          "判断 Issue 是否属于仓库责任边界",
+          "为 Issue 定优先级与难度并给出处置建议",
+          "起草 Issue 回复内容"
+        ],
+        "prerequisites": [
+          "已安装并登录 GitHub CLI（gh）",
+          "可访问仓库 ZhuLinsen/daily_stock_analysis",
+          "仓库根目录存在 AGENTS.md 并含 §7 基线同步规则"
+        ],
+        "limits": [
+          "默认只在对话中输出，仅用户明确要求存档时才写文件",
+          "添加/修改标签、发表评论、关闭 Issue、开始写代码修复前必须先询问用户",
+          "不凭 Issue 描述直接下结论，需核查代码证据",
+          "输出语言为简洁中文"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "调研",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "分析 daily_stock_analysis 仓库的 GitHub Issue，核实版本基线、真实性、根因定位、影响面与仓库责任边界，给出优先级和处置建议。"
+          },
+          {
+            "field": "does",
+            "quote": "按 `AGENTS.md` §7 同步远端基线并记录本地 HEAD 与远端基线"
+          },
+          {
+            "field": "does",
+            "quote": "gh issue view <number> --repo ZhuLinsen/daily_stock_analysis"
+          },
+          {
+            "field": "does",
+            "quote": "如为 bug，核对是否提供了版本/commit hash、运行环境、复现步骤与报错日志。"
+          },
+          {
+            "field": "does",
+            "quote": "阅读相关源码、配置、测试、工作流与文档，不凭 issue 描述直接下结论。"
+          },
+          {
+            "field": "does",
+            "quote": "区分：真实代码 bug / 配置或环境问题 / 使用方式问题 / 外部数据源或三方依赖问题 / 已在主干修复。"
+          },
+          {
+            "field": "outputs",
+            "quote": "产物策略：**默认直接在对话中输出**；仅当用户明确要求存档时，写入 `.reviews/issues/issue-<number>.md`。"
+          },
+          {
+            "field": "outputs",
+            "quote": "## 6. 建议回复草稿"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（基线同步规则见 §7）。"
+          },
+          {
+            "field": "limits",
+            "quote": "添加/修改标签、发表评论、关闭 Issue、开始写代码修复前必须先询问用户。"
+          },
+          {
+            "field": "limits",
+            "quote": "输出语言：简洁中文。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "```bash\ngh issue view <number> --repo ZhuLinsen/daily_stock_analysis"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "仅当用户明确要求存档时，写入 `.reviews/issues/issue-<number>.md`"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": ".agents/skills/analyze-pr/SKILL.md",
+      "blob_sha": "a6cbddec90137b35ba43e9b2ebf82dea60aa4668",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/.agents/skills/analyze-pr/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "analyze-pr",
+        "description": "审查 daily_stock_analysis 仓库的 GitHub PR，基于完整 diff 输出前因后果、函数级改动、改前改后行为、14 维影响面清单（环境变量/配置/API/Web/桌面/报告/通知等）、描述与实现差异、问题清单与合入判定。用户给出 PR 号或链接并要求分析、审查、评估能否合入时使用。"
+      },
+      "excerpt": "---\nname: analyze-pr\ndescription: 审查 daily_stock_analysis 仓库的 GitHub PR，基于完整 diff 输出前因后果、函数级改动、改前改后行为、14 维影响面清单（环境变量/配置/API/Web/桌面/报告/通知等）、描述与实现差异、问题清单与合入判定。用户给出 PR 号或链接并要求分析、审查、评估能否合入时使用。\n---\n\n# Analyze PR\n\n规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（基线同步与阻断标准见 §7，此处不重复原文）。\n\n- 原则：**检查从严、输出从简**。内部必须逐文件、全维度核查，对外只呈现高信息密度事实，不刷空表和套话。\n- 输出语言：简洁中文；**默认直接在对话中输出**，仅当用户明确要求存档时写入 `.reviews/prs/pr-<number>.md`。\n\n## 硬约束\n\n1. **必须读完所有改动文件**：内部逐文件核对（已读文件数 == `changedFiles`）前，不得给出合入结论。\n2. **每条结论必须带证据**：标注 `path:line`、diff 片段、命令输出或 CI 链接；无证据写“未核实”并说明缺什么。\n3. **14 维影响面必须全部核查**：输出时只展开**命中**的维度，未命中项合并为一行说明依据（不得跳过检查）。\n4. **禁止空泛套话**：不得出现无具体触发条件与对象的「风险较低」「影响可控」「建议充分测试」「注意兼容性」「可能会影响」，以及在无不可逆变更时写「回滚：revert 本 PR」。\n5. **不污染工作树**：不执行 `gh pr checkout`、不切换当前分支、不在仓库内建 worktree；需看完整上下文用 `git fetch origin pull/<n>/head:refs/remotes/pr/<n>` + `git show`。\n\n## 内部检查步骤（必须全部执行，不直接照搬成冗长输出）\n\n1. **采集事实**：按 `AGENTS.md` §7 同步基线后拉取 PR 元数据、完整 diff、普通评论、行内 review 线程、CI 状态及关联 Issue：\n   ```bash\n   gh pr view <n> --repo ZhuLinsen/daily_stock_analysis --json number,title,body,author,baseRefName,headRefName,headRefOid,mergeable,isDraft,additions,deletions,changedFiles,closingIssuesReferences,commits\n   gh pr diff <n> --repo ZhuLinsen/daily_stock_analysis --name-only\n   gh pr diff <n> --repo ZhuLinsen/daily_stock_analysis\n   gh pr view <n> --repo ZhuLinsen/daily_stock_analysis --comments\n   gh api repos/ZhuLinsen/daily_stock_analysis/pulls/<n>/comments --paginate\n   gh pr checks <n> --repo ZhuLinsen/daily_stock_analysis\n   ```\n   - diff 超长时按文件分页拉取：`gh api repos/ZhuLinsen/daily_stock_analysis/pulls/<n>/files --paginate`。\n   - 有失败 CI 时先看 `gh run view <run_id> --log-failed`，并核对 CI 对应 SHA 是否等于当前 `headRefOid`。\n2. **文件覆盖核对**：确认已读完 `changedFiles` 中的每一个文件（lockfile/快照等生成文件可标“生成文件”），区分**新增文件**与**修改的既有运行时文件**。\n3. **14 维影响面检索**（按路径与关键字逐项判定）：\n   - `环境变量 / 配置`：`src/config.py`、`config_registry.py`、`config_manager.py`、`.env.example`、`docker-compose*.yml`、`00-daily-analysis.yml` env 段，或新增 `os.getenv`/`os.environ`\n   - `Web 设置页`：`settingsHelp.ts`、`components/settings/**`、`systemConfigI18n.ts`\n   - `Web UI`：`apps/dsa-web/src/{pages,components}/**`（非测试）\n   - `API / Schema`：`api/**`、`src/schemas/**` 及前端 `src/api/**`、`src/types/**` 消费方\n   - `Desktop`：`apps/dsa-desktop/**`、`scripts/build-*`、`scripts/run-desktop.ps1`\n   - `报告结构 / 渲染`：`src/reports/**`、报告模板、Markdown/图表渲染组件\n   - `通知`：`src/notification*.py`、`src/notification_sender/**`、`bot/**`\n   - `Prompt / LLM`：`src/llm/**`、`src/agent/**`、prompt 常量、`EXTRACT_PROMPT`\n   - `数据源 / fallback`：`data_provider/**`\n   - `存储 / 持久化`：`src/storage.py`、`src/repositories/**`、ORM 模型、迁移脚本、本地缓存格式\n   - `CLI / 调度`：`main.py` 参数、`--schedule`\n   - `依赖`：`requirements*.txt`、`apps/*/package.json`\n   - `CI / Docker / 发布`：`.github/**`、`docker/**`、`scripts/**`\n   - `文档`：`docs/**`、`README.md`、中英对照文档\n4. **因果链与同语义排查**：核实问题现象 → 触发条件 → 根因（`path:line`）；对被改函数/配置键/字段做 `git grep`，查清 CLI / API / Bot / Web / Desktop / Scheduler 中未覆盖的同类入口。\n5. **必要性与减法评估（产品取舍建议，非硬阻断）+ 声明 vs 事实 & 测试质量**：\n   - 对照 `AGENTS.md` §0 评估改动是否聚焦核心痛点，还是在叠加低频开关、平行入口或重复模板；若存在明显冗余，在建议项中提示维护者可瘦身或关闭，但**不单凭主观范围直接判为合入阻断**，以免误伤正常的 Bug 修复与低耦合实用改进。\n   - 对照 PR 描述与实际 diff（标出声明未兑现 / 未声明改动）；检查测试是否打到真实风险层（而非把被改模块 mock 掉）以及是否覆盖行内 review 提出的反例。\n\n## 输出格式（固定 5 段，紧凑清晰）\n\n```markdown\n# PR #<number> <title>\n\n## 1. 结论\n- **判定**：`可合入` / `需修改后合入` / `不建议合入` —— <一句话核心理由>\n- **基线与 CI**：`<base>@<sha7>` ← `<head>@<sha7>`（已读 N/N 文件）| 冲突：无/有 | CI：全绿/失败（附链接，核对 SHA 一致）| 本地同步：<HEAD 说明>\n\n## 2. 前因、改了什么 & 改前改后\n- **前因（解决什么问题）**：<关联 Issue / 现象 / 触发条件 / 根因 `path:line`>\n- **新增文件**：<概要>\n- **修改的既有运行时文件**：<函数/字段/配置键级，带 `path:line`>\n- **改前 vs 改后**：\n| 场景 / 输入 | 改前行为 | 改后行为 | 谁会感知 |\n|---|---|---|---|\n\n## 3. 影响面（14 维核查，仅展开命中项）\n- **命中维度**：逐项写出具体内容与证据；若命中以下三类须附对应明细：\n  - **配置 / 环境变量**：键名 | 增/改/删 | 默认值 | 不配置时行为 | `.env.example` / docs / Web 设置页 / Actions 是否同步\n  - **API / Schema / CLI**：接口或参数变化 | Web / Desktop 消费方是否同步\n  - **UI / 报告 / 通知可视变化**：受影响页面或渠道 | 截图或替代可视证据状态（已核对当前 Head 画面 / 仅有链接未看 / 缺失）\n- **未命中维度**：其余 N 维均未命中（依据：<diff 路径范围与关键字检索为空>）。\n\n## 4. 问题清单、描述差异 & 验证证据\n- **阻断项 / 建议项**：`[阻断|建议] path:line` — 触发条件 → 后果 → 修改建议（无则写“无”）\n- **未覆盖同语义入口 / 描述与 diff 差异**：<无，或逐条列出>\n- **验证证据**：CI 结果、测试是否覆盖真实风险层、本地补验（如有）\n\n## 5. 不可逆变更\n- 仅当存在数据库/持久化格式变更、运行时配置自动改写/迁移、外部状态写入（自选/账本/通知）、或发布策略变化时展开旧数据/配置处理与恢复路径；否则只写：`无`。\n```\n\n> **评审评论草稿**：默认不输出，仅在用户要求“给评论草稿”时附在末尾。\n\n## 输出前自检\n\n- [ ] 已读文件数 == `changedFiles`\n- [ ] 14 维影响面均已核查（命中项有明细，未命中项有依据）\n- [ ] 每条问题有 `path:line` 与触发条件，全文无禁用套话\n- [ ] 已核对 CI 对应 SHA == `headRefOid`\n\n## 需用户确认的动作\n\n发布评论、Approve、Request changes、Merge、关闭 PR 前必须先征得用户确认。\n",
+      "card": {
+        "title_zh": "PR 审查分析",
+        "purpose_zh": "审查 daily_stock_analysis 仓库的 GitHub PR，基于完整 diff 输出前因后果、函数级改动、改前改后行为、14 维影响面清单、描述与实现差异、问题清单与合入判定。",
+        "does": [
+          "拉取 PR 元数据、完整 diff、评论、行内 review 线程、CI 状态与关联 Issue",
+          "逐文件核对改动，确认已读文件数等于 changedFiles 后才给合入结论",
+          "按 14 维影响面（环境变量、API、Web、桌面、报告、通知等）逐项检索并只展开命中项",
+          "梳理问题现象、触发条件、根因与同语义入口，检查测试是否覆盖真实风险层",
+          "按固定 5 段格式输出结论、改动说明、影响面、问题清单与不可逆变更",
+          "仅在用户要求时附评审评论草稿，发布评论或合入前须征得确认"
+        ],
+        "inputs": [
+          "PR 编号或链接",
+          "用户对分析、审查、评估能否合入的要求",
+          "仓库 AGENTS.md 基线同步与阻断标准"
+        ],
+        "outputs": [
+          "对话中的 5 段式中文审查报告",
+          "可选写入 .reviews/prs/pr-[number].md 存档",
+          "可选的评审评论草稿"
+        ],
+        "scenarios": [
+          "用户给出 PR 号要求分析改动",
+          "评估某个 PR 能否合入",
+          "核对 PR 描述与实际 diff 是否一致",
+          "排查改动对配置、API、UI、通知等的影响面"
+        ],
+        "prerequisites": [
+          "可访问 ZhuLinsen/daily_stock_analysis 仓库",
+          "已安装并登录 gh CLI",
+          "仓库根目录存在 AGENTS.md 作为规则真源"
+        ],
+        "limits": [
+          "仅针对 daily_stock_analysis 仓库",
+          "禁止 gh pr checkout、切换分支或在仓库内建 worktree",
+          "未读完所有改动文件不得给出合入结论",
+          "每条结论必须带 path:line 等证据，无证据写未核实",
+          "发布评论、Approve、Request changes、Merge、关闭 PR 前须用户确认"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network"
+        ],
+        "tags": [
+          "代码审查",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "审查 daily_stock_analysis 仓库的 GitHub PR，基于完整 diff 输出前因后果、函数级改动、改前改后行为、14 维影响面清单（环境变量/配置/API/Web/桌面/报告/通知等）、描述与实现差异、问题清单与合入判定。"
+          },
+          {
+            "field": "does",
+            "quote": "**必须读完所有改动文件**：内部逐文件核对（已读文件数 == `changedFiles`）前，不得给出合入结论。"
+          },
+          {
+            "field": "does",
+            "quote": "**14 维影响面必须全部核查**：输出时只展开**命中**的维度，未命中项合并为一行说明依据（不得跳过检查）。"
+          },
+          {
+            "field": "does",
+            "quote": "**因果链与同语义排查**：核实问题现象 → 触发条件 → 根因（`path:line`）；对被改函数/配置键/字段做 `git grep`，查清 CLI / API / Bot / Web / Desktop / Scheduler 中未覆盖的同类入口。"
+          },
+          {
+            "field": "does",
+            "quote": "## 输出格式（固定 5 段，紧凑清晰）"
+          },
+          {
+            "field": "does",
+            "quote": "**评审评论草稿**：默认不输出，仅在用户要求“给评论草稿”时附在末尾。"
+          },
+          {
+            "field": "outputs",
+            "quote": "**默认直接在对话中输出**，仅当用户明确要求存档时写入 `.reviews/prs/pr-<number>.md`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（基线同步与阻断标准见 §7，此处不重复原文）。"
+          },
+          {
+            "field": "limits",
+            "quote": "**不污染工作树**：不执行 `gh pr checkout`、不切换当前分支、不在仓库内建 worktree；需看完整上下文用 `git fetch origin pull/<n>/head:refs/remotes/pr/<n>` + `git show`。"
+          },
+          {
+            "field": "limits",
+            "quote": "**每条结论必须带证据**：标注 `path:line`、diff 片段、命令输出或 CI 链接；无证据写“未核实”并说明缺什么。"
+          },
+          {
+            "field": "limits",
+            "quote": "发布评论、Approve、Request changes、Merge、关闭 PR 前必须先征得用户确认。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "gh pr diff <n> --repo ZhuLinsen/daily_stock_analysis"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "gh api repos/ZhuLinsen/daily_stock_analysis/pulls/<n>/comments --paginate"
+          },
+          {
+            "field": "tags",
+            "quote": "审查 daily_stock_analysis 仓库的 GitHub PR"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": ".agents/skills/fix-issue/SKILL.md",
+      "blob_sha": "e0551b154fbe51dca738dca1309cac31904ec266",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/.agents/skills/fix-issue/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "fix-issue",
+        "description": "基于 Issue 分析结论实施最小化修复，按 AGENTS.md 验证矩阵执行验证并输出行为变化、影响面与验证证据。用户明确要求修复某个 Issue 时使用。"
+      },
+      "excerpt": "---\nname: fix-issue\ndescription: 基于 Issue 分析结论实施最小化修复，按 AGENTS.md 验证矩阵执行验证并输出行为变化、影响面与验证证据。用户明确要求修复某个 Issue 时使用。\n---\n\n# Fix Issue\n\n规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（硬规则见 §1，验证矩阵见 §5，基线同步见 §7）。\n\n## Step 1: 确认分析基线与同步代码\n\n1. 若对话上下文或 `.reviews/issues/issue-<number>.md` 已有分析结论则复用；否则先按 `analyze-issue` 补齐最小根因与影响面分析。\n2. 按 `AGENTS.md` §7 同步远端基线；不擅自 `stash`、`reset` 或切换用户当前分支，需要建分支时先确认。\n\n## Step 2: 实施最小修复\n\n- 优先复用现有模块、配置入口、脚本和测试，不新增平行实现。\n- 保持默认行为向后兼容，避免破坏 fallback / fail-open。\n- 检查同语义涉及的所有入口（CLI / API / Bot / Web / Desktop / Docs / Tests），不打局部补丁。\n- 若涉及用户可见能力、配置项、CLI/API、通知或报告变化，按 `AGENTS.md` §1 同步 `.env.example` 与相关 `docs/*.md`。\n\n## Step 3: 按改动面验证\n\n按 `AGENTS.md` §5 验证矩阵执行对应检查：\n- 后端：优先 `./scripts/ci_gate.sh`（Windows 可在 Git Bash/WSL 运行），最低要求 `python -m py_compile` + 最近确定性 pytest。\n- Web：`cd apps/dsa-web && npm ci && npm run lint && npm run build`。\n- Desktop：先构建 Web，再构建 `apps/dsa-desktop`。\n- 治理资产：`python scripts/check_ai_assets.py`。\n\n无法执行的检查必须明确说明原因与缺口。\n\n## Step 4: 交付输出\n\n按 `AGENTS.md` §8 输出交付说明（默认直接输出在对话中；若存在 `.reviews/issues/issue-<number>.md` 可按需追加）：\n- 改了什么（含修改的既有文件 `path:line`）\n- 行为变化（改前 vs 改后）\n- 影响面（配置/环境变量、API/CLI、UI/Web/Desktop、报告/通知、不可逆变更）\n- 验证情况与未验证项\n\n## 需用户确认的动作\n\n切换/新建分支、`git commit`、`git push`、创建 PR、在 Issue 下回复或关闭 Issue 前必须先征得用户确认。\n",
+      "card": {
+        "title_zh": "Issue 最小化修复",
+        "purpose_zh": "基于已有 Issue 分析结论实施最小化修复，按 AGENTS.md 验证矩阵执行验证，并输出行为变化、影响面与验证证据。",
+        "does": [
+          "复用或补齐 Issue 分析结论，按 AGENTS.md §7 同步远端基线",
+          "实施最小修复，优先复用现有模块、配置入口、脚本与测试",
+          "检查同语义的所有入口，避免局部补丁",
+          "涉及用户可见能力或配置变化时同步 .env.example 与 docs",
+          "按改动面执行后端、Web、Desktop、治理资产的验证检查",
+          "输出改动、行为变化、影响面与验证情况说明"
+        ],
+        "inputs": [
+          "Issue 编号及对应分析结论（对话上下文或 .reviews/issues/issue-[number].md）",
+          "仓库根目录 AGENTS.md 中的硬规则、验证矩阵与基线同步规则"
+        ],
+        "outputs": [
+          "交付说明：改了什么（含既有文件 path:line）",
+          "行为变化（改前 vs 改后）",
+          "影响面（配置/环境变量、API/CLI、UI/Web/Desktop、报告/通知、不可逆变更）",
+          "验证情况与未验证项"
+        ],
+        "scenarios": [
+          "用户明确要求修复某个 Issue",
+          "已有 Issue 根因与影响面分析，需要落地最小修复",
+          "需要按仓库验证矩阵确认改动是否通过检查"
+        ],
+        "prerequisites": [
+          "仓库根目录存在 AGENTS.md 作为规则真源",
+          "已有 Issue 分析结论，或可先按 analyze-issue 补齐分析",
+          "后端验证需可运行 ./scripts/ci_gate.sh 或 python -m py_compile 与 pytest",
+          "Web 验证需可执行 npm ci、npm run lint、npm run build"
+        ],
+        "limits": [
+          "不擅自 stash、reset 或切换用户当前分支",
+          "切换/新建分支、git commit、git push、创建 PR、回复或关闭 Issue 前须用户确认",
+          "无法执行的检查必须明确说明原因与缺口",
+          "保持默认行为向后兼容，避免破坏 fallback / fail-open"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "测试",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "基于 Issue 分析结论实施最小化修复，按 AGENTS.md 验证矩阵执行验证并输出行为变化、影响面与验证证据。"
+          },
+          {
+            "field": "does",
+            "quote": "若对话上下文或 `.reviews/issues/issue-<number>.md` 已有分析结论则复用；否则先按 `analyze-issue` 补齐最小根因与影响面分析。"
+          },
+          {
+            "field": "does",
+            "quote": "优先复用现有模块、配置入口、脚本和测试，不新增平行实现。"
+          },
+          {
+            "field": "does",
+            "quote": "检查同语义涉及的所有入口（CLI / API / Bot / Web / Desktop / Docs / Tests），不打局部补丁。"
+          },
+          {
+            "field": "does",
+            "quote": "若涉及用户可见能力、配置项、CLI/API、通知或报告变化，按 `AGENTS.md` §1 同步 `.env.example` 与相关 `docs/*.md`。"
+          },
+          {
+            "field": "does",
+            "quote": "后端：优先 `./scripts/ci_gate.sh`（Windows 可在 Git Bash/WSL 运行），最低要求 `python -m py_compile` + 最近确定性 pytest。"
+          },
+          {
+            "field": "does",
+            "quote": "Web：`cd apps/dsa-web && npm ci && npm run lint && npm run build`。"
+          },
+          {
+            "field": "outputs",
+            "quote": "改了什么（含修改的既有文件 `path:line`）"
+          },
+          {
+            "field": "outputs",
+            "quote": "行为变化（改前 vs 改后）"
+          },
+          {
+            "field": "outputs",
+            "quote": "影响面（配置/环境变量、API/CLI、UI/Web/Desktop、报告/通知、不可逆变更）"
+          },
+          {
+            "field": "outputs",
+            "quote": "验证情况与未验证项"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（硬规则见 §1，验证矩阵见 §5，基线同步见 §7）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Desktop：先构建 Web，再构建 `apps/dsa-desktop`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "治理资产：`python scripts/check_ai_assets.py`。"
+          },
+          {
+            "field": "limits",
+            "quote": "按 `AGENTS.md` §7 同步远端基线；不擅自 `stash`、`reset` 或切换用户当前分支，需要建分支时先确认。"
+          },
+          {
+            "field": "limits",
+            "quote": "切换/新建分支、`git commit`、`git push`、创建 PR、在 Issue 下回复或关闭 Issue 前必须先征得用户确认。"
+          },
+          {
+            "field": "limits",
+            "quote": "无法执行的检查必须明确说明原因与缺口。"
+          },
+          {
+            "field": "limits",
+            "quote": "保持默认行为向后兼容，避免破坏 fallback / fail-open。"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": ".claude/skills/analyze-issue/SKILL.md",
-      "blob_sha": "fd192f15ba4813b036b9e43082fd6cf6c80c1b5c",
-      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/ab69720f3334d17ac5e6d1265be2e75fbe6d944c/.claude/skills/analyze-issue/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "blob_sha": "e6c3892002f33f8d1b524d27cb0b247fb4716f80",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/.claude/skills/analyze-issue/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
-        "name": "",
-        "description": ""
+        "name": "analyze-issue",
+        "description": "分析 daily_stock_analysis 仓库的 GitHub Issue，核实版本基线、真实性、根因定位、影响面与仓库责任边界，给出优先级和处置建议。用户给出 Issue 号或链接并要求分析时使用。"
       },
-      "excerpt": "# Analyze Issue\n\n分析 GitHub Issue，判断其真实性、优先级、仓库责任边界与建议动作。\n\n**Repository**: https://github.com/ZhuLinsen/daily_stock_analysis/issues\n\n## Usage\n\n```text\n/analyze-issue <issue_number>\n```\n\n## Instructions\n\n分析时使用简洁中文，优先遵循仓库根目录 `AGENTS.md`。\n\n### Step 1: 同步最新代码基线\n\n分析 issue 前必须先刷新远端状态，并尽量把本地安全推进到最新基线：\n\n```bash\ngit status --short\ngit fetch --all --prune\n# 仅当工作区干净且当前分支可 fast-forward 时执行：\ngit pull --ff-only\n```\n\n- 只有在工作区干净、当前分支有可 fast-forward 的上游时，才执行并接受 `git pull --ff-only` 的结果。\n- 如存在本地改动、冲突状态、未跟踪风险文件、无上游分支或无法 fast-forward，不要执行 `stash`、`reset`、强制切分支或覆盖本地状态；改用已 fetch 的 `origin/main` 或相关远端 refs 做分析。\n- 在输出文档的 `Evidence` 中记录同步结果：本地 HEAD、使用的远端基线，以及未更新本地工作树的原因（如有）。\n\n### Step 2: 拉取 Issue 信息\n\n```bash\ngh issue view <issue_number> --repo ZhuLinsen/daily_stock_analysis\ngh issue view <issue_number> --repo ZhuLinsen/daily_stock_analysis --comments\n```\n\n如为 bug，优先核对 issue 模板中是否提供了以下信息：\n\n- 是否已同步到最新版本\n- commit hash / 版本基线\n- 运行环境与复现步骤\n- 日志或报错信息\n\n### Step 3: 回答 4 个核心问题\n\n1. 版本是否明确\n2. 问题是否真实且可验证\n3. 是否属于仓库责任边界\n4. 是否值得立即处理\n\n### Step 4: 结合仓库现状做证据检查\n\n- 阅读相关代码、配置、测试、脚本、工作流与文档\n- 如果问题涉及 API、数据源 fallback、报告生成、通知发送、认证、桌面端、发布流程，明确写出影响面\n- 判断是实际 bug、环境配置问题、使用方式问题、还是外部依赖问题\n- 如怀疑已被修复，检查当前代码而不是只看 issue 描述\n\n### Step 5: 形成结论\n\n至少给出以下字段：\n\n- `版本基线`：最新 / 非最新 / 未提供\n- `是否合理`：是/否 + 理由\n- `是否是 issue`：是/否 + 理由\n- `是否好解决`：是/否 + 难点\n- `结论`：`成立 / 部分成立 / 不成立`\n- `分类`：`bug / feature / docs / question / external`\n- `优先级`：`P0 / P1 / P2 / P3`\n- `难度`：`easy / medium / hard`\n- `建议动作`：`立即修复 / 排期修复 / 文档澄清 / 关闭`\n\n### Step 6: 生成分析文档\n\n保存到 `.claude/reviews/issues/issue-<number>.md`\n\n## Output Document Format\n\n```markdown\n# Issue #<number> Analysis\n\n**Date**: YYYY-MM-DD\n**Status**: Pending Review\n\n## Summary\n\n- 版本基线：\n- 是否合理：\n- 是否是 issue：\n- 是否好解决：\n- 结论：\n- 分类：\n- 优先级：\n- 难度：\n- 建议动作：\n\n## Evidence\n\n- 代码同步基线：\n- 关键 issue 信息：\n- 关键代码/脚本/工作流证据：\n\n## Impact Scope\n\n- 受影响模块：\n- 受影响运行路径（本地 / Docker / GitHub Actions / API / Web / Desktop）：\n\n## Root Cause / Main Reasoning\n\n<根因或主要判断依据>\n\n## Proposed Handling\n\n<建议修复、澄清或关闭方式>\n\n若建议后续创建 PR，给出的 PR title 建议符合 `AGENTS.md`：使用 `<类型>: <修改内容>`，不添加 `[codex]`、`codex`、`autocode`、`copilot` 或其他工具/agent 来源前缀；该约定仅用于协作一致性提醒，不应单独作为 review process blocker。\n\n## Risks And Rollback\n\n- 风险点：\n- 若修复，回滚方式：\n\n## Draft Reply\n\n<建议回复内容>\n```\n\n## Allowed Auto-Actions (No Confirmation Needed)\n\n- 拉取 issue 详情与评论\n- 执行 `git fetch --all --prune`，并在工作区干净且可 fast-forward 时执行 `git pull --ff-only`\n- 阅读相关代码、配置、脚本、工作流和文档\n- 生成分析文档\n\n## Actions Requiring Confirmation\n\n执行以下动作前，先询问用户：\n\n1. 添加或修改标签\n2. 在 issue 下评论\n3. 关闭 issue\n4. 开始修复 issue\n",
-      "card": null
+      "excerpt": "---\nname: analyze-issue\ndescription: 分析 daily_stock_analysis 仓库的 GitHub Issue，核实版本基线、真实性、根因定位、影响面与仓库责任边界，给出优先级和处置建议。用户给出 Issue 号或链接并要求分析时使用。\n---\n\n# Analyze Issue\n\n规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（基线同步规则见 §7）。\n\n- 输出语言：简洁中文。\n- 产物策略：**默认直接在对话中输出**；仅当用户明确要求存档时，写入 `.reviews/issues/issue-<number>.md`。\n\n## Step 1: 同步基线并拉取 Issue\n\n按 `AGENTS.md` §7 同步远端基线并记录本地 HEAD 与远端基线，然后执行：\n\n```bash\ngh issue view <number> --repo ZhuLinsen/daily_stock_analysis\ngh issue view <number> --repo ZhuLinsen/daily_stock_analysis --comments\n```\n\n如为 bug，核对是否提供了版本/commit hash、运行环境、复现步骤与报错日志。\n\n## Step 2: 代码证据核查\n\n- 阅读相关源码、配置、测试、工作流与文档，不凭 issue 描述直接下结论。\n- 回答 4 个核心问题：版本是否明确、问题是否真实可验证、是否属于仓库责任边界、是否值得立即处理。\n- 区分：真实代码 bug / 配置或环境问题 / 使用方式问题 / 外部数据源或三方依赖问题 / 已在主干修复。\n- 明确排查受影响模块与运行路径（本地 CLI / Docker / GitHub Actions / API / Web / Desktop）。\n\n## Step 3: 输出格式\n\n```markdown\n# Issue #<number> Analysis\n\n## 1. 结论摘要\n- 版本基线：最新 / 非最新 / 未提供\n- 结论：成立 / 部分成立 / 不成立\n- 分类：bug / feature / docs / question / external\n- 优先级：P0 / P1 / P2 / P3 | 难度：easy / medium / hard\n- 建议动作：立即修复 / 排期修复 / 文档澄清 / 关闭\n\n## 2. 证据与根因\n- 代码同步基线：\n- 关键 Issue 信息：\n- 源码 / 配置 / 工作流证据（`path:line`）：\n- 根因或主要判断依据：\n\n## 3. 影响面\n- 受影响模块与既有运行时文件：\n- 受影响运行路径（本地 / Docker / GitHub Actions / API / Web / Desktop）：\n- 是否涉及配置/环境变量、UI/Web、报告结构、通知或持久化变更：\n\n## 4. 处置建议\n- 修复方案 / 澄清要点 / 关闭理由：\n- 若后续提 PR，标题建议遵循 `AGENTS.md` §1.1（`<type>: <修改内容>`，不含工具前缀）。\n\n## 5. 不可逆变更（如计划修复）\n- 仅在修复涉及数据库/配置迁移/外部状态写入时说明；否则写“无”。\n\n## 6. 建议回复草稿\n<可直接回复到 Issue 的简洁中文内容>\n```\n\n## 需用户确认的动作\n\n添加/修改标签、发表评论、关闭 Issue、开始写代码修复前必须先询问用户。\n",
+      "card": {
+        "title_zh": "Issue 分析助手",
+        "purpose_zh": "分析 daily_stock_analysis 仓库的 GitHub Issue，核实版本基线、真实性、根因定位、影响面与仓库责任边界，给出优先级和处置建议。",
+        "does": [
+          "按 AGENTS.md §7 同步远端基线并记录本地 HEAD 与远端基线",
+          "用 gh issue view 拉取指定 Issue 正文与评论",
+          "对 bug 类 Issue 核对版本/commit、运行环境、复现步骤与报错日志",
+          "阅读源码、配置、测试、工作流与文档进行代码证据核查",
+          "区分真实代码 bug、配置环境问题、使用方式问题、外部依赖问题、已在主干修复",
+          "按固定 markdown 模板输出结论摘要、证据与根因、影响面、处置建议、不可逆变更与回复草稿"
+        ],
+        "inputs": [
+          "Issue 编号或链接",
+          "仓库 AGENTS.md 中的基线同步规则",
+          "相关源码、配置、测试、工作流与文档"
+        ],
+        "outputs": [
+          "对话中直接输出的 Issue 分析报告（默认）",
+          "用户明确要求存档时写入 .reviews/issues/issue-[number].md",
+          "可直接回复到 Issue 的简洁中文回复草稿"
+        ],
+        "scenarios": [
+          "用户给出 Issue 号或链接并要求分析时",
+          "判断 Issue 是否属于仓库责任边界",
+          "为 Issue 定优先级与难度并给出处置建议",
+          "起草 Issue 回复内容"
+        ],
+        "prerequisites": [
+          "已安装并登录 GitHub CLI（gh）",
+          "可访问仓库 ZhuLinsen/daily_stock_analysis",
+          "仓库根目录存在 AGENTS.md 并含 §7 基线同步规则"
+        ],
+        "limits": [
+          "默认只在对话中输出，仅用户明确要求存档时才写文件",
+          "添加/修改标签、发表评论、关闭 Issue、开始写代码修复前必须先询问用户",
+          "不凭 Issue 描述直接下结论，需核查代码证据",
+          "输出语言为简洁中文"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network",
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "调研",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "分析 daily_stock_analysis 仓库的 GitHub Issue，核实版本基线、真实性、根因定位、影响面与仓库责任边界，给出优先级和处置建议。"
+          },
+          {
+            "field": "does",
+            "quote": "按 `AGENTS.md` §7 同步远端基线并记录本地 HEAD 与远端基线"
+          },
+          {
+            "field": "does",
+            "quote": "gh issue view <number> --repo ZhuLinsen/daily_stock_analysis"
+          },
+          {
+            "field": "does",
+            "quote": "如为 bug，核对是否提供了版本/commit hash、运行环境、复现步骤与报错日志。"
+          },
+          {
+            "field": "does",
+            "quote": "阅读相关源码、配置、测试、工作流与文档，不凭 issue 描述直接下结论。"
+          },
+          {
+            "field": "does",
+            "quote": "区分：真实代码 bug / 配置或环境问题 / 使用方式问题 / 外部数据源或三方依赖问题 / 已在主干修复。"
+          },
+          {
+            "field": "outputs",
+            "quote": "产物策略：**默认直接在对话中输出**；仅当用户明确要求存档时，写入 `.reviews/issues/issue-<number>.md`。"
+          },
+          {
+            "field": "outputs",
+            "quote": "## 6. 建议回复草稿"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（基线同步规则见 §7）。"
+          },
+          {
+            "field": "limits",
+            "quote": "添加/修改标签、发表评论、关闭 Issue、开始写代码修复前必须先询问用户。"
+          },
+          {
+            "field": "limits",
+            "quote": "输出语言：简洁中文。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "```bash\ngh issue view <number> --repo ZhuLinsen/daily_stock_analysis"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "仅当用户明确要求存档时，写入 `.reviews/issues/issue-<number>.md`"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": ".claude/skills/analyze-pr/SKILL.md",
-      "blob_sha": "78f2690128bd29cd232dfcb62d945ac61bc1a062",
-      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/ab69720f3334d17ac5e6d1265be2e75fbe6d944c/.claude/skills/analyze-pr/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "blob_sha": "a6cbddec90137b35ba43e9b2ebf82dea60aa4668",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/.claude/skills/analyze-pr/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
-        "name": "",
-        "description": ""
+        "name": "analyze-pr",
+        "description": "审查 daily_stock_analysis 仓库的 GitHub PR，基于完整 diff 输出前因后果、函数级改动、改前改后行为、14 维影响面清单（环境变量/配置/API/Web/桌面/报告/通知等）、描述与实现差异、问题清单与合入判定。用户给出 PR 号或链接并要求分析、审查、评估能否合入时使用。"
       },
-      "excerpt": "# Analyze PR\n\n分析 GitHub Pull Request，评估必要性、描述完整性、验证证据、主要风险与是否可直接合入。\n\n**Repository**: https://github.com/ZhuLinsen/daily_stock_analysis/pulls\n\n## Usage\n\n```text\n/analyze-pr <pr_number>\n```\n\n## Instructions\n\n分析时使用简洁中文，优先遵循仓库根目录 `AGENTS.md` 和 `.github/PULL_REQUEST_TEMPLATE.md`。\n\n### Step 1: 同步最新代码基线\n\n分析 PR 前必须先刷新远端状态，并尽量把本地安全推进到最新基线：\n\n```bash\ngit status --short\ngit fetch --all --prune\n# 仅当工作区干净且当前分支可 fast-forward 时执行：\ngit pull --ff-only\n```\n\n- 只有在工作区干净、当前分支有可 fast-forward 的上游时，才执行并接受 `git pull --ff-only` 的结果。\n- 如存在本地改动、冲突状态、未跟踪风险文件、无上游分支或无法 fast-forward，不要执行 `stash`、`reset`、强制切分支或覆盖本地状态；改用已 fetch 的 `origin/main`、PR head 或 GitHub diff 做分析。\n- 在输出文档的 `Validation Evidence` 中记录同步结果：本地 HEAD、使用的远端基线，以及未更新本地工作树的原因（如有）。\n\n### Step 2: 拉取 PR 基本信息\n\n```bash\ngh pr view <pr_number> --repo ZhuLinsen/daily_stock_analysis\ngh pr view <pr_number> --repo ZhuLinsen/daily_stock_analysis --comments\ngh pr checks <pr_number> --repo ZhuLinsen/daily_stock_analysis\ngh pr diff <pr_number> --repo ZhuLinsen/daily_stock_analysis\n```\n\n如有失败的 CI，优先查看失败日志，而不是立刻在本地重跑全部检查：\n\n```bash\ngh run view <run_id> --log-failed\n```\n\n### Step 3: 检查标题与描述完整性\n\n先检查 PR title 是否符合 `AGENTS.md` 的非阻断建议：\n\n- 格式应为 `<类型>: <修改内容>`，例如 `fix: 修复大盘分析历史记录丢失`\n- 类型优先为 `fix`/`feat`/`refactor`/`docs`/`chore`/`test`/`ci`\n- 不应包含 `[codex]`、`codex`、`autocode`、`copilot` 或其他工具/agent 来源前缀\n- 标题应描述实际变更；若标题与 diff 不符，在描述完整性中指出，但不应单独作为 review process blocker。\n\n对照 `.github/PULL_REQUEST_TEMPLATE.md`，确认是否覆盖：\n\n- `PR Type`\n- `Background And Problem`\n- `Scope Of Change`\n- `Issue Link`\n- `Verification Commands And Results`\n- `Visual Evidence`（仅当 PR 修改报告格式、报告渲染效果或 Web UI 界面时要求截图或替代可视证据）\n- `Compatibility And Risk`\n- `Rollback Plan`\n\n若 PR 涉及第三方模型 / API 兼容语义、请求参数固定值、OpenAI-compatible 路由、YAML alias、fallback 行为或运行时配置保存 / 清理 / 迁移逻辑，还要额外检查描述里是否明确写出：\n\n- 官方来源链接或公告\n- 当前锁定依赖 / 运行时兼容范围（例如 LiteLLM 版本窗口）\n- 已验证的调用链路覆盖面\n- 旧配置是否会被静默改写、清空、迁移或保持不变\n- 最小回滚路径（通常是 revert 本 PR）\n\n若 PR 修改报告格式、报告渲染效果或 Web UI 界面，还要检查 `Visual Evidence` 是否附受影响报告 / 页面截图；涉及前后差异时优先检查前后对比。若无法截图，描述中应说明原因与替代可视证据。\n\n### Step 4: 优先使用 CI / Diff 证据\n\n- 先根据 `gh pr checks`、PR diff、现有测试与工作流日志判断问题\n- 仅当 CI 未覆盖改动面、CI 结果不足以定性问题、或需要验证关键回归风险时，再补充本地最小验证\n- 不要默认切换当前分支或执行 `gh pr checkout`\n\n如果必须补本地验证，按改动面选择最接近的检查，例如：\n\n- 后端：`./scripts/ci_gate.sh` 或 `python -m py_compile <changed_python_files>`\n- 前端：`cd apps/dsa-web && npm ci && npm run lint && npm run build`\n- 桌面端：先构建 Web，再构建 Electron\n\n### Step 5: 评估正确性与风险\n\n重点检查：\n\n- 是否解决了明确问题，且没有夹带无关改动\n- 是否破坏 API / Schema / Web / Desktop 兼容性\n- 是否破坏 fallback、降级路径、通知链路或发布流程\n- 是否存在明显逻辑错误、异常吞没、安全问题、配置语义变化未同步文档\n\n### Step 6: 生成评审文档\n\n保存到 `.claude/reviews/prs/pr-<number>.md`\n\n## Output Document Format\n\n```markdown\n# PR #<number> Analysis\n\n**Date**: YYYY-MM-DD\n**Status**: Pending Review\n\n## Findings\n\n- [严重级别] file:line - 问题描述\n\n## Summary\n\n- 必要性：\n- 是否有对应 issue：\n- PR 类型：\n- PR title：\n- description 完整性：\n- 验证情况：\n- 主要风险：\n- 是否可直接合入：\n\n## Validation Evidence\n\n- 代码同步基线：\n- CI 结论：\n- 本地补充验证（如有）：\n\n## Compatibility And Risk\n\n- API / Web / Desktop：\n- 配置 / Docker / GitHub Actions：\n- fallback / 通知 / 报告结构：\n- 第三方依赖 / 官方约束来源：\n- 运行时兼容窗口 / 已覆盖链路：\n- 旧配置迁移或静默改写风险：\n\n## Draft Review Comment\n\n<建议评论内容>\n```\n\n## Allowed Auto-Actions (No Confirmation Needed)\n\n- 拉取 PR 元数据、diff、评论和 CI 状态\n- 执行 `git fetch --all --prune`，并在工作区干净且可 fast-forward 时执行 `git pull --ff-only`\n- 阅读相关代码、模板、工作流与文档\n- 在必要时执行最小化本地验证\n- 生成评审文档\n\n## Actions Requiring Confirmation\n\n执行以下动作前，先询问用户：\n\n1. 发布评论\n2. Approve PR\n3. Request changes\n4. Merge PR\n5. 关闭 PR\n",
-      "card": null
+      "excerpt": "---\nname: analyze-pr\ndescription: 审查 daily_stock_analysis 仓库的 GitHub PR，基于完整 diff 输出前因后果、函数级改动、改前改后行为、14 维影响面清单（环境变量/配置/API/Web/桌面/报告/通知等）、描述与实现差异、问题清单与合入判定。用户给出 PR 号或链接并要求分析、审查、评估能否合入时使用。\n---\n\n# Analyze PR\n\n规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（基线同步与阻断标准见 §7，此处不重复原文）。\n\n- 原则：**检查从严、输出从简**。内部必须逐文件、全维度核查，对外只呈现高信息密度事实，不刷空表和套话。\n- 输出语言：简洁中文；**默认直接在对话中输出**，仅当用户明确要求存档时写入 `.reviews/prs/pr-<number>.md`。\n\n## 硬约束\n\n1. **必须读完所有改动文件**：内部逐文件核对（已读文件数 == `changedFiles`）前，不得给出合入结论。\n2. **每条结论必须带证据**：标注 `path:line`、diff 片段、命令输出或 CI 链接；无证据写“未核实”并说明缺什么。\n3. **14 维影响面必须全部核查**：输出时只展开**命中**的维度，未命中项合并为一行说明依据（不得跳过检查）。\n4. **禁止空泛套话**：不得出现无具体触发条件与对象的「风险较低」「影响可控」「建议充分测试」「注意兼容性」「可能会影响」，以及在无不可逆变更时写「回滚：revert 本 PR」。\n5. **不污染工作树**：不执行 `gh pr checkout`、不切换当前分支、不在仓库内建 worktree；需看完整上下文用 `git fetch origin pull/<n>/head:refs/remotes/pr/<n>` + `git show`。\n\n## 内部检查步骤（必须全部执行，不直接照搬成冗长输出）\n\n1. **采集事实**：按 `AGENTS.md` §7 同步基线后拉取 PR 元数据、完整 diff、普通评论、行内 review 线程、CI 状态及关联 Issue：\n   ```bash\n   gh pr view <n> --repo ZhuLinsen/daily_stock_analysis --json number,title,body,author,baseRefName,headRefName,headRefOid,mergeable,isDraft,additions,deletions,changedFiles,closingIssuesReferences,commits\n   gh pr diff <n> --repo ZhuLinsen/daily_stock_analysis --name-only\n   gh pr diff <n> --repo ZhuLinsen/daily_stock_analysis\n   gh pr view <n> --repo ZhuLinsen/daily_stock_analysis --comments\n   gh api repos/ZhuLinsen/daily_stock_analysis/pulls/<n>/comments --paginate\n   gh pr checks <n> --repo ZhuLinsen/daily_stock_analysis\n   ```\n   - diff 超长时按文件分页拉取：`gh api repos/ZhuLinsen/daily_stock_analysis/pulls/<n>/files --paginate`。\n   - 有失败 CI 时先看 `gh run view <run_id> --log-failed`，并核对 CI 对应 SHA 是否等于当前 `headRefOid`。\n2. **文件覆盖核对**：确认已读完 `changedFiles` 中的每一个文件（lockfile/快照等生成文件可标“生成文件”），区分**新增文件**与**修改的既有运行时文件**。\n3. **14 维影响面检索**（按路径与关键字逐项判定）：\n   - `环境变量 / 配置`：`src/config.py`、`config_registry.py`、`config_manager.py`、`.env.example`、`docker-compose*.yml`、`00-daily-analysis.yml` env 段，或新增 `os.getenv`/`os.environ`\n   - `Web 设置页`：`settingsHelp.ts`、`components/settings/**`、`systemConfigI18n.ts`\n   - `Web UI`：`apps/dsa-web/src/{pages,components}/**`（非测试）\n   - `API / Schema`：`api/**`、`src/schemas/**` 及前端 `src/api/**`、`src/types/**` 消费方\n   - `Desktop`：`apps/dsa-desktop/**`、`scripts/build-*`、`scripts/run-desktop.ps1`\n   - `报告结构 / 渲染`：`src/reports/**`、报告模板、Markdown/图表渲染组件\n   - `通知`：`src/notification*.py`、`src/notification_sender/**`、`bot/**`\n   - `Prompt / LLM`：`src/llm/**`、`src/agent/**`、prompt 常量、`EXTRACT_PROMPT`\n   - `数据源 / fallback`：`data_provider/**`\n   - `存储 / 持久化`：`src/storage.py`、`src/repositories/**`、ORM 模型、迁移脚本、本地缓存格式\n   - `CLI / 调度`：`main.py` 参数、`--schedule`\n   - `依赖`：`requirements*.txt`、`apps/*/package.json`\n   - `CI / Docker / 发布`：`.github/**`、`docker/**`、`scripts/**`\n   - `文档`：`docs/**`、`README.md`、中英对照文档\n4. **因果链与同语义排查**：核实问题现象 → 触发条件 → 根因（`path:line`）；对被改函数/配置键/字段做 `git grep`，查清 CLI / API / Bot / Web / Desktop / Scheduler 中未覆盖的同类入口。\n5. **必要性与减法评估（产品取舍建议，非硬阻断）+ 声明 vs 事实 & 测试质量**：\n   - 对照 `AGENTS.md` §0 评估改动是否聚焦核心痛点，还是在叠加低频开关、平行入口或重复模板；若存在明显冗余，在建议项中提示维护者可瘦身或关闭，但**不单凭主观范围直接判为合入阻断**，以免误伤正常的 Bug 修复与低耦合实用改进。\n   - 对照 PR 描述与实际 diff（标出声明未兑现 / 未声明改动）；检查测试是否打到真实风险层（而非把被改模块 mock 掉）以及是否覆盖行内 review 提出的反例。\n\n## 输出格式（固定 5 段，紧凑清晰）\n\n```markdown\n# PR #<number> <title>\n\n## 1. 结论\n- **判定**：`可合入` / `需修改后合入` / `不建议合入` —— <一句话核心理由>\n- **基线与 CI**：`<base>@<sha7>` ← `<head>@<sha7>`（已读 N/N 文件）| 冲突：无/有 | CI：全绿/失败（附链接，核对 SHA 一致）| 本地同步：<HEAD 说明>\n\n## 2. 前因、改了什么 & 改前改后\n- **前因（解决什么问题）**：<关联 Issue / 现象 / 触发条件 / 根因 `path:line`>\n- **新增文件**：<概要>\n- **修改的既有运行时文件**：<函数/字段/配置键级，带 `path:line`>\n- **改前 vs 改后**：\n| 场景 / 输入 | 改前行为 | 改后行为 | 谁会感知 |\n|---|---|---|---|\n\n## 3. 影响面（14 维核查，仅展开命中项）\n- **命中维度**：逐项写出具体内容与证据；若命中以下三类须附对应明细：\n  - **配置 / 环境变量**：键名 | 增/改/删 | 默认值 | 不配置时行为 | `.env.example` / docs / Web 设置页 / Actions 是否同步\n  - **API / Schema / CLI**：接口或参数变化 | Web / Desktop 消费方是否同步\n  - **UI / 报告 / 通知可视变化**：受影响页面或渠道 | 截图或替代可视证据状态（已核对当前 Head 画面 / 仅有链接未看 / 缺失）\n- **未命中维度**：其余 N 维均未命中（依据：<diff 路径范围与关键字检索为空>）。\n\n## 4. 问题清单、描述差异 & 验证证据\n- **阻断项 / 建议项**：`[阻断|建议] path:line` — 触发条件 → 后果 → 修改建议（无则写“无”）\n- **未覆盖同语义入口 / 描述与 diff 差异**：<无，或逐条列出>\n- **验证证据**：CI 结果、测试是否覆盖真实风险层、本地补验（如有）\n\n## 5. 不可逆变更\n- 仅当存在数据库/持久化格式变更、运行时配置自动改写/迁移、外部状态写入（自选/账本/通知）、或发布策略变化时展开旧数据/配置处理与恢复路径；否则只写：`无`。\n```\n\n> **评审评论草稿**：默认不输出，仅在用户要求“给评论草稿”时附在末尾。\n\n## 输出前自检\n\n- [ ] 已读文件数 == `changedFiles`\n- [ ] 14 维影响面均已核查（命中项有明细，未命中项有依据）\n- [ ] 每条问题有 `path:line` 与触发条件，全文无禁用套话\n- [ ] 已核对 CI 对应 SHA == `headRefOid`\n\n## 需用户确认的动作\n\n发布评论、Approve、Request changes、Merge、关闭 PR 前必须先征得用户确认。\n",
+      "card": {
+        "title_zh": "PR 审查分析",
+        "purpose_zh": "审查 daily_stock_analysis 仓库的 GitHub PR，基于完整 diff 输出前因后果、函数级改动、改前改后行为、14 维影响面清单、描述与实现差异、问题清单与合入判定。",
+        "does": [
+          "拉取 PR 元数据、完整 diff、评论、行内 review 线程、CI 状态与关联 Issue",
+          "逐文件核对改动，确认已读文件数等于 changedFiles 后才给合入结论",
+          "按 14 维影响面（环境变量、API、Web、桌面、报告、通知等）逐项检索并只展开命中项",
+          "梳理问题现象、触发条件、根因与同语义入口，检查测试是否覆盖真实风险层",
+          "按固定 5 段格式输出结论、改动说明、影响面、问题清单与不可逆变更",
+          "仅在用户要求时附评审评论草稿，发布评论或合入前须征得确认"
+        ],
+        "inputs": [
+          "PR 编号或链接",
+          "用户对分析、审查、评估能否合入的要求",
+          "仓库 AGENTS.md 基线同步与阻断标准"
+        ],
+        "outputs": [
+          "对话中的 5 段式中文审查报告",
+          "可选写入 .reviews/prs/pr-[number].md 存档",
+          "可选的评审评论草稿"
+        ],
+        "scenarios": [
+          "用户给出 PR 号要求分析改动",
+          "评估某个 PR 能否合入",
+          "核对 PR 描述与实际 diff 是否一致",
+          "排查改动对配置、API、UI、通知等的影响面"
+        ],
+        "prerequisites": [
+          "可访问 ZhuLinsen/daily_stock_analysis 仓库",
+          "已安装并登录 gh CLI",
+          "仓库根目录存在 AGENTS.md 作为规则真源"
+        ],
+        "limits": [
+          "仅针对 daily_stock_analysis 仓库",
+          "禁止 gh pr checkout、切换分支或在仓库内建 worktree",
+          "未读完所有改动文件不得给出合入结论",
+          "每条结论必须带 path:line 等证据，无证据写未核实",
+          "发布评论、Approve、Request changes、Merge、关闭 PR 前须用户确认"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "network"
+        ],
+        "tags": [
+          "代码审查",
+          "文档",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "审查 daily_stock_analysis 仓库的 GitHub PR，基于完整 diff 输出前因后果、函数级改动、改前改后行为、14 维影响面清单（环境变量/配置/API/Web/桌面/报告/通知等）、描述与实现差异、问题清单与合入判定。"
+          },
+          {
+            "field": "does",
+            "quote": "**必须读完所有改动文件**：内部逐文件核对（已读文件数 == `changedFiles`）前，不得给出合入结论。"
+          },
+          {
+            "field": "does",
+            "quote": "**14 维影响面必须全部核查**：输出时只展开**命中**的维度，未命中项合并为一行说明依据（不得跳过检查）。"
+          },
+          {
+            "field": "does",
+            "quote": "**因果链与同语义排查**：核实问题现象 → 触发条件 → 根因（`path:line`）；对被改函数/配置键/字段做 `git grep`，查清 CLI / API / Bot / Web / Desktop / Scheduler 中未覆盖的同类入口。"
+          },
+          {
+            "field": "does",
+            "quote": "## 输出格式（固定 5 段，紧凑清晰）"
+          },
+          {
+            "field": "does",
+            "quote": "**评审评论草稿**：默认不输出，仅在用户要求“给评论草稿”时附在末尾。"
+          },
+          {
+            "field": "outputs",
+            "quote": "**默认直接在对话中输出**，仅当用户明确要求存档时写入 `.reviews/prs/pr-<number>.md`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（基线同步与阻断标准见 §7，此处不重复原文）。"
+          },
+          {
+            "field": "limits",
+            "quote": "**不污染工作树**：不执行 `gh pr checkout`、不切换当前分支、不在仓库内建 worktree；需看完整上下文用 `git fetch origin pull/<n>/head:refs/remotes/pr/<n>` + `git show`。"
+          },
+          {
+            "field": "limits",
+            "quote": "**每条结论必须带证据**：标注 `path:line`、diff 片段、命令输出或 CI 链接；无证据写“未核实”并说明缺什么。"
+          },
+          {
+            "field": "limits",
+            "quote": "发布评论、Approve、Request changes、Merge、关闭 PR 前必须先征得用户确认。"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "gh pr diff <n> --repo ZhuLinsen/daily_stock_analysis"
+          },
+          {
+            "field": "risk_flags",
+            "quote": "gh api repos/ZhuLinsen/daily_stock_analysis/pulls/<n>/comments --paginate"
+          },
+          {
+            "field": "tags",
+            "quote": "审查 daily_stock_analysis 仓库的 GitHub PR"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": ".claude/skills/fix-issue/SKILL.md",
-      "blob_sha": "564ba825ef3fe6b1654efbdefdcf0f563a4bbb32",
-      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/ab69720f3334d17ac5e6d1265be2e75fbe6d944c/.claude/skills/fix-issue/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
-      "generated_at": null,
-      "model": null,
-      "status": "failed",
-      "last_error": "Skill card failed schema or evidence validation",
+      "blob_sha": "e0551b154fbe51dca738dca1309cac31904ec266",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/.claude/skills/fix-issue/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
       "card_prompt_version": "skill_card_v1",
       "frontmatter": {
-        "name": "",
-        "description": ""
+        "name": "fix-issue",
+        "description": "基于 Issue 分析结论实施最小化修复，按 AGENTS.md 验证矩阵执行验证并输出行为变化、影响面与验证证据。用户明确要求修复某个 Issue 时使用。"
       },
-      "excerpt": "# Fix Issue\n\n基于 issue 分析结果实现修复，并按仓库规则补齐验证、风险与回滚说明。\n\n**Repository**: https://github.com/ZhuLinsen/daily_stock_analysis\n\n## Usage\n\n```text\n/fix-issue <issue_number>\n```\n\n## Prerequisites\n\n优先先完成 `/analyze-issue <issue_number>`，确保问题成立且边界清晰。\n\n## Instructions\n\n### Step 1: 确认分析基线\n\n检查 `.claude/reviews/issues/issue-<number>.md` 是否存在；如果不存在，先补做 issue 分析或在本次修复中补齐最小分析结论。\n\n### Step 2: 同步最新代码基线并选择安全的工作方式\n\n开始修复或准备创建 / 更新 PR 前，先按 `AGENTS.md` 拉新：\n\n```bash\ngit status --short\ngit fetch --all --prune\n# 仅当工作区干净且当前分支可 fast-forward 时执行：\ngit pull --ff-only\n```\n\n- 默认基于当前工作树做最小相关改动\n- 只有在工作区干净、当前分支有可 fast-forward 的上游时，才执行并接受 `git pull --ff-only` 的结果\n- 如存在本地改动、冲突状态、未跟踪风险文件、无上游分支或无法 fast-forward，不要执行 `stash`、`reset`、强制切分支或覆盖本地状态；先记录本地 HEAD、使用的远端基线与无法更新本地工作树的原因\n- 若后续要创建 / 更新 PR，先说明当前分支与目标基线差异；必要时请求用户确认 rebase、merge 或继续基于当前分支推进\n- 不要默认切换分支或改写用户当前工作状态\n- 如果用户明确要求建分支，再执行最小必要的分支操作\n\n### Step 3: 实施修复\n\n- 根据 issue 结论定位相关文件\n- 优先复用现有模块、配置入口、脚本和测试\n- 保持默认行为向后兼容，避免破坏 fallback / fail-open\n- 如果修复涉及用户可见行为、配置语义、CLI/API、部署、通知、报告结构，要同步更新相关文档、`docs/CHANGELOG.md`、`.env.example`\n- 向 `docs/CHANGELOG.md` 写入条目时，在 `[Unreleased]` 段追加一行，格式为 `- [类型] 描述`，其中 `[类型]` 从 `[新功能]/[改进]/[修复]/[文档]/[测试]/[chore]` 中按本次变更内容选择；只有修复 bug 时才使用 `[修复]`；**不要**在 `[Unreleased]` 内新增 `### 类目标题`\n- `README.md` 只承载项目定位、核心能力、快速开始、主要入口、赞助/合作等首页级信息；非必要不更新 README，避免持续膨胀\n- 更细的模块行为、页面交互、专题配置、排障说明、字段契约、实现语义和边界条件，优先更新对应 `docs/*.md`\n\n### Step 4: 按改动面验证\n\n按 `AGENTS.md` 的验证矩阵执行最接近的检查：\n\n- 后端优先：`./scripts/ci_gate.sh`\n- 最低后端要求：`python -m py_compile <changed_python_files>`\n- 前端：`cd apps/dsa-web && npm ci && npm run lint && npm run build`\n- 桌面端：先构建 Web，再构建桌面端\n\n如无法完成完整验证，必须记录缺口、原因与潜在风险。\n\n### Step 5: 更新 issue 分析文档\n\n在 `.claude/reviews/issues/issue-<number>.md` 中补充：\n\n```markdown\n## Fix Implementation\n\n**Date**: YYYY-MM-DD\n\n### Changes Made\n\n- 文件与改动点：\n\n### Validation\n\n- 已执行：\n- 未执行：\n\n### Risks\n\n- 风险点：\n\n### Rollback\n\n- 回滚方式：\n```\n\n### Step 6: 需要确认的后续动作\n\n如用户要求创建 PR、生成 PR 标题或整理 PR 描述，PR title 建议遵循 `AGENTS.md`：\n\n- 使用 `<类型>: <修改内容>` 格式，例如 `fix: 修复大盘分析历史记录丢失`\n- 类型优先使用 `fix`/`feat`/`refactor`/`docs`/`chore`/`test`/`ci`\n- 标题只描述实际改动，建议不添加 `[codex]`、`codex`、`autocode`、`copilot` 或其他工具/agent 来源前缀\n- 该约定仅用于协作一致性，不应被单独当作 process blocker\n\n只有在用户明确确认后，才执行：\n\n- 建分支\n- `git commit`\n- `git push`\n- 创建 PR\n- 在 issue 下回复或关闭 issue\n\n## Allowed Auto-Actions (No Confirmation Needed)\n\n- 阅读和分析代码\n- 执行 `git fetch --all --prune`，并在工作区干净且可 fast-forward 时执行 `git pull --ff-only`\n- 应用与当前任务直接相关的最小修复\n- 运行非破坏性的本地验证\n- 更新本地 issue 分析文档\n\n## Actions Requiring Confirmation\n\n1. 切换或创建分支\n2. `git commit`\n3. `git push`\n4. 创建 PR\n5. 回复或关闭 issue\n",
-      "card": null
+      "excerpt": "---\nname: fix-issue\ndescription: 基于 Issue 分析结论实施最小化修复，按 AGENTS.md 验证矩阵执行验证并输出行为变化、影响面与验证证据。用户明确要求修复某个 Issue 时使用。\n---\n\n# Fix Issue\n\n规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（硬规则见 §1，验证矩阵见 §5，基线同步见 §7）。\n\n## Step 1: 确认分析基线与同步代码\n\n1. 若对话上下文或 `.reviews/issues/issue-<number>.md` 已有分析结论则复用；否则先按 `analyze-issue` 补齐最小根因与影响面分析。\n2. 按 `AGENTS.md` §7 同步远端基线；不擅自 `stash`、`reset` 或切换用户当前分支，需要建分支时先确认。\n\n## Step 2: 实施最小修复\n\n- 优先复用现有模块、配置入口、脚本和测试，不新增平行实现。\n- 保持默认行为向后兼容，避免破坏 fallback / fail-open。\n- 检查同语义涉及的所有入口（CLI / API / Bot / Web / Desktop / Docs / Tests），不打局部补丁。\n- 若涉及用户可见能力、配置项、CLI/API、通知或报告变化，按 `AGENTS.md` §1 同步 `.env.example` 与相关 `docs/*.md`。\n\n## Step 3: 按改动面验证\n\n按 `AGENTS.md` §5 验证矩阵执行对应检查：\n- 后端：优先 `./scripts/ci_gate.sh`（Windows 可在 Git Bash/WSL 运行），最低要求 `python -m py_compile` + 最近确定性 pytest。\n- Web：`cd apps/dsa-web && npm ci && npm run lint && npm run build`。\n- Desktop：先构建 Web，再构建 `apps/dsa-desktop`。\n- 治理资产：`python scripts/check_ai_assets.py`。\n\n无法执行的检查必须明确说明原因与缺口。\n\n## Step 4: 交付输出\n\n按 `AGENTS.md` §8 输出交付说明（默认直接输出在对话中；若存在 `.reviews/issues/issue-<number>.md` 可按需追加）：\n- 改了什么（含修改的既有文件 `path:line`）\n- 行为变化（改前 vs 改后）\n- 影响面（配置/环境变量、API/CLI、UI/Web/Desktop、报告/通知、不可逆变更）\n- 验证情况与未验证项\n\n## 需用户确认的动作\n\n切换/新建分支、`git commit`、`git push`、创建 PR、在 Issue 下回复或关闭 Issue 前必须先征得用户确认。\n",
+      "card": {
+        "title_zh": "Issue 最小化修复",
+        "purpose_zh": "基于已有 Issue 分析结论实施最小化修复，按 AGENTS.md 验证矩阵执行验证，并输出行为变化、影响面与验证证据。",
+        "does": [
+          "复用或补齐 Issue 分析结论，按 AGENTS.md §7 同步远端基线",
+          "实施最小修复，优先复用现有模块、配置入口、脚本与测试",
+          "检查同语义的所有入口，避免局部补丁",
+          "涉及用户可见能力或配置变化时同步 .env.example 与 docs",
+          "按改动面执行后端、Web、Desktop、治理资产的验证检查",
+          "输出改动、行为变化、影响面与验证情况说明"
+        ],
+        "inputs": [
+          "Issue 编号及对应分析结论（对话上下文或 .reviews/issues/issue-[number].md）",
+          "仓库根目录 AGENTS.md 中的硬规则、验证矩阵与基线同步规则"
+        ],
+        "outputs": [
+          "交付说明：改了什么（含既有文件 path:line）",
+          "行为变化（改前 vs 改后）",
+          "影响面（配置/环境变量、API/CLI、UI/Web/Desktop、报告/通知、不可逆变更）",
+          "验证情况与未验证项"
+        ],
+        "scenarios": [
+          "用户明确要求修复某个 Issue",
+          "已有 Issue 根因与影响面分析，需要落地最小修复",
+          "需要按仓库验证矩阵确认改动是否通过检查"
+        ],
+        "prerequisites": [
+          "仓库根目录存在 AGENTS.md 作为规则真源",
+          "已有 Issue 分析结论，或可先按 analyze-issue 补齐分析",
+          "后端验证需可运行 ./scripts/ci_gate.sh 或 python -m py_compile 与 pytest",
+          "Web 验证需可执行 npm ci、npm run lint、npm run build"
+        ],
+        "limits": [
+          "不擅自 stash、reset 或切换用户当前分支",
+          "切换/新建分支、git commit、git push、创建 PR、回复或关闭 Issue 前须用户确认",
+          "无法执行的检查必须明确说明原因与缺口",
+          "保持默认行为向后兼容，避免破坏 fallback / fail-open"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "shell",
+          "writes_files"
+        ],
+        "tags": [
+          "代码审查",
+          "测试",
+          "文档",
+          "自动化"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "基于 Issue 分析结论实施最小化修复，按 AGENTS.md 验证矩阵执行验证并输出行为变化、影响面与验证证据。"
+          },
+          {
+            "field": "does",
+            "quote": "若对话上下文或 `.reviews/issues/issue-<number>.md` 已有分析结论则复用；否则先按 `analyze-issue` 补齐最小根因与影响面分析。"
+          },
+          {
+            "field": "does",
+            "quote": "优先复用现有模块、配置入口、脚本和测试，不新增平行实现。"
+          },
+          {
+            "field": "does",
+            "quote": "检查同语义涉及的所有入口（CLI / API / Bot / Web / Desktop / Docs / Tests），不打局部补丁。"
+          },
+          {
+            "field": "does",
+            "quote": "若涉及用户可见能力、配置项、CLI/API、通知或报告变化，按 `AGENTS.md` §1 同步 `.env.example` 与相关 `docs/*.md`。"
+          },
+          {
+            "field": "does",
+            "quote": "后端：优先 `./scripts/ci_gate.sh`（Windows 可在 Git Bash/WSL 运行），最低要求 `python -m py_compile` + 最近确定性 pytest。"
+          },
+          {
+            "field": "does",
+            "quote": "Web：`cd apps/dsa-web && npm ci && npm run lint && npm run build`。"
+          },
+          {
+            "field": "outputs",
+            "quote": "改了什么（含修改的既有文件 `path:line`）"
+          },
+          {
+            "field": "outputs",
+            "quote": "行为变化（改前 vs 改后）"
+          },
+          {
+            "field": "outputs",
+            "quote": "影响面（配置/环境变量、API/CLI、UI/Web/Desktop、报告/通知、不可逆变更）"
+          },
+          {
+            "field": "outputs",
+            "quote": "验证情况与未验证项"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "规则真源：仓库根目录 [`AGENTS.md`](../../../AGENTS.md)（硬规则见 §1，验证矩阵见 §5，基线同步见 §7）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "Desktop：先构建 Web，再构建 `apps/dsa-desktop`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "治理资产：`python scripts/check_ai_assets.py`。"
+          },
+          {
+            "field": "limits",
+            "quote": "按 `AGENTS.md` §7 同步远端基线；不擅自 `stash`、`reset` 或切换用户当前分支，需要建分支时先确认。"
+          },
+          {
+            "field": "limits",
+            "quote": "切换/新建分支、`git commit`、`git push`、创建 PR、在 Issue 下回复或关闭 Issue 前必须先征得用户确认。"
+          },
+          {
+            "field": "limits",
+            "quote": "无法执行的检查必须明确说明原因与缺口。"
+          },
+          {
+            "field": "limits",
+            "quote": "保持默认行为向后兼容，避免破坏 fallback / fail-open。"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
     },
     {
       "skill_path": "docs/examples/grok_bot/SKILL.md",
-      "blob_sha": "741468fe7fbbff6ba0b3f1da4c5e41ca111e82e4",
-      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/ab69720f3334d17ac5e6d1265be2e75fbe6d944c/docs/examples/grok_bot/SKILL.md",
-      "fetched_at": "2026-11-13T11:43:07.027Z",
-      "generated_at": "2026-11-13T11:43:07.027Z",
+      "blob_sha": "b8df0e100a43a9d2d33677534d9b9f5460674daf",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/docs/examples/grok_bot/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
       "model": "deepseek-flash",
       "status": "ok",
       "last_error": null,
@@ -212,50 +948,52 @@
         "name": "daily-stock-analysis",
         "description": "调用 daily_stock_analysis API 做股票分析。当用户说「分析茅台」「analyze AAPL」「帮我看看 600519」或要大盘复盘时使用。优先用股票代码。"
       },
-      "excerpt": "---\nname: daily-stock-analysis\ndescription: 调用 daily_stock_analysis API 做股票分析。当用户说「分析茅台」「analyze AAPL」「帮我看看 600519」或要大盘复盘时使用。优先用股票代码。\n---\n\n# daily_stock_analysis\n\n本 Skill 供 Grok Bot（2026-08-11 AI teammate）使用。通过 HTTP 调用已部署的 DSA，不要把 Bot 配成 LiteLLM provider。\n\n需要环境变量 `DSA_BASE_URL`（DSA API 根地址，无尾斜杠）。\n\n## 何时使用\n\n- 分析单只或多只股票\n- 查询某股最新 DecisionSignal（早报 / 盯盘 Routine）\n- 大盘复盘\n\n## 工作流程\n\n1. 提取股票代码：A股 6 位（`600519`）、港股 `hk00700`、美股 `AAPL`、台股 `.TW` / `.TWO`。只有中文名时先提示用户给代码，或使用常见映射（茅台 → `600519`）。\n2. 需要完整分析时 POST `{DSA_BASE_URL}/api/v1/analysis/analyze`。**Routine 或预计超过 Bot HTTP 超时的分析，从一开始用异步**，不要先同步再改发异步：同步超时后服务端 `_handle_sync_analysis` 仍会继续跑且不进 `TaskQueue`，再发 `async_mode: true` 会绕过队列去重，重复计费和推送。\n\n```json\n{\n  \"stock_code\": \"<code>\",\n  \"report_type\": \"detailed\",\n  \"force_refresh\": true,\n  \"async_mode\": true\n}\n```\n\n返回 202 + `task_id` 后轮询 `GET {DSA_BASE_URL}/api/v1/analysis/status/{task_id}`，直到 `status: completed`。完成报告在 `result.report`，不要读响应根上的 `report`。\n\n仅当 Bot HTTP 超时 ≥300 秒、且用户在等单次同步结果时，才用 `async_mode: false`。同步超时后不要改发异步重跑；先查询该股是否已有进行中任务（409 / status），或读最新 DecisionSignal。\n\n3. 只需最新建议、不要重跑分析时：`GET {DSA_BASE_URL}/api/v1/decision-signals/latest/{stock_code}`。\n4. 大盘复盘：`POST {DSA_BASE_URL}/api/v1/analysis/market-review` 固定返回 202 + `task_id`，不是复盘正文。轮询同一条 status 接口，完成后读顶层 `market_review_report` 或 `market_review_payload`（不在 `result.report`）。\n5. 健康检查失败先 `GET {DSA_BASE_URL}/api/health`。\n\n## 如何呈现结果\n\n- 同步分析：`report.summary.operation_advice`、`trend_prediction`、`analysis_summary`\n- 异步分析：`result.report.summary.operation_advice`、`result.report.summary.trend_prediction`、`result.report.summary.analysis_summary`\n- 结构化动作：`action` / `action_label`（`buy|add|hold|reduce|sell|watch|avoid|alert`）；异步时在 `result.report.summary`\n- 计划：同步 `report.strategy.ideal_buy` / `stop_loss` / `take_profit`；异步 `result.report.strategy.*`\n- 大盘复盘：`market_review_report`（文本）或 `market_review_payload`（结构化）\n- 缺字段时回退 `operation_advice`；旧三态统计仍看 `decision_type`\n- DecisionSignal 只展示建议，不下单、不调仓\n\n## 错误\n\n| 状态 | 处理 |\n| --- | --- |\n| 连接失败 | 检查 DSA 是否在跑、`DSA_BASE_URL` 是否正确 |\n| 400 | 检查 `stock_code` |\n| 409 | 该股正在分析，查已有 `existing_task_id` 的 status；不要另开一条分析 |\n| 500 | 看 DSA 日志；确认 `LITELLM_MODEL` 与对应 Key（含可选 `XAI_API_KEY`） |\n\n若 `ADMIN_AUTH_ENABLED=true`，当前 API 只认 Cookie，不认 Bearer。不要把 `XAI_API_KEY` 当作 DSA API 密钥。\n",
+      "excerpt": "---\nname: daily-stock-analysis\ndescription: 调用 daily_stock_analysis API 做股票分析。当用户说「分析茅台」「analyze AAPL」「帮我看看 600519」或要大盘复盘时使用。优先用股票代码。\n---\n\n# daily_stock_analysis\n\n本 Skill 供 Grok Bot（2026-08-11 AI teammate）使用。通过 HTTP 调用已部署的 DSA，不要把 Bot 配成 LiteLLM provider。\n\n需要环境变量 `DSA_BASE_URL`（DSA API 根地址，无尾斜杠）。\n\n## 何时使用\n\n- 分析单只或多只股票\n- 查询某股最新 DecisionSignal（早报 / 盯盘 Routine）\n- 大盘复盘\n\n## 工作流程\n\n1. 提取股票代码：A股 6 位（`600519`）、港股 `hk00700`、美股 `AAPL`、台股 `.TW` / `.TWO`。只有中文名时先提示用户给代码，或使用常见映射（茅台 → `600519`）。\n2. 需要完整分析时 POST `{DSA_BASE_URL}/api/v1/analysis/analyze`。**Routine 或预计超过 Bot HTTP 超时的分析，从一开始用异步**，不要先同步再改发异步：同步超时后服务端 `_handle_sync_analysis` 仍会继续跑且不进 `TaskQueue`，再发 `async_mode: true` 会绕过队列去重，重复计费和推送。\n\n```json\n{\n  \"stock_code\": \"<code>\",\n  \"report_type\": \"detailed\",\n  \"force_refresh\": true,\n  \"async_mode\": true\n}\n```\n\n返回 202 + `task_id` 后轮询 `GET {DSA_BASE_URL}/api/v1/analysis/status/{task_id}`，直到 `status: completed`。完成报告在 `result.report`，不要读响应根上的 `report`。\n\n仅当 Bot HTTP 超时 ≥300 秒、且用户在等单次同步结果时，才用 `async_mode: false`。同步超时后不要改发异步重跑；先查询该股是否已有进行中任务（409 / status），或读最新 DecisionSignal。\n\n3. 只需最新建议、不要重跑分析时：`GET {DSA_BASE_URL}/api/v1/decision-signals/latest/{stock_code}`。\n4. 大盘复盘：`POST {DSA_BASE_URL}/api/v1/analysis/market-review`，对话内查看须显式传 `\"send_notification\": false`（默认 `true`；不读个股的 `notify`）。固定返回 202 + `task_id`，不是复盘正文。轮询同一条 status 接口，完成后读顶层 `market_review_report` 或 `market_review_payload`（不在 `result.report`）。\n5. 健康检查失败先 `GET {DSA_BASE_URL}/api/health`。\n\n## 如何呈现结果\n\n- 同步分析：`report.summary.operation_advice`、`trend_prediction`、`analysis_summary`\n- 异步分析：`result.report.summary.operation_advice`、`result.report.summary.trend_prediction`、`result.report.summary.analysis_summary`\n- 结构化动作：`action` / `action_label`（`buy|add|hold|reduce|sell|watch|avoid|alert`）；异步时在 `result.report.summary`\n- 计划：同步 `report.strategy.ideal_buy` / `stop_loss` / `take_profit`；异步 `result.report.strategy.*`\n- 大盘复盘：`market_review_report`（文本）或 `market_review_payload`（结构化）\n- 缺字段时回退 `operation_advice`；旧三态统计仍看 `decision_type`\n- DecisionSignal 只展示建议，不下单、不调仓\n\n## 错误\n\n| 状态 | 处理 |\n| --- | --- |\n| 连接失败 | 检查 DSA 是否在跑、`DSA_BASE_URL` 是否正确 |\n| 400 | 检查 `stock_code` |\n| 409 | 该股正在分析，查已有 `existing_task_id` 的 status；不要另开一条分析 |\n| 500 | 看 DSA 日志；确认 `LITELLM_MODEL` 与对应 Key（含可选 `XAI_API_KEY`） |\n\n若 `ADMIN_AUTH_ENABLED=true`，当前 API 只认 Cookie，不认 Bearer。不要把 `XAI_API_KEY` 当作 DSA API 密钥。\n",
       "card": {
-        "title_zh": "股票分析API调用",
-        "purpose_zh": "通过HTTP调用已部署的DSA服务，对单只或多只股票做分析、查询最新DecisionSignal、做大盘复盘，并按约定字段呈现建议与计划。",
+        "title_zh": "每日股票分析调用",
+        "purpose_zh": "通过 HTTP 调用已部署的 daily_stock_analysis（DSA）API，对单只或多只股票做分析、查询最新 DecisionSignal、做大盘复盘，并按约定字段呈现建议与计划。",
         "does": [
-          "提取A股、港股、美股、台股股票代码，中文名可提示用户给代码或使用常见映射",
-          "POST分析接口发起完整分析，长任务用异步模式并轮询状态直到完成",
-          "GET查询某股最新DecisionSignal，只展示建议",
-          "POST大盘复盘接口并轮询，读取复盘文本或结构化结果",
-          "按同步或异步路径读取操作建议、趋势预测、买卖计划等字段",
-          "健康检查失败时先请求健康检查接口排查"
+          "提取并规范化股票代码（A股6位、港股hk前缀、美股代码、台股.TW/.TWO），仅有中文名时提示用户给代码或用常见映射",
+          "POST /api/v1/analysis/analyze 发起完整分析，长任务从一开始用 async_mode: true，返回202后轮询 status 接口直到 completed",
+          "仅需最新建议时 GET /api/v1/decision-signals/latest/{stock_code}，只展示建议不下单不调仓",
+          "POST /api/v1/analysis/market-review 做大盘复盘，对话内查看须传 send_notification: false，轮询后读 market_review_report 或 market_review_payload",
+          "按同步/异步不同路径读取 operation_advice、trend_prediction、analysis_summary、action、strategy 等字段呈现结果",
+          "健康检查失败时先 GET /api/health，并按 400/409/500 等状态码给出对应处理"
         ],
         "inputs": [
-          "环境变量DSA_BASE_URL（DSA API根地址，无尾斜杠）",
-          "股票代码（A股6位、港股hk前缀、美股代码、台股.TW/.TWO）",
-          "分析参数：report_type、force_refresh、async_mode",
-          "task_id（用于轮询状态）"
+          "环境变量 DSA_BASE_URL（DSA API 根地址，无尾斜杠）",
+          "股票代码：A股6位、港股 hk00700、美股 AAPL、台股 .TW/.TWO",
+          "分析请求参数：stock_code、report_type、force_refresh、async_mode",
+          "大盘复盘请求参数：send_notification",
+          "异步任务的 task_id（用于轮询状态）"
         ],
         "outputs": [
-          "异步分析返回202与task_id",
-          "分析报告：result.report或report中的summary与strategy字段",
-          "操作动作action/action_label及买卖止损止盈计划",
-          "DecisionSignal最新建议",
-          "大盘复盘：market_review_report文本或market_review_payload结构化数据"
+          "异步分析返回 202 + task_id，完成后报告在 result.report",
+          "同步分析报告字段 report.summary.operation_advice、trend_prediction、analysis_summary",
+          "结构化动作 action / action_label（buy|add|hold|reduce|sell|watch|avoid|alert）",
+          "计划字段 report.strategy.ideal_buy / stop_loss / take_profit",
+          "大盘复盘结果 market_review_report（文本）或 market_review_payload（结构化）",
+          "DecisionSignal 最新建议"
         ],
         "scenarios": [
-          "用户要求分析某只或多只股票",
-          "查询某股最新决策建议而不重跑分析",
-          "大盘复盘",
-          "早报或盯盘Routine中发起异步分析"
+          "用户说「分析茅台」「analyze AAPL」「帮我看看 600519」时分析单只或多只股票",
+          "查询某股最新 DecisionSignal（早报 / 盯盘 Routine）",
+          "做大盘复盘",
+          "Routine 或预计超过 Bot HTTP 超时的长分析任务（用异步模式）"
         ],
         "prerequisites": [
-          "已部署DSA服务并可访问",
-          "配置环境变量DSA_BASE_URL",
-          "若ADMIN_AUTH_ENABLED=true需使用Cookie认证",
-          "服务端需配置LITELLM_MODEL及对应Key（含可选XAI_API_KEY）"
+          "已部署可访问的 DSA 服务",
+          "配置环境变量 DSA_BASE_URL",
+          "若 ADMIN_AUTH_ENABLED=true，当前 API 只认 Cookie，不认 Bearer",
+          "500 时需确认 LITELLM_MODEL 与对应 Key（含可选 XAI_API_KEY）"
         ],
         "limits": [
-          "本Skill供Grok Bot使用，不要把Bot配成LiteLLM provider",
-          "长任务应一开始就用异步，避免同步超时后重发异步导致重复计费与推送",
-          "同步模式仅在Bot HTTP超时≥300秒且用户等待单次结果时使用",
-          "遇到409应查询已有任务状态，不要另开分析",
-          "DecisionSignal只展示建议，不下单、不调仓",
-          "不要把XAI_API_KEY当作DSA API密钥"
+          "本 Skill 供 Grok Bot 使用，不要把 Bot 配成 LiteLLM provider",
+          "同步超时后不要改发异步重跑，否则绕过队列去重导致重复计费和推送",
+          "仅当 Bot HTTP 超时 ≥300 秒且用户在等单次同步结果时才用 async_mode: false",
+          "大盘复盘固定返回 202 + task_id，不是复盘正文",
+          "DecisionSignal 只展示建议，不下单、不调仓",
+          "不要把 XAI_API_KEY 当作 DSA API 密钥"
         ],
         "hosts": [
           "未说明"
@@ -272,23 +1010,7 @@
         "evidence": [
           {
             "field": "purpose_zh",
-            "quote": "通过 HTTP 调用已部署的 DSA，不要把 Bot 配成 LiteLLM provider。"
-          },
-          {
-            "field": "purpose_zh",
-            "quote": "分析单只或多只股票"
-          },
-          {
-            "field": "purpose_zh",
-            "quote": "查询某股最新 DecisionSignal（早报 / 盯盘 Routine）"
-          },
-          {
-            "field": "purpose_zh",
-            "quote": "大盘复盘"
-          },
-          {
-            "field": "does",
-            "quote": "提取股票代码：A股 6 位（`600519`）、港股 `hk00700`、美股 `AAPL`、台股 `.TW` / `.TWO`。只有中文名时先提示用户给代码，或使用常见映射（茅台 → `600519`）。"
+            "quote": "调用 daily_stock_analysis API 做股票分析。当用户说「分析茅台」「analyze AAPL」「帮我看看 600519」或要大盘复盘时使用。"
           },
           {
             "field": "does",
@@ -304,11 +1026,11 @@
           },
           {
             "field": "does",
-            "quote": "大盘复盘：`POST {DSA_BASE_URL}/api/v1/analysis/market-review` 固定返回 202 + `task_id`，不是复盘正文。"
+            "quote": "大盘复盘：`POST {DSA_BASE_URL}/api/v1/analysis/market-review`，对话内查看须显式传 `\"send_notification\": false`"
           },
           {
             "field": "does",
-            "quote": "健康检查失败先 `GET {DSA_BASE_URL}/api/health`。"
+            "quote": "提取股票代码：A股 6 位（`600519`）、港股 `hk00700`、美股 `AAPL`、台股 `.TW` / `.TWO`。"
           },
           {
             "field": "prerequisites",
@@ -319,20 +1041,12 @@
             "quote": "若 `ADMIN_AUTH_ENABLED=true`，当前 API 只认 Cookie，不认 Bearer。"
           },
           {
-            "field": "prerequisites",
-            "quote": "看 DSA 日志；确认 `LITELLM_MODEL` 与对应 Key（含可选 `XAI_API_KEY`）"
+            "field": "limits",
+            "quote": "不要把 Bot 配成 LiteLLM provider。"
           },
           {
             "field": "limits",
-            "quote": "**Routine 或预计超过 Bot HTTP 超时的分析，从一开始用异步**，不要先同步再改发异步"
-          },
-          {
-            "field": "limits",
-            "quote": "仅当 Bot HTTP 超时 ≥300 秒、且用户在等单次同步结果时，才用 `async_mode: false`。"
-          },
-          {
-            "field": "limits",
-            "quote": "该股正在分析，查已有 `existing_task_id` 的 status；不要另开一条分析"
+            "quote": "同步超时后不要改发异步重跑；先查询该股是否已有进行中任务（409 / status），或读最新 DecisionSignal。"
           },
           {
             "field": "limits",
@@ -341,9 +1055,156 @@
           {
             "field": "limits",
             "quote": "不要把 `XAI_API_KEY` 当作 DSA API 密钥。"
+          },
+          {
+            "field": "hosts",
+            "quote": "本 Skill 供 Grok Bot（2026-08-11 AI teammate）使用。"
           }
         ]
-      }
+      },
+      "input_format": "excerpt_only_v1"
+    },
+    {
+      "skill_path": "plugin/skills/stock_analyzer/SKILL.md",
+      "blob_sha": "df37eda559527ac66755a49fb5c8f79b8383c01b",
+      "source_url": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/4728c73a933a0b69a553289f70f443cae57e4d03/plugin/skills/stock_analyzer/SKILL.md",
+      "fetched_at": "2026-11-28T00:18:21.002Z",
+      "generated_at": "2026-11-28T00:18:21.002Z",
+      "model": "deepseek-flash",
+      "status": "ok",
+      "last_error": null,
+      "card_prompt_version": "skill_card_v1",
+      "frontmatter": {
+        "name": "stock_analyzer",
+        "description": "分析股票和市场。当用户想要分析单个或多个股票，或进行市场复盘时调用。"
+      },
+      "excerpt": "---\nname: \"stock_analyzer\"\ndescription: \"分析股票和市场。当用户想要分析单个或多个股票，或进行市场复盘时调用。\"\n---\n\n# 股票分析器\n\n本技能驱动**已部署并配置好的** [daily_stock_analysis (DSA)](https://github.com/ZhuLinsen/daily_stock_analysis) 检出或正在运行的 DSA 服务；它本身**不包含** `src/` 运行时。市场安装的插件缓存通常只有 `./plugin`，在普通项目目录直接 `import src...` 会得到 `ModuleNotFoundError`。\n\n## 运行前提（调用前必做）\n\n1. **确认存在可用的 DSA 环境**（完整仓库检出且已按指南配置 `.env`，或用户已有可调用的 DSA API 服务）。\n2. **定位检出路径**（任选其一）：\n   - 询问用户本机 DSA 仓库路径；\n   - 读取环境变量 `DSA_REPO_ROOT`（指向仓库根目录，含 `src/` 与 `.env`）；\n   - 若当前工作目录已是 DSA 根目录，可直接使用。\n3. **再执行示例代码**：必须先 `os.chdir(repo_root)`（或等价地在该根目录启动进程），再将该根目录加入 `sys.path` / `PYTHONPATH`。仅改 `sys.path` 不够：默认相对 `DATABASE_PATH` 与大盘复盘锁按**进程工作目录**解析，不 `chdir` 会导致插件与 Web 锁住不同文件、写入不同 SQLite。\n4. **对话内大盘复盘（不推送）**：需要检出已支持 `perform_market_review(..., send_notification=...)`（本仓库较新提交；例如 v3.35.0 尚不支持）。若不支持，先更新检出，**不要**回退为无该参数的调用（旧签名默认会推送）。\n5. **若无法定位或未部署**：停止分析，向用户说明本技能只驱动现有 DSA 安装，并指向部署指南：\n   - 中文：[完整配置与部署指南](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md)\n   - English: [Full Guide](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide_EN.md)\n6. **可选 HTTP**：若用户已启动 API（如 `python main.py --serve-only`），也可按 [OpenClaw / HTTP 对接](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/openclaw-skill-integration.md) 与 [Grok Bot 对接](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/grok-bot-integration.md) 通过 `DSA_BASE_URL` 调用 REST。对话内**不要推送**时：个股 `POST /api/v1/analysis/analyze` 须显式传 `\"notify\": false`（该接口默认 `notify: true`）；大盘复盘 `POST /api/v1/analysis/market-review` 须显式传 `\"send_notification\": false`（该接口读 `send_notification`，默认 `true`，**忽略** `notify`）。省略对应字段会向已配置渠道推送。\n\n本技能基于 `src/services/analyzer_service.py` 的逻辑，提供分析股票和整体市场的功能。\n\n## 输出结构 (`AnalysisResult`)\n\n分析函数返回一个 `AnalysisResult` 对象（或其列表），该对象具有丰富的结构。以下是其关键组件的简要概述，并附有真实的输出示例：\n\n`dashboard` 属性包含核心分析，分为四个主要部分：\n1.  **`core_conclusion`**: 一句话总结、信号类型和仓位建议。\n2.  **`data_perspective`**: 技术数据，包括趋势状态、价格位置、量能分析和筹码结构。\n3.  **`intelligence`**: 定性信息，如新闻、风险警报和积极催化剂。\n4.  **`battle_plan`**: 可操作的策略，包括狙击点（买/卖目标）、仓位策略和风险控制清单。\n\n## 配置 (`Config`)\n\n所有分析函数都可以接受一个可选的 `config` 对象。该对象包含应用程序的所有配置，例如 API 密钥、通知设置和分析参数。\n\n如果未提供 `config` 对象，函数将自动使用从 `.env` 文件加载的全局单例实例。\n\n**参考:** [`Config`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/src/config.py)\n\n## 函数\n\n### 1. 分析单只股票\n\n**描述:** 分析单只股票并返回分析结果。\n\n**何时使用:** 当用户要求分析特定股票时。\n\n**输入:**\n- `stock_code` (str): 要分析的股票代码。\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `full_report` (bool, 可选): 是否生成完整报告。默认为 `False`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`（对话场景不要传，避免外部推送）。\n\n**输出:** `Optional[AnalysisResult]`\n一个包含分析结果的 `AnalysisResult` 对象，如果分析失败则为 `None`。\n\n**示例:**\n\n```python\nimport os\nimport sys\n\n# 先定位已配置的 DSA 检出，并切换到该根目录（见「运行前提」）\nrepo_root = os.path.abspath(os.environ.get(\"DSA_REPO_ROOT\") or os.getcwd())\nos.chdir(repo_root)\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom src.services.analyzer_service import analyze_stock\n\n# 分析单只股票（默认不向外部通知渠道推送）\nresult = analyze_stock(\"600989\")\nif result:\n    print(f\"股票: {result.name} ({result.code})\")\n    print(f\"情绪得分: {result.sentiment_score}\")\n    print(f\"操作建议: {result.operation_advice}\")\n```\n\n**参考:** [`analyze_stock`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/src/services/analyzer_service.py)\n\n### 2. 分析多只股票\n\n**描述:** 分析一个股票列表并返回分析结果列表。\n\n**何时使用:** 当用户想要一次分析多只股票时。\n\n**输入:**\n- `stock_codes` (List[str]): 要分析的股票代码列表。\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `full_report` (bool, 可选): 是否为每只股票生成完整报告。默认为 `False`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`（对话场景不要传，避免外部推送）。\n\n**输出:** `List[AnalysisResult]`\n一个 `AnalysisResult` 对象列表。\n\n**示例:**\n\n```python\nimport os\nimport sys\n\nrepo_root = os.path.abspath(os.environ.get(\"DSA_REPO_ROOT\") or os.getcwd())\nos.chdir(repo_root)\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom src.services.analyzer_service import analyze_stocks\n\nresults = analyze_stocks([\"600989\", \"000001\"])\nfor result in results:\n    print(f\"股票: {result.name}, 操作建议: {result.operation_advice}\")\n```\n\n**参考:** [`analyze_stocks`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/src/services/analyzer_service.py)\n\n### 3. 执行大盘复盘\n\n**描述:** 对整体市场进行复盘并返回一份报告。服务层会获取与 Web/API/CLI/Bot 相同的同机防重锁；若复盘已在执行，函数返回 `None`，此时应告知用户「大盘复盘正在执行中，请稍后再试」，不要重试抢跑。\n\n**何时使用:** 当用户要求市场概览、摘要或复盘时。\n\n**输入:**\n- `config` (Config, 可选): 配置对象。默认为 `None`。\n- `notifier` (NotificationService, 可选): 通知服务对象。默认为 `None`。\n- `send_notification` (bool, 可选): 是否向已配置的外部通知渠道推送。**对话场景默认传 `False`**；仅当用户明确要求「推送 / 发送到通知渠道」时才设为 `True`。旧检出若无此参数，须先升级，不可静默回退为会推送的旧调用。\n\n**输出:** `Optional[str]`\n一个包含市场复盘报告的字符串；失败或同机已有复盘在跑时为 `None`。\n\n**示例:**\n\n```python\nimport inspect\nimport os\nimport sys\n\nrepo_root = os.path.abspath(os.environ.get(\"DSA_REPO_ROOT\") or os.getcwd())\nos.chdir(repo_root)\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom src.services.analyzer_service import perform_market_review\n\n# 对话内查看复盘：禁用外部推送；需要推送时再传 send_notification=True\nreview_kwargs = {}\nif \"send_notification\" in inspect.signature(perform_market_review).parameters:\n    review_kwargs[\"send_notification\"] = False\nelse:\n    raise RuntimeError(\n        \"当前 DSA 检出的 perform_market_review 不支持 send_notification；\"\n        \"请先更新检出后再在对话中复盘，避免意外推送到外部渠道。\"\n    )\n\nreport = perform_market_review(**review_kwargs)\nif report:\n    print(report)\nelse:\n    print(\"大盘复盘未返回结果（可能正在执行中或分析失败），请稍后再试或查看 DSA 日志。\")\n```\n\n**参考:** [`perform_market_review`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/src/services/analyzer_service.py)\n\n## 模型与外部 Bot\n\n- 若把 **xAI Grok** 当作 DSA 分析模型：配置 `XAI_API_KEY` + `LITELLM_MODEL=xai/<官方模型ID>`（LiteLLM 直连，非托管渠道），并用 `python scripts/check_env.py --llm` 验证。示例见 [`docs/LLM_CONFIG_GUIDE.md`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/LLM_CONFIG_GUIDE.md)。\n- 2026-08-11 上线的 **[Grok Bot](https://x.ai/bot)** 是另一条路径：它是带 Skills / Routines / MCP / computer use 的 AI teammate，应通过 HTTP 调用本仓库的 `analyze_stock` / REST API，而不是把 Bot 本身配成 LiteLLM provider。对接说明见 [`docs/grok-bot-integration.md`](https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/grok-bot-integration.md)。\n",
+      "card": {
+        "title_zh": "股票分析器",
+        "purpose_zh": "驱动已部署并配置好的 daily_stock_analysis 环境，分析单只或多只股票，并执行大盘复盘；本身不含运行时。",
+        "does": [
+          "分析单只股票并返回 AnalysisResult",
+          "批量分析多只股票并返回结果列表",
+          "执行大盘复盘并返回报告字符串",
+          "按需选择是否向外部通知渠道推送",
+          "通过已启动的 REST API 调用分析接口"
+        ],
+        "inputs": [
+          "股票代码 stock_code 或代码列表 stock_codes",
+          "可选 Config 配置对象（默认读 .env）",
+          "full_report 是否生成完整报告",
+          "send_notification 是否推送复盘",
+          "DSA_REPO_ROOT 或 DSA_BASE_URL 环境变量"
+        ],
+        "outputs": [
+          "AnalysisResult 对象（含 dashboard 四部分）",
+          "AnalysisResult 列表",
+          "大盘复盘报告字符串或 None"
+        ],
+        "scenarios": [
+          "用户要求分析某只股票",
+          "用户要求一次分析多只股票",
+          "用户要求市场概览或大盘复盘",
+          "用户已有 DSA API 服务需通过 HTTP 调用"
+        ],
+        "prerequisites": [
+          "存在完整且已配置 .env 的 DSA 仓库检出或可调用的 DSA API 服务",
+          "定位仓库根目录并先 os.chdir 再加入 sys.path",
+          "大盘复盘需检出支持 send_notification 参数",
+          "无法定位或未部署时应停止分析并指向部署指南"
+        ],
+        "limits": [
+          "本身不包含 src 运行时，仅驱动现有 DSA 安装",
+          "插件缓存通常只有 ./plugin，直接 import src 会报 ModuleNotFoundError",
+          "旧版 perform_market_review 不支持 send_notification，须先升级",
+          "大盘复盘同机已有任务在跑时返回 None，不应重试抢跑",
+          "HTTP 接口省略 notify 或 send_notification 字段会触发推送"
+        ],
+        "hosts": [
+          "未说明"
+        ],
+        "risk_flags": [
+          "network",
+          "writes_files",
+          "needs_secret"
+        ],
+        "tags": [
+          "数据分析",
+          "调研",
+          "其他"
+        ],
+        "evidence": [
+          {
+            "field": "purpose_zh",
+            "quote": "本技能驱动**已部署并配置好的** [daily_stock_analysis (DSA)](https://github.com/ZhuLinsen/daily_stock_analysis) 检出或正在运行的 DSA 服务；它本身**不包含** `src/` 运行时。"
+          },
+          {
+            "field": "does",
+            "quote": "**描述:** 分析单只股票并返回分析结果。"
+          },
+          {
+            "field": "does",
+            "quote": "**描述:** 分析一个股票列表并返回分析结果列表。"
+          },
+          {
+            "field": "does",
+            "quote": "**描述:** 对整体市场进行复盘并返回一份报告。"
+          },
+          {
+            "field": "does",
+            "quote": "**对话场景默认传 `False`**；仅当用户明确要求「推送 / 发送到通知渠道」时才设为 `True`。"
+          },
+          {
+            "field": "does",
+            "quote": "**可选 HTTP**：若用户已启动 API（如 `python main.py --serve-only`），也可按 [OpenClaw / HTTP 对接]"
+          },
+          {
+            "field": "inputs",
+            "quote": "- `stock_code` (str): 要分析的股票代码。"
+          },
+          {
+            "field": "inputs",
+            "quote": "- `stock_codes` (List[str]): 要分析的股票代码列表。"
+          },
+          {
+            "field": "inputs",
+            "quote": "- `send_notification` (bool, 可选): 是否向已配置的外部通知渠道推送。"
+          },
+          {
+            "field": "inputs",
+            "quote": "读取环境变量 `DSA_REPO_ROOT`（指向仓库根目录，含 `src/` 与 `.env`）；"
+          },
+          {
+            "field": "outputs",
+            "quote": "**输出:** `Optional[AnalysisResult]`"
+          },
+          {
+            "field": "outputs",
+            "quote": "**输出:** `List[AnalysisResult]`"
+          },
+          {
+            "field": "outputs",
+            "quote": "**输出:** `Optional[str]`"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**确认存在可用的 DSA 环境**（完整仓库检出且已按指南配置 `.env`，或用户已有可调用的 DSA API 服务）。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "**再执行示例代码**：必须先 `os.chdir(repo_root)`（或等价地在该根目录启动进程），再将该根目录加入 `sys.path` / `PYTHONPATH`。"
+          },
+          {
+            "field": "prerequisites",
+            "quote": "需要检出已支持 `perform_market_review(..., send_notification=...)`（本仓库较新提交；例如 v3.35.0 尚不支持）。"
+          },
+          {
+            "field": "limits",
+            "quote": "市场安装的插件缓存通常只有 `./plugin`，在普通项目目录直接 `import src...` 会得到 `ModuleNotFoundError`。"
+          }
+        ]
+      },
+      "input_format": "excerpt_only_v1"
     }
   ]
 }
